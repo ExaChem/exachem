@@ -1,0 +1,28 @@
+{
+  "geometry": {
+    "coordinates": [
+      "C    0.0000  0.6665  0.0000",
+      "C    0.0000 -0.6665  0.0000",
+      "H    0.0000  1.2060  0.9344414107",
+      "H    0.0000  1.2060 -0.9344414107",
+      "H    0.0000 -1.2060  0.9344414107",
+      "H    0.0000 -1.2060 -0.9344414107"
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "sto-3g",
+    "gaussian_type": "spherical"
+  },
+  "SCF": {
+    "tilesize": 30,
+    "restart": false
+  },
+  "TASK": {
+    "scf": true,
+    "mp2": false,
+    "cd_2e": false,
+    "ccsd": false,
+    "ccsd_t": false
+  }  
+}

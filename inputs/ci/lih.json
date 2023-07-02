@@ -1,0 +1,45 @@
+{
+  "geometry": {
+    "coordinates": [
+      "Li   0.000000000000000   0.000000000000000   0.000000000000000",
+      "H    0.000000000000000   0.000000000000000   1.624000000000000"
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "cc-pvdz",
+    "gaussian_type": "spherical"
+  },
+  "common": {
+    "maxiter": 50
+  },
+  "SCF": {
+    "tol_int": 1e-12,
+    "tol_lindep": 1e-06,
+    "conve": 1e-12,
+    "convd": 1e-11,
+    "diis_hist": 10,
+    "tilesize": 30
+  },
+  "CD": {
+    "diagtol": 1e-08
+  },
+  "CC": {
+    "threshold": 1e-06,
+    "debug": false,
+    "DLPNO": {
+      "df_basisset": "cc-pv5z-ri",
+      "localize": false,
+      "TCutPairs": 0.0,
+      "TCutPNO": 0.0,
+      "TCutEN": 0.97,
+      "TCutPre": -1.0,
+      "TCutDOij": 1.0e-5,
+      "TCutDOPre": 3.0e-2
+    }
+  },
+  "TASK": {
+    "dlpno_ccsd": [true,""],
+    "dlpno_ccsd_t": [false,""]
+  }  
+}

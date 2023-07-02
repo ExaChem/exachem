@@ -1,0 +1,61 @@
+#!/bin/bash
+
+#run_ci <$CHEM_SRC> <exe-path> [num-procs]
+
+CHEM_SRC=$1
+EXE_PATH=$2
+NPROC=${3:-3}
+MPICMD=${4:-mpirun}
+UPCXX=$5
+MPIEXEC="$MPICMD -n ${NPROC}"
+
+CHEM_INP="$CHEM_SRC/inputs/ci"
+
+if [ $# -le 1 ]
+  then
+    { echo "Insufficient arguments supplied. Run as: ./run_ci <\$CHEM_SRC> <path-to-exe> [nproc] [is_upcxx]"; exit 1; }
+fi
+
+echo "----------------------------------------------------------"
+echo "input-path = $CHEM_INP"
+echo "exe-path   = $EXE_PATH"
+echo "nprocs     = $NPROC"
+echo "mpi-cmd    = $MPIEXEC"
+echo "----------------------------------------------------------"
+
+echo ""
+
+[ ! -f "$EXE_PATH" ] && { echo "ERROR: Folder $EXE_PATH does not exist." ; exit 1; }
+[ ! -d "$CHEM_INP" ] && { echo "ERROR: Folder $CHEM_INP does not exist." ; exit 1; }
+
+echo ""
+
+#CCSD
+$MPIEXEC $EXE_PATH $CHEM_INP/butanol2.json
+#CCSD_T
+$MPIEXEC $EXE_PATH  $CHEM_INP/butanol2_pt.json
+#$MPIEXEC $EXE_PATH $CHEM_INP/uracil.json
+
+#DLPNO_CCSD
+$MPIEXEC $EXE_PATH  $CHEM_INP/lih.json
+
+#cp *_files/restricted/json/*.json .
+#python3 $CHEM_SRC/ci/scripts/compare_results.py $CHEM_SRC/ci/reference_output/ . 1
+[ -d butanol2.sto-3g_files ] && { rm butanol2.sto-3g_files/restricted/*; }
+
+#EOMCCSD
+$MPIEXEC $EXE_PATH $CHEM_INP/h2o_eom.json
+#CCSD_Lambda
+$MPIEXEC $EXE_PATH $CHEM_INP/butanol2_lambda.json
+#GF_CCSD
+$MPIEXEC $EXE_PATH $CHEM_INP/co.json
+#DUCC-T_CCSD
+$MPIEXEC $EXE_PATH $CHEM_INP/h2o_ducc.json
+
+#RT-EOM-CCSD
+$MPIEXEC $EXE_PATH $CHEM_INP/ozone.json
+$MPIEXEC $EXE_PATH $CHEM_INP/ozone_td.json
+
+cp *_files/restricted/json/*.json .
+cp *_files/unrestricted/json/*.json .
+python3 $CHEM_SRC/ci/scripts/compare_results.py $CHEM_SRC/ci/reference_output/ . $UPCXX

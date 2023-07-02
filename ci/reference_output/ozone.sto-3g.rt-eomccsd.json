@@ -1,0 +1,134 @@
+{
+  "output": {
+    "SCF": {
+      "iter": {
+        "1": {
+          "energy": -220.78811388960042,
+          "e_diff": -220.78811388960042,
+          "rmsd": 0.0729722511582987,
+          "performance": {
+            "total_time": 0.007235967
+          }
+        },
+        "2": {
+          "energy": -220.8595499571952,
+          "e_diff": -0.07143606759478871,
+          "rmsd": 0.012730823503686593,
+          "performance": {
+            "total_time": 0.008215421
+          }
+        }
+      },
+      "final_energy": -220.8595499571952,
+      "n_iterations": 2
+    },
+    "CD": {
+      "n_cholesky_vectors": 76
+    },
+    "RT-EOMCCSD": {
+      "dcdt": {
+        "timestep": {
+          "1": {
+            "time_au": 0.0,
+            "energy": {
+              "real": 0.0,
+              "imag": 0.0
+            }
+          },
+          "2": {
+            "time_au": 0.025,
+            "energy": {
+              "real": -0.0012809221678384464,
+              "imag": 0.030783990545690913
+            }
+          },
+          "3": {
+            "time_au": 0.05,
+            "energy": {
+              "real": -0.0049577216544876915,
+              "imag": 0.06094940278468131
+            }
+          },
+          "4": {
+            "time_au": 0.07500000000000001,
+            "energy": {
+              "real": -0.010653276471262673,
+              "imag": 0.090092322696226
+            }
+          },
+          "5": {
+            "time_au": 0.1,
+            "energy": {
+              "real": -0.017870224525000877,
+              "imag": 0.11805249293532638
+            }
+          },
+          "6": {
+            "time_au": 0.125,
+            "energy": {
+              "real": -0.026195135123655525,
+              "imag": 0.14496161337856608
+            }
+          },
+          "7": {
+            "time_au": 0.15000000000000002,
+            "energy": {
+              "real": -0.03542433836864559,
+              "imag": 0.17112265000140964
+            }
+          },
+          "8": {
+            "time_au": 0.17500000000000002,
+            "energy": {
+              "real": -0.045599092253272036,
+              "imag": 0.19685130550860871
+            }
+          },
+          "9": {
+            "time_au": 0.2,
+            "energy": {
+              "real": -0.05695128587530439,
+              "imag": 0.22235141282240703
+            }
+          },
+          "10": {
+            "time_au": 0.225,
+            "energy": {
+              "real": -0.06980534783504741,
+              "imag": 0.24761358240947312
+            }
+          }
+        }
+      }
+    }
+  },
+  "input": {
+    "molecule": {
+      "name": "ozone",
+      "basisset": "sto-3g",
+      "gaussian_type": "spherical",
+      "geometry_units": "bohr"
+    },
+    "SCF": {
+      "tol_int": 1e-16,
+      "tol_lindep": 1e-06,
+      "conve": 0.1,
+      "convd": 0.1,
+      "diis_hist": 10,
+      "AO_tilesize": 30,
+      "force_tilesize": "false",
+      "scf_type": "unrestricted",
+      "multiplicity": 2
+    },
+    "CCSD": {
+      "threshold": 1e-06
+    },
+    "RT-EOMCC": {
+      "pcore": 1,
+      "ntimesteps": 10,
+      "rt_microiter": 10,
+      "rt_step_size": 0.025,
+      "rt_multiplier": 0.5
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "geometry": {
+    "coordinates": [
+      "O   0.0000000000        0.0000000000        0.0000000000",
+      "O   0.0000000000       -2.0473224350       -1.2595211660",
+      "O   0.0000000000        2.0473224350       -1.2595211660"
+    ],
+    "units": "bohr"
+  },
+  "basis": {
+    "basisset": "sto-3g",
+    "gaussian_type": "spherical"
+  },
+  "SCF": {
+    "tilesize": 30,
+    "restart": false,
+    "conve": 1e-9,
+    "convd": 1e-8,    
+    "charge": 0,    
+    "multiplicity": 1,
+    "scf_type": "restricted"    
+  },
+  "CD": {
+    "diagtol": 1e-06,
+    "max_cvecs": 8
+  },
+  "CC": {
+    "threshold": 1e-6,
+    "tilesize": 30,
+    "debug": false,
+    "RT-EOMCC": {
+      "pcore": 1,
+      "ntimesteps": 10,
+      "rt_microiter": 10,
+      "rt_step_size": 0.025,
+      "rt_multiplier": 0.5
+    }    
+  },
+  "TASK": {
+    "ccsd": true
+  }
+}

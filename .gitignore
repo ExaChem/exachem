@@ -1,0 +1,22 @@
+#These are configuration files for CLion
+.idea/
+
+#These are configuration files for VS code
+.vscode/
+
+#This is the documentation build directory
+
+#These are common build directory names
+Debug/
+Release/
+cmake-build-debug/
+cmake-build-release/
+build/
+debug*
+build*
+
+#editor backups
+*~
+
+#Misc
+clang-format

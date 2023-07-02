@@ -1,0 +1,30 @@
+{
+  "geometry": {
+    "coordinates": [
+      "Si   2.5852    2.9076    1.2074",
+      "Si   1.4832    0.8326    1.2646",
+      "H    2.2035    3.6704   -0.0133",
+      "H    4.0621    2.7168    1.1971",
+      "H    2.2275    3.7245    2.4001",
+      "H    1.8648    0.0697    2.4853",
+      "H    1.8408    0.0158    0.0718",
+      "H    0.0062    1.0234    1.2750"
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "cc-pvdz",
+    "gaussian_type": "spherical"
+  },
+  "SCF": {
+    "tilesize": 30,
+    "restart": false
+  },
+  "TASK": {
+    "scf": true,
+    "mp2": false,
+    "cd_2e": false,
+    "ccsd": false,
+    "ccsd_t": false
+  }  
+}

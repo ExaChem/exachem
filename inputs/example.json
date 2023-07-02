@@ -1,0 +1,236 @@
+{
+
+    "geometry" : {
+        "coordinates" : [
+         "H 0.000000000000000 1.579252144093028  2.174611055780858",
+         "O 0.000000000000000 0.000000000000000  0.000000000000000",
+         "H 0.000000000000000 1.579252144093028 -2.174611055780858"
+        ],
+        "units": "bohr"
+    },
+
+    "comments": {
+      "comment1": "comments are also allowed in all following sections"
+    },
+
+    "common": {
+      "maxiter": 50,
+      "debug": false,
+      "output_file_prefix": "",
+      "comments": {
+        "comment1": "example comment"
+      }  
+    },
+
+    "basis": {
+        "basisset": "cc-pvdz",
+        "df_basisset": "",
+        "gaussian_type": "spherical",
+        "atom_basis": {
+          "H": "cc-pvtz",
+          "O": "aug-cc-pvtz"
+        }
+    },
+    
+    "SCF": {
+        "charge": 0,
+        "multiplicity": 1,
+        "lshift": 0,
+        "tol_int": 1e-12,
+        "tol_lindep": 1e-5,
+        "conve": 1e-8,
+        "convd": 1e-7,
+        "diis_hist": 10,
+        "force_tilesize": false,
+        "tilesize": 30,
+        "df_tilesize": 50,
+        "alpha": 1.0,
+        "nnodes": 1,
+        "writem": 10,
+        "riscf": "JK",
+        "restart": false,
+        "noscf": false,
+        "ediis": false,
+        "ediis_off": 1e-5,
+        "sad": false,
+        "scf_type": "restricted",
+        "xc_type": ["pbe0"],
+        "debug": false,
+        "restart_size": 2000,
+        "scalapack_nb": 1,
+        "scalapack_np_row": 0,
+        "scalapack_np_col": 0,
+        "n_lindep": 0,
+        "moldenfile": "",
+        "PRINT": {
+          "mos_txt" : false,
+          "mulliken": false,
+          "mo_vectors" : [false,0.15]
+        },
+        "qed_omegas" : [],
+        "qed_volumes": [],
+        "qed_lambdas": [],
+        "qed_polvecs": []
+    },
+    
+    "CD": {
+        "debug": false,
+        "diagtol": 1e-5,
+        "write_vcount": 5000
+    },
+
+    "GW": {
+        "ngl"      : 200,
+        "noqpa"    : 1,
+        "noqpb"    : 1,
+        "nvqpa"    : 0,
+        "nvqpb"    : 0,
+        "ieta"     : 0.01,
+        "evgw"     : false,
+        "evgw0"    : false,
+        "core"     : false,
+        "maxnewton": 15,
+        "maxev"    : 0,
+        "minres"   : false,
+        "method"   : "sdgw",
+        "cdbasis"  : "def2-tzvp-ri",
+        "debug"    : false    
+    },
+    
+    "CC": {
+        "threshold": 1e-6,
+        "force_tilesize": false,
+        "tilesize": 50,
+        "itilesize": 1000,
+        "lshift": 0,
+        "ndiis": 5,
+        "ccsd_maxiter": 50,
+        "nactive": 0,
+        "freeze_core": 0,
+        "freeze_virtual": 0,
+
+        "readt": false,
+        "writet": false,
+        "writev": false,
+        "writet_iter": 5,
+
+        "debug": false,
+        "profile_ccsd": false,
+        "balance_tiles": true,
+
+        "ext_data_path": "",
+
+        "PRINT": {
+          "tamplitudes": [false,0.05],
+          "ccsd_diagnostics" : false
+        },
+
+        "CCSD(T)": {
+          "cache_size": 8,
+          "skip_ccsd": false,
+          "ccsdt_tilesize": 32
+        },
+
+        "EOMCCSD": {
+          "eom_nroots": 0,
+          "eom_type": "right",
+          "eom_threshold": 1e-6,
+          "eom_microiter": 50
+        },
+    
+        "RT-EOMCC": {
+          "pcore"  : 0,
+          "ntimesteps": 10,
+          "rt_microiter": 20,
+          "rt_threshold": 1e-6,
+          "rt_step_size": 0.025,
+          "rt_multiplier": 0.5,
+
+          "secent_x": 0.1,
+          "h_red": 0.5,
+          "h_inc": 1.2,
+          "h_max": 0.25
+        },
+
+       "GFCCSD": {
+        "gf_ip": true, 
+        "gf_ea": false, 
+        "gf_os": false, 
+        "gf_cs": true,
+        "gf_profile": false, 
+        "gf_itriples": false,
+        "gf_restart": false,
+        "gf_p_oi_range": 1,
+        "gf_eta": -0.01,
+        "gf_threshold": 1e-2,
+        "gf_maxiter": 500,
+        "gf_nprocs_poi": 0,
+        "gf_ndiis": 10,
+        "gf_ngmres": 10,
+        "gf_damping_factor": 1.0,
+        "gf_omega_min_ip": -0.4,   
+        "gf_omega_max_ip": -0.2,  
+        "gf_omega_min_ip_e": -2.0,  
+        "gf_omega_max_ip_e": 0,     
+        "gf_omega_min_ea": 0.0,   
+        "gf_omega_max_ea": 0.1,   
+        "gf_omega_min_ea_e": 0.0,  
+        "gf_omega_max_ea_e": 2.0,     
+        "gf_omega_delta": 0.01, 
+        "gf_omega_delta_e": 0.002, 
+        "gf_orbitals": [],
+        "gf_extrapolate_level": 0,
+        "gf_analyze_level": 2,
+        "gf_analyze_num_omega": 0,
+        "gf_analyze_omega": [0.3, 0.2]
+       }
+    },
+
+    "FCI": {
+      "nalpha": 3,
+      "nbeta": 3,
+      "nactive": 12,
+      "ninactive": 6,
+      "job": "CI",
+      "expansion": "CAS",
+      "MCSCF": {
+        "max_macro_iter"     : 100,
+        "max_orbital_step"   : 0.5,
+        "orb_grad_tol_mcscf" : 5e-6,
+        "enable_diis"        : true,
+        "diis_start_iter"    : 3,
+        "diis_nkeep"         : 10,
+        "ci_res_tol"         : 1e-8,
+        "ci_max_subspace"    : 20,
+        "ci_matel_tol"       : 1e-18
+      },
+      "FCIDUMP": {},
+      "PRINT": {
+        "davidson": false,
+        "ci": false,
+        "mcscf": true,
+        "diis": false,
+        "asci_search": false,
+        "state_char": [false,1e-2]
+      }      
+    },
+    
+    "TASK": {
+      "scf": true,
+      "mp2": false,
+      "gw": false,
+      "fci": false,
+      "fcidump": false,
+      "cd_2e": false,
+      "ducc": false,
+      "ccsd": false,
+      "ccsd_t": false,
+      "ccsd_sf": false,
+      "ccsd_lambda": false,
+      "eom_ccsd": false,
+      "rteom_ccsd": false,
+      "gfccsd": false
+    }
+    
+}
+    

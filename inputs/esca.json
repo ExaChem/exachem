@@ -1,0 +1,98 @@
+{
+  "geometry": {
+    "coordinates": [
+      "C   -0.19837009  -1.38188811  -0.00000023",
+      "C    0.61319371  -0.05700384   0.00000138",
+      "C    0.38603214   2.29927988  -0.00000060",
+      "C   -0.73294118   3.31303697  -0.00000103",
+      "O   -0.21956733   0.97358112   0.00000048",
+      "O    1.81006627  -0.02626818   0.00000175",
+      "F   -0.98444735  -1.45688287  -1.08780991",
+      "F   -0.98444703  -1.45688594   1.08780970",
+      "F    0.61968851  -2.43141735  -0.00000118",
+      "H    1.01972859   2.37938385  -0.88240047",
+      "H    1.01972880   2.37938718   0.88239899",
+      "H   -1.35941491   3.20555328  -0.88472869",
+      "H   -0.30925671   4.31775053  -0.00000010",
+      "H   -1.35941136   3.20554730   0.88472769"
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "Sapporo-TZP",
+    "df_basisset": "",
+    "gaussian_type": "cartesian",
+    "atom_basis": {
+      "C": "Sapporo-TZP",
+      "O": "Sapporo-TZP",
+      "H": "aug-cc-pvdz",
+      "F": "Sapporo-TZP"
+    }
+  },
+
+  "common": {
+    "maxiter": 50
+  },
+  "SCF": {
+    "tol_int": 1e-16,
+    "tol_lindep": 1e-06,
+    "conve": 1e-9,
+    "convd": 1e-8,
+    "diis_hist": 12,
+    "charge": 0,
+    "multiplicity": 1,
+    "scf_type": "restricted",  
+    "writem": 10,
+    "tilesize": 30
+  },
+  "CD": {
+    "diagtol": 1e-6,
+    "max_cvecs": 8
+  },
+  "CC": {
+    "threshold": 1e-6,
+    "ndiis": 5,
+    "writet": true,
+    "ccsd_maxiter": 50,
+    "CCSD(T)": {
+      "ccsdt_tilesize": 28
+    },
+    "debug": false,
+    "EOMCCSD": {
+      "eom_nroots": 4
+    },
+    "readt": false,
+    "GFCCSD": {
+      "restart": false,
+      "gf_p_oi_range": 1,
+      "gf_eta": 0.01,
+      "gf_threshold": 0.01,
+      "gf_maxiter": 100,
+      "gf_itriples": false,
+      "gf_preconditioning": true,
+      "gf_ngmres": 20,
+      "gf_damping_factor": 1.0,
+      "gf_omega_min_ip": -10.4,
+      "gf_omega_max_ip": -10.2,
+      "gf_omega_min_ip_e": -11.5,
+      "gf_omega_max_ip_e": -10.5,
+      "gf_omega_min_ea": 0.0,
+      "gf_omega_max_ea": 0.1,
+      "gf_omega_min_ea_e": 0.0,
+      "gf_omega_max_ea_e": 2.0,
+      "gf_omega_delta": 0.01,
+      "gf_omega_delta_e": 0.002,
+      "gf_ip": true,
+      "gf_ea": false,
+      "gf_os": false,
+      "gf_cs": false
+    }
+  },
+  "TASK": {
+    "scf": true,
+    "mp2": false,
+    "cd_2e": false,
+    "ccsd": false,
+    "ccsd_t": false
+  }  
+}

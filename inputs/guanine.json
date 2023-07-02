@@ -1,0 +1,76 @@
+{
+  "geometry": {
+    "coordinates": [
+      "H -1.890291 -2.502956 0.000476",
+      "N -1.741175 -1.501025 0.000503",
+      "C -2.716559 -0.525847 0.001180",
+      "H -3.767973 -0.778924 0.001382",
+      "N -2.219512 0.689871 0.001579",
+      "C -0.846125 0.502377 0.000767",
+      "C 0.223703 1.451882 0.001000",
+      "O 0.180265 2.688157 0.000745",
+      "N 1.478846 0.794007 -0.001043",
+      "H 2.282286 1.415156 -0.023943",
+      "C 1.680379 -0.567818 -0.000199",
+      "N 2.970093 -1.005826 -0.062192",
+      "H 3.716618 -0.402787 0.260562",
+      "H 3.104229 -1.989492 0.137539",
+      "N 0.690663 -1.441517 0.004479",
+      "C -0.531298 -0.859732 -0.000291"
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "6-31++g*",
+    "gaussian_type": "spherical"
+  },
+  "common": {
+    "maxiter": 50
+  },
+  "SCF": {
+    "tol_int": 1e-20,
+    "tol_lindep": 1e-05,
+    "conve": 1e-10,
+    "convd": 1e-09,
+    "diis_hist": 10
+  },
+  "CD": {
+    "diagtol": 1e-06
+  },
+  "CC": {
+    "threshold": 1e-06,
+    "writet": true,
+    "writet_iter": 1,
+    "tilesize": 50,
+    "GFCCSD": {
+      "gf_ip": true,
+      "gf_ea": false,
+      "gf_os": false,
+      "gf_cs": false,
+      "gf_ngmres": 10,
+      "gf_maxiter": 100,
+      "gf_itriples": false,
+      "gf_damping_factor": 1.0,
+      "gf_p_oi_range": 1,
+      "gf_eta": 0.01,
+      "gf_threshold": 0.01,
+      "gf_omega_min_ip": -0.4,
+      "gf_omega_max_ip": -0.2,
+      "gf_omega_min_ip_e": -2.0,
+      "gf_omega_max_ip_e": 0.0,
+      "gf_omega_delta": 0.01,
+      "gf_omega_delta_e": 0.01,
+      "gf_omega_min_ea": 0.0,
+      "gf_omega_max_ea": 0.1,
+      "gf_omega_min_ea_e": 0.0,
+      "gf_omega_max_ea_e": 0.1
+    }
+  },
+  "TASK": {
+    "scf": true,
+    "mp2": false,
+    "cd_2e": false,
+    "ccsd": false,
+    "ccsd_t": false
+  }  
+}

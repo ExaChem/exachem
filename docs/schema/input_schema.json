@@ -1,0 +1,639 @@
+{
+  "type": "object",
+  "properties": {
+    "geometry": {
+      "type": "object",
+      "properties": {
+        "coordinates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "units": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "coordinates",
+        "units"
+      ]
+    },
+    "basis": {
+      "type": "object",
+      "properties": {
+        "basisset": {
+          "type": "string"
+        },
+        "gaussian_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "basisset"
+      ]
+    },
+    "comments": {
+      "type": "object",
+      "properties": {
+        "comment1": {
+          "type": "string"
+        }
+      }
+    },
+    "common": {
+      "type": "object",
+      "properties": {
+        "maxiter": {
+          "type": "number"
+        },
+        "debug": {
+          "type": "boolean"
+        },
+        "output_file_prefix": {
+          "type": "string"
+        },
+        "comments": {
+          "type": "object",
+          "properties": {
+            "comment1": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "SCF": {
+      "type": "object",
+      "properties": {
+        "charge": {
+          "type": "number"
+        },
+        "multiplicity": {
+          "type": "number"
+        },
+        "lshift": {
+          "type": "number"
+        },
+        "tol_int": {
+          "type": "number"
+        },
+        "tol_lindep": {
+          "type": "number"
+        },
+        "conve": {
+          "type": "number"
+        },
+        "convd": {
+          "type": "number"
+        },
+        "diis_hist": {
+          "type": "number"
+        },
+        "force_tilesize": {
+          "type": "boolean"
+        },
+        "tilesize": {
+          "type": "number"
+        },
+        "df_tilesize": {
+          "type": "number"
+        },
+        "alpha": {
+          "type": "number"
+        },
+        "nnodes": {
+          "type": "number"
+        },
+        "writem": {
+          "type": "number"
+        },
+        "riscf": {
+          "type": "string"
+        },
+        "restart": {
+          "type": "boolean"
+        },
+        "noscf": {
+          "type": "boolean"
+        },
+        "ediis": {
+          "type": "boolean"
+        },
+        "ediis_off": {
+          "type": "number"
+        },
+        "sad": {
+          "type": "boolean"
+        },
+        "scf_type": {
+          "type": "string"
+        },
+        "xc_type": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "debug": {
+          "type": "boolean"
+        },
+        "restart_size": {
+          "type": "number"
+        },
+        "scalapack_nb": {
+          "type": "number"
+        },
+        "scalapack_np_row": {
+          "type": "number"
+        },
+        "scalapack_np_col": {
+          "type": "number"
+        },
+        "n_lindep": {
+          "type": "number"
+        },
+        "moldenfile": {
+          "type": "string"
+        },
+        "PRINT": {
+          "type": "object",
+          "properties": {
+            "mos_txt": {
+              "type": "boolean"
+            },
+            "mulliken": {
+              "type": "boolean"
+            },
+            "mo_vectors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "qed_omegas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "qed_volumes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "qed_lambdas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "qed_polvecs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "CD": {
+      "type": "object",
+      "properties": {
+        "debug": {
+          "type": "boolean"
+        },
+        "diagtol": {
+          "type": "number"
+        },
+        "write_vcount": {
+          "type": "number"
+        }
+      }
+    },
+    "GW": {
+      "type": "object",
+      "properties": {
+        "ngl": {
+          "type": "number"
+        },
+        "noqpa": {
+          "type": "number"
+        },
+        "noqpb": {
+          "type": "number"
+        },
+        "nvqpa": {
+          "type": "number"
+        },
+        "nvqpb": {
+          "type": "number"
+        },
+        "ieta": {
+          "type": "number"
+        },
+        "evgw": {
+          "type": "boolean"
+        },
+        "evgw0": {
+          "type": "boolean"
+        },
+        "core": {
+          "type": "boolean"
+        },
+        "maxnewton": {
+          "type": "number"
+        },
+        "maxev": {
+          "type": "number"
+        },
+        "minres": {
+          "type": "boolean"
+        },
+        "method": {
+          "type": "string"
+        },
+        "cdbasis": {
+          "type": "string"
+        },
+        "debug": {
+          "type": "boolean"
+        }
+      }
+    },
+    "CC": {
+      "type": "object",
+      "properties": {
+        "threshold": {
+          "type": "number"
+        },
+        "force_tilesize": {
+          "type": "boolean"
+        },
+        "tilesize": {
+          "type": "number"
+        },
+        "itilesize": {
+          "type": "number"
+        },
+        "lshift": {
+          "type": "number"
+        },
+        "ndiis": {
+          "type": "number"
+        },
+        "ccsd_maxiter": {
+          "type": "number"
+        },
+        "nactive": {
+          "type": "number"
+        },
+        "freeze_core": {
+          "type": "number"
+        },
+        "freeze_virtual": {
+          "type": "number"
+        },
+        "readt": {
+          "type": "boolean"
+        },
+        "writet": {
+          "type": "boolean"
+        },
+        "writev": {
+          "type": "boolean"
+        },
+        "writet_iter": {
+          "type": "number"
+        },
+        "debug": {
+          "type": "boolean"
+        },
+        "profile_ccsd": {
+          "type": "boolean"
+        },
+        "balance_tiles": {
+          "type": "boolean"
+        },
+        "ext_data_path": {
+          "type": "string"
+        },
+        "PRINT": {
+          "type": "object",
+          "properties": {
+            "tamplitudes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "ccsd_diagnostics": {
+              "type": "string"
+            }
+          }
+        },
+        "CCSD(T)": {
+          "type": "object",
+          "properties": {
+            "cache_size": {
+              "type": "number"
+            },
+            "skip_ccsd": {
+              "type": "boolean"
+            },
+            "ccsdt_tilesize": {
+              "type": "number"
+            }
+          }
+        },
+        "EOMCCSD": {
+          "type": "object",
+          "properties": {
+            "eom_nroots": {
+              "type": "number"
+            },
+            "eom_type": {
+              "type": "string"
+            },
+            "eom_threshold": {
+              "type": "number"
+            },
+            "eom_microiter": {
+              "type": "number"
+            }
+          }
+        },
+        "RT-EOMCC": {
+          "type": "object",
+          "properties": {
+            "pcore": {
+              "type": "number"
+            },
+            "ntimesteps": {
+              "type": "number"
+            },
+            "rt_microiter": {
+              "type": "number"
+            },
+            "rt_threshold": {
+              "type": "number"
+            },
+            "rt_step_size": {
+              "type": "number"
+            },
+            "rt_multiplier": {
+              "type": "number"
+            },
+            "secent_x": {
+              "type": "number"
+            },
+            "h_red": {
+              "type": "number"
+            },
+            "h_inc": {
+              "type": "number"
+            },
+            "h_max": {
+              "type": "number"
+            }
+          }
+        },
+        "GFCCSD": {
+          "type": "object",
+          "properties": {
+            "gf_ip": {
+              "type": "boolean"
+            },
+            "gf_ea": {
+              "type": "boolean"
+            },
+            "gf_os": {
+              "type": "boolean"
+            },
+            "gf_cs": {
+              "type": "boolean"
+            },
+            "gf_profile": {
+              "type": "boolean"
+            },
+            "gf_itriples": {
+              "type": "boolean"
+            },
+            "gf_restart": {
+              "type": "boolean"
+            },
+            "gf_p_oi_range": {
+              "type": "number"
+            },
+            "gf_eta": {
+              "type": "number"
+            },
+            "gf_threshold": {
+              "type": "number"
+            },
+            "gf_maxiter": {
+              "type": "number"
+            },
+            "gf_nprocs_poi": {
+              "type": "number"
+            },
+            "gf_ndiis": {
+              "type": "number"
+            },
+            "gf_ngmres": {
+              "type": "number"
+            },
+            "gf_damping_factor": {
+              "type": "number"
+            },
+            "gf_omega_min_ip": {
+              "type": "number"
+            },
+            "gf_omega_max_ip": {
+              "type": "number"
+            },
+            "gf_omega_min_ip_e": {
+              "type": "number"
+            },
+            "gf_omega_max_ip_e": {
+              "type": "number"
+            },
+            "gf_omega_min_ea": {
+              "type": "number"
+            },
+            "gf_omega_max_ea": {
+              "type": "number"
+            },
+            "gf_omega_min_ea_e": {
+              "type": "number"
+            },
+            "gf_omega_max_ea_e": {
+              "type": "number"
+            },
+            "gf_omega_delta": {
+              "type": "number"
+            },
+            "gf_omega_delta_e": {
+              "type": "number"
+            },
+            "gf_orbitals": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "gf_extrapolate_level": {
+              "type": "number"
+            },
+            "gf_analyze_level": {
+              "type": "number"
+            },
+            "gf_analyze_num_omega": {
+              "type": "number"
+            },
+            "gf_analyze_omega": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "FCI": {
+      "type": "object",
+      "properties": {
+        "nalpha": {
+          "type": "number"
+        },
+        "nbeta": {
+          "type": "number"
+        },
+        "nactive": {
+          "type": "number"
+        },
+        "ninactive": {
+          "type": "number"
+        },
+        "job": {
+          "type": "string"
+        },
+        "expansion": {
+          "type": "string"
+        },
+        "MCSCF": {
+          "type": "object",
+          "properties": {
+            "max_macro_iter": {
+              "type": "number"
+            },
+            "max_orbital_step": {
+              "type": "number"
+            },
+            "orb_grad_tol_mcscf": {
+              "type": "number"
+            },
+            "enable_diis": {
+              "type": "boolean"
+            },
+            "diis_start_iter": {
+              "type": "number"
+            },
+            "diis_nkeep": {
+              "type": "number"
+            },
+            "ci_res_tol": {
+              "type": "number"
+            },
+            "ci_max_subspace": {
+              "type": "number"
+            },
+            "ci_matel_tol": {
+              "type": "number"
+            }
+          }
+        },
+        "FCIDUMP": {
+          "type": "object",
+          "properties": {}
+        },
+        "PRINT": {
+          "type": "object",
+          "properties": {
+            "davidson": {
+              "type": "boolean"
+            },
+            "ci": {
+              "type": "boolean"
+            },
+            "mcscf": {
+              "type": "boolean"
+            },
+            "diis": {
+              "type": "boolean"
+            },
+            "asci_search": {
+              "type": "boolean"
+            },
+            "state_char": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "TASK": {
+      "type": "object",
+      "properties": {
+        "scf": {
+          "type": "boolean"
+        },
+        "mp2": {
+          "type": "boolean"
+        },
+        "gw": {
+          "type": "boolean"
+        },
+        "fci": {
+          "type": "boolean"
+        },
+        "fcidump": {
+          "type": "boolean"
+        },
+        "cd_2e": {
+          "type": "boolean"
+        },
+        "ducc": {
+          "type": "boolean"
+        },
+        "ccsd": {
+          "type": "boolean"
+        },
+        "ccsd_t": {
+          "type": "boolean"
+        },
+        "ccsd_sf": {
+          "type": "boolean"
+        },
+        "ccsd_lambda": {
+          "type": "boolean"
+        },
+        "eom_ccsd": {
+          "type": "boolean"
+        },
+        "rteom_ccsd": {
+          "type": "boolean"
+        },
+        "gfccsd": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

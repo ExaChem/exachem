@@ -1,0 +1,101 @@
+{
+  "geometry": {
+    "coordinates": [
+      "Fe  0.00000000000  0.00000000000  0.00000000000",
+      "C   1.21857429598  0.00000000000 -1.65542000000",
+      "C   0.37656016637  1.15893302478 -1.65542000000",
+      "C  -0.98584731436  0.71626000000 -1.65542000000",
+      "C  -0.98584731436 -0.71626000000 -1.65542000000",
+      "C   0.37656016637 -1.15893302478 -1.65542000000",
+      "H   2.29561645597  0.00000000000 -1.63530387430",
+      "H   0.70938449746  2.18326098937 -1.63530387430",
+      "H  -1.85719272545  1.34932949774 -1.63530387430",
+      "H  -1.85719272545 -1.34932949774 -1.63530387430",
+      "H   0.70938449746 -2.18326098937 -1.63530387430",
+      "C   1.21857429598  0.00000000000  1.65542000000",
+      "C   0.37656016637  1.15893302478  1.65542000000",
+      "C  -0.98584731436  0.71626000000  1.65542000000",
+      "C  -0.98584731436 -0.71626000000  1.65542000000",
+      "C   0.37656016637 -1.15893302478  1.65542000000",
+      "H   2.29561645597  0.00000000000  1.63530387430",
+      "H   0.70938449746  2.18326098937  1.63530387430",
+      "H  -1.85719272545  1.34932949774  1.63530387430",
+      "H  -1.85719272545 -1.34932949774  1.63530387430",
+      "H   0.70938449746 -2.18326098937  1.63530387430"
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "6-31g*",
+    "gaussian_type": "cartesian"
+  },
+  "common": {
+    "maxiter": 100
+  },
+  "SCF": {
+    "tol_int": 1e-16,
+    "tol_lindep": 1e-06,
+    "conve": 1e-4,
+    "convd": 1e-3,
+    "diis_hist": 10,
+    "charge": 0,
+    "multiplicity": 1,
+    "scf_type": "restricted",    
+    "sad": false,
+    "writem": 10,
+    "restart": false,
+    "tilesize": 30
+  },
+  "CD": {
+    "diagtol": 1e-12,
+    "max_cvecs": 40
+  },
+  "CC": {
+    "pcore"  : 48,
+    "ntimesteps": 5,
+    "rt_microiter": 2,
+    "rt_step_size": 0.025,
+    "rt_multiplier": 0.5,
+    "threshold": 1e-6,
+    "ndiis": 5,
+    "writet": false,
+    "ccsd_maxiter": 100,
+    "CCSD(T)": {
+      "ccsdt_tilesize": 28
+    },
+    "debug": false,
+    "EOMCCSD": {
+      "eom_nroots": 4
+    },
+    "GFCCSD": {
+      "gf_p_oi_range": 1,
+      "gf_eta": -0.01,
+      "gf_threshold": 0.01,
+      "gf_maxiter": 100,
+      "gf_itriples": false,
+      "gf_ngmres": 10,
+      "gf_damping_factor": 1.0,
+      "gf_omega_min_ip": -0.4,
+      "gf_omega_max_ip": -0.2,
+      "gf_omega_min_ip_e": -2.0,
+      "gf_omega_max_ip_e": 0.0,
+      "gf_omega_min_ea": 0.0,
+      "gf_omega_max_ea": 0.1,
+      "gf_omega_min_ea_e": 0.0,
+      "gf_omega_max_ea_e": 2.0,
+      "gf_omega_delta": 0.01,
+      "gf_omega_delta_e": 0.002,
+      "gf_ip": true,
+      "gf_ea": false,
+      "gf_os": false,
+      "gf_cs": true
+    }
+  },
+  "TASK": {
+    "scf": true,
+    "mp2": false,
+    "cd_2e": false,
+    "ccsd": false,
+    "ccsd_t": false
+  }
+}

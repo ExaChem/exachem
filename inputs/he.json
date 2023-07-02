@@ -1,0 +1,27 @@
+{
+  "geometry": {
+    "coordinates": [
+      "he 0 0 0"
+    ],
+    "units": "bohr"
+  },
+  "basis": {
+    "basisset": "cc-pvdz",
+    "gaussian_type": "spherical"
+  },
+  "SCF": {
+    "tol_int": 1e-12,
+    "tol_lindep": 1e-06,
+    "conve": 1e-10,
+    "convd": 1e-09,
+    "diis_hist": 10,
+    "tilesize": 30
+  },
+  "TASK": {
+    "scf": true,
+    "mp2": false,
+    "cd_2e": false,
+    "ccsd": false,
+    "ccsd_t": false
+  }  
+}

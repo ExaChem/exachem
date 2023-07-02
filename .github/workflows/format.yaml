@@ -1,0 +1,35 @@
+
+name: ExaChem_Linter
+
+on: 
+  push:
+    paths-ignore:
+      - docs
+  pull_request:
+    branches:
+      - main
+      - develop
+  repository_dispatch:
+    types: [backend_automation]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: DoozyX/clang-format-lint-action@v0.14
+      with:
+        source: 'exachem methods'
+        exclude: 'exachem/util'
+        extensions: 'hpp,cpp,h,c,cu,cuh,cc'
+        clangFormatVersion: 14
+        inplace: True
+    - uses: EndBug/add-and-commit@v4
+      with:
+        author_name: ExaChem developers
+        author_email: exachem23@gmail.com
+        message: 'Committing clang-format changes'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

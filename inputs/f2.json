@@ -1,0 +1,24 @@
+{
+  "geometry": {
+    "coordinates": [
+      "f 0 0   1.33408",
+      "f 0 0  -1.33408"
+    ],
+    "units": "bohr"
+  },
+  "basis": {
+    "basisset": "sto-3g",
+    "gaussian_type": "spherical"
+  },
+  "SCF": {
+    "tilesize": 30,
+    "restart": false
+  },
+  "TASK": {
+    "scf": true,
+    "mp2": false,
+    "cd_2e": false,
+    "ccsd": false,
+    "ccsd_t": false
+  }  
+}

@@ -1,0 +1,49 @@
+{
+    "geometry": {
+      "coordinates": [
+        "C           0.052842    -1.701332    .000000",
+        "H          -2.016793    -1.512231    .000000",
+        "H          -0.025494    -2.778299    .000000",
+        "H          -0.023568     1.988544    .000000",
+        "C          -1.232948     0.358893    .000000",
+        "O          -2.294123     0.950188    .000000",
+        "C           1.274970     0.391620    .000000",
+        "O           2.275873     1.086244    .000000",
+        "N           0.000000     0.978006    .000000",
+        "N          -1.137535    -1.023018    .000000",
+        "C           1.239239    -1.061325    .000000",
+        "H           2.169983    -1.601520    .000000"
+      ],
+      "units": "angstrom"
+    },
+    "basis": {
+      "basisset": "sapporo-dzp",
+      "gaussian_type": "spherical"
+    },
+    "SCF": {
+      "tol_int": 1e-16,
+      "tol_lindep": 1e-06,
+      "conve": 1e-8,
+      "convd": 1e-7,
+      "charge": 0,
+      "multiplicity": 1,
+      "scf_type": "restricted",
+      "restart": false
+    },
+    "CC": {
+      "threshold": 1e-6,
+      "ccsd_maxiter": 50,
+      "writet": true,
+      "CCSD(T)": {
+        "skip_ccsd": false,
+        "ccsdt_tilesize": 40
+      }
+    },
+    "TASK": {
+      "scf": false,
+      "cd_2e": false,
+      "ccsd": true,
+      "rteom_ccsd": false
+    }    
+  }
+  

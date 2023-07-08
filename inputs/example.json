@@ -122,7 +122,8 @@
 
         "PRINT": {
           "tamplitudes": [false,0.05],
-          "ccsd_diagnostics" : false
+          "ccsd_diagnostics" : false,
+          "rdm": [1,2]
         },
 
         "CCSD(T)": {
@@ -219,6 +220,7 @@
       "scf": true,
       "mp2": false,
       "gw": false,
+      "cc2": false,
       "fci": false,
       "fcidump": false,
       "cd_2e": false,

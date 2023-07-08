@@ -7,10 +7,8 @@
  * See LICENSE.txt for details
  */
 
-#pragma once
-
 // clang-format off
-#include "cc/cd_ccsd_os_ann.hpp"
+#include "cc/ccsd/cd_ccsd_os_ann.hpp"
 #include "cc/ccsd_t/ccsd_t_fused_driver.hpp"
 // clang-format on
 
@@ -78,7 +76,7 @@ void ccsd_t_driver(std::string filename, OptionsMap options_map) {
   ccsd_options.writet       = true;
   ccsd_options.computeTData = true;
 
-  debug          = ccsd_options.debug;
+  auto debug     = ccsd_options.debug;
   bool skip_ccsd = ccsd_options.skip_ccsd;
   if(rank == 0) ccsd_options.print();
 
@@ -114,6 +112,7 @@ void ccsd_t_driver(std::string filename, OptionsMap options_map) {
 
   std::vector<T> p_evl_sorted;
   double         residual = 0, corr_energy = 0;
+  Tensor<T>      dt1_full, dt2_full;
 
   if(!skip_ccsd) {
     // deallocates F_AO, C_AO
@@ -189,14 +188,14 @@ void ccsd_t_driver(std::string filename, OptionsMap options_map) {
                       << std::endl;
           std::tie(residual, corr_energy) = cd_ccsd_cs_driver<T>(
             sys_data, *sub_ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
-            p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
+            p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
         }
         ec.pg().barrier();
       }
       else {
         std::tie(residual, corr_energy) = cd_ccsd_cs_driver<T>(
           sys_data, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
-          p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
+          p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
       }
     }
     else {

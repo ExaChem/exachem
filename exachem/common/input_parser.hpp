@@ -90,6 +90,7 @@ public:
   bool                         scf{false};
   bool                         mp2{false};
   bool                         gw{false};
+  bool                         cc2{false};
   bool                         fci{false};
   bool                         fcidump{false};
   bool                         ducc{false};
@@ -455,6 +456,7 @@ public:
   double                  threshold;
   bool                    ccsd_diagnostics{false};
   std::pair<bool, double> tamplitudes{false, 0.05};
+  std::vector<int>        cc_rdm{};
 
   int nactive;
   int ccsd_maxiter;
@@ -889,6 +891,7 @@ parse_json(json& jinput) {
 
   json jcc_print = jcc["PRINT"];
   parse_option<bool> (ccsd_options.ccsd_diagnostics, jcc_print, "ccsd_diagnostics");
+  parse_option<std::vector<int>>(ccsd_options.cc_rdm, jcc_print, "rdm");
   parse_option<std::pair<bool, double>>(ccsd_options.tamplitudes, jcc_print, "tamplitudes");
 
   //RT-EOMCC
@@ -1025,9 +1028,9 @@ parse_json(json& jinput) {
   // TASK
   json                      jtask = jinput["TASK"];
   const std::vector<string> valid_tasks{
-    "scf",        "fci",          "fcidump",  "mp2",        "gw",      "cd_2e",
-    "dlpno_ccsd", "dlpno_ccsd_t", "ducc",     "ccsd",       "ccsd_sf", "ccsd_t",
-    "gfccsd",     "ccsd_lambda",  "eom_ccsd", "rteom_ccsd", "comments"};
+    "scf",    "fci",        "fcidump",      "mp2",      "gw",         "cd_2e",
+    "cc2",    "dlpno_ccsd", "dlpno_ccsd_t", "ducc",     "ccsd",       "ccsd_sf",
+    "ccsd_t", "gfccsd",     "ccsd_lambda",  "eom_ccsd", "rteom_ccsd", "comments"};
 
   for(auto& el: jtask.items()) {
     if(std::find(valid_tasks.begin(), valid_tasks.end(), el.key()) == valid_tasks.end())
@@ -1038,6 +1041,7 @@ parse_json(json& jinput) {
   parse_option<bool>(task_options.scf         , jtask, "scf");
   parse_option<bool>(task_options.mp2         , jtask, "mp2");
   parse_option<bool>(task_options.gw          , jtask, "gw");
+  parse_option<bool>(task_options.cc2          , jtask, "cc2");
   parse_option<bool>(task_options.fci         , jtask, "fci");  
   parse_option<bool>(task_options.fcidump     , jtask, "fcidump");  
   parse_option<bool>(task_options.cd_2e       , jtask, "cd_2e");

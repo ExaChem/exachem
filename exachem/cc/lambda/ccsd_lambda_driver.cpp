@@ -6,8 +6,6 @@
  * See LICENSE.txt for details
  */
 
-#pragma once
-
 #include "ccsd_lambda.hpp"
 
 #include <filesystem>
@@ -24,7 +22,7 @@ void ccsd_lambda_driver(std::string filename, OptionsMap options_map) {
         AO_tis, scf_conv] = hartree_fock_driver<T>(ec, filename, options_map);
 
   CCSDOptions& ccsd_options = sys_data.options_map.ccsd_options;
-  debug                     = ccsd_options.debug;
+  auto         debug        = ccsd_options.debug;
   if(rank == 0) ccsd_options.print();
 
   if(rank == 0)
@@ -115,14 +113,15 @@ void ccsd_lambda_driver(std::string filename, OptionsMap options_map) {
   //     computeTData = computeTData && !fs::exists(fullV2file);
   //&& !fs::exists(t1file) && !fs::exists(t2file);
 
+  Tensor<T> dt1_full, dt2_full;
   if(computeTData && is_rhf) setup_full_t1t2(ec, MO, dt1_full, dt2_full);
 
   double residual = 0, corr_energy = 0;
 
   if(is_rhf)
-    std::tie(residual, corr_energy) =
-      cd_ccsd_cs_driver<T>(sys_data, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s,
-                           d_t2s, p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
+    std::tie(residual, corr_energy) = cd_ccsd_cs_driver<T>(
+      sys_data, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s, p_evl_sorted,
+      cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
   else
     std::tie(residual, corr_energy) =
       cd_ccsd_os_driver<T>(sys_data, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s,
@@ -383,46 +382,9 @@ void ccsd_lambda_driver(std::string filename, OptionsMap options_map) {
     write_json_data(sys_data, "CCSD_Lambda");
   }
 
-  // 1-RDM
-  Tensor<T> gamma1{{mo1, mo2}, {1, 1}};
-  Tensor<T> i_1{{h2, h3}, {1, 1}};
-  Tensor<T> i_2{{h1, h2, h3, p1}, {2, 2}};
-
-  sch.allocate(gamma1, i_1, i_2).execute();
-
-  // D_a^i =  l_i^a
-  // D_i^a =  t_a^i + l_m^e*t_ae^im
-  //         -(l_m^e*t_e^i + 1/2*l_mn^ef*t_ef^in)=i1_m^i * t_a^m
-  //         +(-1/2 * l_mn^ef*t_e^i)=i2_mn^if * t_af^mn
-  // D_i^j = -l_j^e*t_e^i - 1/2*l_jm^ef*t_ef^im
-  // D_a^b =  l_m^a*t_b^m + 1/2*l_mn^ae*t_be^mn
-  // {a,b,e,f} -> {p1, p2, p3, p4}
-  // {i,j,m,n} -> {h1, h2, h3, h4}
-
-  // clang-format off
-  sch( gamma1(p1,h1)      =        d_y1(h1,p1)                              )
-     ( gamma1(h1,p1)      =        d_t1(p1,h1)                              )
-     ( gamma1(h1,p1)     +=        d_y1(h3,p3)        * d_t2(p1,p3,h1, h3)  )
-     (  i_1(h3,h1)        =    1 * d_y1(h3,p3)        * d_t1(p3,h1)         )
-     (  i_1(h3,h1)       +=  0.5 * d_y2(h3,h4,p3,p4)  * d_t2(p3,p4,h1,h4)   )
-     ( gamma1(h1,p1)     +=   -1 * i_1(h3,h1)         * d_t1(p1,h3)         )
-     (  i_2(h3,h4,h1,p4)  = -0.5 * d_y2(h3,h4,p3,p4)  * d_t1(p3,h1)         )
-     ( gamma1(h1,p1)     +=        i_2(h3,h4,h1,p4)   * d_t2(p1,p4,h3,h4)   )
-     ( gamma1(h1,h2)      =   -1 * d_y1(h2,p3)        * d_t1(p3,h1)         )
-     ( gamma1(h1,h2)     += -0.5 * d_y2(h2,h3,p3,p4)  * d_t2(p3,p4,h1,h3)   )
-     ( gamma1(p1,p2)      =        d_y1(h3,p1)        * d_t1(p2,h3)         )
-     ( gamma1(p1,p2)     +=  0.5 * d_y2(h3,h4,p1,p3)  * d_t2(p2,p3,h3,h4)   )
-    .execute(ex_hw);
-  // clang-format on
-
-  ExecutionContext ec_dense{ec.pg(), DistributionKind::dense, MemoryManagerKind::ga};
-  Tensor<T>        gamma1_dense = to_dense_tensor(ec_dense, gamma1);
-  print_dense_tensor(gamma1_dense, files_prefix + ".1_RDM");
-  Tensor<T>::deallocate(gamma1_dense);
-
   sch
     .deallocate(d_t1, d_t2, d_y1, d_y2, tmp1, tmp2, tmp3, tmp4, tmp5, dipole_mx, dipole_my,
-                dipole_mz, DipX_mo, DipY_mo, DipZ_mo, gamma1, i_1, i_2)
+                dipole_mz, DipX_mo, DipY_mo, DipZ_mo)
     .execute();
 
   ec.flush_and_sync();

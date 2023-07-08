@@ -5,6 +5,6 @@ Quantum Mechanical Methods
 .. toctree::
     :maxdepth: 2
  
-    ccsd
+    coupledcluster
     gfcc/gfcc
     bibliography

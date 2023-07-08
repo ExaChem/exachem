@@ -7,22 +7,14 @@
  * See LICENSE.txt for details
  */
 
-#pragma once
-
-#include "ccsd_util.hpp"
-#include "diis.hpp"
-
-using namespace tamm;
-
-bool debug = false;
+#include "cd_ccsd_cs_ann.hpp"
 
 using CCEType = double;
 CCSE_Tensors<CCEType> _a021;
 Tensor<CCEType>       a22_abab, a22_aaaa, a22_bbbb;
-TiledIndexSpace       o_alpha, v_alpha, o_beta, v_beta, CI_tmp;
+TiledIndexSpace       o_alpha, v_alpha, o_beta, v_beta;
 bool                  has_gpu_tmp;
 
-Tensor<CCEType>       dt1_full, dt2_full;
 Tensor<CCEType>       _a01V, _a02V, _a007V;
 CCSE_Tensors<CCEType> _a01, _a02, _a03, _a04, _a05, _a06, _a001, _a004, _a006, _a008, _a009, _a017,
   _a019, _a020; //_a022
@@ -564,13 +556,12 @@ void ccsd_t2_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
 }
 
 template<typename T>
-std::tuple<double, double>
-cd_ccsd_cs_driver(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
-                  const TiledIndexSpace& CI, Tensor<T>& t1_aa, Tensor<T>& t2_abab, Tensor<T>& d_f1,
-                  Tensor<T>& r1_aa, Tensor<T>& r2_abab, std::vector<Tensor<T>>& d_r1s,
-                  std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_t1s,
-                  std::vector<Tensor<T>>& d_t2s, std::vector<T>& p_evl_sorted, Tensor<T>& cv3d,
-                  bool ccsd_restart = false, std::string out_fp = "", bool computeTData = false) {
+std::tuple<double, double> cd_ccsd_cs_driver(
+  SystemData& sys_data, ExecutionContext& ec, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
+  Tensor<T>& t1_aa, Tensor<T>& t2_abab, Tensor<T>& d_f1, Tensor<T>& r1_aa, Tensor<T>& r2_abab,
+  std::vector<Tensor<T>>& d_r1s, std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_t1s,
+  std::vector<Tensor<T>>& d_t2s, std::vector<T>& p_evl_sorted, Tensor<T>& cv3d, Tensor<T> dt1_full,
+  Tensor<T> dt2_full, bool ccsd_restart, std::string out_fp, bool computeTData) {
   int    maxiter     = sys_data.options_map.ccsd_options.ccsd_maxiter;
   int    ndiis       = sys_data.options_map.ccsd_options.ndiis;
   double thresh      = sys_data.options_map.ccsd_options.threshold;
@@ -593,7 +584,6 @@ cd_ccsd_cs_driver(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSp
   const TiledIndexSpace& O = MO("occ");
   const TiledIndexSpace& V = MO("virt");
   auto [cind]              = CI.labels<1>("all");
-  CI_tmp                   = CI;
   has_gpu_tmp              = ec.has_gpu();
 
   const int otiles  = O.num_tiles();
@@ -885,3 +875,11 @@ cd_ccsd_cs_driver(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSp
 
   return std::make_tuple(residual, energy);
 }
+
+using T = double;
+template std::tuple<double, double> cd_ccsd_cs_driver<T>(
+  SystemData& sys_data, ExecutionContext& ec, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
+  Tensor<T>& t1_aa, Tensor<T>& t2_abab, Tensor<T>& d_f1, Tensor<T>& r1_aa, Tensor<T>& r2_abab,
+  std::vector<Tensor<T>>& d_r1s, std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_t1s,
+  std::vector<Tensor<T>>& d_t2s, std::vector<T>& p_evl_sorted, Tensor<T>& cv3d, Tensor<T> dt1_full,
+  Tensor<T> dt2_full, bool ccsd_restart, std::string out_fp, bool computeTData);

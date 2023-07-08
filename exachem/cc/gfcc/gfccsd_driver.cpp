@@ -6,14 +6,12 @@
  * See LICENSE.txt for details
  */
 
-#pragma once
-
 #include "gf_diis.hpp"
 #include "gf_guess.hpp"
 #include "gfccsd_ea.hpp"
 #include "gfccsd_ip.hpp"
 
-#include "cc/ccsd_lambda.hpp"
+#include "cc/lambda/ccsd_lambda.hpp"
 #include <algorithm>
 
 using namespace tamm;
@@ -180,23 +178,25 @@ void write_string_to_disk(ExecutionContext& ec, const std::string& tstring,
 
 template<typename T>
 void gfccsd_driver_ip_a(
-  ExecutionContext& gec, ExecutionContext& sub_ec, MPI_Comm& subcomm, const TiledIndexSpace& MO,
-  Tensor<T>& t1_a, Tensor<T>& t1_b, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb, Tensor<T>& t2_abab,
-  Tensor<T>& f1, Tensor<T>& t2v2_o, Tensor<T>& lt12_o_a, Tensor<T>& lt12_o_b, Tensor<T>& ix1_1_1_a,
-  Tensor<T>& ix1_1_1_b, Tensor<T>& ix2_1_aaaa, Tensor<T>& ix2_1_abab, Tensor<T>& ix2_1_bbbb,
-  Tensor<T>& ix2_1_baba, Tensor<T>& ix2_2_a, Tensor<T>& ix2_2_b, Tensor<T>& ix2_3_a,
-  Tensor<T>& ix2_3_b, Tensor<T>& ix2_4_aaaa, Tensor<T>& ix2_4_abab, Tensor<T>& ix2_4_bbbb,
-  Tensor<T>& ix2_5_aaaa, Tensor<T>& ix2_5_abba, Tensor<T>& ix2_5_abab, Tensor<T>& ix2_5_bbbb,
-  Tensor<T>& ix2_5_baab, Tensor<T>& ix2_5_baba, Tensor<T>& ix2_6_2_a, Tensor<T>& ix2_6_2_b,
-  Tensor<T>& ix2_6_3_aaaa, Tensor<T>& ix2_6_3_abba, Tensor<T>& ix2_6_3_abab,
-  Tensor<T>& ix2_6_3_bbbb, Tensor<T>& ix2_6_3_baab, Tensor<T>& ix2_6_3_baba, Tensor<T>& v2ijab_aaaa,
-  Tensor<T>& v2ijab_abab, Tensor<T>& v2ijab_bbbb, std::vector<T>& p_evl_sorted_occ,
-  std::vector<T>& p_evl_sorted_virt, long int total_orbitals, const TAMM_SIZE nocc,
-  const TAMM_SIZE nvir, size_t& nptsi, const TiledIndexSpace& unit_tis, string files_prefix,
-  string levelstr, int noa) {
+  ExecutionContext& gec, CCSDOptions& ccsd_options, ExecutionContext& sub_ec, MPI_Comm& subcomm,
+  const TiledIndexSpace& MO, Tensor<T>& t1_a, Tensor<T>& t1_b, Tensor<T>& t2_aaaa,
+  Tensor<T>& t2_bbbb, Tensor<T>& t2_abab, Tensor<T>& f1, Tensor<T>& t2v2_o, Tensor<T>& lt12_o_a,
+  Tensor<T>& lt12_o_b, Tensor<T>& ix1_1_1_a, Tensor<T>& ix1_1_1_b, Tensor<T>& ix2_1_aaaa,
+  Tensor<T>& ix2_1_abab, Tensor<T>& ix2_1_bbbb, Tensor<T>& ix2_1_baba, Tensor<T>& ix2_2_a,
+  Tensor<T>& ix2_2_b, Tensor<T>& ix2_3_a, Tensor<T>& ix2_3_b, Tensor<T>& ix2_4_aaaa,
+  Tensor<T>& ix2_4_abab, Tensor<T>& ix2_4_bbbb, Tensor<T>& ix2_5_aaaa, Tensor<T>& ix2_5_abba,
+  Tensor<T>& ix2_5_abab, Tensor<T>& ix2_5_bbbb, Tensor<T>& ix2_5_baab, Tensor<T>& ix2_5_baba,
+  Tensor<T>& ix2_6_2_a, Tensor<T>& ix2_6_2_b, Tensor<T>& ix2_6_3_aaaa, Tensor<T>& ix2_6_3_abba,
+  Tensor<T>& ix2_6_3_abab, Tensor<T>& ix2_6_3_bbbb, Tensor<T>& ix2_6_3_baab,
+  Tensor<T>& ix2_6_3_baba, Tensor<T>& v2ijab_aaaa, Tensor<T>& v2ijab_abab, Tensor<T>& v2ijab_bbbb,
+  std::vector<T>& p_evl_sorted_occ, std::vector<T>& p_evl_sorted_virt, long int total_orbitals,
+  const TAMM_SIZE nocc, const TAMM_SIZE nvir, size_t& nptsi, const TiledIndexSpace& unit_tis,
+  string files_prefix, string levelstr, int noa) {
   using ComplexTensor  = Tensor<std::complex<T>>;
   using VComplexTensor = std::vector<Tensor<std::complex<T>>>;
   using CMatrix = Eigen::Matrix<std::complex<T>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+  auto debug = ccsd_options.debug;
 
   const TiledIndexSpace& O = MO("occ");
   const TiledIndexSpace& V = MO("virt");
@@ -209,6 +209,8 @@ void gfccsd_driver_ip_a(
   const int obtiles = MO("occ_beta").num_tiles();
   const int vatiles = MO("virt_alpha").num_tiles();
   const int vbtiles = MO("virt_beta").num_tiles();
+
+  TiledIndexSpace o_alpha, v_alpha, o_beta, v_beta;
 
   o_alpha = {MO("occ"), range(oatiles)};
   v_alpha = {MO("virt"), range(vatiles)};
@@ -2550,7 +2552,7 @@ void gfccsd_driver(std::string filename, OptionsMap options_map) {
   sys_data.options_map.ccsd_options.computeTData = true;
 
   CCSDOptions& ccsd_options = sys_data.options_map.ccsd_options;
-  debug                     = ccsd_options.debug;
+  auto         debug        = ccsd_options.debug;
   if(rank == 0) ccsd_options.print();
 
   if(rank == 0)
@@ -2641,6 +2643,7 @@ void gfccsd_driver(std::string filename, OptionsMap options_map) {
   //     computeTData = computeTData && !fs::exists(fullV2file)
   //             && !fs::exists(t1file) && !fs::exists(t2file);
 
+  Tensor<T> dt1_full, dt2_full;
   if(computeTData && is_rhf) setup_full_t1t2(ec, MO, dt1_full, dt2_full);
 
   double residual = 0, corr_energy = 0;
@@ -2654,14 +2657,14 @@ void gfccsd_driver(std::string filename, OptionsMap options_map) {
                     << std::endl;
         std::tie(residual, corr_energy) = cd_ccsd_cs_driver<T>(
           sys_data, *sub_ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
-          p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
+          p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
       }
       ec.pg().barrier();
     }
     else {
       std::tie(residual, corr_energy) = cd_ccsd_cs_driver<T>(
         sys_data, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
-        p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
+        p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
     }
   }
   else {
@@ -3458,15 +3461,15 @@ void gfccsd_driver(std::string filename, OptionsMap options_map) {
         ndiis    = ccsd_options.gf_ndiis;
         gf_omega = x;
         if(!gf_restart) {
-          gfccsd_driver_ip_a<T>(ec, *sub_ec, subcomm, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
-                                d_t2_abab, d_f1, t2v2_o, lt12_o_a, lt12_o_b, ix1_1_1_a, ix1_1_1_b,
-                                ix2_1_aaaa, ix2_1_abab, ix2_1_bbbb, ix2_1_baba, ix2_2_a, ix2_2_b,
-                                ix2_3_a, ix2_3_b, ix2_4_aaaa, ix2_4_abab, ix2_4_bbbb, ix2_5_aaaa,
-                                ix2_5_abba, ix2_5_abab, ix2_5_bbbb, ix2_5_baab, ix2_5_baba,
-                                ix2_6_2_a, ix2_6_2_b, ix2_6_3_aaaa, ix2_6_3_abba, ix2_6_3_abab,
-                                ix2_6_3_bbbb, ix2_6_3_baab, ix2_6_3_baba, v2ijab_aaaa, v2ijab_abab,
-                                v2ijab_bbbb, p_evl_sorted_occ, p_evl_sorted_virt, total_orbitals,
-                                nocc, nvir, nptsi, unit_tis, files_prefix, levelstr, noa);
+          gfccsd_driver_ip_a<T>(
+            ec, ccsd_options, *sub_ec, subcomm, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab,
+            d_f1, t2v2_o, lt12_o_a, lt12_o_b, ix1_1_1_a, ix1_1_1_b, ix2_1_aaaa, ix2_1_abab,
+            ix2_1_bbbb, ix2_1_baba, ix2_2_a, ix2_2_b, ix2_3_a, ix2_3_b, ix2_4_aaaa, ix2_4_abab,
+            ix2_4_bbbb, ix2_5_aaaa, ix2_5_abba, ix2_5_abab, ix2_5_bbbb, ix2_5_baab, ix2_5_baba,
+            ix2_6_2_a, ix2_6_2_b, ix2_6_3_aaaa, ix2_6_3_abba, ix2_6_3_abab, ix2_6_3_bbbb,
+            ix2_6_3_baab, ix2_6_3_baba, v2ijab_aaaa, v2ijab_abab, v2ijab_bbbb, p_evl_sorted_occ,
+            p_evl_sorted_virt, total_orbitals, nocc, nvir, nptsi, unit_tis, files_prefix, levelstr,
+            noa);
         }
         else if(rank == 0) cout << endl << "Restarting freq: " << gf_omega << endl;
         auto ni             = std::round((x - omega_min_ip) / omega_delta);

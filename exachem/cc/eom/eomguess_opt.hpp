@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "cc/cd_ccsd_os_ann.hpp"
+#include "cc/ccsd/cd_ccsd_os_ann.hpp"
 #include <algorithm>
 #include <complex>
 using namespace tamm;

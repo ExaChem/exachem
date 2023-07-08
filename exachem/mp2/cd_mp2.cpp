@@ -6,9 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#pragma once
-
-#include "cc/ccsd_util.hpp"
+#include "cc/ccsd/ccsd_util.hpp"
 
 #include <filesystem>
 namespace fs = std::filesystem;

@@ -6,16 +6,20 @@
  * See LICENSE.txt for details
  */
 
-#include "exachem/cc/ccsd_lambda_driver.hpp"
-#include "exachem/cc/ccsd_t/ccsd_t.hpp"
-#include "exachem/cc/eom/eomccsd_driver.hpp"
+// clang-format off
+#include "cc/ccsd/cd_ccsd_os_ann.hpp"
+#include "cc/ccsd_t/ccsd_t_fused_driver.hpp"
+#include "exachem/cc/lambda/ccsd_lambda.hpp"
+#include "exachem/cc/eom/eomccsd_opt.hpp"
+// clang-format on
+
 #if !defined(USE_UPCXX)
-#include "exachem/cc/gfcc/gfccsd_driver.hpp"
-#include "exachem/cc/rteom/rt_eom_cd_ccsd.hpp"
+void gfccsd_driver(std::string filename, OptionsMap options_map);
+void rt_eom_cd_ccsd_driver(std::string filename, OptionsMap options_map);
 #include "exachem/fci/fci.hpp"
 #endif
-#include "exachem/cc/cd_ccsd.hpp"
-#include "exachem/mp2/cd_mp2.hpp"
+
+void cc2_canonical_driver(std::string filename, OptionsMap options_map);
 
 int main(int argc, char* argv[]) {
   tamm::initialize(argc, argv);
@@ -67,11 +71,11 @@ int main(int argc, char* argv[]) {
   if(std::count(tvec.begin(), tvec.end(), true) > 1)
     tamm_terminate("[INPUT FILE ERROR] only a single task can be enabled at once!");
 
-  std::string ec_arg2 = "";
+  std::string ec_arg2{};
   if(argc == 3) {
     ec_arg2 = std::string(argv[2]);
-    std::ifstream testinput();
-    if(!testinput) tamm_terminate("Input file provided [" + ec_arg2 + "] does not exist!");
+    if(!fs::exists(ec_arg2))
+      tamm_terminate("Input file provided [" + ec_arg2 + "] does not exist!");
   }
 
 #if !defined(USE_MACIS)
@@ -83,6 +87,7 @@ int main(int argc, char* argv[]) {
   else if(task.cd_2e) cd_2e_driver(filename, options_map);
   else if(task.ccsd) cd_ccsd(filename, options_map);
   else if(task.ccsd_t) ccsd_t_driver(filename, options_map);
+  else if(task.cc2) cc2_canonical_driver(filename, options_map);
   else if(task.ccsd_lambda) ccsd_lambda_driver(filename, options_map);
   else if(task.eom_ccsd) eom_ccsd_driver(filename, options_map);
 #if !defined(USE_UPCXX)

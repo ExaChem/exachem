@@ -16,6 +16,8 @@
 #endif
 #include "ccsd_t_common.hpp"
 
+void ccsd_t_driver(std::string filename, OptionsMap options_map);
+
 void finalizememmodule();
 
 /**
@@ -24,7 +26,7 @@ void finalizememmodule();
  *  - requirements: (1) arch >= 80 and (2) driver >= 11.2?
  **/
 #if defined(USE_CUDA)
-int checkCudaKernelCompatible(bool r0) {
+inline int checkCudaKernelCompatible(bool r0) {
   int            version = 0;
   cudaDeviceProp dP;
 

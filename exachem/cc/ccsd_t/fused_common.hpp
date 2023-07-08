@@ -14,13 +14,13 @@
 #include "ccsd_t_all_fused_singles.hpp"
 #include "ccsd_t_common.hpp"
 
-void helper_calculate_num_ops(const Index noab, const Index nvab, int* df_simple_s1_size,
-                              int* df_simple_d1_size, int* df_simple_d2_size,
-                              int* df_simple_s1_exec, int* df_simple_d1_exec,
-                              int* df_simple_d2_exec, long double& task_num_ops_s1,
-                              long double& task_num_ops_d1, long double& task_num_op_sd2,
-                              long double& total_num_ops_s1, long double& total_num_ops_d1,
-                              long double& total_num_ops_d2);
+inline void helper_calculate_num_ops(const Index noab, const Index nvab, int* df_simple_s1_size,
+                                     int* df_simple_d1_size, int* df_simple_d2_size,
+                                     int* df_simple_s1_exec, int* df_simple_d1_exec,
+                                     int* df_simple_d2_exec, long double& task_num_ops_s1,
+                                     long double& task_num_ops_d1, long double& task_num_op_sd2,
+                                     long double& total_num_ops_s1, long double& total_num_ops_d1,
+                                     long double& total_num_ops_d2);
 
 template<typename T>
 long double ccsd_t_fully_fused_performance(
@@ -114,13 +114,13 @@ long double ccsd_t_fully_fused_performance(
 }
 
 //
-void helper_calculate_num_ops(const Index noab, const Index nvab, int* df_simple_s1_size,
-                              int* df_simple_d1_size, int* df_simple_d2_size,
-                              int* df_simple_s1_exec, int* df_simple_d1_exec,
-                              int* df_simple_d2_exec, long double& task_num_ops_s1,
-                              long double& task_num_ops_d1, long double& task_num_ops_d2,
-                              long double& total_num_ops_s1, long double& total_num_ops_d1,
-                              long double& total_num_ops_d2) {
+inline void helper_calculate_num_ops(const Index noab, const Index nvab, int* df_simple_s1_size,
+                                     int* df_simple_d1_size, int* df_simple_d2_size,
+                                     int* df_simple_s1_exec, int* df_simple_d1_exec,
+                                     int* df_simple_d2_exec, long double& task_num_ops_s1,
+                                     long double& task_num_ops_d1, long double& task_num_ops_d2,
+                                     long double& total_num_ops_s1, long double& total_num_ops_d1,
+                                     long double& total_num_ops_d2) {
   //
   //  s1
   //

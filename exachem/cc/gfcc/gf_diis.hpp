@@ -8,7 +8,6 @@
 
 #pragma once
 
-#include "ga/ga.h"
 #include "tamm/eigen_utils.hpp"
 #include "tamm/tamm.hpp"
 

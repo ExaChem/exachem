@@ -7,9 +7,7 @@
  * See LICENSE.txt for details
  */
 
-#pragma once
-
-#include "cc/cd_ccsd_os_ann.hpp"
+#include "cc/ccsd/cd_ccsd_os_ann.hpp"
 
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -25,7 +23,7 @@ void cd_ccsd(std::string filename, OptionsMap options_map) {
         AO_tis, scf_conv] = hartree_fock_driver<T>(ec, filename, options_map);
 
   CCSDOptions& ccsd_options = sys_data.options_map.ccsd_options;
-  debug                     = ccsd_options.debug;
+  auto         debug        = ccsd_options.debug;
   if(rank == 0) ccsd_options.print();
 
   if(rank == 0)
@@ -115,14 +113,15 @@ void cd_ccsd(std::string filename, OptionsMap options_map) {
     computeTData = computeTData && !fs::exists(fullV2file) && !fs::exists(t1file) &&
                    !fs::exists(t2file);
 
+  Tensor<T> dt1_full, dt2_full;
   if(computeTData && is_rhf) setup_full_t1t2(ec, MO, dt1_full, dt2_full);
 
   double residual = 0, corr_energy = 0;
 
   if(is_rhf)
-    std::tie(residual, corr_energy) =
-      cd_ccsd_cs_driver<T>(sys_data, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s,
-                           d_t2s, p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
+    std::tie(residual, corr_energy) = cd_ccsd_cs_driver<T>(
+      sys_data, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s, p_evl_sorted,
+      cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
   else
     std::tie(residual, corr_energy) =
       cd_ccsd_os_driver<T>(sys_data, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s,

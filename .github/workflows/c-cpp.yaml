@@ -1,0 +1,277 @@
+name: ExaChem_CI
+
+on: 
+  push:
+    paths-ignore:
+      - docs  
+  pull_request:
+    branches:
+      - develop
+  repository_dispatch:
+    types: [backend_automation]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 1000
+    strategy:
+      matrix:
+        os: 
+          - [self-hosted, ubuntu18]
+          - [self-hosted, macos]
+        backend:
+          - ga
+          - upcxx
+        mpi_impl:
+          - openmpi
+        cxx:
+          - g++
+        cc:
+          - gcc
+        fc:
+          - gfortran
+        use_cuda:
+          - no-cuda          
+        use_scalapack:
+          - no-scalapack         
+        include:
+          - os: [self-hosted, ubuntu18]
+            mpi_impl: openmpi
+            cxx: clang++
+            cc: clang
+            fc: gfortran
+            backend: ga
+            use_cuda: no-cuda
+            use_scalapack: no-scalapack
+          - os: [self-hosted, ubuntu18]
+            mpi_impl: openmpi
+            cxx: g++
+            cc: gcc
+            fc: gfortran
+            backend: ga
+            use_cuda: cuda
+            use_scalapack: no-scalapack
+          - os: [self-hosted, ubuntu18]
+            mpi_impl: openmpi
+            cxx: g++
+            cc: gcc
+            fc: gfortran
+            backend: upcxx
+            use_cuda: cuda
+            use_scalapack: no-scalapack      
+          - os: [self-hosted, ubuntu18]
+            mpi_impl: openmpi
+            cxx: g++
+            cc: gcc
+            fc: gfortran
+            backend: ga
+            use_cuda: no-cuda
+            use_scalapack: scalapack
+          - os: [self-hosted, macos]
+            mpi_impl: openmpi
+            cxx: g++
+            cc: gcc
+            fc: gfortran
+            backend: ga
+            use_cuda: no-cuda
+            use_scalapack: no-scalapack
+        exclude:
+          - os: [self-hosted, macos]
+            mpi_impl: openmpi
+            cxx: g++
+            cc: gcc
+            fc: gfortran
+            backend: upcxx
+            use_cuda: no-cuda
+            use_scalapack: no-scalapack
+      fail-fast: true
+
+    env:
+      MPI_IMPL: ${{ matrix.mpi_impl }}
+      CXX: ${{ matrix.cxx }}
+      CC: ${{ matrix.cc }}
+      FC: ${{ matrix.fc }}
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Check SIMD
+      id: get-simd
+      run: |
+        chmod +x ${GITHUB_WORKSPACE}/.github/workflows/scripts/check_simd.sh
+        echo "simd=$(${GITHUB_WORKSPACE}/.github/workflows/scripts/check_simd.sh)" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Set cache path mac
+      if: ${{ matrix.os[1] == 'macos' }}
+      id: set-cache-path-mac
+      run: |
+        echo "exachem_cache_path=$HOME/software/CI/cache/exachem_cache" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Set cache path linux
+      if: ${{ matrix.os[1] == 'ubuntu18' }}
+      id: set-cache-path-linux
+      run: |
+        echo "exachem_cache_path=/hpc/software/CI/cache/exachem_cache" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Set build option defaults
+      id: set-build-option-defaults
+      run: |
+        echo "INSTALL_PATH=$GITHUB_WORKSPACE/install" >> $GITHUB_ENV
+        echo "USE_CUDA=OFF" >> $GITHUB_ENV
+        echo "USE_SCALAPACK=OFF" >> $GITHUB_ENV
+        echo "EC_NPROC=12" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Set cuda build options
+      if: ${{ matrix.use_cuda == 'cuda' }}
+      shell: bash
+      run: |
+        echo "USE_CUDA=ON" >> $GITHUB_ENV
+
+    - name: Set scalapack build options
+      if: ${{ matrix.use_scalapack == 'scalapack' }}
+      shell: bash
+      run: |
+        echo "USE_SCALAPACK=ON" >> $GITHUB_ENV
+
+    - name: load llvm
+      if: ${{ matrix.cc == 'clang' && matrix.cxx == 'clang++' && matrix.os[1] == 'ubuntu18' }}
+      shell: bash
+      run: |
+        module load llvm
+        echo "CC=$(which clang)" >> $GITHUB_ENV
+        echo "CXX=$(which clang++)" >> $GITHUB_ENV
+
+    - name: macos env
+      if: ${{ matrix.os[1] == 'macos' }}
+      shell: bash
+      run: |
+        echo "CC=gcc-12" >> $GITHUB_ENV
+        echo "CXX=g++-12" >> $GITHUB_ENV
+        echo "EC_NPROC=2" >> $GITHUB_ENV
+
+    - name: Cache install steps (backend = ga)
+      if: ${{ matrix.backend == 'ga' }}
+      id: exachem-cache-install
+      uses: actions/cache@v3
+      with:
+        path: |
+          ${{ env.exachem_cache_path }}
+        key: ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-ga-${{ matrix.use_scalapack }}
+
+    - name: Cache install steps (backend = upcxx)
+      if: ${{ matrix.backend == 'upcxx' }}
+      id: exachem-upcxx-cache-install
+      uses: actions/cache@v3
+      with:
+        path: |
+          ${{ env.exachem_cache_path }}
+        key: ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-upcxx
+
+
+    - name: show-mpi
+      run: |
+        mpicc   -show
+        mpifort -show
+        mpicxx  -show
+        mpiexec --version
+
+    - name: show-compilers
+      run: |
+        $CC     --version
+        $CXX    --version
+        $FC     --version
+        python3 --version
+      shell: bash
+
+    - name: build upcxx
+      if: ${{ matrix.backend == 'upcxx' && steps.exachem-upcxx-cache-install.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        mkdir -p $GITHUB_WORKSPACE/../external_deps
+        cd $GITHUB_WORKSPACE/../external_deps
+        wget https://bitbucket.org/berkeleylab/upcxx/downloads/upcxx-2023.3.0.tar.gz
+        tar xf upcxx-2023.3.0.tar.gz
+        cd upcxx-2023.3.0
+        ./configure --prefix=${{ env.INSTALL_PATH }} --with-cxx=mpicxx --with-cc=mpicc --with-default-network=smp
+        make -j${{ env.EC_NPROC }} all
+        make install
+
+    - name: find cache
+      id: find_cache
+      if: ${{ steps.exachem-cache-install.outputs.cache-hit == 'true' || steps.exachem-upcxx-cache-install.outputs.cache-hit == 'true' }}
+      run: |
+        pwd
+        ls -lart
+        mkdir -p ${{ env.INSTALL_PATH }} ${{ env.exachem_cache_path }} || true
+        rsync -av  ${{ env.exachem_cache_path }}/* ${{ env.INSTALL_PATH }}/.
+        ls -lrt ${{ env.INSTALL_PATH }} || true
+
+    - name: build exachem (backend = ga)
+      if: ${{ matrix.backend == 'ga' }}
+      id: build_exachem
+      run: |
+        # TAMM build
+        git clone https://github.com/NWChemEx-Project/TAMM $GITHUB_WORKSPACE/TAMM
+        cd $GITHUB_WORKSPACE/TAMM
+        cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DGPU_ARCH=70 -DMODULES="CC" -DUSE_CUDA=${{ env.USE_CUDA }} -DUSE_SCALAPACK=${{ env.USE_SCALAPACK }}
+        cd build
+        make -j${{ env.EC_NPROC }}
+        make install
+        mkdir -p  ${{ env.exachem_cache_path }} || true
+        rsync -av --exclude="*tamm*" ${{ env.INSTALL_PATH }}/* ${{ env.exachem_cache_path }}/.
+
+        # Chem build
+        cd $GITHUB_WORKSPACE
+        cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES="CC" -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }}
+        cd build
+        make -j${{ env.EC_NPROC }}
+        # make install
+        # mkdir -p  ${{ env.exachem_cache_path }} || true
+        # rsync -av --exclude="*tamm*" ${{ env.INSTALL_PATH }}/* ${{ env.exachem_cache_path }}/.
+
+    - name: build exachem (backend = upcxx)
+      if: ${{ matrix.backend == 'upcxx' }}
+      id: build_exachem_upcxx
+      run: |
+        export PATH=$PATH:$GITHUB_WORKSPACE/install/bin
+        export CPATH=$CPATH:/usr/lib/x86_64-linux-gnu/openmpi/include
+        echo "UPCXX_SHARED_HEAP_SIZE=MAX" >> $GITHUB_ENV
+        echo "CI_MPIEXEC=upcxx-run" >> $GITHUB_ENV
+        echo "UPCXX_MISSING_TESTS=1" >> $GITHUB_ENV
+
+        # TAMM build
+        git clone https://github.com/NWChemEx-Project/TAMM $GITHUB_WORKSPACE/TAMM
+        cd $GITHUB_WORKSPACE/TAMM
+        UPCXX_CODEMODE=O3 CXX=upcxx cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DGPU_ARCH=70 -DMODULES="CC" -DUSE_UPCXX=ON -DMPIRUN_EXECUTABLE=${{ env.CI_MPIEXEC }}
+        cd build
+        UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make -j${{ env.EC_NPROC }}
+        UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make install
+        mkdir -p  ${{ env.exachem_cache_path }} || true
+        rsync -av --exclude="*tamm*" ${{ env.INSTALL_PATH }}/* ${{ env.exachem_cache_path }}/.
+
+        # Chem build
+        cd $GITHUB_WORKSPACE
+        UPCXX_CODEMODE=O3 CXX=upcxx cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES="CC" -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DUSE_UPCXX=ON -DMPIRUN_EXECUTABLE="upcxx-run"
+        cd build
+        UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make -j${{ env.EC_NPROC }}
+
+
+    - name: ctest
+      run: |
+        cd $GITHUB_WORKSPACE/build
+        export PATH=$PATH:$GITHUB_WORKSPACE/install/bin
+        # ctest -VV
+        $GITHUB_WORKSPACE/ci/scripts/run_ci $GITHUB_WORKSPACE $GITHUB_WORKSPACE/build/methods_stage/${{ env.INSTALL_PATH }}/methods/ExaChem 3 ${{ env.CI_MPIEXEC }} ${{ env.UPCXX_MISSING_TESTS }}
+    # - name: gcovr
+    #   run: |
+    #     cd $GITHUB_WORKSPACE
+    #     gcovr --root . --exclude build --exclude tests --xml ./coverage.xml
+    #     ls -al .
+    # - uses: codecov/codecov-action@v3
+    #   with:
+    #     token: ${{ secrets.CODECOV_TOKEN }}
+    #     file: ./coverage.xml

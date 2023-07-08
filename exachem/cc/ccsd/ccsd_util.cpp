@@ -6,130 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#pragma once
-
-#include "ccse_tensors.hpp"
-
-// auto lambdar2 = [](const IndexVector& blockid, span<double> buf){
-//     if((blockid[0] > blockid[1]) || (blockid[2] > blockid[3])) {
-//         for(auto i = 0U; i < buf.size(); i++) buf[i] = 0;
-//     }
-// };
-
-template<typename T>
-class V2Tensors {
-  std::map<std::string, Tensor<T>> tmap;
-  std::vector<Tensor<T>>           allocated_tensors;
-  std::vector<std::string> allowed_blocks = {"ijab", "iajb", "ijka", "ijkl", "iabc", "abcd"};
-  std::vector<std::string> blocks;
-
-  std::vector<std::string> get_tensor_files(const std::string& fprefix) {
-    std::vector<std::string> tensor_files;
-    for(auto block: blocks) tensor_files.push_back(fprefix + ".v2" + block);
-    return tensor_files;
-  }
-
-  void set_map(const TiledIndexSpace& MO) {
-    auto [h1, h2, h3, h4] = MO.labels<4>("occ");
-    auto [p1, p2, p3, p4] = MO.labels<4>("virt");
-
-    for(auto x: blocks) {
-      if(x == "ijab") {
-        v2ijab  = Tensor<T>{{h1, h2, p1, p2}, {2, 2}};
-        tmap[x] = v2ijab;
-      }
-      else if(x == "iajb") {
-        v2iajb  = Tensor<T>{{h1, p1, h2, p2}, {2, 2}};
-        tmap[x] = v2iajb;
-      }
-      else if(x == "ijka") {
-        v2ijka  = Tensor<T>{{h1, h2, h3, p1}, {2, 2}};
-        tmap[x] = v2ijka;
-      }
-      else if(x == "ijkl") {
-        v2ijkl  = Tensor<T>{{h1, h2, h3, h4}, {2, 2}};
-        tmap[x] = v2ijkl;
-      }
-      else if(x == "iabc") {
-        v2iabc  = Tensor<T>{{h1, p1, p2, p3}, {2, 2}};
-        tmap[x] = v2iabc;
-      }
-      else if(x == "abcd") {
-        v2abcd  = Tensor<T>{{p1, p2, p3, p4}, {2, 2}};
-        tmap[x] = v2abcd;
-      }
-    }
-  }
-
-public:
-  Tensor<T> v2ijab; // hhpp
-  Tensor<T> v2iajb; // hphp
-  Tensor<T> v2ijka; // hhhp
-  Tensor<T> v2ijkl; // hhhh
-  Tensor<T> v2iabc; // hppp
-  Tensor<T> v2abcd; // pppp
-
-  V2Tensors() { blocks = allowed_blocks; }
-
-  V2Tensors(std::vector<std::string> v2blocks) {
-    blocks              = v2blocks;
-    std::string err_msg = "Error in V2 tensors declaration";
-    for(auto x: blocks) {
-      if(std::find(allowed_blocks.begin(), allowed_blocks.end(), x) == allowed_blocks.end()) {
-        tamm_terminate(err_msg + ": Invalid block [" + x +
-                       "] specified, allowed blocks are [ijab|iajb|ijka|ijkl|iabc|abcd]");
-      }
-    }
-  }
-
-  std::vector<std::string> get_blocks() { return blocks; }
-
-  void deallocate() {
-    ExecutionContext& ec = get_ec(allocated_tensors[0]());
-    Scheduler         sch{ec};
-    for(auto x: allocated_tensors) sch.deallocate(x);
-    sch.execute();
-  }
-
-  T tensor_sizes(const TiledIndexSpace& MO) {
-    set_map(MO);
-    T v2_sizes{};
-    for(auto iter = tmap.begin(); iter != tmap.end(); ++iter)
-      v2_sizes += sum_tensor_sizes(iter->second);
-    return v2_sizes;
-  }
-
-  void allocate(ExecutionContext& ec, const TiledIndexSpace& MO) {
-    set_map(MO);
-
-    for(auto iter = tmap.begin(); iter != tmap.end(); ++iter)
-      allocated_tensors.push_back(iter->second);
-
-    Scheduler sch{ec};
-    for(auto x: allocated_tensors) sch.allocate(x);
-    sch.execute();
-  }
-
-  void write_to_disk(const std::string& fprefix) {
-    auto tensor_files = get_tensor_files(fprefix);
-    // TODO: Assume all on same ec for now
-    ExecutionContext& ec = get_ec(allocated_tensors[0]());
-    tamm::write_to_disk_group<T>(ec, allocated_tensors, tensor_files);
-  }
-
-  void read_from_disk(const std::string& fprefix) {
-    auto              tensor_files = get_tensor_files(fprefix);
-    ExecutionContext& ec           = get_ec(allocated_tensors[0]());
-    tamm::read_from_disk_group<T>(ec, allocated_tensors, tensor_files);
-  }
-
-  bool exist_on_disk(const std::string& fprefix) {
-    auto tensor_files = get_tensor_files(fprefix);
-    bool tfiles_exist = std::all_of(tensor_files.begin(), tensor_files.end(),
-                                    [](std::string x) { return fs::exists(x); });
-    return tfiles_exist;
-  }
-};
+#include "ccsd_util.hpp"
 
 template<typename T>
 void setup_full_t1t2(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& dt1_full,
@@ -152,26 +29,6 @@ void update_r2(ExecutionContext& ec, LabeledTensor<TensorType> ltensor) {
   auto lambda = [&](const IndexVector& bid) {
     const IndexVector blockid = internal::translate_blockid(bid, ltensor);
     if((blockid[0] > blockid[1]) || (blockid[2] > blockid[3])) {
-      const tamm::TAMM_SIZE   dsize = tensor.block_size(blockid);
-      std::vector<TensorType> dbuf(dsize);
-      tensor.get(blockid, dbuf);
-      // func(blockid, dbuf);
-      for(auto i = 0U; i < dsize; i++) dbuf[i] = 0;
-      tensor.put(blockid, dbuf);
-    }
-  };
-  block_for(ec, ltensor, lambda);
-}
-
-template<typename TensorType>
-void update_gamma2(ExecutionContext& ec, LabeledTensor<TensorType> ltensor) {
-  Tensor<TensorType> tensor = ltensor.tensor();
-  auto               tis    = tensor.tiled_index_spaces();
-
-  auto lambda = [&](const IndexVector& bid) {
-    const IndexVector blockid = internal::translate_blockid(bid, ltensor);
-    if((tis[0].spin(blockid[0]) != tis[2].spin(blockid[2])) ||
-       (tis[1].spin(blockid[1]) != tis[3].spin(blockid[3]))) {
       const tamm::TAMM_SIZE   dsize = tensor.block_size(blockid);
       std::vector<TensorType> dbuf(dsize);
       tensor.get(blockid, dbuf);
@@ -207,24 +64,8 @@ void init_diagonal(ExecutionContext& ec, LabeledTensor<TensorType> ltensor) {
   block_for(ec, ltensor, lambda);
 }
 
-inline std::string ccsd_test(int argc, char* argv[]) {
-  if(argc < 2) {
-    std::cout << "Please provide an input file!" << std::endl;
-    exit(0);
-  }
-
-  auto          filename = std::string(argv[1]);
-  std::ifstream testinput(filename);
-  if(!testinput) {
-    std::cout << "Input file provided [" << filename << "] does not exist!" << std::endl;
-    exit(0);
-  }
-
-  return filename;
-}
-
-inline void iteration_print(SystemData& sys_data, const ProcGroup& pg, int iter, double residual,
-                            double energy, double time, string cmethod = "CCSD") {
+void iteration_print(SystemData& sys_data, const ProcGroup& pg, int iter, double residual,
+                     double energy, double time, string cmethod) {
   if(pg.rank() == 0) {
     std::cout << std::setw(4) << std::right << iter + 1 << "     ";
     std::cout << std::setprecision(13) << std::setw(16) << std::left << residual << "  ";
@@ -240,15 +81,6 @@ inline void iteration_print(SystemData& sys_data, const ProcGroup& pg, int iter,
   }
 }
 
-inline void iteration_print_lambda(const ProcGroup& pg, int iter, double residual, double time) {
-  if(pg.rank() == 0) {
-    std::cout << std::setw(4) << std::right << iter + 1 << "     ";
-    std::cout << std::setprecision(13) << std::setw(16) << std::left << residual << "  ";
-    std::cout << std::fixed << std::setprecision(2);
-    std::cout << std::string(5, ' ') << time << std::endl;
-  }
-}
-
 /**
  *
  * @tparam T
@@ -261,7 +93,7 @@ std::pair<double, double> rest(ExecutionContext& ec, const TiledIndexSpace& MO, 
                                Tensor<T>& d_r2, Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& de,
                                Tensor<T>& d_r1_residual, Tensor<T>& d_r2_residual,
                                std::vector<T>& p_evl_sorted, T zshiftl, const TAMM_SIZE& noa,
-                               const TAMM_SIZE& nob, bool transpose = false) {
+                               const TAMM_SIZE& nob, bool transpose) {
   T         residual, energy;
   Scheduler sch{ec};
   // Tensor<T> d_r1_residual{}, d_r2_residual{};
@@ -299,7 +131,7 @@ std::pair<double, double>
 rest_cs(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1, Tensor<T>& d_r2,
         Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& de, Tensor<T>& d_r1_residual,
         Tensor<T>& d_r2_residual, std::vector<T>& p_evl_sorted, T zshiftl, const TAMM_SIZE& noa,
-        const TAMM_SIZE& nva, bool transpose = false, const bool not_spin_orbital = false) {
+        const TAMM_SIZE& nva, bool transpose, const bool not_spin_orbital) {
   T         residual, energy;
   Scheduler sch{ec};
   // Tensor<T> d_r1_residual{}, d_r2_residual{};
@@ -335,7 +167,7 @@ rest_cs(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1, Tensor
   return {residual, energy};
 }
 
-inline void print_ccsd_header(const bool do_print) {
+void print_ccsd_header(const bool do_print) {
   if(do_print) {
     const auto mksp = std::string(10, ' ');
     std::cout << std::endl << std::endl;
@@ -350,7 +182,7 @@ template<typename T>
 std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vector<Tensor<T>>,
            std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>>
 setupTensors(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndiis,
-             bool ccsd_restart = false) {
+             bool ccsd_restart) {
   auto rank = ec.pg().rank();
 
   TiledIndexSpace O = MO("occ");
@@ -400,7 +232,7 @@ template<typename T>
 std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vector<Tensor<T>>,
            std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>>
 setupTensors_cs(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndiis,
-                bool ccsd_restart = false) {
+                bool ccsd_restart) {
   auto rank = ec.pg().rank();
 
   const TiledIndexSpace& O = MO("occ");
@@ -496,8 +328,8 @@ hartree_fock_driver(ExecutionContext& ec, const string filename, OptionsMap opti
                          F_beta_AO, tAO, tAOt, scf_conv);
 }
 
-inline void ccsd_stats(ExecutionContext& ec, double hf_energy, double residual, double energy,
-                       double thresh) {
+void ccsd_stats(ExecutionContext& ec, double hf_energy, double residual, double energy,
+                double thresh) {
   auto rank      = ec.pg().rank();
   bool ccsd_conv = residual < thresh;
   if(rank == 0) {
@@ -517,62 +349,9 @@ inline void ccsd_stats(ExecutionContext& ec, double hf_energy, double residual, 
   }
 }
 
-inline auto free_vec_tensors = [](auto&&... vecx) {
-  (std::for_each(vecx.begin(), vecx.end(), [](auto& t) { t.deallocate(); }), ...);
-};
-
-inline auto free_tensors = [](auto&&... t) { ((t.deallocate()), ...); };
-
 template<typename T>
-std::tuple<Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vector<Tensor<T>>,
-           std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>>
-setupLambdaTensors(ExecutionContext& ec, TiledIndexSpace& MO, size_t ndiis) {
-  TiledIndexSpace O = MO("occ");
-  TiledIndexSpace V = MO("virt");
-
-  auto rank = ec.pg().rank();
-
-  Tensor<T> d_r1{{O, V}, {1, 1}};
-  Tensor<T> d_r2{{O, O, V, V}, {2, 2}};
-  Tensor<T> d_y1{{O, V}, {1, 1}};
-  Tensor<T> d_y2{{O, O, V, V}, {2, 2}};
-
-  Tensor<T>::allocate(&ec, d_r1, d_r2, d_y1, d_y2);
-  // clang-format off
-  Scheduler{ec}
-    (d_y1() = 0)
-    (d_y2() = 0)
-    (d_r1() = 0)
-    (d_r2() = 0)
-  .execute();
-  // clang-format on
-
-  if(rank == 0) {
-    std::cout << std::endl << std::endl;
-    std::cout << " Lambda CCSD iterations" << std::endl;
-    std::cout << std::string(45, '-') << std::endl;
-    std::cout << "  Iter     Residuum \t      Time(s)" << std::endl;
-    std::cout << std::string(45, '-') << std::endl;
-  }
-
-  std::vector<Tensor<T>> d_r1s, d_r2s, d_y1s, d_y2s;
-
-  for(size_t i = 0; i < ndiis; i++) {
-    d_r1s.push_back(Tensor<T>{{O, V}, {1, 1}});
-    d_r2s.push_back(Tensor<T>{{O, O, V, V}, {2, 2}});
-
-    d_y1s.push_back(Tensor<T>{{O, V}, {1, 1}});
-    d_y2s.push_back(Tensor<T>{{O, O, V, V}, {2, 2}});
-    Tensor<T>::allocate(&ec, d_r1s[i], d_r2s[i], d_y1s[i], d_y2s[i]);
-  }
-
-  return std::make_tuple(d_r1, d_r2, d_y1, d_y2, d_r1s, d_r2s, d_y1s, d_y2s);
-}
-
-template<typename T>
-V2Tensors<T>
-setupV2Tensors(ExecutionContext& ec, Tensor<T> cholVpr, ExecutionHW ex_hw = ExecutionHW::CPU,
-               std::vector<std::string> blocks = {"ijab", "iajb", "ijka", "ijkl", "iabc", "abcd"}) {
+V2Tensors<T> setupV2Tensors(ExecutionContext& ec, Tensor<T> cholVpr, ExecutionHW ex_hw,
+                            std::vector<std::string> blocks) {
   TiledIndexSpace MO    = cholVpr.tiled_index_spaces()[0]; // MO
   TiledIndexSpace CI    = cholVpr.tiled_index_spaces()[2]; // CI
   auto [cind]           = CI.labels<1>("all");
@@ -620,8 +399,7 @@ setupV2Tensors(ExecutionContext& ec, Tensor<T> cholVpr, ExecutionHW ex_hw = Exec
 
 template<typename T>
 Tensor<T> setupV2(ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& CI, Tensor<T> cholVpr,
-                  const tamm::Tile chol_count, ExecutionHW hw = ExecutionHW::CPU,
-                  bool anti_sym = true) {
+                  const tamm::Tile chol_count, ExecutionHW hw, bool anti_sym) {
   auto rank = ec.pg().rank();
 
   TiledIndexSpace N = MO("all");
@@ -733,8 +511,8 @@ template<typename T>
 std::tuple<Tensor<T>, Tensor<T>, Tensor<T>, TAMM_SIZE, tamm::Tile, TiledIndexSpace>
 cd_svd_driver(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& AO,
               Tensor<T> C_AO, Tensor<T> F_AO, Tensor<T> C_beta_AO, Tensor<T> F_beta_AO,
-              libint2::BasisSet& shells, std::vector<size_t>& shell_tile_map, bool readv2 = false,
-              std::string cholfile = "", bool is_dlpno = false, bool is_mso = true) {
+              libint2::BasisSet& shells, std::vector<size_t>& shell_tile_map, bool readv2,
+              std::string cholfile, bool is_dlpno, bool is_mso) {
   CDOptions cd_options        = sys_data.options_map.cd_options;
   auto      diagtol           = cd_options.diagtol; // tolerance for the max. diagonal
   cd_options.max_cvecs_factor = 2 * std::abs(std::log10(diagtol));
@@ -872,7 +650,7 @@ cd_svd_driver(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO, T
   return std::make_tuple(cholVpr, d_f1, lcao, chol_count, max_cvecs, CI);
 }
 
-inline void cd_2e_driver(std::string filename, OptionsMap options_map) {
+void cd_2e_driver(std::string filename, OptionsMap options_map) {
   using T = double;
 
   ProcGroup        pg = ProcGroup::create_world_coll();
@@ -925,3 +703,58 @@ inline void cd_2e_driver(std::string filename, OptionsMap options_map) {
   ec.flush_and_sync();
   // delete ec;
 }
+
+using T = double;
+
+template void init_diagonal(ExecutionContext& ec, LabeledTensor<T> ltensor);
+
+template void cc_print<T>(SystemData& sys_data, Tensor<T> d_t1, Tensor<T> d_t2,
+                          std::string files_prefix);
+
+template void update_r2<T>(ExecutionContext& ec, LabeledTensor<T> ltensor);
+
+template void setup_full_t1t2<T>(ExecutionContext& ec, const TiledIndexSpace& MO,
+                                 Tensor<T>& dt1_full, Tensor<T>& dt2_full);
+
+template std::pair<double, double> rest<T>(ExecutionContext& ec, const TiledIndexSpace& MO,
+                                           Tensor<T>& d_r1, Tensor<T>& d_r2, Tensor<T>& d_t1,
+                                           Tensor<T>& d_t2, Tensor<T>& de, Tensor<T>& d_r1_residual,
+                                           Tensor<T>& d_r2_residual, std::vector<T>& p_evl_sorted,
+                                           double zshiftl, const TAMM_SIZE& noa,
+                                           const TAMM_SIZE& nob, bool transpose);
+
+template std::pair<double, double>
+rest_cs<T>(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1, Tensor<T>& d_r2,
+           Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& de, Tensor<T>& d_r1_residual,
+           Tensor<T>& d_r2_residual, std::vector<T>& p_evl_sorted, double zshiftl,
+           const TAMM_SIZE& noa, const TAMM_SIZE& nva, bool transpose, const bool not_spin_orbital);
+
+template std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>,
+                    std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>,
+                    std::vector<Tensor<T>>>
+setupTensors<T>(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndiis,
+                bool ccsd_restart);
+
+template std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>,
+                    std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>,
+                    std::vector<Tensor<T>>>
+setupTensors_cs<T>(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndiis,
+                   bool ccsd_restart);
+
+template std::tuple<SystemData, double, libint2::BasisSet, std::vector<size_t>, Tensor<T>,
+                    Tensor<T>, Tensor<T>, Tensor<T>, TiledIndexSpace, TiledIndexSpace, bool>
+hartree_fock_driver<T>(ExecutionContext& ec, const string filename, OptionsMap options_map);
+
+template std::tuple<Tensor<T>, Tensor<T>, Tensor<T>, TAMM_SIZE, tamm::Tile, TiledIndexSpace>
+cd_svd_driver<T>(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO,
+                 TiledIndexSpace& AO, Tensor<T> C_AO, Tensor<T> F_AO, Tensor<T> C_beta_AO,
+                 Tensor<T> F_beta_AO, libint2::BasisSet& shells,
+                 std::vector<size_t>& shell_tile_map, bool readv2, std::string cholfile,
+                 bool is_dlpno, bool is_mso);
+
+template V2Tensors<T> setupV2Tensors<T>(ExecutionContext& ec, Tensor<T> cholVpr, ExecutionHW ex_hw,
+                                        std::vector<std::string> blocks);
+
+template Tensor<T> setupV2<T>(ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& CI,
+                              Tensor<T> cholVpr, const tamm::Tile chol_count, ExecutionHW hw,
+                              bool anti_sym);

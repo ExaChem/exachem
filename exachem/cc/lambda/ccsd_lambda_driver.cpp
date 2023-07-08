@@ -11,6 +11,10 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
+template<typename T>
+void compute_rdm(std::vector<int>&, std::string, Scheduler&, TiledIndexSpace&, Tensor<T>, Tensor<T>,
+                 Tensor<T>, Tensor<T>);
+
 void ccsd_lambda_driver(std::string filename, OptionsMap options_map) {
   using T = double;
 
@@ -381,6 +385,8 @@ void ccsd_lambda_driver(std::string filename, OptionsMap options_map) {
     sys_data.results["output"]["CCSD_Lambda"]["performance"]["total_time"] = ccsd_time;
     write_json_data(sys_data, "CCSD_Lambda");
   }
+
+  compute_rdm(ccsd_options.cc_rdm, files_prefix, sch, MO, d_t1, d_t2, d_y1, d_y2);
 
   sch
     .deallocate(d_t1, d_t2, d_y1, d_y2, tmp1, tmp2, tmp3, tmp4, tmp5, dipole_mx, dipole_my,

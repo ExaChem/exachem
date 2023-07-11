@@ -20,6 +20,7 @@ include(${EXACHEM_SRC_DIR}/cc/eom/eom.cmake)
 include(${EXACHEM_SRC_DIR}/cc/ccsd/ccsd.cmake)
 include(${EXACHEM_SRC_DIR}/cc/ccsd_t/ccsd_t.cmake)
 include(${EXACHEM_SRC_DIR}/cc/lambda/lambda.cmake)
+include(${EXACHEM_SRC_DIR}/cc/ducc/ducc.cmake)
 
 if(NOT USE_UPCXX)
 include(${EXACHEM_SRC_DIR}/cc/gfcc/gfcc.cmake)
@@ -27,7 +28,7 @@ include(${EXACHEM_SRC_DIR}/cc/rteom/rteom.cmake)
 endif()
 
 set(CoupledCluster_SRCS ${CC_SRCS} ${CC2_SRCS} ${CCSD_SRCS} ${CCSD_T_SRCS} 
-${CC_LAMBDA_SRCS} ${CC_EOM_SRCS} ${GFCC_SRCS} ${RTEOM_SRCS})
+${CC_LAMBDA_SRCS} ${CC_EOM_SRCS} ${GFCC_SRCS} ${RTEOM_SRCS} ${DUCC_SRCS})
 
 set(EXACHEM_SRCS ${SCF_SRCS} ${COMMON_SRCS} ${MP2_SRCS} ${CoupledCluster_SRCS} ${EC_PRIVATE_SRCS})
 

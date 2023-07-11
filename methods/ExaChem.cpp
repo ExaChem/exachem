@@ -20,6 +20,7 @@ void rt_eom_cd_ccsd_driver(std::string filename, OptionsMap options_map);
 #endif
 
 void cc2_canonical_driver(std::string filename, OptionsMap options_map);
+void ducc_driver(std::string filename, OptionsMap options_map);
 
 int main(int argc, char* argv[]) {
   tamm::initialize(argc, argv);
@@ -90,6 +91,7 @@ int main(int argc, char* argv[]) {
   else if(task.cc2) cc2_canonical_driver(filename, options_map);
   else if(task.ccsd_lambda) ccsd_lambda_driver(filename, options_map);
   else if(task.eom_ccsd) eom_ccsd_driver(filename, options_map);
+  else if(task.ducc) ducc_driver(filename, options_map);
 #if !defined(USE_UPCXX)
   else if(task.fci || task.fcidump) fci_driver(filename, options_map);
   else if(task.gfccsd) gfccsd_driver(filename, options_map);

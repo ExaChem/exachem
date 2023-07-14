@@ -18,7 +18,7 @@ import os
 # -- Project information -----------------------------------------------------
 
 project = u'ExaChem'
-copyright = u'2022, ExaChem Team'
+copyright = u'2022-2023, ExaChem Team'
 author = u'ExaChem Team'
 
 # Get the version from version.txt

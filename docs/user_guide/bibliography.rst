@@ -73,6 +73,11 @@ Bibliography
    Cluster Calculations.” *J. Chem. Theory Comput.* 13 (9): 4179–92.
    https://doi.org/10.1021/acs.jctc.7b00605.
 
+.. .. [peng_201747]
+..    Peng, Bo, and Karol Kowalski. 2017.
+..    "Low-rank factorization of electron integral tensors and its application in electronic structure theory."
+..    *Chemical Physics Letters.* https://doi.org/10.1016/j.cplett.2017.01.056.
+
 .. [vanbeeumen17_4950]
    Van Beeumen, Roel, David B. Williams-Young, Joseph M. Kasper, Chao
    Yang, Esmond G. Ng, and Xiaosong Li. 2017. “Model Order Reduction

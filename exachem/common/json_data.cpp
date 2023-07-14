@@ -141,6 +141,9 @@ void write_json_data(SystemData& sys_data, const std::string cmodule) {
   if(cmodule == "CD" || cmodule == "CCSD") {
     // CD options
     results["input"]["CD"]["diagtol"]          = cd.diagtol;
+    results["input"]["CD"]["itilesize"]        = cd.itilesize;
+    results["input"]["CD"]["write_cv"]         = cd.write_cv;
+    results["input"]["CD"]["write_vcount"]     = cd.write_vcount;
     results["input"]["CD"]["max_cvecs_factor"] = cd.max_cvecs_factor;
   }
 
@@ -149,7 +152,6 @@ void write_json_data(SystemData& sys_data, const std::string cmodule) {
   if(cmodule == "CCSD") {
     // CCSD options
     results["input"][cmodule]["tilesize"]      = ccsd.tilesize;
-    results["input"][cmodule]["itilesize"]     = ccsd.itilesize;
     results["input"][cmodule]["ndiis"]         = ccsd.ndiis;
     results["input"][cmodule]["readt"]         = str_bool(ccsd.readt);
     results["input"][cmodule]["writet"]        = str_bool(ccsd.writet);

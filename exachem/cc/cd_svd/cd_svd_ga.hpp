@@ -306,7 +306,7 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
   using libint2::Shell;
 
   double           diagtol    = sys_data.options_map.cd_options.diagtol;
-  const tamm::Tile itile_size = sys_data.options_map.ccsd_options.itilesize;
+  const tamm::Tile itile_size = sys_data.options_map.cd_options.itilesize;
   // const TAMM_GA_SIZE northo         = sys_data.nbf;
   const TAMM_GA_SIZE nao = sys_data.nbf_orig;
 

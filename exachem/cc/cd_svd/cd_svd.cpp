@@ -290,12 +290,11 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
   using libint2::Operator;
   using libint2::Shell;
 
-  const auto       ccsd_options = sys_data.options_map.ccsd_options;
-  const bool       readt        = ccsd_options.readt;
-  const bool       writet       = ccsd_options.writet;
-  const double     diagtol      = sys_data.options_map.cd_options.diagtol;
-  const int        write_vcount = sys_data.options_map.cd_options.write_vcount;
-  const tamm::Tile itile_size   = ccsd_options.itilesize;
+  const auto       cd_options   = sys_data.options_map.cd_options;
+  const bool       write_cv     = cd_options.write_cv;
+  const double     diagtol      = cd_options.diagtol;
+  const int        write_vcount = cd_options.write_vcount;
+  const tamm::Tile itile_size   = cd_options.itilesize;
   // const TAMM_GA_SIZE northo      = sys_data.nbf;
   const TAMM_GA_SIZE nao = sys_data.nbf_orig;
 
@@ -333,7 +332,7 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
   const auto nbf   = nao;
   int64_t    count = 0; // Initialize cholesky vector count
 
-  const auto out_fp        = sys_data.output_file_prefix + "." + ccsd_options.basis;
+  const auto out_fp        = sys_data.output_file_prefix + "." + cd_options.basis;
   const auto files_dir     = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type;
   const auto files_prefix  = /*out_fp;*/ files_dir + "/" + out_fp;
   const auto chol_ao_file  = files_prefix + ".chol_ao";
@@ -436,7 +435,7 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
   Engine      engine(Operator::coulomb, max_nprim(shells), max_l(shells), 0);
   const auto& buf = engine.results();
 
-  bool cd_restart = (readt || writet) && fs::exists(diag_ao_file) && fs::exists(chol_ao_file) &&
+  bool cd_restart = write_cv && fs::exists(diag_ao_file) && fs::exists(chol_ao_file) &&
                     fs::exists(cv_count_file);
 
 #if defined(USE_UPCXX)
@@ -980,13 +979,13 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
 
 #if !defined(USE_UPCXX)
     // Restart
-    if(writet && count % write_vcount == 0 && nbf > 1000) { write_chol_vectors(); }
+    if(write_cv && count % write_vcount == 0 && nbf > 1000) { write_chol_vectors(); }
 #endif
 
   } // while
 
 #if !defined(USE_UPCXX)
-  if(writet && nbf > 1000) write_chol_vectors();
+  if(write_cv && nbf > 1000) write_chol_vectors();
   Tensor<TensorType>::deallocate(g_d_tamm, g_r_tamm);
 #else
 g_r->destroy();

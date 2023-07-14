@@ -6,7 +6,7 @@
          "O 0.000000000000000 0.000000000000000  0.000000000000000",
          "H 0.000000000000000 1.579252144093028 -2.174611055780858"
         ],
-        "units": "bohr"
+        "units": "angstrom"
     },
 
     "comments": {
@@ -76,6 +76,8 @@
     "CD": {
         "debug": false,
         "diagtol": 1e-5,
+        "itilesize": 1000,
+        "write_cv": false,
         "write_vcount": 5000
     },
 
@@ -101,7 +103,6 @@
         "threshold": 1e-6,
         "force_tilesize": false,
         "tilesize": 50,
-        "itilesize": 1000,
         "lshift": 0,
         "ndiis": 5,
         "ccsd_maxiter": 50,
@@ -133,7 +134,7 @@
         },
 
         "EOMCCSD": {
-          "eom_nroots": 0,
+          "eom_nroots": 1,
           "eom_type": "right",
           "eom_threshold": 1e-6,
           "eom_microiter": 50

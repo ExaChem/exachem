@@ -111,15 +111,9 @@ ProcGroupData get_spg_data(ExecutionContext& ec, const size_t N, const int node_
   if(spg_nnodes > nnodes) spg_nnodes = nnodes;
   int spg_nranks = spg_nnodes * ppn;
 
-  if(node_inp > nnodes) {
-    const std::string errmsg = "ERROR: nnodes (" + std::to_string(node_inp) +
-                               ") provided is greater than the number of nodes (" +
-                               std::to_string(nnodes) + ") available!";
-    tamm_terminate(errmsg);
-  }
-
-  if(node_inp > spg_nnodes) {
-    spg_nnodes = nnodes;
+  int user_nnodes = static_cast<int>(node_inp / 100) * nnodes;
+  if(user_nnodes > spg_nnodes) {
+    spg_nnodes = user_nnodes;
     spg_nranks = spg_nnodes * ppn;
   }
   pgdata.spg_nnodes = spg_nnodes;

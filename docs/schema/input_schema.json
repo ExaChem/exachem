@@ -210,6 +210,12 @@
         },
         "write_vcount": {
           "type": "number"
+        },
+        "write_cv": {
+          "type": "boolean"
+        },
+        "itilesize": {
+          "type": "number"
         }
       }
     },
@@ -275,9 +281,6 @@
         "tilesize": {
           "type": "number"
         },
-        "itilesize": {
-          "type": "number"
-        },
         "lshift": {
           "type": "number"
         },
@@ -331,6 +334,9 @@
             },
             "ccsd_diagnostics": {
               "type": "string"
+            },
+            "rdm": {
+              "type": "array"
             }
           }
         },

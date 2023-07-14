@@ -6,5 +6,5 @@ ExaChem User Guide
     :maxdepth: 2
     :caption: Contents:
  
-    input_options
+    basic_options
     methods

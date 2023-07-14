@@ -132,7 +132,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   }
 
 #if SCF_THROTTLE_RESOURCES
-  ProcGroupData pgdata = get_spg_data(exc, N, -1, 30, scf_options.nnodes, -1, 4);
+  ProcGroupData pgdata = get_spg_data(exc, N, -1, 50, scf_options.nnodes, -1, 4);
   auto [t_nnodes, hf_nnodes, ppn, hf_nranks, sca_nnodes, sca_nranks] = pgdata.unpack();
 
 #if defined(USE_UPCXX)

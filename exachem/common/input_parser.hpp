@@ -48,7 +48,7 @@ public:
     debug              = false;
     basis              = "sto-3g";
     dfbasis            = "";
-    geom_units         = "bohr";
+    geom_units         = "angstrom";
     gaussian_type      = "spherical";
     output_file_prefix = "";
     ext_data_path      = "";
@@ -272,25 +272,31 @@ public:
   CDOptions() = default;
   CDOptions(Options o): Options(o) {
     diagtol      = 1e-5;
+    write_cv     = false;
     write_vcount = 5000;
     // At most 8*ao CholVec's. For vast majority cases, this is way
     // more than enough. For very large basis, it can be increased.
     max_cvecs_factor = 12;
+    itilesize        = 1000;
   }
 
   double diagtol;
+  int    itilesize;
   int    max_cvecs_factor;
   // write to disk after every count number of vectors are computed.
-  // writes only if cc.writet=true and nbf>1000
-  int write_vcount;
+  // enabled only if write_cv=true and nbf>1000
+  bool write_cv;
+  int  write_vcount;
 
   void print() {
     std::cout << std::defaultfloat;
     cout << endl << "CD Options" << endl;
     cout << "{" << endl;
     cout << std::boolalpha << " debug            = " << debug << endl;
+    cout << std::boolalpha << " write_cv         = " << write_cv << endl;
     cout << " diagtol          = " << diagtol << endl;
     cout << " write_vcount     = " << write_vcount << endl;
+    cout << " itilesize        = " << itilesize << endl;
     cout << " max_cvecs_factor = " << max_cvecs_factor << endl;
     cout << "}" << endl;
   }
@@ -361,7 +367,6 @@ public:
     threshold      = 1e-6;
     force_tilesize = false;
     tilesize       = 40;
-    itilesize      = 1000;
     ndiis          = 5;
     lshift         = 0;
     nactive        = 0;
@@ -397,7 +402,7 @@ public:
     eom_nroots    = 1;
     eom_threshold = 1e-6;
     eom_type      = "right";
-    eom_microiter = o.maxiter;
+    eom_microiter = ccsd_maxiter;
 
     pcore         = 0;
     ntimesteps    = 10;
@@ -445,7 +450,6 @@ public:
   }
 
   int  tilesize;
-  int  itilesize;
   bool force_tilesize;
   int  ndiis;
   int  writet_iter;
@@ -545,7 +549,6 @@ public:
     cout << " ccsd_maxiter         = " << ccsd_maxiter << endl;
     cout << " freeze_core          = " << freeze_core << endl;
     cout << " freeze_virtual       = " << freeze_virtual << endl;
-    cout << " itilesize            = " << itilesize << endl;
     if(lshift != 0) cout << " lshift               = " << lshift << endl;
     if(gf_nprocs_poi > 0) cout << " gf_nprocs_poi        = " << gf_nprocs_poi << endl;
     print_bool(" readt               ", readt);
@@ -815,17 +818,23 @@ parse_json(json& jinput) {
     if(std::find(valid_scf.begin(), valid_scf.end(), el.key()) == valid_scf.end())
       tamm_terminate("INPUT FILE ERROR: Invalid SCF option [" + el.key() + "] in the input file");
   }
+  if(scf_options.nnodes < 1 || scf_options.nnodes > 100) {
+    tamm_terminate("INPUT FILE ERROR: SCF option nnodes should be a number between 1 and 100");
+  }
 
   // CD
   json jcd = jinput["CD"];
   parse_option<bool>(cd_options.debug, jcd, "debug");
+  parse_option<int>(cd_options.itilesize, jcd, "itilesize");
   parse_option<double>(cd_options.diagtol, jcd, "diagtol");
+  parse_option<bool>(cd_options.write_cv, jcd, "write_cv");
   parse_option<int>(cd_options.write_vcount, jcd, "write_vcount");
   parse_option<int>(cd_options.max_cvecs_factor, jcd, "max_cvecs");
+
   parse_option<string>(cd_options.ext_data_path, jcd, "ext_data_path");
 
-  const std::vector<string> valid_cd{"comments",     "debug",     "diagtol",
-                                     "write_vcount", "max_cvecs", "ext_data_path"};
+  const std::vector<string> valid_cd{"comments", "debug",        "itilesize", "diagtol",
+                                     "write_cv", "write_vcount", "max_cvecs", "ext_data_path"};
   for(auto& el: jcd.items()) {
     if(std::find(valid_cd.begin(), valid_cd.end(), el.key()) == valid_cd.end())
       tamm_terminate("INPUT FILE ERROR: Invalid CD option [" + el.key() + "] in the input file");
@@ -858,12 +867,11 @@ parse_json(json& jinput) {
   // CC
   json                      jcc = jinput["CC"];
   const std::vector<string> valid_cc{
-    "CCSD(T)",     "DLPNO",     "EOMCCSD",        "RT-EOMCC",      "GFCCSD",
-    "comments",    "threshold", "force_tilesize", "tilesize",      "itilesize",
-    "lshift",      "ndiis",     "ccsd_maxiter",   "freeze_core",   "freeze_virtual",
-    "PRINT",       "readt",     "writet",         "writev",        "writet_iter",
-    "debug",       "nactive",   "profile_ccsd",   "balance_tiles", "ext_data_path",
-    "computeTData"};
+    "CCSD(T)",  "DLPNO",     "EOMCCSD",        "RT-EOMCC",      "GFCCSD",
+    "comments", "threshold", "force_tilesize", "tilesize",      "computeTData",
+    "lshift",   "ndiis",     "ccsd_maxiter",   "freeze_core",   "freeze_virtual",
+    "PRINT",    "readt",     "writet",         "writev",        "writet_iter",
+    "debug",    "nactive",   "profile_ccsd",   "balance_tiles", "ext_data_path"};
   for(auto& el: jcc.items()) {
     if(std::find(valid_cc.begin(), valid_cc.end(), el.key()) == valid_cc.end())
       tamm_terminate("INPUT FILE ERROR: Invalid CC option [" + el.key() + "] in the input file");
@@ -877,7 +885,6 @@ parse_json(json& jinput) {
   parse_option<double>(ccsd_options.lshift        , jcc, "lshift");
   parse_option<double>(ccsd_options.threshold     , jcc, "threshold");
   parse_option<int>   (ccsd_options.tilesize      , jcc, "tilesize");
-  parse_option<int>   (ccsd_options.itilesize     , jcc, "itilesize");
   parse_option<bool>  (ccsd_options.debug         , jcc, "debug");
   parse_option<bool>  (ccsd_options.readt         , jcc, "readt");
   parse_option<bool>  (ccsd_options.writet        , jcc, "writet");
@@ -1172,10 +1179,6 @@ inline std::tuple<OptionsMap, json> parse_input(std::istream& is) {
   options_map.scf_options   = scf_options;
   options_map.cd_options    = cd_options;
   options_map.gw_options    = gw_options;
-
-  if(ccsd_options.eom_microiter < ccsd_options.maxiter &&
-     ccsd_options.eom_microiter == options.maxiter)
-    ccsd_options.eom_microiter = ccsd_options.maxiter;
 
   options_map.ccsd_options = ccsd_options;
   options_map.fci_options  = fci_options;

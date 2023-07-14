@@ -535,7 +535,7 @@ cd_svd_driver(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO, T
   // std::tie(V2) =
   Tensor<T> cholVpr;
 
-  auto itile_size = sys_data.options_map.ccsd_options.itilesize;
+  auto itile_size = sys_data.options_map.cd_options.itilesize;
 
   sys_data.n_frozen_core    = sys_data.options_map.ccsd_options.freeze_core;
   sys_data.n_frozen_virtual = sys_data.options_map.ccsd_options.freeze_virtual;

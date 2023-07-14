@@ -665,12 +665,12 @@
     },
     "CD": {
       "diagtol": 1e-12,
+      "itilesize": 1000,
       "max_cvecs_factor": 40
     },
     "CCSD": {
       "threshold": 1e-06,
       "tilesize": 40,
-      "itilesize": 1000,
       "ndiis": 5,
       "readt": "false",
       "writet": "false",

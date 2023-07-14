@@ -1,11 +1,11 @@
 ExaChem Documentation
-================================
+=======================
 
 .. toctree::
    :maxdepth: 3
    :caption: Contents:
 
-   intro
+   introduction
    user_guide/user
    developer_guide/developer
 

@@ -199,17 +199,17 @@ scf_iter_body(ExecutionContext& ec, ScalapackInfo& scalapack_info, const int& it
       double lval = is_rhf ? 0.5 * lshift : lshift;
       // clang-format off
       sch
-	(ehf_tmp(mu,ku) = S1(mu,nu) * D_last_alpha_tamm(nu,ku))
-	(F_alpha(mu,ku) -= lval * ehf_tmp(mu,nu) * S1(nu,ku))
-	.execute();
+      (ehf_tmp(mu,ku) = S1(mu,nu) * D_last_alpha_tamm(nu,ku))
+      (F_alpha(mu,ku) -= lval * ehf_tmp(mu,nu) * S1(nu,ku))
+      .execute();
       // clang-format on
 
       if(is_uhf) {
         // clang-format off
-	sch
-	  (ehf_tmp(mu,ku) = S1(mu,nu) * D_last_beta_tamm(nu,ku))
-	  (F_beta(mu,ku) -= lval * ehf_tmp(mu,nu) * S1(nu,ku))
-	  .execute();
+        sch
+        (ehf_tmp(mu,ku) = S1(mu,nu) * D_last_beta_tamm(nu,ku))
+        (F_beta(mu,ku) -= lval * ehf_tmp(mu,nu) * S1(nu,ku))
+        .execute();
         // clang-format on
       }
     }

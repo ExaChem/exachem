@@ -137,7 +137,8 @@ void fci_driver(std::string filename, OptionsMap options_map) {
 
   files_prefix = generate_fcidump(sys_data, ec, MO, lcao, d_f1, full_v2, ex_hw);
   #if defined(USE_MACIS)
-  macis_driver(ec, sys_data, files_prefix);
+  if(options_map.task_options.fci)
+    macis_driver(ec, sys_data, files_prefix);
   #endif
   
   free_tensors(lcao, d_f1, full_v2);

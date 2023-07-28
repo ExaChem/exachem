@@ -13,28 +13,6 @@ bool cd_debug = false;
 #define CD_USE_PGAS_API
 
 template<typename T>
-auto get_max(Tensor<T> tens) {
-  T maxval{};
-#if !defined(USE_UPCXX)
-  std::vector<int64_t> indx(tens.num_modes());
-  NGA_Select_elem64(tens.ga_handle(), const_cast<char*>("max"), &maxval, indx.data());
-#else
-  std::vector<int64_t> indx(4, -1);
-  // tens.upcxx_handle()->maximum(maxval, indx[0], indx[1], indx[2], indx[3]);
-#endif
-
-  // max using tamm
-  // auto [maxval_, blkid, eoff] = tamm::max_element(tens);
-  // maxval                      = maxval_;
-  // auto                 blkoff = tens.block_offsets(blkid);
-  // std::vector<int64_t> indx(tens.num_modes());
-  // indx[0] = (int64_t) blkoff[0] + (int64_t) eoff[0];
-  // indx[1] = (int64_t) blkoff[1] + (int64_t) eoff[1];
-
-  return std::make_tuple(maxval, indx);
-}
-
-template<typename T>
 auto cd_tensor_zero(Tensor<T>& tens) {
 #if !defined(USE_UPCXX)
   NGA_Zero(tens.ga_handle());
@@ -328,7 +306,6 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
     cout << std::string(45, '-') << endl;
   }
 
-  // Step A. Initialization
   const auto nbf   = nao;
   int64_t    count = 0; // Initialize cholesky vector count
 
@@ -356,13 +333,15 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
   };
   check_cd_mem_req("computing cholesky vectors");
 
-#if !defined(USE_UPCXX)
   g_r_tamm.set_dense();
   g_d_tamm.set_dense();
   g_chol_tamm.set_dense();
 
   Tensor<TensorType>::allocate(&ec_dense, g_d_tamm, g_r_tamm, g_chol_tamm);
+
+#if !defined(USE_UPCXX)
   cd_tensor_zero(g_d_tamm);
+  cd_tensor_zero(g_r_tamm);
   cd_tensor_zero(g_chol_tamm);
 
   auto write_chol_vectors = [&]() {
@@ -381,28 +360,8 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
   const int g_chol = g_chol_tamm.ga_handle();
   const int g_d    = g_d_tamm.ga_handle();
   const int g_r    = g_r_tamm.ga_handle();
-#else
-  upcxx::team& team_ref = upcxx::world();
-  upcxx::team* team     = &team_ref;
 
-  std::vector<int64_t> dims = {nbf, nbf, max_cvecs};
-  std::vector<int64_t> chnk = {-1, -1, max_cvecs};
-
-  ga_over_upcxx<TensorType>* g_chol =
-    new ga_over_upcxx<TensorType>(3, dims.data(), chnk.data(), *team);
-  g_chol->zero();
-
-  dims = {nbf, nbf, 1};
-  chnk = {-1, -1, 1};
-
-  ga_over_upcxx<TensorType>* g_d =
-    new ga_over_upcxx<TensorType>(3, dims.data(), chnk.data(), *team);
-  ga_over_upcxx<TensorType>* g_r =
-    new ga_over_upcxx<TensorType>(3, dims.data(), chnk.data(), *team);
-  g_d->zero();
-#endif
-
-#if defined(CD_USE_PGAS_API) && !defined(USE_UPCXX)
+#if defined(CD_USE_PGAS_API)
   std::vector<int64_t> lo_b(g_chol_tamm.num_modes(), -1); // The lower limits of blocks of B
   std::vector<int64_t> hi_b(g_chol_tamm.num_modes(), -2); // The upper limits of blocks of B
   std::vector<int64_t> ld_b(g_chol_tamm.num_modes());     // The leading dims of blocks of B
@@ -424,11 +383,12 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
   bool has_gd_data = (lo_d[0] >= 0 && hi_d[0] >= 0);
   bool has_gr_data = (lo_r[0] >= 0 && hi_r[0] >= 0);
 #endif
+#endif
 
   ec_dense.pg().barrier();
 
   auto cd_t1 = std::chrono::high_resolution_clock::now();
-  /* Step B. Compute the diagonal
+  /* Compute the diagonal
     g_d_tamm stores the diagonal integrals, i.e. (uv|uv)'s
     ScrCol temporarily stores all (uv|rs)'s with fixed r and s
   */
@@ -438,39 +398,6 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
   bool cd_restart = write_cv && fs::exists(diag_ao_file) && fs::exists(chol_ao_file) &&
                     fs::exists(cv_count_file);
 
-#if defined(USE_UPCXX)
-  for(size_t s1 = 0; s1 != shells.size(); ++s1) {
-    auto bf1_first = shell2bf[s1]; // first basis function in this shell
-    auto n1        = shells[s1].size();
-
-    for(size_t s2 = 0; s2 != shells.size(); ++s2) {
-      auto bf2_first = shell2bf[s2];
-      auto n2        = shells[s2].size();
-
-      if(!g_d->coord_is_local(bf1_first, bf2_first, 0, 0)) continue;
-
-      engine.compute(shells[s1], shells[s2], shells[s1], shells[s2]);
-      const auto* buf_1212 = buf[0];
-      if(buf_1212 == nullptr) continue; // if all integrals screened out, skip to next quartet
-
-      std::vector<TensorType> k_eri(n1 * n2);
-      for(decltype(n1) f1 = 0; f1 != n1; ++f1) {
-        // const auto bf1 = f1 + bf1_first;
-        for(decltype(n2) f2 = 0; f2 != n2; ++f2) {
-          // const auto bf2 = f2 + bf2_first;
-          auto f1212          = f1 * n2 * n1 * n2 + f2 * n1 * n2 + f1 * n2 + f2;
-          k_eri[f1 * n2 + f2] = buf_1212[f1212];
-        }
-      }
-      int64_t ibflo[2] = {cd_ncast<size_t>(bf1_first), cd_ncast<size_t>(bf2_first)};
-      int64_t ibfhi[2] = {cd_ncast<size_t>(bf1_first + n1 - 1),
-                          cd_ncast<size_t>(bf2_first + n2 - 1)};
-      int64_t ld[4]    = {cd_ncast<size_t>(n1), cd_ncast<size_t>(n2), 1, 1};
-      g_d->put(ibflo[0], ibflo[1], 0, 0, ibfhi[0], ibfhi[1], 0, 0, &k_eri[0], ld);
-    } // s2
-  }   // s1
-
-#else
   auto compute_diagonals = [&](const IndexVector& blockid) {
     auto bi0 = blockid[0];
     auto bi1 = blockid[1];
@@ -535,7 +462,6 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
   //   }
   // }
   if(!cd_restart) block_for(ec_dense, g_d_tamm(), compute_diagonals);
-#endif
 
   auto cd_t2   = std::chrono::high_resolution_clock::now();
   auto cd_time = std::chrono::duration_cast<std::chrono::duration<double>>((cd_t2 - cd_t1)).count();
@@ -572,16 +498,12 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
 
   auto cd_t3 = std::chrono::high_resolution_clock::now();
 
-// Step C. Find the coordinates of the maximum element of the diagonal.
-#if !defined(USE_UPCXX)
-  auto [val_d0, indx_d0] = get_max(g_d_tamm);
-#else
-  TensorType           val_d0{};
-  std::vector<int64_t> indx_d0(4, -1);
-  g_d->maximum(val_d0, indx_d0[0], indx_d0[1], indx_d0[2], indx_d0[3]);
-#endif
+  auto [val_d0, blkid, eoff]  = tamm::max_element(g_d_tamm);
+  auto                 blkoff = g_d_tamm.block_offsets(blkid);
+  std::vector<int64_t> indx_d0(g_d_tamm.num_modes());
+  indx_d0[0] = (int64_t) blkoff[0] + (int64_t) eoff[0];
+  indx_d0[1] = (int64_t) blkoff[1] + (int64_t) eoff[1];
 
-  // Step D. Start the while loop
   while(val_d0 > diagtol && count < max_cvecs) {
     auto bfu   = indx_d0[0];
     auto bfv   = indx_d0[1];
@@ -596,8 +518,6 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
 
 #if !defined(USE_UPCXX)
     cd_tensor_zero(g_r_tamm);
-#else
-    g_r->zero();
 #endif
 
 #if !defined(CD_USE_PGAS_API)
@@ -671,23 +591,15 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
       auto bf3_first = shell2bf[s3]; // first basis function in this shell
       auto n3        = shells[s3].size();
 
-#if defined(USE_UPCXX)
-      for(decltype(s3) s4 = 0; s4 != shells.size(); ++s4) {
+      for(size_t s4 = 0; s4 != shells.size(); ++s4) {
         auto bf4_first = shell2bf[s4];
         auto n4        = shells[s4].size();
 
-        if(g_r->coord_is_local(bf3_first, bf4_first, 0, 0)) {
+#if defined(USE_UPCXX)
+        if(g_r_tamm.is_local_element(0, 0, bf3_first, bf4_first)) {
 #else
-      decltype(bf3_first) lo_r0 = lo_r[0];
-      decltype(bf3_first) hi_r0 = hi_r[0];
-      if(lo_r0 <= bf3_first && bf3_first <= hi_r0) {
-        for(decltype(s3) s4 = 0; s4 != shells.size(); ++s4) {
-          auto bf4_first = shell2bf[s4];
-          auto n4        = shells[s4].size();
-
-          decltype(bf4_first) lo_r1 = lo_r[1];
-          decltype(bf4_first) hi_r1 = hi_r[1];
-          if(lo_r1 <= bf4_first && bf4_first <= hi_r1) {
+        if(lo_r[0] <= bf3_first && bf3_first <= hi_r[0] && lo_r[1] <= bf4_first &&
+           bf4_first <= hi_r[1]) {
 #endif
           engine.compute(shells[s3], shells[s4], shells[s1], shells[s2]);
           const auto* buf_3412 = buf[0];
@@ -701,48 +613,45 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
             }
           }
 
-          int64_t ibflo[2] = {cd_ncast<size_t>(bf3_first), cd_ncast<size_t>(bf4_first)};
-          int64_t ibfhi[2] = {cd_ncast<size_t>(bf3_first + n3 - 1),
+          int64_t ibflo[4] = {0, 0, cd_ncast<size_t>(bf3_first), cd_ncast<size_t>(bf4_first)};
+          int64_t ibfhi[4] = {0, 0, cd_ncast<size_t>(bf3_first + n3 - 1),
                               cd_ncast<size_t>(bf4_first + n4 - 1)};
-#if defined(USE_UPCXX)
-          int64_t ld[4]    = {cd_ncast<size_t>(n3), cd_ncast<size_t>(n4), 1, 1}; // n3
-          g_r->put(ibflo[0], ibflo[1], 0, 0, ibfhi[0], ibfhi[1], 0, 0, &k_eri[0], ld);
+
+#ifdef USE_UPCXX
+          g_r_tamm.put_raw(ibflo, ibfhi, k_eri.data());
 #else
-            const void* fbuf = &k_eri[0];
-            // TODO
-            int64_t ld[1] = {cd_ncast<size_t>(n4)}; // n3
-            NGA_Put64(g_r, ibflo, ibfhi, const_cast<void*>(fbuf), ld);
+          int64_t ld[1] = {cd_ncast<size_t>(n4)};
+          NGA_Put64(g_r, &ibflo[2], &ibfhi[2], k_eri.data(), ld);
 #endif
-        } // if s4
-      }   // s4
-#if !defined(USE_UPCXX)
-    }     // if s3
-#endif
-  }       // s3
+        }
+      }
+    }
 
-  ec_dense.pg().barrier();
-
+    ec_dense.pg().barrier();
 #endif
 
-    // Step F. Update the residual
+#ifndef USE_UPCXX
     lo_x[0] = indx_d0[0];
     lo_x[1] = indx_d0[1];
     lo_x[2] = 0;
     lo_x[3] = 0;
     hi_x[0] = indx_d0[0];
     hi_x[1] = indx_d0[1];
-    hi_x[2] = count; // count>0? count : 0;
+    hi_x[2] = count;
     hi_x[3] = 0;
     ld_x[0] = 1;
-#if defined(USE_UPCXX)
-    ld_x[1] = 1;
-    ld_x[2] = hi_x[2] + 1;
-    ld_x[3] = 1;
+    ld_x[1] = hi_x[2] + 1;
 #else
-  ld_x[1] = hi_x[2] + 1;
+    lo_x[0] = 0;
+    lo_x[1] = indx_d0[0];
+    lo_x[2] = indx_d0[1];
+    lo_x[3] = 0;
+    hi_x[0] = 0;
+    hi_x[1] = indx_d0[0];
+    hi_x[2] = indx_d0[1];
+    hi_x[3] = count;
 #endif
 
-    TensorType *            indx_b, *indx_d, *indx_r;
     std::vector<TensorType> k_row(max_cvecs);
 
 #if !defined(CD_USE_PGAS_API)
@@ -819,163 +728,95 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
     // }
     block_for(ec_dense, g_chol_tamm(), update_diagonals);
 
-    // Step H. Increment count
     count++;
 
 #else
 
 #if defined(USE_UPCXX)
-  g_chol->get(lo_x[0], lo_x[1], lo_x[2], lo_x[3], hi_x[0], hi_x[1], hi_x[2], hi_x[3], k_row.data(),
-              ld_x.data());
+    g_chol_tamm.get_raw_contig(lo_x.data(), hi_x.data(), k_row.data());
 
-  auto g_r_iter    = g_r->local_chunks_begin();
-  auto g_r_end     = g_r->local_chunks_end();
-  auto g_chol_iter = g_chol->local_chunks_begin();
-  auto g_chol_end  = g_chol->local_chunks_end();
+    auto left  = g_r_tamm.access_local_buf();
+    auto right = g_chol_tamm.access_local_buf();
+    auto n     = g_r_tamm.local_buf_size();
+    for(size_t icount = 0; icount < count; icount++)
+      for(size_t i = 0, k = icount; i < n; i++, k += max_cvecs)
+        *(left + i) -= *(right + k) * k_row[icount];
 
-  while(g_r_iter != g_r_end && g_chol_iter != g_chol_end) {
-    ga_over_upcxx_chunk<TensorType>* g_r_chunk    = *g_r_iter;
-    ga_over_upcxx_chunk<TensorType>* g_chol_chunk = *g_chol_iter;
-    assert(g_r_chunk->same_coord(g_chol_chunk) && g_r_chunk->same_size_or_smaller(g_chol_chunk));
-
-    ga_over_upcxx_chunk_view<TensorType> g_chol_view = g_chol_chunk->local_view();
-    ga_over_upcxx_chunk_view<TensorType> g_r_view    = g_r_chunk->local_view();
-
-    for(int64_t icount = 0; icount < count; icount++) {
-      for(int64_t i = 0; i < g_r_view.get_chunk_size(0); i++) {
-        for(int64_t j = 0; j < g_r_view.get_chunk_size(1); j++) {
-          g_r_view.subtract(i, j, 0, 0, g_chol_view.read(i, j, icount, 0) * k_row[icount]);
-        }
-      }
+    for(size_t i = 0, k = count; i < n; i++, k += max_cvecs) {
+      auto tmp     = *(left + i) / sqrt(val_d0);
+      *(right + k) = tmp;
     }
 
-    g_r_iter++;
-    g_chol_iter++;
-  }
-  assert(g_r_iter == g_r_end && g_chol_iter == g_chol_end);
-
-  // Step G. Compute the new Cholesky vector
-  g_r_iter    = g_r->local_chunks_begin();
-  g_r_end     = g_r->local_chunks_end();
-  g_chol_iter = g_chol->local_chunks_begin();
-  g_chol_end  = g_chol->local_chunks_end();
-
-  while(g_r_iter != g_r_end && g_chol_iter != g_chol_end) {
-    ga_over_upcxx_chunk<TensorType>* g_r_chunk    = *g_r_iter;
-    ga_over_upcxx_chunk<TensorType>* g_chol_chunk = *g_chol_iter;
-    assert(g_r_chunk->same_coord(g_chol_chunk) && g_r_chunk->same_size_or_smaller(g_chol_chunk));
-
-    ga_over_upcxx_chunk_view<TensorType> g_r_view    = g_r_chunk->local_view();
-    ga_over_upcxx_chunk_view<TensorType> g_chol_view = g_chol_chunk->local_view();
-
-    for(auto i = 0; i < g_r_view.get_chunk_size(0); i++) {
-      for(auto j = 0; j < g_r_view.get_chunk_size(1); j++) {
-        auto tmp = g_r_view.read(i, j, 0, 0) / sqrt(val_d0);
-        g_chol_view.write(i, j, count, 0, tmp);
-      }
+    left = g_d_tamm.access_local_buf();
+    n    = g_d_tamm.local_buf_size();
+    for(size_t i = 0, k = count; i < n; i++, k += max_cvecs) {
+      auto tmp = *(right + k);
+      *(left + i) -= tmp * tmp;
     }
-    g_r_iter++;
-    g_chol_iter++;
-  }
-  assert(g_r_iter == g_r_end && g_chol_iter == g_chol_end);
 
-  // Step H. Increment count
-  count++;
-
-  // Step I. Update the diagonal
-  auto g_d_iter = g_d->local_chunks_begin();
-  auto g_d_end  = g_d->local_chunks_end();
-  g_chol_iter   = g_chol->local_chunks_begin();
-  g_chol_end    = g_chol->local_chunks_end();
-
-  while(g_d_iter != g_d_end && g_chol_iter != g_chol_end) {
-    ga_over_upcxx_chunk<TensorType>* g_d_chunk    = *g_d_iter;
-    ga_over_upcxx_chunk<TensorType>* g_chol_chunk = *g_chol_iter;
-    assert(g_d_chunk->same_coord(g_chol_chunk) && g_d_chunk->same_size_or_smaller(g_chol_chunk));
-
-    ga_over_upcxx_chunk_view<TensorType> g_chol_view = g_chol_chunk->local_view();
-    ga_over_upcxx_chunk_view<TensorType> g_d_view    = g_d_chunk->local_view();
-
-    for(auto i = 0; i < g_d_view.get_chunk_size(0); i++) {
-      for(auto j = 0; j < g_d_view.get_chunk_size(1); j++) {
-        auto tmp = g_chol_view.read(i, j, count - 1, 0);
-        g_d_view.subtract(i, j, 0, 0, tmp * tmp);
-      }
-    }
-    g_d_iter++;
-    g_chol_iter++;
-  }
-  assert(g_d_iter == g_d_end && g_chol_iter == g_chol_end);
-
+    count++;
 #else
-      {
-        NGA_Get64(g_chol, lo_x.data(), hi_x.data(), k_row.data(), ld_x.data());
-        // get_tensor_block(g_chol, lo_x, hi_x, ld_x, k_row);
+    TensorType *indx_b, *indx_d, *indx_r;
 
-        if(has_gr_data) NGA_Access64(g_r, lo_r.data(), hi_r.data(), &indx_r, ld_r.data());
-        if(has_gc_data) NGA_Access64(g_chol, lo_b.data(), hi_b.data(), &indx_b, ld_b.data());
+    {
+      NGA_Get64(g_chol, lo_x.data(), hi_x.data(), k_row.data(), ld_x.data());
 
-        if(has_gr_data) {
-          for(decltype(count) icount = 0; icount < count; icount++) {
-            for(int64_t i = 0; i <= hi_r[0] - lo_r[0]; i++) {
-              for(int64_t j = 0; j <= hi_r[1] - lo_r[1]; j++) {
-                indx_r[i * ld_r[0] + j] -=
-                  indx_b[icount + j * ld_b[1] + i * ld_b[1] * ld_b[0]] * k_row[icount];
-              }
-            }
-          }
-        }
-
-        if(has_gc_data) NGA_Release64(g_chol, lo_b.data(), hi_b.data());
-        if(has_gr_data) NGA_Release_update64(g_r, lo_r.data(), hi_r.data());
-
-        // Step G. Compute the new Cholesky vector
-        if(has_gr_data) NGA_Access64(g_r, lo_r.data(), hi_r.data(), &indx_r, ld_r.data());
-        if(has_gc_data) NGA_Access64(g_chol, lo_b.data(), hi_b.data(), &indx_b, ld_b.data());
-
-        if(has_gc_data) {
-          for(auto i = 0; i <= hi_r[0] - lo_r[0]; i++) {
-            for(auto j = 0; j <= hi_r[1] - lo_r[1]; j++) {
-              auto tmp = indx_r[i * ld_r[0] + j] / sqrt(val_d0);
-              indx_b[count + j * ld_b[1] + i * ld_b[1] * ld_b[0]] = tmp;
-            }
-          }
-        }
-
-        if(has_gc_data) NGA_Release_update64(g_chol, lo_b.data(), hi_b.data());
-        if(has_gr_data) NGA_Release64(g_r, lo_r.data(), hi_r.data());
-      }
-
-      // Step H. Increment count
-      count++;
-
-      // Step I. Update the diagonal
-      if(has_gd_data) NGA_Access64(g_d, lo_d.data(), hi_d.data(), &indx_d, ld_d.data());
+      if(has_gr_data) NGA_Access64(g_r, lo_r.data(), hi_r.data(), &indx_r, ld_r.data());
       if(has_gc_data) NGA_Access64(g_chol, lo_b.data(), hi_b.data(), &indx_b, ld_b.data());
 
-      if(has_gd_data) {
-        for(auto i = 0; i <= hi_d[0] - lo_d[0]; i++) {
-          for(auto j = 0; j <= hi_d[1] - lo_d[1]; j++) {
-            auto tmp = indx_b[count - 1 + j * ld_b[1] + i * ld_b[1] * ld_b[0]];
-            indx_d[i * ld_d[0] + j] -= tmp * tmp;
+      if(has_gr_data) {
+        for(decltype(count) icount = 0; icount < count; icount++) {
+          for(int64_t i = 0; i <= hi_r[0] - lo_r[0]; i++) {
+            for(int64_t j = 0; j <= hi_r[1] - lo_r[1]; j++) {
+              indx_r[i * ld_r[0] + j] -=
+                indx_b[icount + j * ld_b[1] + i * ld_b[1] * ld_b[0]] * k_row[icount];
+            }
           }
         }
       }
 
       if(has_gc_data) NGA_Release64(g_chol, lo_b.data(), hi_b.data());
-      if(has_gd_data) NGA_Release_update64(g_d, lo_d.data(), hi_d.data());
+      if(has_gr_data) NGA_Release_update64(g_r, lo_r.data(), hi_r.data());
+
+      if(has_gr_data) NGA_Access64(g_r, lo_r.data(), hi_r.data(), &indx_r, ld_r.data());
+      if(has_gc_data) NGA_Access64(g_chol, lo_b.data(), hi_b.data(), &indx_b, ld_b.data());
+
+      if(has_gc_data) {
+        for(auto i = 0; i <= hi_r[0] - lo_r[0]; i++) {
+          for(auto j = 0; j <= hi_r[1] - lo_r[1]; j++) {
+            auto tmp = indx_r[i * ld_r[0] + j] / sqrt(val_d0);
+            indx_b[count + j * ld_b[1] + i * ld_b[1] * ld_b[0]] = tmp;
+          }
+        }
+      }
+
+      if(has_gc_data) NGA_Release_update64(g_chol, lo_b.data(), hi_b.data());
+      if(has_gr_data) NGA_Release64(g_r, lo_r.data(), hi_r.data());
+    }
+
+    if(has_gd_data) NGA_Access64(g_d, lo_d.data(), hi_d.data(), &indx_d, ld_d.data());
+    if(has_gc_data) NGA_Access64(g_chol, lo_b.data(), hi_b.data(), &indx_b, ld_b.data());
+
+    if(has_gd_data) {
+      for(auto i = 0; i <= hi_d[0] - lo_d[0]; i++) {
+        for(auto j = 0; j <= hi_d[1] - lo_d[1]; j++) {
+          auto tmp = indx_b[count + j * ld_b[1] + i * ld_b[1] * ld_b[0]];
+          indx_d[i * ld_d[0] + j] -= tmp * tmp;
+        }
+      }
+    }
+
+    if(has_gc_data) NGA_Release64(g_chol, lo_b.data(), hi_b.data());
+    if(has_gd_data) NGA_Release_update64(g_d, lo_d.data(), hi_d.data());
+
+    count++;
+#endif
 #endif
 
-#endif // CD_USE_PGAS_API
-
-    ec_dense.pg().barrier();
-
-// Step J. Find the coordinates of the maximum element of the diagonal.
-#if !defined(USE_UPCXX)
-    std::tie(val_d0, indx_d0) = get_max(g_d_tamm);
-#else
-  g_d->maximum(val_d0, indx_d0[0], indx_d0[1], indx_d0[2], indx_d0[3]);
-#endif
+    std::tie(val_d0, blkid, eoff) = tamm::max_element(g_d_tamm);
+    blkoff                        = g_d_tamm.block_offsets(blkid);
+    indx_d0[0]                    = (int64_t) blkoff[0] + (int64_t) eoff[0];
+    indx_d0[1]                    = (int64_t) blkoff[1] + (int64_t) eoff[1];
 
 #if !defined(USE_UPCXX)
     // Restart
@@ -984,15 +825,13 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
 
   } // while
 
+  if(rank == 0) std::cout << endl << "- Total number of cholesky vectors = " << count << std::endl;
+
 #if !defined(USE_UPCXX)
   if(write_cv && nbf > 1000) write_chol_vectors();
-  Tensor<TensorType>::deallocate(g_d_tamm, g_r_tamm);
-#else
-g_r->destroy();
-g_d->destroy();
 #endif
 
-  if(rank == 0) std::cout << endl << "- Total number of cholesky vectors = " << count << std::endl;
+  Tensor<TensorType>::deallocate(g_d_tamm, g_r_tamm);
 
   auto cd_t4 = std::chrono::high_resolution_clock::now();
   cd_time    = std::chrono::duration_cast<std::chrono::duration<double>>((cd_t4 - cd_t3)).count();
@@ -1017,7 +856,7 @@ g_d->destroy();
 
   Tensor<TensorType>::allocate(&ec, g_chol_ao_tamm);
 
-  // convert g_chol_tamm(nD with max_cvecs) to g_chol_ao_tamm(1D with chol_count)
+  // Convert g_chol_tamm(nD with max_cvecs) to g_chol_ao_tamm(1D with chol_count)
   auto lambdacv = [&](const IndexVector& bid) {
     const IndexVector blockid = internal::translate_blockid(bid, g_chol_ao_tamm());
 
@@ -1026,30 +865,21 @@ g_d->destroy();
 
     const tamm::TAMM_SIZE dsize = g_chol_ao_tamm.block_size(blockid);
 
-    int64_t lo[3] = {cd_ncast<size_t>(block_offset[0]), cd_ncast<size_t>(block_offset[1]),
+    int64_t lo[4] = {0, cd_ncast<size_t>(block_offset[0]), cd_ncast<size_t>(block_offset[1]),
                      cd_ncast<size_t>(block_offset[2])};
-    int64_t hi[3] = {cd_ncast<size_t>(block_offset[0] + block_dims[0] - 1),
+    int64_t hi[4] = {0, cd_ncast<size_t>(block_offset[0] + block_dims[0] - 1),
                      cd_ncast<size_t>(block_offset[1] + block_dims[1] - 1),
                      cd_ncast<size_t>(block_offset[2] + block_dims[2] - 1)};
-#if defined(USE_UPCXX)
-    int64_t ld[4] = {cd_ncast<size_t>(block_dims[0]), cd_ncast<size_t>(block_dims[1]),
-                     cd_ncast<size_t>(block_dims[2]), 1};
 
-    upcxx::progress();
-#else
-  int64_t ld[2] = {cd_ncast<size_t>(block_dims[1]), cd_ncast<size_t>(block_dims[2])};
-#endif
     std::vector<TensorType> sbuf(dsize);
-#if defined(USE_UPCXX)
-    g_chol->get(lo[0], lo[1], lo[2], 0, hi[0], hi[1], hi[2], 0, &sbuf[0], ld);
+#ifdef USE_UPCXX
+    g_chol_tamm.get_raw(lo, hi, sbuf.data());
 #else
-  NGA_Get64(g_chol, lo, hi, &sbuf[0], ld);
+    int64_t ld[2] = {cd_ncast<size_t>(block_dims[1]), cd_ncast<size_t>(block_dims[2])};
+    NGA_Get64(g_chol, &lo[1], &hi[1], sbuf.data(), ld);
 #endif
 
     g_chol_ao_tamm.put(blockid, sbuf);
-#if defined(USE_UPCXX)
-    upcxx::progress();
-#endif
   };
 
   block_for(ec, g_chol_ao_tamm(), lambdacv);
@@ -1063,14 +893,9 @@ g_d->destroy();
     lcao = Tensor<TensorType>{tAO, tMO};
     sch.allocate(lcao).execute();
     if(rank == 0) eigen_to_tamm_tensor(lcao, lcao_new);
-    // ec.pg().barrier();
   }
 
-#if !defined(USE_UPCXX)
   Tensor<TensorType>::deallocate(g_chol_tamm);
-#else
-g_chol->destroy();
-#endif
 
   Tensor<TensorType> CholVpr_tmp{tMO, tAO, tCIp};
   Tensor<TensorType> CholVpr_tamm{{tMO, tMO, tCIp},
@@ -1088,16 +913,16 @@ g_chol->destroy();
   cd_t1 = std::chrono::high_resolution_clock::now();
 
   // clang-format off
-// Contraction 1
-sch(CholVpr_tmp(pmo, mu, cindexp) = lcao(nu, pmo) * g_chol_ao_tamm(nu, mu, cindexp))
+  // Contraction 1
+  sch(CholVpr_tmp(pmo, mu, cindexp) = lcao(nu, pmo) * g_chol_ao_tamm(nu, mu, cindexp))
   .deallocate(g_chol_ao_tamm).execute(ec.exhw());
 
   cd_mem_req -= sum_tensor_sizes(g_chol_ao_tamm);
   cd_mem_req += sum_tensor_sizes(CholVpr_tamm);
   check_cd_mem_req("the 2-step contraction");
 
-// Contraction 2
-sch.allocate(CholVpr_tamm)
+  // Contraction 2
+  sch.allocate(CholVpr_tamm)
   (CholVpr_tamm(pmo, rmo, cindexp) = lcao(mu, rmo) * CholVpr_tmp(pmo, mu, cindexp))
   .deallocate(CholVpr_tmp)
   .execute(ec.exhw());

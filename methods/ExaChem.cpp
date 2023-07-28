@@ -19,7 +19,7 @@ void rt_eom_cd_ccsd_driver(std::string filename, OptionsMap options_map);
 #include "exachem/fci/fci.hpp"
 #endif
 
-void cc2_canonical_driver(std::string filename, OptionsMap options_map);
+void cd_cc2_driver(std::string filename, OptionsMap options_map);
 void ducc_driver(std::string filename, OptionsMap options_map);
 
 int main(int argc, char* argv[]) {
@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
 
   if(argc < 2) tamm_terminate("Please provide an input file!");
 
-  std::string   filename = std::string(argv[1]);
+  std::string   filename = fs::canonical(std::string(argv[1]));
   std::ifstream testinput(filename);
   if(!testinput) tamm_terminate("Input file provided [" + filename + "] does not exist!");
 
@@ -35,8 +35,9 @@ int main(int argc, char* argv[]) {
   auto current_time_t = std::chrono::system_clock::to_time_t(current_time);
   auto cur_local_time = localtime(&current_time_t);
 
-  const auto rank = ProcGroup::world_rank();
-  if(rank == 0) cout << endl << "Date: " << std::put_time(cur_local_time, "%c") << endl << endl;
+  const auto       rank = ProcGroup::world_rank();
+  ProcGroup        pg   = ProcGroup::create_world_coll();
+  ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
 
   // read geometry from a json file
   json jinput;
@@ -47,6 +48,19 @@ int main(int argc, char* argv[]) {
   std::tie(options_map, jinput) = parse_input(is);
   if(options_map.options.output_file_prefix.empty())
     options_map.options.output_file_prefix = getfilename(filename);
+
+  if(rank == 0) {
+    cout << endl << "date: " << std::put_time(cur_local_time, "%c") << endl;
+    cout << "program: " << fs::canonical(argv[0]) << endl;
+    cout << "input: " << filename << endl;
+    cout << "nnodes: " << ec.nnodes() << ", ";
+    cout << "nproc: " << ec.nnodes() * ec.ppn() << endl;
+    cout << "prefix: " << options_map.options.output_file_prefix << endl << endl;
+    ec.print_mem_info();
+    cout << endl << endl;
+    cout << "Input file provided" << endl << std::string(20, '-') << endl;
+    std::cout << jinput.dump(2) << std::endl;
+  }
 
   // if(rank == 0) {
   //   std::ofstream res_file(getfilename(filename)+".json");
@@ -65,6 +79,7 @@ int main(int argc, char* argv[]) {
                                   task.ccsd_lambda,
                                   task.eom_ccsd,
                                   task.fcidump,
+                                  task.rteom_cc2,
                                   task.rteom_ccsd,
                                   task.gfccsd,
                                   task.dlpno_ccsd.first,
@@ -88,7 +103,7 @@ int main(int argc, char* argv[]) {
   else if(task.cd_2e) cd_2e_driver(filename, options_map);
   else if(task.ccsd) cd_ccsd(filename, options_map);
   else if(task.ccsd_t) ccsd_t_driver(filename, options_map);
-  else if(task.cc2) cc2_canonical_driver(filename, options_map);
+  else if(task.cc2) cd_cc2_driver(filename, options_map);
   else if(task.ccsd_lambda) ccsd_lambda_driver(filename, options_map);
   else if(task.eom_ccsd) eom_ccsd_driver(filename, options_map);
   else if(task.ducc) ducc_driver(filename, options_map);

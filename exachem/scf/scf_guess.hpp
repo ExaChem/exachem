@@ -65,15 +65,6 @@ void compute_initial_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info,
                            const std::string& basis, bool is_spherical, EigenTensors& etensors,
                            TAMMTensors& ttensors, int charge, int multiplicity);
 
-// [WIP] guess by computing atom scf
-#if 0
-template<typename TensorType>
-void compute_sad_guess(ExecutionContext& ec, SystemData& sys_data, const SCFVars& scf_vars,
-                      const std::vector<libint2::Atom>& atoms, const libint2::BasisSet& shells,
-                      const std::string& basis, bool is_spherical,  EigenTensors& etensors,
-                      int charge, int multiplicity);
-#endif
-
 template<typename TensorType>
 std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
 compute_initial_guess_taskinfo(ExecutionContext& ec, SystemData& sys_data, const SCFVars& scf_vars,

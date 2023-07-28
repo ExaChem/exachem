@@ -158,16 +158,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 #endif
 
   if(rank == 0) {
-#if defined(USE_UPCXX)
-    cout << std::endl
-         << "Number of nodes, processes per node provided: " << nnodes << ", "
-         << (int) (gcomm->rank_n() / nnodes) << endl;
-#else
-    cout << std::endl
-         << "Number of nodes, processes per node provided: " << nnodes << ", "
-         << GA_Cluster_nprocs(0) << endl;
-#endif
-
+    cout << endl;
 #if SCF_THROTTLE_RESOURCES
     cout << "Number of nodes, processes per node used for SCF calculation: " << hf_nnodes << ", "
          << ppn << endl;
@@ -306,7 +297,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
 #else
   // TODO: Fix - create ec_m, when throttle is disabled
-  ExecutionContext& ec = exc;
+  ExecutionContext& ec  = exc;
 #endif
     // ProcGroup pg_l = ProcGroup::create_coll(MPI_COMM_SELF);
     // ExecutionContext ec_l{pg_l, DistributionKind::nw, MemoryManagerKind::local};
@@ -380,7 +371,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     const double xHF = is_ks ? (gauxc_func.is_hyb() ? gauxc_func.hyb_exx() : 0.) : 1.;
     if(rank == 0) cout << "HF exch = " << xHF << endl;
 #else
-  const double xHF = 1.;
+  const double      xHF = 1.;
 #endif
 
     ec.pg().barrier();

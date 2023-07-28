@@ -51,6 +51,7 @@ struct SystemData {
   // output data
   double scf_energy{};
   int    num_chol_vectors{};
+  double cc2_corr_energy{};
   double ccsd_corr_energy{};
 
   // json data

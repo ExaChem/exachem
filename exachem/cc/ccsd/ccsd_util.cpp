@@ -167,11 +167,12 @@ rest_cs(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1, Tensor
   return {residual, energy};
 }
 
-void print_ccsd_header(const bool do_print) {
+void print_ccsd_header(const bool do_print, std::string mname) {
   if(do_print) {
+    if(mname.empty()) mname = "CCSD";
     const auto mksp = std::string(10, ' ');
     std::cout << std::endl << std::endl;
-    std::cout << " CCSD iterations" << std::endl;
+    std::cout << " " << mname << " iterations" << std::endl;
     std::cout << std::string(60, '-') << std::endl;
     std::cout << "  Iter     Residuum" << mksp << "Correlation" << mksp << "Time(s)" << std::endl;
     std::cout << std::string(60, '-') << std::endl;

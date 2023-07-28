@@ -100,6 +100,7 @@ public:
   bool                         ccsd_t{false};
   bool                         ccsd_lambda{false};
   bool                         eom_ccsd{false};
+  bool                         rteom_cc2{false};
   bool                         rteom_ccsd{false};
   bool                         gfccsd{false};
   std::pair<bool, std::string> dlpno_ccsd{false, ""};
@@ -1035,9 +1036,9 @@ parse_json(json& jinput) {
   // TASK
   json                      jtask = jinput["TASK"];
   const std::vector<string> valid_tasks{
-    "scf",    "fci",        "fcidump",      "mp2",      "gw",         "cd_2e",
-    "cc2",    "dlpno_ccsd", "dlpno_ccsd_t", "ducc",     "ccsd",       "ccsd_sf",
-    "ccsd_t", "gfccsd",     "ccsd_lambda",  "eom_ccsd", "rteom_ccsd", "comments"};
+    "scf",         "fci",          "fcidump",   "mp2",        "gw",      "cd_2e",  "cc2",
+    "dlpno_ccsd",  "dlpno_ccsd_t", "ducc",      "ccsd",       "ccsd_sf", "ccsd_t", "gfccsd",
+    "ccsd_lambda", "eom_ccsd",     "rteom_cc2", "rteom_ccsd", "comments"};
 
   for(auto& el: jtask.items()) {
     if(std::find(valid_tasks.begin(), valid_tasks.end(), el.key()) == valid_tasks.end())
@@ -1058,6 +1059,7 @@ parse_json(json& jinput) {
   parse_option<bool>(task_options.ccsd_t      , jtask, "ccsd_t");
   parse_option<bool>(task_options.ccsd_lambda , jtask, "ccsd_lambda");
   parse_option<bool>(task_options.eom_ccsd    , jtask, "eom_ccsd");
+  parse_option<bool>(task_options.rteom_cc2   , jtask, "rteom_cc2");
   parse_option<bool>(task_options.rteom_ccsd  , jtask, "rteom_ccsd");
   parse_option<bool>(task_options.gfccsd      , jtask, "gfccsd");
 
@@ -1162,12 +1164,12 @@ inline std::tuple<OptionsMap, json> parse_input(std::istream& is) {
   if(ProcGroup::world_rank() == 0) {
     jinput.erase(std::remove(jinput.begin(), jinput.end(), nullptr), jinput.end());
 
-    std::cout << jinput.dump(2) << std::endl;
+    // std::cout << jinput.dump(2) << std::endl;
     // if(!nw_units_bohr) {
     //   std::cout << "Geometry in bohr as follows:" << std::endl;
     //   std::cout << jgeom_bohr.dump(2) << std::endl;
     // }
-    options.print();
+    // options.print();
     // scf_options.print();
     // cd_options.print();
     // ccsd_options.print();

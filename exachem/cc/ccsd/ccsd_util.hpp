@@ -182,7 +182,7 @@ rest_cs(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1, Tensor
         Tensor<T>& d_r2_residual, std::vector<T>& p_evl_sorted, T zshiftl, const TAMM_SIZE& noa,
         const TAMM_SIZE& nva, bool transpose = false, const bool not_spin_orbital = false);
 
-void print_ccsd_header(const bool do_print);
+void print_ccsd_header(const bool do_print, std::string mname = "");
 
 template<typename T>
 std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vector<Tensor<T>>,

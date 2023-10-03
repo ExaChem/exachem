@@ -2776,7 +2776,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 
 // Driver to the above kernel call for CUDA(non-TC), HIP, SYCL
 template<typename T>
-void fully_fused_ccsd_t_gpu(gpuStream_t& stream_id, size_t num_blocks, size_t base_size_h1b,
+void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_size_h1b,
                             size_t base_size_h2b, size_t base_size_h3b, size_t base_size_p4b,
                             size_t base_size_p5b, size_t base_size_p6b,
                             //
@@ -2795,66 +2795,57 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream_id, size_t num_blocks, size_t ba
                             //
                             T* dev_evl_sorted_h1b, T* dev_evl_sorted_h2b, T* dev_evl_sorted_h3b,
                             T* dev_evl_sorted_p4b, T* dev_evl_sorted_p5b, T* dev_evl_sorted_p6b,
-                            T* partial_energies) {
+                            T* partial_energies, gpuEvent_t* done_copy) {
 #ifdef USE_CUDA
   cudaMemcpyToSymbolAsync(const_df_s1_size, host_s1_size, sizeof(int) * (6), 0,
-                          cudaMemcpyHostToDevice, stream_id);
+                          cudaMemcpyHostToDevice, stream);
   cudaMemcpyToSymbolAsync(const_df_s1_exec, host_s1_exec, sizeof(int) * (9), 0,
-                          cudaMemcpyHostToDevice, stream_id);
+                          cudaMemcpyHostToDevice, stream);
 
   cudaMemcpyToSymbolAsync(const_df_d1_size, host_d1_size, sizeof(int) * (7 * size_noab), 0,
-                          cudaMemcpyHostToDevice, stream_id);
+                          cudaMemcpyHostToDevice, stream);
   cudaMemcpyToSymbolAsync(const_df_d1_exec, host_d1_exec, sizeof(int) * (9 * size_noab), 0,
-                          cudaMemcpyHostToDevice, stream_id);
+                          cudaMemcpyHostToDevice, stream);
 
   cudaMemcpyToSymbolAsync(const_df_d2_size, host_d2_size, sizeof(int) * (7 * size_nvab), 0,
-                          cudaMemcpyHostToDevice, stream_id);
+                          cudaMemcpyHostToDevice, stream);
   cudaMemcpyToSymbolAsync(const_df_d2_exec, host_d2_exec, sizeof(int) * (9 * size_nvab), 0,
-                          cudaMemcpyHostToDevice, stream_id);
+                          cudaMemcpyHostToDevice, stream);
+
+  CUDA_SAFE(cudaEventRecord(*done_copy, stream));
 
   //    Depends on # of Fused Kernel
   dim3 gridsize_1(num_blocks);
   dim3 blocksize_1(FUSION_SIZE_TB_1_X, FUSION_SIZE_TB_1_Y);
 
   //    to call the fused kernel for singles, doubles and energies.
-  revised_jk_ccsd_t_fully_fused_kernel<T><<<gridsize_1, blocksize_1, 0, stream_id>>>(
-    (int) size_noab, (int) size_nvab,
-    //
-    (int) size_max_dim_s1_t1, (int) size_max_dim_s1_v2, (int) size_max_dim_d1_t2,
-    (int) size_max_dim_d1_v2, (int) size_max_dim_d2_t2, (int) size_max_dim_d2_v2,
-    //
-    df_dev_d1_t2_all, df_dev_d1_v2_all, df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_s1_t1_all,
-    df_dev_s1_v2_all,
-    //
-    dev_evl_sorted_h1b, dev_evl_sorted_h2b, dev_evl_sorted_h3b, dev_evl_sorted_p4b,
-    dev_evl_sorted_p5b, dev_evl_sorted_p6b,
-    //
-    partial_energies,
-    //
-    CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3), CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2),
-    CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1), CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6),
-    CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5), CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4),
-    //
-    (int) base_size_h1b, (int) base_size_h2b, (int) base_size_h3b, (int) base_size_p4b,
-    (int) base_size_p5b, (int) base_size_p6b);
+  revised_jk_ccsd_t_fully_fused_kernel<T><<<gridsize_1, blocksize_1, 0, stream>>>(
+    (int) size_noab, (int) size_nvab, (int) size_max_dim_s1_t1, (int) size_max_dim_s1_v2,
+    (int) size_max_dim_d1_t2, (int) size_max_dim_d1_v2, (int) size_max_dim_d2_t2,
+    (int) size_max_dim_d2_v2, df_dev_d1_t2_all, df_dev_d1_v2_all, df_dev_d2_t2_all,
+    df_dev_d2_v2_all, df_dev_s1_t1_all, df_dev_s1_v2_all, dev_evl_sorted_h1b, dev_evl_sorted_h2b,
+    dev_evl_sorted_h3b, dev_evl_sorted_p4b, dev_evl_sorted_p5b, dev_evl_sorted_p6b,
+    partial_energies, CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3),
+    CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2), CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1),
+    CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6), CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5),
+    CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4), (int) base_size_h1b, (int) base_size_h2b,
+    (int) base_size_h3b, (int) base_size_p4b, (int) base_size_p5b, (int) base_size_p6b);
 
 #elif defined(USE_HIP)
   HIP_SAFE(hipMemcpyToSymbolAsync(HIP_SYMBOL(const_df_s1_size), host_s1_size, sizeof(int) * (6), 0,
-                                  hipMemcpyHostToDevice, stream_id));
+                                  hipMemcpyHostToDevice, stream));
   HIP_SAFE(hipMemcpyToSymbolAsync(HIP_SYMBOL(const_df_s1_exec), host_s1_exec, sizeof(int) * (9), 0,
-                                  hipMemcpyHostToDevice, stream_id));
+                                  hipMemcpyHostToDevice, stream));
   HIP_SAFE(hipMemcpyToSymbolAsync(HIP_SYMBOL(const_df_d1_size), host_d1_size,
-                                  sizeof(int) * (7 * size_noab), 0, hipMemcpyHostToDevice,
-                                  stream_id));
+                                  sizeof(int) * (7 * size_noab), 0, hipMemcpyHostToDevice, stream));
   HIP_SAFE(hipMemcpyToSymbolAsync(HIP_SYMBOL(const_df_d1_exec), host_d1_exec,
-                                  sizeof(int) * (9 * size_noab), 0, hipMemcpyHostToDevice,
-                                  stream_id));
+                                  sizeof(int) * (9 * size_noab), 0, hipMemcpyHostToDevice, stream));
   HIP_SAFE(hipMemcpyToSymbolAsync(HIP_SYMBOL(const_df_d2_size), host_d2_size,
-                                  sizeof(int) * (7 * size_nvab), 0, hipMemcpyHostToDevice,
-                                  stream_id));
+                                  sizeof(int) * (7 * size_nvab), 0, hipMemcpyHostToDevice, stream));
   HIP_SAFE(hipMemcpyToSymbolAsync(HIP_SYMBOL(const_df_d2_exec), host_d2_exec,
-                                  sizeof(int) * (9 * size_nvab), 0, hipMemcpyHostToDevice,
-                                  stream_id));
+                                  sizeof(int) * (9 * size_nvab), 0, hipMemcpyHostToDevice, stream));
+
+  HIP_SAFE(hipEventRecord(*done_copy, stream));
 
   //    Depends on # of Fused Kernel
   dim3 gridsize_1(num_blocks);
@@ -2863,50 +2854,41 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream_id, size_t num_blocks, size_t ba
   //    to call the fused kernel for singles, doubles and energies.
   hipLaunchKernelGGL(
     HIP_KERNEL_NAME(revised_jk_ccsd_t_fully_fused_kernel<T>), dim3(gridsize_1), dim3(blocksize_1),
-    0, stream_id, (int) size_noab, (int) size_nvab,
-    //
-    (int) size_max_dim_s1_t1, (int) size_max_dim_s1_v2, (int) size_max_dim_d1_t2,
-    (int) size_max_dim_d1_v2, (int) size_max_dim_d2_t2, (int) size_max_dim_d2_v2,
-    //
-    df_dev_d1_t2_all, df_dev_d1_v2_all, df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_s1_t1_all,
-    df_dev_s1_v2_all,
-    //
-    dev_evl_sorted_h1b, dev_evl_sorted_h2b, dev_evl_sorted_h3b, dev_evl_sorted_p4b,
-    dev_evl_sorted_p5b, dev_evl_sorted_p6b,
-    //
-    partial_energies,
-    //
-    CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3), CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2),
-    CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1), CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6),
-    CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5), CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4),
-    //
-    (int) base_size_h1b, (int) base_size_h2b, (int) base_size_h3b, (int) base_size_p4b,
-    (int) base_size_p5b, (int) base_size_p6b);
+    0, stream, (int) size_noab, (int) size_nvab, (int) size_max_dim_s1_t1, (int) size_max_dim_s1_v2,
+    (int) size_max_dim_d1_t2, (int) size_max_dim_d1_v2, (int) size_max_dim_d2_t2,
+    (int) size_max_dim_d2_v2, df_dev_d1_t2_all, df_dev_d1_v2_all, df_dev_d2_t2_all,
+    df_dev_d2_v2_all, df_dev_s1_t1_all, df_dev_s1_v2_all, dev_evl_sorted_h1b, dev_evl_sorted_h2b,
+    dev_evl_sorted_h3b, dev_evl_sorted_p4b, dev_evl_sorted_p5b, dev_evl_sorted_p6b,
+    partial_energies, CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3),
+    CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2), CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1),
+    CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6), CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5),
+    CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4), (int) base_size_h1b, (int) base_size_h2b,
+    (int) base_size_h3b, (int) base_size_p4b, (int) base_size_p5b, (int) base_size_p6b);
+
 #elif defined(USE_DPCPP)
   sycl::range<2> gridsize(1, num_blocks);
   sycl::range<2> blocksize(FUSION_SIZE_TB_1_Y, FUSION_SIZE_TB_1_X);
   auto           global_range = gridsize * blocksize;
 
-  stream_id.parallel_for<class ccsd_t_syclkernel>(
-    sycl::nd_range<2>(global_range, blocksize), [=](auto item) [[sycl::reqd_sub_group_size(16)]] {
-      revised_jk_ccsd_t_fully_fused_kernel(
-        size_noab, size_nvab, size_max_dim_s1_t1, size_max_dim_s1_v2, size_max_dim_d1_t2,
-        size_max_dim_d1_v2, size_max_dim_d2_t2, size_max_dim_d2_v2, df_dev_d1_t2_all,
-        df_dev_d1_v2_all, df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_s1_t1_all, df_dev_s1_v2_all,
-        dev_evl_sorted_h1b, dev_evl_sorted_h2b, dev_evl_sorted_h3b, dev_evl_sorted_p4b,
-        dev_evl_sorted_p5b, dev_evl_sorted_p6b, partial_energies,
-        CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3), CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2),
-        CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1), CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6),
-        CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5), CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4),
-        base_size_h1b, base_size_h2b, base_size_h3b, base_size_p4b, base_size_p5b, base_size_p6b,
-        item, host_s1_size, host_s1_exec, host_d1_size, host_d1_exec, host_d2_size, host_d2_exec);
-    });
+  stream.parallel_for(sycl::nd_range<2>(global_range, blocksize), [=](auto item) {
+    revised_jk_ccsd_t_fully_fused_kernel(
+      size_noab, size_nvab, size_max_dim_s1_t1, size_max_dim_s1_v2, size_max_dim_d1_t2,
+      size_max_dim_d1_v2, size_max_dim_d2_t2, size_max_dim_d2_v2, df_dev_d1_t2_all,
+      df_dev_d1_v2_all, df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_s1_t1_all, df_dev_s1_v2_all,
+      dev_evl_sorted_h1b, dev_evl_sorted_h2b, dev_evl_sorted_h3b, dev_evl_sorted_p4b,
+      dev_evl_sorted_p5b, dev_evl_sorted_p6b, partial_energies,
+      CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3), CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2),
+      CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1), CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6),
+      CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5), CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4),
+      base_size_h1b, base_size_h2b, base_size_h3b, base_size_p4b, base_size_p5b, base_size_p6b,
+      item, host_s1_size, host_s1_exec, host_d1_size, host_d1_exec, host_d2_size, host_d2_exec);
+  });
 #endif
 }
 
 // Explicit template instantiation: double
 template void fully_fused_ccsd_t_gpu<double>(
-  gpuStream_t& stream_id, size_t num_blocks, size_t base_size_h1b, size_t base_size_h2b,
+  gpuStream_t& stream, size_t num_blocks, size_t base_size_h1b, size_t base_size_h2b,
   size_t base_size_h3b, size_t base_size_p4b, size_t base_size_p5b, size_t base_size_p6b,
   //
   double* df_dev_d1_t2_all, double* df_dev_d1_v2_all, double* df_dev_d2_t2_all,
@@ -2923,4 +2905,24 @@ template void fully_fused_ccsd_t_gpu<double>(
   //
   double* dev_evl_sorted_h1b, double* dev_evl_sorted_h2b, double* dev_evl_sorted_h3b,
   double* dev_evl_sorted_p4b, double* dev_evl_sorted_p5b, double* dev_evl_sorted_p6b,
-  double* partial_energies);
+  double* partial_energies, gpuEvent_t* done_copy);
+// Explicit template instantiation: float
+template void fully_fused_ccsd_t_gpu<float>(
+  gpuStream_t& stream, size_t num_blocks, size_t base_size_h1b, size_t base_size_h2b,
+  size_t base_size_h3b, size_t base_size_p4b, size_t base_size_p5b, size_t base_size_p6b,
+  //
+  float* df_dev_d1_t2_all, float* df_dev_d1_v2_all, float* df_dev_d2_t2_all,
+  float* df_dev_d2_v2_all, float* df_dev_s1_t1_all, float* df_dev_s1_v2_all,
+  //
+  int* host_d1_size, int* host_d1_exec, // used
+  int* host_d2_size, int* host_d2_exec, int* host_s1_size, int* host_s1_exec,
+  //
+  size_t size_noab, size_t size_max_dim_d1_t2, size_t size_max_dim_d1_v2, size_t size_nvab,
+  size_t size_max_dim_d2_t2, size_t size_max_dim_d2_v2, size_t size_max_dim_s1_t1,
+  size_t size_max_dim_s1_v2,
+  //
+  float factor,
+  //
+  float* dev_evl_sorted_h1b, float* dev_evl_sorted_h2b, float* dev_evl_sorted_h3b,
+  float* dev_evl_sorted_p4b, float* dev_evl_sorted_p5b, float* dev_evl_sorted_p6b,
+  float* partial_energies, gpuEvent_t* done_copy);

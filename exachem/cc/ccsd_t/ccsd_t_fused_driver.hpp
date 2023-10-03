@@ -113,9 +113,29 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   energy_l[0] = 0.0;
   energy_l[1] = 0.0;
 
-#if defined(USE_DPCPP)
-  std::vector<gpuEvent_t> done_copy(12);
-  gpuEvent_t              done_compute;
+#if defined(USE_CUDA)
+  std::shared_ptr<gpuEvent_t> done_compute(new gpuEvent_t,
+                                           [](gpuEvent_t* e) { CUDA_SAFE(cudaEventDestroy(*e)); });
+  CUDA_SAFE(cudaEventCreateWithFlags(done_compute.get(), cudaEventDisableTiming));
+  std::shared_ptr<gpuEvent_t> done_copy(new gpuEvent_t,
+                                        [](gpuEvent_t* e) { CUDA_SAFE(cudaEventDestroy(*e)); });
+  CUDA_SAFE(cudaEventCreateWithFlags(done_copy.get(), cudaEventDisableTiming));
+
+  std::shared_ptr<hostEnergyReduceData_t> reduceData = std::make_shared<hostEnergyReduceData_t>();
+#elif defined(USE_HIP)
+  std::shared_ptr<gpuEvent_t> done_compute(new gpuEvent_t,
+                                           [](gpuEvent_t* e) { HIP_SAFE(hipEventDestroy(*e)); });
+  HIP_SAFE(hipEventCreateWithFlags(done_compute.get(), hipEventDisableTiming));
+  std::shared_ptr<gpuEvent_t> done_copy(new gpuEvent_t,
+                                        [](gpuEvent_t* e) { HIP_SAFE(hipEventDestroy(*e)); });
+  HIP_SAFE(hipEventCreateWithFlags(done_copy.get(), hipEventDisableTiming));
+
+  std::shared_ptr<hostEnergyReduceData_t> reduceData = std::make_shared<hostEnergyReduceData_t>();
+#elif defined(USE_DPCPP)
+  std::shared_ptr<gpuEvent_t> done_compute = std::make_shared<gpuEvent_t>();
+  std::shared_ptr<gpuEvent_t> done_copy    = std::make_shared<gpuEvent_t>();
+
+  std::shared_ptr<hostEnergyReduceData_t> reduceData = std::make_shared<hostEnergyReduceData_t>();
 #endif
 
   AtomicCounter* ac = new AtomicCounterGA(ec.pg(), 1);
@@ -240,12 +260,13 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
                         size_T_s1_t1, size_T_s1_v2, size_T_d1_t2, size_T_d1_v2, size_T_d2_t2,
                         size_T_d2_v2,
                         //
-                        energy_l, cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v
-#if defined(USE_DPCPP)
-                        ,
-                        done_compute, done_copy
+                        energy_l,
+#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
+                        reduceData.get(),
 #endif
-                      );
+                        cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v,
+                        //
+                        done_compute.get(), done_copy.get());
 #else
                       total_fused_ccsd_t_cpu<T>(
                         is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2,
@@ -342,12 +363,13 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
                         size_T_s1_t1, size_T_s1_v2, size_T_d1_t2, size_T_d1_v2, size_T_d2_t2,
                         size_T_d2_v2,
                         //
-                        energy_l, cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v
-#if defined(USE_DPCPP)
-                        ,
-                        done_compute, done_copy
+                        energy_l,
+#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
+                        reduceData.get(),
 #endif
-                      );
+                        cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v,
+                        //
+                        done_compute.get(), done_copy.get());
 #else
             total_fused_ccsd_t_cpu<T>(
               is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2, d_v2,
@@ -381,10 +403,8 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
     }
   } // end seq h3b
 
-#if defined(USE_CUDA)
-  CUDA_SAFE(cudaDeviceSynchronize());
-#elif defined(USE_HIP)
-HIP_SAFE(hipDeviceSynchronize());
+#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
+  gpuDeviceSynchronize();
 #endif
   //
   energy1 = energy_l[0];

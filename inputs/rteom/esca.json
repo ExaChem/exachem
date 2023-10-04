@@ -33,7 +33,6 @@
     "charge": 0,
     "multiplicity": 1,
     "scf_type": "restricted",  
-    "sad": false,
     "writem": 10,
     "force_tilesize": false,
     "tilesize": 30

@@ -55,7 +55,6 @@
   },
   "basis": {
     "basisset": "def2-svp",
-    "gaussian_type": "spherical",
     "atom_basis": {
       "Fe": "def2-tzvp"
     }
@@ -70,8 +69,8 @@
     "diis_hist": 10,
     "tol_int": 1e-16,
     "tol_lindep": 1e-06,    
-    "conve": 1e-7,
-    "convd": 1e-6,    
+    "conve": 1e-8,
+    "convd": 1e-7,    
     "charge": 2,    
     "multiplicity": 5,
     "alpha": 0.95,

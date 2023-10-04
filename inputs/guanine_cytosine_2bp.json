@@ -63,8 +63,7 @@
     "units": "angstrom"
   },
   "basis": {
-    "basisset": "6-31++g*",
-    "gaussian_type": "spherical"
+    "basisset": "6-31++g*"
   },
   "common": {
     "maxiter": 100

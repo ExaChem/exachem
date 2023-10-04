@@ -469,11 +469,11 @@ void print_energies(ExecutionContext& ec, TAMMTensors& ttensors, const SystemDat
   const bool is_rhf = sys_data.is_restricted;
   const bool is_ks  = sys_data.is_ks;
 
-  double nelectrons    = 0.0;
-  double kinetic_1e    = 0.0;
-  double NE_1e         = 0.0;
-  double energy_1e     = 0.0;
-  double energy_2e     = 0.0;
+  double nelectrons = 0.0;
+  double kinetic_1e = 0.0;
+  double NE_1e      = 0.0;
+  double energy_1e  = 0.0;
+  double energy_2e  = 0.0;
 
   if(is_rhf) {
     nelectrons = tt_trace(ec, ttensors.D_tamm, ttensors.S1);
@@ -482,9 +482,7 @@ void print_energies(ExecutionContext& ec, TAMMTensors& ttensors, const SystemDat
     energy_1e  = tt_trace(ec, ttensors.D_tamm, ttensors.H1);
     energy_2e  = 0.5 * tt_trace(ec, ttensors.D_tamm, ttensors.F_alpha_tmp);
 
-    if(is_ks) {
-      energy_2e -= 0.5 * tt_trace(ec, ttensors.D_tamm, ttensors.VXC);
-    }
+    if(is_ks) { energy_2e -= 0.5 * tt_trace(ec, ttensors.D_tamm, ttensors.VXC); }
   }
   if(is_uhf) {
     nelectrons = tt_trace(ec, ttensors.D_tamm, ttensors.S1);
@@ -896,10 +894,10 @@ Matrix compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A) {
 
 void print_mulliken(OptionsMap& options_map, libint2::BasisSet& shells, Matrix& D, Matrix& D_beta,
                     Matrix& S, bool is_uhf) {
-  auto        atoms = options_map.options.atoms;
-  BasisSetMap bsm   = construct_basisset_maps(atoms, shells);
+  auto        ec_atoms = options_map.options.ec_atoms;
+  BasisSetMap bsm      = construct_basisset_maps(options_map.options.atoms, shells);
 
-  const int                        natoms = atoms.size();
+  const int                        natoms = ec_atoms.size();
   std::vector<double>              cs_acharge(natoms, 0);
   std::vector<double>              os_acharge(natoms, 0);
   std::vector<double>              net_acharge(natoms, 0);
@@ -956,8 +954,8 @@ void print_mulliken(OptionsMap& options_map, libint2::BasisSet& shells, Matrix& 
               << std::endl;
 
     for(size_t x = 0; x < natoms; x++) { // loop over atoms
-      const auto Z        = atoms[x].atomic_number;
-      const auto e_symbol = options_map.options.atom_symbol_map[Z];
+      const auto Z        = ec_atoms[x].atom.atomic_number;
+      const auto e_symbol = ec_atoms[x].esymbol;
       std::cout << mksp << std::setw(3) << std::right << x + 1 << " " << std::left << std::setw(2)
                 << e_symbol << " " << std::setw(3) << std::right << Z << mksp << std::fixed
                 << std::setprecision(2) << std::right << " " << std::setw(5) << acharge[x] << mksp

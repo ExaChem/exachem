@@ -106,7 +106,7 @@
     "molecule": {
       "name": "ozone",
       "basisset": "sto-3g",
-      "gaussian_type": "spherical",
+      
       "geometry_units": "bohr"
     },
     "SCF": {

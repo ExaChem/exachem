@@ -20,8 +20,7 @@
     "units": "angstrom"
   },
   "basis": {
-    "basisset": "sto-3g",
-    "gaussian_type": "spherical"
+    "basisset": "sto-3g"
   },
   "SCF": {
     "tol_int": 1e-16,

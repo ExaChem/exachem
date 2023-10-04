@@ -43,7 +43,6 @@
   },
   "basis": {
     "basisset": "def2-svp",
-    "gaussian_type": "spherical",
     "atom_basis": {
       "Fe": "def2-tzvp"
     }

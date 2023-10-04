@@ -407,7 +407,7 @@
     "molecule": {
       "name": "ubiquitin_dgrtl",
       "basisset": "sto-3g",
-      "gaussian_type": "spherical",
+      
       "geometry_units": "angstrom"
     },
     "SCF": {

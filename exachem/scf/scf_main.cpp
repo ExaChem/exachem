@@ -36,22 +36,20 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   SystemData sys_data{options_map, options_map.scf_options.scf_type};
   SCFOptions scf_options = sys_data.options_map.scf_options;
 
-  std::string basis        = scf_options.basis;
-  int         charge       = scf_options.charge;
-  int         multiplicity = scf_options.multiplicity;
-  int         maxiter      = scf_options.maxiter;
-  double      conve        = scf_options.conve;
-  double      convd        = scf_options.convd;
-  bool        debug        = scf_options.debug;
-  bool        ediis        = scf_options.ediis;
-  double      ediis_off    = scf_options.ediis_off;
-  auto        restart      = scf_options.restart;
-  bool        is_spherical = (scf_options.gaussian_type == "spherical");
-  // bool        sad          = scf_options.sad;
-  auto       iter          = 0;
-  auto       rank          = exc.pg().rank();
-  const bool molden_exists = !scf_options.moldenfile.empty();
-  const int  restart_size  = scf_options.restart_size;
+  std::string basis         = scf_options.basis;
+  int         charge        = scf_options.charge;
+  int         multiplicity  = scf_options.multiplicity;
+  int         maxiter       = scf_options.maxiter;
+  double      conve         = scf_options.conve;
+  double      convd         = scf_options.convd;
+  bool        debug         = scf_options.debug;
+  auto        restart       = scf_options.restart;
+  bool        is_spherical  = (scf_options.gaussian_type == "spherical");
+  bool        sad           = scf_options.sad;
+  auto        iter          = 0;
+  auto        rank          = exc.pg().rank();
+  const bool  molden_exists = !scf_options.moldenfile.empty();
+  const int   restart_size  = scf_options.restart_size;
 
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;
@@ -64,9 +62,6 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     molden_file_valid = std::filesystem::exists(scf_options.moldenfile);
     if(!molden_file_valid)
       tamm_terminate("ERROR: moldenfile provided: " + scf_options.moldenfile + " does not exist");
-    if(!is_spherical)
-      std::cout << "WARNING: molden interface is not tested with gaussian_type:cartesian"
-                << std::endl;
   }
 
   auto hf_t1 = std::chrono::high_resolution_clock::now();
@@ -88,22 +83,18 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   // If starting guess is from a molden file, read the geometry.
   if(molden_file_valid) read_geom_molden(sys_data, sys_data.options_map.options.atoms);
 
-  auto atoms          = sys_data.options_map.options.atoms;
-  auto atom_basis_map = sys_data.options_map.options.atom_basis_map;
+  auto atoms    = sys_data.options_map.options.atoms;
+  auto ec_atoms = sys_data.options_map.options.ec_atoms;
 
   libint2::BasisSet shells;
   {
-    std::vector<std::vector<libint2::Shell>> bset_vec(119);
+    std::vector<libint2::Shell> bset_vec;
     for(int i = 0; i < atoms.size(); i++) {
-      const auto  Z          = atoms[i].atomic_number;
-      std::string _basisname = basis;
-      if(atom_basis_map.find(Z) != atom_basis_map.end()) _basisname = atom_basis_map[Z];
-      else atom_basis_map[Z] = _basisname;
-      libint2::BasisSet ashells(_basisname, {atoms[i]});
-      bset_vec[Z] = ashells.shells();
-      // shells.insert(shells.end(),ashells.begin(),ashells.end());
+      const auto        Z = atoms[i].atomic_number;
+      libint2::BasisSet ashells(ec_atoms[i].basis, {atoms[i]});
+      bset_vec.insert(bset_vec.end(), ashells.begin(), ashells.end());
     }
-    libint2::BasisSet bset(atoms, bset_vec);
+    libint2::BasisSet bset(bset_vec);
     shells = std::move(bset);
   }
 
@@ -115,7 +106,6 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
   sys_data.nbf      = N;
   sys_data.nbf_orig = N;
-  sys_data.ediis    = ediis;
 
   std::string out_fp    = options_map.options.output_file_prefix + "." + scf_options.basis;
   std::string files_dir = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type + "/scf";
@@ -276,7 +266,6 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   TAMMTensors  ttensors;
 
   const bool scf_conv = restart && scf_options.noscf;
-  const int  max_hist = sys_data.options_map.scf_options.diis_hist;
   bool       is_conv  = true;
 
   scf_restart_test(exc, sys_data, filename, restart, files_prefix);
@@ -474,7 +463,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
       SchwarzK = read_scf_mat<TensorType>(schwarz_matfile);
     }
     else {
-      if(rank == 0) cout << "pre-computing data for Schwarz bounds... " << endl;
+      // if(rank == 0) cout << "pre-computing data for Schwarz bounds... " << endl;
       SchwarzK = compute_schwarz_ints<>(ec, scf_vars, shells);
       if(rank == 0) write_scf_mat<TensorType>(SchwarzK, schwarz_matfile);
     }
@@ -812,46 +801,12 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
                               shell2bf, SchwarzK, max_nprim4, shells, ttensors, etensors,
                               is_3c_init, do_density_fitting, xHF);
 
-      // E_Diis
-      if(ediis) {
-        Tensor<TensorType> Dcopy{tAO, tAO};
-        Tensor<TensorType> Fcopy{tAO, tAO};
-        Tensor<TensorType> ehf_tamm_copy{};
-        Tensor<TensorType>::allocate(&ec, Dcopy, Fcopy, ehf_tamm_copy);
-        // clang-format off
-        sch (Dcopy()  = ttensors.D_tamm())
-            (Fcopy()  = ttensors.F_alpha_tmp())
-            (Fcopy() += ttensors.H1())
-            (ehf_tamm_copy()  = 0.5 * Dcopy() * Fcopy())
-            (ehf_tamm_copy() += 0.5 * Dcopy() * ttensors.H1())
-            .execute();
-        // clang-format on
-
-        auto H_nrm = norm(ttensors.H1);
-        auto F_nrm = norm(Fcopy);
-        auto D_nrm = norm(Dcopy);
-        if(rank == 0 && debug)
-          cout << "<ediis> norm of H,F,D: " << H_nrm << "," << F_nrm << "," << D_nrm << ","
-               << get_scalar(ehf_tamm_copy) << endl;
-        ttensors.D_hist.push_back(Dcopy);
-        ttensors.fock_hist.push_back(Fcopy);
-        ttensors.ehf_tamm_hist.push_back(ehf_tamm_copy);
-        // if(rank==0) cout << "iter: " << iter << "," << (int)ttensors.D_hist.size() << "," <<
-        // get_scalar(ehf_tamm_copy) << endl;
-        // FIXME: Undo
-        // energy_diis(ec, tAO, iter, max_hist, ttensors.D_tamm, ttensors.F_alpha,
-        // ttensors.ehf_tamm,
-        //             ttensors.D_hist, ttensors.fock_hist, ttensors.ehf_tamm_hist);
-      }
-
       std::tie(ehf, rmsd) = scf_iter_body<TensorType>(ec, scalapack_info, iter, sys_data, scf_vars,
-                                                      ttensors, etensors, ediis,
+                                                      ttensors, etensors,
 #if defined(USE_GAUXC)
                                                       gauxc_integrator,
 #endif
                                                       scf_conv);
-
-      if(ediis && fabs(rmsd) < ediis_off) ediis = false;
 
       ehf += enuc;
       // compute difference with last iteration
@@ -884,7 +839,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
       // if(rank==0) cout << "D at the end of iteration: " << endl << std::setprecision(6) <<
       // etensors.D << endl;
-      if(rank == 0 && scf_options.writem % iter == 0) {
+      if(rank == 0 && (scf_options.writem % iter == 0 || scf_options.writem == 1)) {
         write_scf_mat<TensorType>(etensors.C, movecsfile_alpha);
         write_scf_mat<TensorType>(etensors.D, densityfile_alpha);
         if(is_uhf) {

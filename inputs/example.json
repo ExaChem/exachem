@@ -2,9 +2,9 @@
 
     "geometry" : {
         "coordinates" : [
-         "H 0.000000000000000 1.579252144093028  2.174611055780858",
-         "O 0.000000000000000 0.000000000000000  0.000000000000000",
-         "H 0.000000000000000 1.579252144093028 -2.174611055780858"
+         "H  0.000000000000000 1.579252144093028  2.174611055780858",
+         "O  0.000000000000000 0.000000000000000  0.000000000000000",
+         "H1 0.000000000000000 1.579252144093028 -2.174611055780858"
         ],
         "units": "angstrom"
     },
@@ -24,11 +24,11 @@
 
     "basis": {
         "basisset": "cc-pvdz",
+        "basisfile": "",
         "df_basisset": "",
-        "gaussian_type": "spherical",
         "atom_basis": {
-          "H": "cc-pvtz",
-          "O": "aug-cc-pvtz"
+          "H1": "cc-pvtz",
+          "O" : "aug-cc-pvtz"
         }
     },
     
@@ -50,9 +50,6 @@
         "riscf": "JK",
         "restart": false,
         "noscf": false,
-        "ediis": false,
-        "ediis_off": 1e-5,
-        "sad": false,
         "scf_type": "restricted",
         "xc_type": ["pbe0"],
         "debug": false,
@@ -62,6 +59,12 @@
         "scalapack_np_col": 0,
         "n_lindep": 0,
         "moldenfile": "",
+        "guess": {
+          "atom_options":{
+            "O": [0,1],
+            "H1": [0,1]
+          }
+        },        
         "PRINT": {
           "mos_txt" : false,
           "mulliken": false,
@@ -131,6 +134,22 @@
           "cache_size": 8,
           "skip_ccsd": false,
           "ccsdt_tilesize": 32
+        },
+    
+        "DLPNO": {
+          "localize": false,
+          "skip_dlpno": false,
+          "df_basisset": "",
+          "max_pnos": 1,
+          "keep_npairs": 1,
+          "TCutPNO":   0,
+          "TCutEN":    0.97,
+          "TCutPre":   -1.0,
+          "TCutPairs": 0.0,
+          "TCutDO":    1e-2,
+          "TCutDOij":  1e-5,
+          "TCutDOPre": 3e-2,
+          "doubles_opt_eqns": []
         },
 
         "EOMCCSD": {
@@ -232,7 +251,9 @@
       "ccsd_lambda": false,
       "eom_ccsd": false,
       "rteom_ccsd": false,
-      "gfccsd": false
+      "gfccsd": false,
+      "dlpno_ccsd": [false,"standalone"],
+      "dlpno_ccsd_t": [false,"standalone"]
     }
     
 }

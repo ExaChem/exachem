@@ -8,8 +8,7 @@
     "units": "bohr"
   },
   "basis": {
-    "basisset": "sto-3g",
-    "gaussian_type": "spherical"
+    "basisset": "sto-3g"
   },
   "common": {
     "output_file_prefix": "ozone"

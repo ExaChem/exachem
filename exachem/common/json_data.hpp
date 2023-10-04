@@ -35,13 +35,13 @@ struct SystemData {
   int        nact{};
   int        focc{};
   int        qed_nmodes{};
-  bool       ediis{};
   bool       is_restricted{};
   bool       is_unrestricted{};
   bool       is_restricted_os{};
   bool       is_ks{};
   bool       is_qed{};
   bool       do_qed{};
+  bool       has_ecp{};
   // bool       is_cas{};???
 
   std::string scf_type_string;

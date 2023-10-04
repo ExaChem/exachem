@@ -34,7 +34,7 @@ Kowalski, Karol, Bair, Raymond, Bauman, Nicholas P., Boschen, Jeffery S., Bylask
 
 The TAMM library (core infrastructure and current optimizations), the ground-state formulations of the closed-shell CCSD, and CCSD(T) methods have been supported by the [NWChemEx](https://nwchemex-project.github.io/NWChemEx) project, funded through the [Exascale Computing Project ECP](https://www.exascaleproject.org) (17-SC-20-SC), a collaborative effort of the U.S. Department of Energy Office of Science and the National Nuclear Security Administration. 
 
-The development of additional TAMM capabilities and methodologies (HF, MP2, CC2, CCSD-Lambda, EOM-CCSD, RT-EOM-CCSD, and GFCCSD) are supported by the Center for **S**calable **P**redictive Methods for **E**xcitations and **C**orrelated Phenomena  [(SPEC)](https://spec.labworks.org/home) under FWP 70942.
+The development of additional TAMM infrastructure extensions, optimizations and methodologies (HF, MP2, CC2, CCSD-Lambda, EOM-CCSD, RT-EOM-CCSD, and GFCCSD) are supported by the Center for **S**calable **P**redictive Methods for **E**xcitations and **C**orrelated Phenomena  [(SPEC)](https://spec.labworks.org/home) under FWP 70942.
 
 The double unitary coupled-cluster (DUCC) development is supported under FWP 72689 (Embedding QC into Many-body Frameworks for Strongly Correlated Molecular and Materials Systems) funded by the DOE BES "Materials and Chemical Sciences Research for Quantum Information Science" program.
 
@@ -42,17 +42,4 @@ Ongoing development of many-body methodologies for molecular polaritonic systems
 
 The SPEC and MAPOL projects are funded as part of the Computational Chemical Sciences (CCS) program by the U.S. Department of Energy (DOE), Office of Science, Office of Basic Energy Sciences (BES), Division of Chemical Sciences, Geosciences and Biosciences at PNNL. PNNL is a multi-program national laboratory operated by Battelle Memorial Institute for the United States Department of Energy under DOE contract number **DE-AC05-76RL01830**.
 
-### Computing Resources
-
-- Allocation on [OLCF Summit](https://www.olcf.ornl.gov/summit), [NERSC Perlmutter](https://docs.nersc.gov/systems/perlmutter), [ALCF Sunspot](https://www.alcf.anl.gov/support-center/aurora-sunspot), and [OLCF Frontier](https://www.olcf.ornl.gov/frontier) for the [NWChemEx project](https://nwchemex-project.github.io/NWChemEx) (2017-2023) through the [Exascale Computing Project ECP](https://www.exascaleproject.org) (17-SC-20-SC). 
-
-- [NERSC Perlmutter](https://docs.nersc.gov/systems/perlmutter) allocations through the DOE Basic Energy Sciences (BES) Chemical Sciences, Geosciences, & Biosciences (CSGB) program:
-  * **m3196** (2020 - current): Scalable Predictive Methods for Excitations and Correlated Phenomena [(SPEC)](https://spec.labworks.org/home).
-  * **m4262** (2023 - current): Many-Body Methods, Spectroscopies, and Dynamics for Molecular Polaritonic Systems (MAPOL).
-
-<br />
-
-- [OLCF Summit](https://www.olcf.ornl.gov/summit) allocations awarded for the [SPEC](https://spec.labworks.org/home) project.
-  - INCITE 2021 for OLCF Summit: **Deciphering the Mysteries of Hydrogen Bonding in Water.**
-  - OLCF Director's Discretionary (DD) project for OLCF Summit (2019). **CHM159: Excited States of DNA/RNA oligomers.** 
-  - Early Science project for OLCF Summit (2019). **CHM146: Highly Accurate Electronic Structure Methods for Ground and Excited States at Scale: Addressing Problems in Energy Capture, Transfer, and Storage.**  
+Acknowledgements for Computing Resources can be found [here](docs/resource_ack.md).

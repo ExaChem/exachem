@@ -98,8 +98,7 @@
     "units": "bohr"
   },
   "basis": {
-    "basisset": "6-31g*",
-    "gaussian_type": "spherical"
+    "basisset": "6-31g*"
   },
   "SCF": {
     "tilesize": 30,

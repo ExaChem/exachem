@@ -21,7 +21,6 @@
   "basis": {
     "basisset": "Sapporo-TZP",
     "df_basisset": "",
-    "gaussian_type": "cartesian",
     "atom_basis": {
       "C": "Sapporo-TZP",
       "O": "Sapporo-TZP",

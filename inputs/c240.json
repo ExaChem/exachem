@@ -245,8 +245,7 @@
     "units": "angstrom"
   },
   "basis": {
-    "basisset": "sto-3g",
-    "gaussian_type": "spherical"
+    "basisset": "sto-3g"
   },
   "SCF": {
     "tilesize": 30,

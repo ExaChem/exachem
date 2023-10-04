@@ -85,8 +85,7 @@
     "units": "angstrom"
   },
   "basis": {
-    "basisset": "6-31g*",
-    "gaussian_type": "cartesian"
+    "basisset": "6-31g*" 
   },
   "common": {
     "maxiter": 500

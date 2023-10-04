@@ -17,8 +17,7 @@
       "units": "angstrom"
     },
     "basis": {
-      "basisset": "sapporo-dzp",
-      "gaussian_type": "spherical"
+      "basisset": "sapporo-dzp"
     },
     "SCF": {
       "tol_int": 1e-16,

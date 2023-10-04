@@ -102,7 +102,7 @@ def parse_nwchem_input(input_file):
   nwchem_opt["TASK"] = {}
   nwchem_opt["task_tce"] = False
   nw_task = nwchem_opt["TASK"]
-  nwchem_opt["gaussian_type"] = "spherical"
+  # nwchem_opt["gaussian_type"] = "spherical"
   nwchem_opt["basisset"] = "sto-3g"
 
   nwchem_opt["SCF"] = {}
@@ -197,7 +197,8 @@ def parse_nwchem_input(input_file):
       if line.startswith("basis"):
         basis_block=True
         if "cartesian" in line:
-          nwchem_opt["gaussian_type"] = "cartesian"
+          # nwchem_opt["gaussian_type"] = "cartesian"
+          unsupported.append("cartesian not supported (ignored), spherical will be used")
         continue
 
       if basis_block and "library" in line:
@@ -405,7 +406,7 @@ if __name__ == '__main__':
 
   #BASIS
   #TODO: atom basis is not parsed 
-  exachem_opt["basis"] = {"basisset":nwchem_opt["basisset"], "gaussian_type":nwchem_opt["gaussian_type"]}
+  exachem_opt["basis"] = {"basisset":nwchem_opt["basisset"]}
 
   if "atom_basis" in nwchem_opt.keys():
     exachem_opt["basis"]["atom_basis"] = nwchem_opt["atom_basis"]

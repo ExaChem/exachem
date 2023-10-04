@@ -452,7 +452,7 @@
     "molecule": {
       "name": "co",
       "basisset": "cc-pvdz",
-      "gaussian_type": "spherical",
+      
       "geometry_units": "angstrom"
     },
     "SCF": {

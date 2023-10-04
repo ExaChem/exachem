@@ -41,30 +41,39 @@ inline void print_bool(std::string str, bool val) {
   else cout << str << " = false" << endl;
 }
 
+struct ECAtom {
+  Atom                atom;
+  std::string         esymbol;
+  std::string         basis;
+  bool                has_ecp{false};
+  int                 ecp_nelec{};
+  std::vector<double> ecp_coeffs{};
+  std::vector<double> ecp_exps{};
+  std::vector<int>    ecp_ams{};
+  std::vector<int>    ecp_ns{};
+};
+
 class Options {
 public:
   Options() {
-    maxiter            = 50;
-    debug              = false;
-    basis              = "sto-3g";
-    dfbasis            = "";
-    geom_units         = "angstrom";
-    gaussian_type      = "spherical";
-    output_file_prefix = "";
-    ext_data_path      = "";
+    maxiter       = 50;
+    debug         = false;
+    basis         = "sto-3g";
+    geom_units    = "angstrom";
+    gaussian_type = "spherical";
   }
 
   bool                       debug;
   int                        maxiter;
   std::string                basis;
-  std::string                dfbasis;
+  std::string                dfbasis{};
+  std::string                basisfile{}; // supports only ECPs for now
   std::string                gaussian_type;
   std::string                geom_units;
-  std::string                output_file_prefix;
-  std::string                ext_data_path;
+  std::string                output_file_prefix{};
+  std::string                ext_data_path{};
   std::vector<libint2::Atom> atoms;
-  std::map<int, std::string> atom_basis_map;
-  std::map<int, std::string> atom_symbol_map;
+  std::vector<ECAtom>        ec_atoms;
 
   void print() {
     std::cout << std::defaultfloat;
@@ -75,6 +84,7 @@ public:
     cout << gaussian_type;
     cout << endl;
     if(!dfbasis.empty()) cout << " dfbasis    = " << dfbasis << endl;
+    if(!basisfile.empty()) cout << " basisfile  = " << basisfile << endl;
     cout << " geom_units = " << geom_units << endl;
     print_bool(" debug     ", debug);
     if(!output_file_prefix.empty())
@@ -124,9 +134,7 @@ public:
     restart_size     = 2000;
     restart          = false;
     noscf            = false;
-    ediis            = false;
-    ediis_off        = 1e-5;
-    sad              = false;
+    sad              = true;
     force_tilesize   = false;
     riscf            = 0; // 0 for JK, 1 for J, 2 for K
     riscf_str        = "JK";
@@ -136,7 +144,7 @@ public:
     xc_type          = {}; // pbe0
     alpha            = 1.0;
     nnodes           = 1;
-    writem           = diis_hist;
+    writem           = 1;
     scalapack_nb     = 64;
     scalapack_np_row = 0;
     scalapack_np_col = 0;
@@ -158,8 +166,6 @@ public:
   uint32_t    dfAO_tilesize;
   bool        restart; // Read movecs from disk
   bool        noscf;   // only recompute energy from movecs
-  bool        ediis;
-  double      ediis_off;
   bool        sad;
   bool        force_tilesize;
   int         restart_size; // read/write orthogonalizer, schwarz, etc matrices when N>=restart_size
@@ -174,6 +180,9 @@ public:
   int         writem;
   double      alpha; // density mixing parameter
   std::string scf_type;
+
+  std::map<std::string, std::tuple<int, int>> guess_atom_options;
+
   std::vector<std::string> xc_type;
   // mos_txt: write lcao, mo transformed core H, fock, and v2 to disk as text files.
   bool                             mos_txt{false};
@@ -198,7 +207,7 @@ public:
     cout << " diis_hist    = " << diis_hist << endl;
     cout << " AO_tilesize  = " << AO_tilesize << endl;
     cout << " writem       = " << writem << endl;
-    if(alpha != 1.0) cout << " alpha        = " << alpha << endl;
+    cout << " alpha        = " << alpha << endl;
     if(!moldenfile.empty()) {
       cout << " moldenfile   = " << moldenfile << endl;
       // cout << " n_lindep = " << n_lindep << endl;
@@ -250,8 +259,6 @@ public:
     print_bool(" restart     ", restart);
     print_bool(" debug       ", debug);
     if(restart) print_bool(" noscf       ", noscf);
-    // print_bool(" ediis       ", ediis);
-    // cout << " ediis_off    = " << ediis_off   << endl;
     // print_bool(" sad         ", sad);
     if(mulliken_analysis || mos_txt || mo_vectors_analysis.first) {
       cout << " PRINT {" << endl;
@@ -695,8 +702,26 @@ void parse_option(T& val, json j, string key, bool optional = true) {
   }
 }
 
+inline int get_atomic_number(std::string element_symbol) {
+  int Z = -1;
+  for(const auto& e: libint2::chemistry::get_element_info()) {
+    auto es = element_symbol;
+    es.erase(std::remove_if(std::begin(es), std::end(es), [](auto d) { return std::isdigit(d); }),
+             es.end());
+    if(strequal_case(e.symbol, es)) {
+      Z = e.Z;
+      break;
+    }
+  }
+  if(Z == -1) {
+    tamm_terminate("INPUT FILE ERROR: element symbol \"" + element_symbol + "\" is not recognized");
+  }
+
+  return Z;
+}
+
 inline std::tuple<Options, SCFOptions, CDOptions, GWOptions, CCSDOptions, FCIOptions, TaskOptions>
-parse_json(json& jinput) {
+parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   Options options;
 
   parse_option<string>(options.geom_units, jinput["geometry"], "units");
@@ -711,32 +736,29 @@ parse_json(json& jinput) {
   // basis
   json jbasis = jinput["basis"];
   parse_option<string>(options.basis, jbasis, "basisset", false);
-  parse_option<string>(options.gaussian_type, jbasis, "gaussian_type");
+  parse_option<string>(options.basisfile, jbasis, "basisfile");
+  // parse_option<string>(options.gaussian_type, jbasis, "gaussian_type");
   parse_option<string>(options.dfbasis, jbasis, "df_basisset");
 
   to_lower(options.basis);
-  const std::vector<string> valid_basis{"comments", "basisset", "gaussian_type", "df_basisset",
-                                        "atom_basis"};
+  const std::vector<string> valid_basis{"comments",      "basisset",    "basisfile",
+                                        "gaussian_type", "df_basisset", "atom_basis"};
   for(auto& el: jbasis.items()) {
     if(std::find(valid_basis.begin(), valid_basis.end(), el.key()) == valid_basis.end())
       tamm_terminate("INPUT FILE ERROR: Invalid basis section option [" + el.key() +
                      "] in the input file");
   }
 
-  json jatom_basis = jinput["basis"]["atom_basis"];
+  json                               jatom_basis = jinput["basis"]["atom_basis"];
+  std::map<std::string, std::string> atom_basis_map;
   for(auto& [element_symbol, basis_string]: jatom_basis.items()) {
-    int Z = -1;
-    for(const auto& e: libint2::chemistry::get_element_info()) {
-      if(strequal_case(e.symbol, element_symbol)) {
-        Z = e.Z;
-        break;
-      }
-    }
-    if(Z == -1) {
-      tamm_terminate("INPUT FILE ERROR: atom_basis section: element symbol \"" + element_symbol +
-                     "\" is not recognized");
-    }
-    options.atom_basis_map[Z] = basis_string;
+    atom_basis_map[element_symbol] = basis_string;
+  }
+
+  for(size_t i = 0; i < ec_atoms.size(); i++) {
+    const auto es     = ec_atoms[i].esymbol; // element_symbol
+    ec_atoms[i].basis = options.basis;
+    if(atom_basis_map.find(es) != atom_basis_map.end()) ec_atoms[i].basis = atom_basis_map[es];
   }
 
   // common
@@ -779,9 +801,6 @@ parse_json(json& jinput) {
   parse_option<int>   (scf_options.nnodes          , jscf, "nnodes");
   parse_option<bool>  (scf_options.restart         , jscf, "restart");
   parse_option<bool>  (scf_options.noscf           , jscf, "noscf");
-  parse_option<bool>  (scf_options.ediis           , jscf, "ediis");
-  parse_option<double>(scf_options.ediis_off       , jscf, "ediis_off");
-  parse_option<bool>  (scf_options.sad             , jscf, "sad");
   parse_option<bool>  (scf_options.debug           , jscf, "debug");
   parse_option<string>(scf_options.moldenfile      , jscf, "moldenfile");
   parse_option<string>(scf_options.scf_type        , jscf, "scf_type");
@@ -797,6 +816,15 @@ parse_json(json& jinput) {
   parse_option<std::vector<double>>(scf_options.qed_volumes, jscf, "qed_volumes");
   parse_option<std::vector<std::vector<double>>>(scf_options.qed_polvecs, jscf, "qed_polvecs");
 
+
+  json jscf_guess  = jscf["guess"];
+  json jguess_atom_options = jscf_guess["atom_options"];
+  parse_option<bool>  (scf_options.sad, jscf_guess, "sad");
+
+  for(auto& [element_symbol, atom_opt]: jguess_atom_options.items()) {
+    scf_options.guess_atom_options[element_symbol] = atom_opt;
+  }  
+
   json jscf_analysis = jscf["PRINT"];
   parse_option<bool> (scf_options.mos_txt          , jscf_analysis, "mos_txt");
   parse_option<bool> (scf_options.mulliken_analysis, jscf_analysis, "mulliken");
@@ -809,7 +837,7 @@ parse_json(json& jinput) {
   // clang-format off
   const std::vector<string> valid_scf{"charge", "multiplicity", "lshift", "tol_int",
     "tol_lindep", "conve", "convd", "diis_hist","force_tilesize","tilesize","df_tilesize",
-    "alpha","writem","nnodes","restart","noscf","ediis","ediis_off","sad","moldenfile",
+    "alpha","writem","nnodes","restart","noscf","moldenfile", "guess",
     "debug","scf_type","xc_type","n_lindep","restart_size","scalapack_nb","riscf",
     "scalapack_np_row","scalapack_np_col","ext_data_path","PRINT",
     "qed_omegas","qed_lambdas","qed_volumes","qed_polvecs","comments"};
@@ -1049,7 +1077,7 @@ parse_json(json& jinput) {
   parse_option<bool>(task_options.scf         , jtask, "scf");
   parse_option<bool>(task_options.mp2         , jtask, "mp2");
   parse_option<bool>(task_options.gw          , jtask, "gw");
-  parse_option<bool>(task_options.cc2          , jtask, "cc2");
+  parse_option<bool>(task_options.cc2         , jtask, "cc2");
   parse_option<bool>(task_options.fci         , jtask, "fci");  
   parse_option<bool>(task_options.fcidump     , jtask, "fcidump");  
   parse_option<bool>(task_options.cd_2e       , jtask, "cd_2e");
@@ -1070,6 +1098,10 @@ parse_json(json& jinput) {
   // options.print();
   // scf_options.print();
   // ccsd_options.print();
+
+  // For UHF cases, set alpha=0.8 (ie damping=20%)
+  if(scf_options.scf_type == "unrestricted" && (int) scf_options.alpha == 1)
+    scf_options.alpha = 0.8;
 
   return std::make_tuple(options, scf_options, cd_options, gw_options, ccsd_options, fci_options,
                          task_options);
@@ -1099,9 +1131,9 @@ inline std::tuple<OptionsMap, json> parse_input(std::istream& is) {
   parse_option<std::vector<string>>(geometry, jinput["geometry"], "coordinates", false);
   size_t natom = geometry.size();
 
-  std::vector<Atom>          atoms(natom);
-  std::vector<string>        geom_bohr(natom);
-  std::map<int, std::string> atom_symbol_map;
+  std::vector<ECAtom> ec_atoms(natom);
+  std::vector<Atom>   atoms(natom);
+  std::vector<string> geom_bohr(natom);
 
   for(size_t i = 0; i < natom; i++) {
     std::string        line = geometry[i];
@@ -1111,33 +1143,22 @@ inline std::tuple<OptionsMap, json> parse_input(std::istream& is) {
     iss >> element_symbol >> x >> y >> z;
     geom_bohr[i] = element_symbol;
 
-    // .xyz files report element labels, hence convert to atomic numbers
-    int Z = -1;
-    for(const auto& e: libint2::chemistry::get_element_info()) {
-      if(strequal_case(e.symbol, element_symbol)) {
-        Z = e.Z;
-        break;
-      }
-    }
-    if(Z == -1) {
-      tamm_terminate("INPUT FILE ERROR: geometry: element symbol \"" + element_symbol +
-                     "\" is not recognized");
-    }
+    const auto Z = get_atomic_number(element_symbol);
 
     atoms[i].atomic_number = Z;
     atoms[i].x             = x;
     atoms[i].y             = y;
     atoms[i].z             = z;
 
-    atom_symbol_map[Z] = element_symbol;
+    ec_atoms[i].atom    = atoms[i];
+    ec_atoms[i].esymbol = element_symbol;
   }
 
   auto [options, scf_options, cd_options, gw_options, ccsd_options, fci_options, task_options] =
-    parse_json(jinput);
+    parse_json(jinput, ec_atoms);
 
   json jgeom_bohr;
-  bool nw_units_bohr      = true;
-  options.atom_symbol_map = atom_symbol_map;
+  bool nw_units_bohr = true;
   // Done parsing input file
   {
     // If geometry units specified are angstrom, convert to bohr
@@ -1155,7 +1176,8 @@ inline std::tuple<OptionsMap, json> parse_input(std::istream& is) {
                 << std::fixed << std::setprecision(10) << atoms[i].x << " " << std::right
                 << std::setw(14) << std::fixed << std::setprecision(10) << atoms[i].y << " "
                 << std::right << std::setw(14) << std::fixed << std::setprecision(10) << atoms[i].z;
-        geom_bohr[i] = ss_bohr.str();
+        geom_bohr[i]     = ss_bohr.str();
+        ec_atoms[i].atom = atoms[i];
       }
       jgeom_bohr["geometry_bohr"] = geom_bohr;
     }
@@ -1176,12 +1198,13 @@ inline std::tuple<OptionsMap, json> parse_input(std::istream& is) {
   }
 
   OptionsMap options_map;
-  options_map.options       = options;
-  options_map.options.atoms = atoms;
-  options_map.scf_options   = scf_options;
-  options_map.cd_options    = cd_options;
-  options_map.gw_options    = gw_options;
+  options_map.options          = options;
+  options_map.options.atoms    = atoms;
+  options_map.options.ec_atoms = ec_atoms;
 
+  options_map.scf_options  = scf_options;
+  options_map.cd_options   = cd_options;
+  options_map.gw_options   = gw_options;
   options_map.ccsd_options = ccsd_options;
   options_map.fci_options  = fci_options;
   options_map.task_options = task_options;

@@ -141,7 +141,7 @@ jobs:
       if: ${{ matrix.cc == 'clang' && matrix.cxx == 'clang++' && matrix.os[1] == 'ubuntu18' }}
       shell: bash
       run: |
-        module load llvm
+        module load llvm/11.1.0
         echo "CC=$(which clang)" >> $GITHUB_ENV
         echo "CXX=$(which clang++)" >> $GITHUB_ENV
 

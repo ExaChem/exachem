@@ -26,8 +26,7 @@
     "units": "angstrom"
   },
   "basis": {
-    "basisset": "6-31g*",
-    "gaussian_type": "cartesian"
+    "basisset": "6-31g*" 
   },
   "common": {
     "maxiter": 100
@@ -41,7 +40,6 @@
     "charge": 0,
     "multiplicity": 1,
     "scf_type": "restricted",    
-    "sad": false,
     "writem": 10,
     "restart": false,
     "tilesize": 30

@@ -117,14 +117,17 @@
         "noscf": {
           "type": "boolean"
         },
-        "ediis": {
-          "type": "boolean"
-        },
-        "ediis_off": {
-          "type": "number"
-        },
-        "sad": {
-          "type": "boolean"
+        "guess": {
+          "type": "array",
+          "sad": {
+            "type": "boolean"
+          },
+          "atom_options": {
+            "type": "array",
+            "items": {
+              "type": "int"
+            }
+          }
         },
         "scf_type": {
           "type": "string"

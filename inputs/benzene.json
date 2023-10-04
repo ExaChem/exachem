@@ -17,8 +17,7 @@
     "units": "bohr"
   },
   "basis": {
-    "basisset": "cc-pvdz",
-    "gaussian_type": "spherical"
+    "basisset": "cc-pvdz"
   },
   "SCF": {
     "tilesize": 30,

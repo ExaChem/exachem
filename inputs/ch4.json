@@ -10,8 +10,7 @@
     "units": "angstrom"
   },
   "basis": {
-    "basisset": "cc-pvdz",
-    "gaussian_type": "cartesian"
+    "basisset": "cc-pvdz"
   },
   "common": {
     "maxiter": 100
@@ -25,7 +24,6 @@
     "charge": 0,
     "multiplicity": 1,
     "scf_type": "restricted",  
-    "sad": false,
     "writem": 10,
     "force_tilesize": false,
     "tilesize": 30

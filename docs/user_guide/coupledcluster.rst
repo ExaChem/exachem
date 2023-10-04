@@ -125,7 +125,7 @@ EOMCCSD
 RT-EOMCCSD
 ~~~~~~~~~~
 
-The RT-EOMCCSD procedure is described in the following paper.
+The RT-EOMCCSD procedure is described in the following paper. 
 
 - Himadri Pathak, Ajay Panyala, Bo Peng, Nicholas P. Bauman, Erdal Mutlu, John J. Rehr, Fernando D. Vila, Karol Kowalski. **Real-Time Equation-of-Motion Coupled-Cluster Cumulant Green’s Function Method: Heterogeneous Parallel Implementation Based on the Tensor Algebra for Many-Body Methods Infrastructure.** *Journal of Chemical Theory and Computation (JCTC)*, April 2023. https://doi.org/10.1021/acs.jctc.3c00045
 
@@ -151,3 +151,7 @@ The RT-EOMCCSD procedure is described in the following paper.
 :rt_step_size: ``[default=0.025]`` Specifies the step size used in the time propagation of the wavefunction.
 
 :rt_multiplier: ``[default=0.5]`` Specifies a multiplier factor that scales the step size in the time propagation of the wavefunction.
+
+.. note::
+
+   The same options described here can be used to run an RT-EOM-CC2 calculation using task ``rteom_cc2`` in the input file.

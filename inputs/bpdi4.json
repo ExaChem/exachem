@@ -213,7 +213,6 @@
   },
   "basis": {
     "basisset": "6-31g",
-    "gaussian_type": "spherical",
     "atom_basis": {
       "Ni": "def2-tzvp",
       "S": "def2-tzvp"

@@ -311,8 +311,7 @@
     "units": "angstrom"
   },
   "basis": {
-    "basisset": "cc-pvdz",
-    "gaussian_type": "spherical"
+    "basisset": "cc-pvdz"
   },
   "common": {
     "maxiter": 50

@@ -35,6 +35,12 @@ The values listed below are the defaults
    "noscf": false,
    "scf_type": "restricted",
    "debug": false,
+    "guess": {
+      "atom_options":{
+        "Fe1": [1,2],
+        "H": [1,2]
+      }
+    },   
    "PRINT": {
      "mos_txt" : false,
      "mulliken": false,
@@ -73,10 +79,10 @@ The values listed below are the defaults
 :tilesize: The tilesize for the AO dimension. An integer value that is automatically set to ``ceil(Nbf * 0.05)``. If **force_tilesize=true**, 
    the value specified by the user is respected. It is recommended to let the SCF module automatically determine this value.
 
-:alpha: damping (mixing) factor for the density matrix where :math:`0 \leq \alpha \leq 1`.  Specifies the percentage of the current iterations density  mixed with the previous iterations density. ``default=1.0`` indicates no damping.
+:alpha: damping (mixing) factor for the density matrix where :math:`0 \leq \alpha \leq 1`.  Specifies the percentage of the current iterations density  mixed with the previous iterations density. ``default=1.0`` (RHF only) indicates no damping. For UHF, ``default=0.8``.
    :math:`D_{n} = \alpha*D_{n} + (1.0-\alpha)*D_{n-1}` 
 
-:writem: ``[default=diis_hist]`` An integer specifying the frequency (as number of iterations) after which the movecs and density matrices are written to disk for restarting the calculation.
+:writem: ``[default=1]`` An integer specifying the frequency (as number of iterations) after which the movecs and density matrices are written to disk for restarting the calculation.
 
 :restart: ``[default=false]`` indicates the calculation be restarted.
 
@@ -93,6 +99,8 @@ The values listed below are the defaults
    If a larger number of processors than required are used, the SCF module automatically chooses a smaller subset of processors for the calculation. 
    The SCF module automatically chooses the number of processors to be ``50% * Nbf``. This option allows to override this behavior and choose a larger set of processors by specifying 
    the percentage (as an integer value) of the total number of processors to use.  
+
+:guess: This block allows specifying options for indivudal atoms for the initial guess specified as atom symbol with charge and multiplicity values.
 
 :PRINT: This block allows specifying a couple of printing options. When enabled, they provide the following
 

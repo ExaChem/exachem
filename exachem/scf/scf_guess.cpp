@@ -7,6 +7,8 @@
  */
 
 #include "scf_guess.hpp"
+#include <algorithm>
+#include <iterator>
 
 /// computes orbital occupation numbers for a subshell of size \c size created
 /// by smearing
@@ -17,97 +19,76 @@
 /// @param[in,out] ne the number of electrons, on return contains the number of
 /// "remaining" electrons
 template<typename Real>
-void scf_guess::subshell_occvec(Real*& occvec, size_t size, size_t& ne) {
+void scf_guess::subshell_occvec(Real& occvec, size_t size, size_t& ne) {
   const auto ne_alloc = (ne > 2 * size) ? 2 * size : ne;
   ne -= ne_alloc;
-  // # of electrons / orbital compute as precisely as possible
-  const double ne_per_orb = (ne_alloc % size == 0) ? static_cast<Real>(ne_alloc / size)
-                                                   : (static_cast<Real>(ne_alloc)) / size;
-  for(size_t f = 0; f != size; ++f) occvec[f] = ne_per_orb;
-  occvec += size;
+  occvec += ne_alloc;
 }
 
-/// @param[in] Z the atomic number of the element
-/// @throw if Z > 53
-/// @return the number of STO-3G AOs for the element with atomic number \c Z
-size_t scf_guess::sto3g_num_ao(size_t Z) {
-  size_t nao;
-  if(Z == 1 || Z == 2) // H, He
-    nao = 1;
-  else if(Z <= 10) // Li - Ne
-    nao = 5;       // 2p is included even for Li and Be
-  else if(Z <= 18) // Na - Ar
-    nao = 9;       // 3p is included even for Na and Mg
-  else if(Z <= 20) // K, Ca
-    nao = 13;      // 4p is included
-  else if(Z <= 36) // Sc - Kr
-    nao = 18;
-  else if(Z <= 38) // Rb, Sr
-    nao = 22;      // 5p is included
-  else if(Z <= 53) // Y - I
-    nao = 27;
-  else throw "STO-3G basis is not defined for elements with Z > 53";
-  return nao;
-}
-
-/// @brief computes average orbital occupancies in the ground state of a neutral
-///        atoms
-/// @throw if Z > 53
+/// @brief computes the number of electrons is s, p, d, and f shells
 /// @return occupation vector corresponding to the ground state electronic
 ///         configuration of a neutral atom with atomic number \c Z
-///         corresponding to the orbital ordering in STO-3G basis
 template<typename Real>
-const std::vector<Real>& scf_guess::sto3g_ao_occupation_vector(size_t Z) {
-  static std::vector<Real> occvec(27, 0.0);
-
-  occvec.resize(sto3g_num_ao(Z));
-  auto* occs_ptr = &occvec[0];
-  auto& occs     = occs_ptr;
-
-  size_t num_of_electrons = Z; // # of electrons to allocate
+const std::vector<Real> scf_guess::compute_ao_occupation_vector(size_t Z) {
+  std::vector<Real> occvec(4, 0.0);
+  size_t            num_of_electrons = Z; // # of electrons to allocate
 
   // neutral atom electronic configurations from NIST:
   // http://www.nist.gov/pml/data/images/illo_for_2014_PT_1.PNG
-  subshell_occvec(occs, 1, num_of_electrons);   // 1s
-  if(Z > 2) {                                   // Li+
-    subshell_occvec(occs, 1, num_of_electrons); // 2s
-    subshell_occvec(occs, 3, num_of_electrons); // 2p
+  subshell_occvec(occvec[0], 1, num_of_electrons);   // 1s
+  if(Z > 2) {                                        // Li+
+    subshell_occvec(occvec[0], 1, num_of_electrons); // 2s
+    subshell_occvec(occvec[1], 3, num_of_electrons); // 2p
   }
-  if(Z > 10) {                                  // Na+
-    subshell_occvec(occs, 1, num_of_electrons); // 3s
-    subshell_occvec(occs, 3, num_of_electrons); // 3p
+  if(Z > 10) {                                       // Na+
+    subshell_occvec(occvec[0], 1, num_of_electrons); // 3s
+    subshell_occvec(occvec[1], 3, num_of_electrons); // 3p
   }
-  if(18 < Z && Z <= 36) { // K .. Kr
+  if(Z > 18) { // K .. Kr
     // NB 4s is singly occupied in K, Cr, and Cu
     size_t num_of_4s_electrons = (Z == 19 || Z == 24 || Z == 29) ? 1 : 2;
     num_of_electrons -= num_of_4s_electrons;
-    subshell_occvec(occs, 1, num_of_4s_electrons); // 4s
-
-    size_t num_of_4p_electrons = std::min(static_cast<decltype(Z)>(6), (Z > 30) ? Z - 30 : 0);
-    num_of_electrons -= num_of_4p_electrons;
-    subshell_occvec(occs, 3, num_of_4p_electrons); // 4p
-
-    subshell_occvec(occs, 5, num_of_electrons); // 3d
+    subshell_occvec(occvec[0], 1, num_of_4s_electrons); // 4s
+    subshell_occvec(occvec[2], 5, num_of_electrons);    // 3d
+    subshell_occvec(occvec[1], 3, num_of_electrons);    // 4p
   }
-  if(36 < Z && Z <= 53) { // Rb .. I
-    // 3d4s4p are fully occupied ...
-    subshell_occvec(occs, 1, num_of_electrons); // 4s
-    subshell_occvec(occs, 3, num_of_electrons); // 4p
+  if(Z > 36) { // Rb .. I
 
     // NB 5s is singly occupied in Rb, Nb, Mo, Ru, Rh, and Ag
-    size_t num_of_5s_electrons =
-      (Z == 37 || Z == 41 || Z == 42 || Z == 44 || Z == 45 || Z == 47) ? 1 : 2;
+    size_t num_of_5s_electrons = (Z == 37 || Z == 41 || Z == 42 || Z == 44 || Z == 45 || Z == 47)
+                                   ? 1
+                                 : (Z == 46) ? 0
+                                             : 2;
     num_of_electrons -= num_of_5s_electrons;
-    subshell_occvec(occs, 1, num_of_5s_electrons); // 5s
-
-    size_t num_of_5p_electrons = std::min(static_cast<decltype(Z)>(6), (Z > 48) ? Z - 48 : 0);
-    num_of_electrons -= num_of_5p_electrons;
-    subshell_occvec(occs, 3, num_of_5p_electrons); // 5p
-
-    subshell_occvec(occs, 5, num_of_electrons); // 3d
-    subshell_occvec(occs, 5, num_of_electrons); // 4d
+    subshell_occvec(occvec[0], 1, num_of_5s_electrons); // 5s
+    subshell_occvec(occvec[2], 5, num_of_electrons);    // 4d
+    subshell_occvec(occvec[1], 3, num_of_electrons);    // 5p
   }
-
+  if(Z > 54) { // Cs .. Rn
+    size_t num_of_6s_electrons = (Z == 55 || Z == 78 || Z == 79) ? 1 : 2;
+    num_of_electrons -= num_of_6s_electrons;
+    subshell_occvec(occvec[0], 1, num_of_6s_electrons); // 6s
+    size_t num_of_5d_electrons = (Z == 57 || Z == 58 || Z == 64) ? 1 : 0;
+    num_of_electrons -= num_of_5d_electrons;
+    subshell_occvec(occvec[2], 5, num_of_5d_electrons); // 5d (Lanthanides)
+    subshell_occvec(occvec[3], 7, num_of_electrons);    // 4f
+    subshell_occvec(occvec[2], 5, num_of_electrons);    // 5d
+    subshell_occvec(occvec[1], 3, num_of_electrons);    // 6p
+  }
+  if(Z > 86) {                                       // Fr .. Og
+    subshell_occvec(occvec[0], 1, num_of_electrons); // 7s
+    size_t num_of_6d_electrons = (Z == 89 || Z == 91 || Z == 92 || Z == 93 || Z == 96) ? 1
+                                 : (Z == 90)                                           ? 2
+                                                                                       : 0;
+    num_of_electrons -= num_of_6d_electrons;
+    subshell_occvec(occvec[2], 5, num_of_6d_electrons); // 6d (Actinides)
+    subshell_occvec(occvec[3], 7, num_of_electrons);    // 5f
+    size_t num_of_7p_electrons = (Z == 103) ? 1 : 0;
+    num_of_electrons -= num_of_7p_electrons;
+    subshell_occvec(occvec[1], 3, num_of_7p_electrons); // 7p (Lawrencium)
+    subshell_occvec(occvec[2], 5, num_of_electrons);    // 6d
+    subshell_occvec(occvec[1], 3, num_of_electrons);    // 7p
+  }
   return occvec;
 }
 
@@ -115,22 +96,16 @@ const std::vector<Real>& scf_guess::sto3g_ao_occupation_vector(size_t Z) {
 // in minimal basis; occupies subshells by smearing electrons evenly over the orbitals
 Matrix compute_soad(const std::vector<Atom>& atoms) {
   // compute number of atomic orbitals
-  size_t nao = 0;
-  for(const auto& atom: atoms) {
-    const auto Z = atom.atomic_number;
-    nao += scf_guess::sto3g_num_ao(Z);
-  }
+  size_t natoms = atoms.size();
+  size_t offset = 0;
 
   // compute the minimal basis density
-  Matrix D         = Matrix::Zero(nao, nao);
-  size_t ao_offset = 0; // first AO of this atom
+  Matrix D = Matrix::Zero(natoms, 4);
   for(const auto& atom: atoms) {
-    const auto  Z      = atom.atomic_number;
-    const auto& occvec = scf_guess::sto3g_ao_occupation_vector(Z);
-    for(const auto& occ: occvec) {
-      D(ao_offset, ao_offset) = occ;
-      ++ao_offset;
-    }
+    const auto Z      = atom.atomic_number;
+    const auto occvec = scf_guess::compute_ao_occupation_vector(Z);
+    for(int i = 0; i < 4; ++i) D(offset, i) = occvec[i];
+    ++offset;
   }
   return D; // we use densities normalized to # of electrons/2
 }
@@ -384,6 +359,255 @@ void compute_1body_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<Te
 }
 
 template<typename TensorType>
+void compute_ecp_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<TensorType>& tensor1e,
+                      std::vector<libecpint::GaussianShell>& shells,
+                      std::vector<libecpint::ECP>&           ecps) {
+  const std::vector<Tile>&   AO_tiles       = scf_vars.AO_tiles;
+  const std::vector<size_t>& shell_tile_map = scf_vars.shell_tile_map;
+
+  int maxam     = 0;
+  int ecp_maxam = 0;
+  for(auto shell: shells)
+    if(shell.l > maxam) maxam = shell.l;
+  for(auto ecp: ecps)
+    if(ecp.L > ecp_maxam) ecp_maxam = ecp.L;
+
+  size_t  size_       = (maxam + 1) * (maxam + 2) * (maxam + 1) * (maxam + 2) / 4;
+  double* buffer_     = new double[size_];
+  double* buffer_sph_ = new double[size_];
+  memset(buffer_, 0, size_ * sizeof(double));
+
+  libecpint::ECPIntegral engine(maxam, ecp_maxam);
+
+  auto compute_ecp_ints_lambda = [&](const IndexVector& blockid) {
+    auto bi0 = blockid[0];
+    auto bi1 = blockid[1];
+
+    const TAMM_SIZE         size       = tensor1e.block_size(blockid);
+    auto                    block_dims = tensor1e.block_dims(blockid);
+    std::vector<TensorType> dbuf(size);
+
+    auto bd1 = block_dims[1];
+
+    // cout << "blockid: [" << blockid[0] <<"," << blockid[1] << "], dims(0,1) = " <<
+    //  block_dims[0] << ", " << block_dims[1] << endl;
+
+    // auto s1 = blockid[0];
+    auto                  s1range_end   = shell_tile_map[bi0];
+    decltype(s1range_end) s1range_start = 0l;
+    if(bi0 > 0) s1range_start = shell_tile_map[bi0 - 1] + 1;
+
+    // cout << "s1-start,end = " << s1range_start << ", " << s1range_end << endl;
+    for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
+      // auto bf1 = shell2bf[s1]; //shell2bf[s1]; // first basis function in
+      // this shell
+      auto n1 = 2 * shells[s1].l + 1;
+
+      auto                  s2range_end   = shell_tile_map[bi1];
+      decltype(s2range_end) s2range_start = 0l;
+      if(bi1 > 0) s2range_start = shell_tile_map[bi1 - 1] + 1;
+
+      // cout << "s2-start,end = " << s2range_start << ", " << s2range_end << endl;
+
+      // cout << "screend shell pair list = " << s2spl << endl;
+      for(auto s2 = s2range_start; s2 <= s2range_end; ++s2) {
+        // for (auto s2: scf_vars.obs_shellpair_list.at(s1)) {
+        // auto s2 = blockid[1];
+        // if (s2>s1) continue;
+
+        if(s2 > s1) {
+          auto s2spl = scf_vars.obs_shellpair_list.at(s2);
+          if(std::find(s2spl.begin(), s2spl.end(), s1) == s2spl.end()) continue;
+        }
+        else {
+          auto s2spl = scf_vars.obs_shellpair_list.at(s1);
+          if(std::find(s2spl.begin(), s2spl.end(), s2) == s2spl.end()) continue;
+        }
+
+        // auto bf2 = shell2bf[s2];
+        auto n2 = 2 * shells[s2].l + 1;
+
+        std::vector<TensorType> tbuf(n1 * n2);
+        // cout << "s1,s2,n1,n2 = "  << s1 << "," << s2 <<
+        //       "," << n1 <<"," << n2 <<endl;
+
+        // compute shell pair; return is the pointer to the buffer
+        const libecpint::GaussianShell& LibECPShell1 = shells[s1];
+        const libecpint::GaussianShell& LibECPShell2 = shells[s2];
+        size_ = shells[s1].ncartesian() * shells[s2].ncartesian();
+        memset(buffer_, 0, size_ * sizeof(double));
+        for(const auto& ecp: ecps) {
+          libecpint::TwoIndex<double> results;
+          engine.compute_shell_pair(ecp, LibECPShell1, LibECPShell2, results);
+          // for (auto v: results.data) std::cout << std::setprecision(6) << v << std::endl;
+          std::transform(results.data.begin(), results.data.end(), buffer_, buffer_,
+                         std::plus<double>());
+        }
+        libint2::solidharmonics::tform(shells[s1].l, shells[s2].l, buffer_, buffer_sph_);
+
+        // "map" buffer to a const Eigen Matrix, and copy it to the
+        // corresponding blocks of the result
+        Eigen::Map<const Matrix> buf_mat(&buffer_sph_[0], n1, n2);
+        Eigen::Map<Matrix>(&tbuf[0], n1, n2) = buf_mat;
+        // tensor1e.put(blockid, tbuf);
+
+        auto curshelloffset_i = 0U;
+        auto curshelloffset_j = 0U;
+        for(auto x = s1range_start; x < s1; x++) curshelloffset_i += AO_tiles[x];
+        for(auto x = s2range_start; x < s2; x++) curshelloffset_j += AO_tiles[x];
+
+        size_t c    = 0;
+        auto   dimi = curshelloffset_i + AO_tiles[s1];
+        auto   dimj = curshelloffset_j + AO_tiles[s2];
+
+        // cout << "curshelloffset_i,curshelloffset_j,dimi,dimj = "  << curshelloffset_i << "," <<
+        // curshelloffset_j <<
+        //       "," << dimi <<"," << dimj <<endl;
+
+        for(size_t i = curshelloffset_i; i < dimi; i++) {
+          for(size_t j = curshelloffset_j; j < dimj; j++, c++) { dbuf[i * bd1 + j] = tbuf[c]; }
+        }
+
+        // if(s1!=s2){
+        //     std::vector<TensorType> ttbuf(n1*n2);
+        //     Eigen::Map<Matrix>(ttbuf.data(),n2,n1) = buf_mat.transpose();
+        //     // Matrix buf_mat_trans = buf_mat.transpose();
+        //     size_t c = 0;
+        //     for(size_t j = curshelloffset_j; j < dimj; j++) {
+        //       for(size_t i = curshelloffset_i; i < dimi; i++, c++) {
+        //             dbuf[j*block_dims[0]+i] = ttbuf[c];
+        //       }
+        //     }
+        // }
+        // tensor1e.put({s2,s1}, ttbuf);
+      }
+    }
+    tensor1e.put(blockid, dbuf);
+  };
+  block_for(ec, tensor1e(), compute_ecp_ints_lambda);
+  delete[] buffer_;
+  delete[] buffer_sph_;
+}
+
+template<typename TensorType>
+void compute_pchg_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<TensorType>& tensor1e,
+                       std::vector<std::pair<double, std::array<double, 3>>>& q,
+                       libint2::BasisSet& shells, libint2::Operator otype) {
+  using libint2::Atom;
+  using libint2::BasisSet;
+  using libint2::Engine;
+  using libint2::Operator;
+  using libint2::Shell;
+
+  const std::vector<Tile>&   AO_tiles       = scf_vars.AO_tiles;
+  const std::vector<size_t>& shell_tile_map = scf_vars.shell_tile_map;
+
+  Engine engine(otype, max_nprim(shells), max_l(shells), 0);
+
+  // engine.set(otype);
+  engine.set_params(q);
+
+  auto& buf = (engine.results());
+
+  auto compute_pchg_ints_lambda = [&](const IndexVector& blockid) {
+    auto bi0 = blockid[0];
+    auto bi1 = blockid[1];
+
+    const TAMM_SIZE         size       = tensor1e.block_size(blockid);
+    auto                    block_dims = tensor1e.block_dims(blockid);
+    std::vector<TensorType> dbuf(size);
+
+    auto bd1 = block_dims[1];
+
+    // cout << "blockid: [" << blockid[0] <<"," << blockid[1] << "], dims(0,1) = " <<
+    //  block_dims[0] << ", " << block_dims[1] << endl;
+
+    // auto s1 = blockid[0];
+    auto                  s1range_end   = shell_tile_map[bi0];
+    decltype(s1range_end) s1range_start = 0l;
+    if(bi0 > 0) s1range_start = shell_tile_map[bi0 - 1] + 1;
+
+    // cout << "s1-start,end = " << s1range_start << ", " << s1range_end << endl;
+    for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
+      // auto bf1 = shell2bf[s1]; //shell2bf[s1]; // first basis function in
+      // this shell
+      auto n1 = shells[s1].size();
+
+      auto                  s2range_end   = shell_tile_map[bi1];
+      decltype(s2range_end) s2range_start = 0l;
+      if(bi1 > 0) s2range_start = shell_tile_map[bi1 - 1] + 1;
+
+      // cout << "s2-start,end = " << s2range_start << ", " << s2range_end << endl;
+
+      // cout << "screend shell pair list = " << s2spl << endl;
+      for(auto s2 = s2range_start; s2 <= s2range_end; ++s2) {
+        // for (auto s2: scf_vars.obs_shellpair_list.at(s1)) {
+        // auto s2 = blockid[1];
+        // if (s2>s1) continue;
+
+        if(s2 > s1) {
+          auto s2spl = scf_vars.obs_shellpair_list.at(s2);
+          if(std::find(s2spl.begin(), s2spl.end(), s1) == s2spl.end()) continue;
+        }
+        else {
+          auto s2spl = scf_vars.obs_shellpair_list.at(s1);
+          if(std::find(s2spl.begin(), s2spl.end(), s2) == s2spl.end()) continue;
+        }
+
+        // auto bf2 = shell2bf[s2];
+        auto n2 = shells[s2].size();
+
+        std::vector<TensorType> tbuf(n1 * n2);
+        // cout << "s1,s2,n1,n2 = "  << s1 << "," << s2 <<
+        //       "," << n1 <<"," << n2 <<endl;
+
+        // compute shell pair; return is the pointer to the buffer
+        engine.compute(shells[s1], shells[s2]);
+        if(buf[0] == nullptr) continue;
+        // "map" buffer to a const Eigen Matrix, and copy it to the
+        // corresponding blocks of the result
+        Eigen::Map<const Matrix> buf_mat(buf[0], n1, n2);
+        Eigen::Map<Matrix>(&tbuf[0], n1, n2) = buf_mat;
+        // tensor1e.put(blockid, tbuf);
+
+        auto curshelloffset_i = 0U;
+        auto curshelloffset_j = 0U;
+        for(auto x = s1range_start; x < s1; x++) curshelloffset_i += AO_tiles[x];
+        for(auto x = s2range_start; x < s2; x++) curshelloffset_j += AO_tiles[x];
+
+        size_t c    = 0;
+        auto   dimi = curshelloffset_i + AO_tiles[s1];
+        auto   dimj = curshelloffset_j + AO_tiles[s2];
+
+        // cout << "curshelloffset_i,curshelloffset_j,dimi,dimj = "  << curshelloffset_i << "," <<
+        // curshelloffset_j <<
+        //       "," << dimi <<"," << dimj <<endl;
+
+        for(size_t i = curshelloffset_i; i < dimi; i++) {
+          for(size_t j = curshelloffset_j; j < dimj; j++, c++) { dbuf[i * bd1 + j] = tbuf[c]; }
+        }
+
+        // if(s1!=s2){
+        //     std::vector<TensorType> ttbuf(n1*n2);
+        //     Eigen::Map<Matrix>(ttbuf.data(),n2,n1) = buf_mat.transpose();
+        //     // Matrix buf_mat_trans = buf_mat.transpose();
+        //     size_t c = 0;
+        //     for(size_t j = curshelloffset_j; j < dimj; j++) {
+        //       for(size_t i = curshelloffset_i; i < dimi; i++, c++) {
+        //             dbuf[j*block_dims[0]+i] = ttbuf[c];
+        //       }
+        //     }
+        // }
+        // tensor1e.put({s2,s1}, ttbuf);
+      }
+    }
+    tensor1e.put(blockid, dbuf);
+  };
+
+  block_for(ec, tensor1e(), compute_pchg_ints_lambda);
+}
+
+template<typename TensorType>
 void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, ScalapackInfo& scalapack_info,
                      TAMMTensors& ttensors, EigenTensors& etensors) {
   auto rank = sch.ec().pg().rank();
@@ -550,7 +774,6 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, ScalapackInfo& 
                  1., Fp.data(), Northo_b, X_b.data(), Northo_b, 0., C_beta.data(), Northo_b);
     }
   }
-
 #endif
 }
 
@@ -581,21 +804,61 @@ void compute_initial_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info,
   Matrix& G_b     = etensors.G_beta;
 
   // compute guess in minimal basis
-  Matrix D_minbs_a;
-  Matrix D_minbs_b;
   int    neutral_charge = sys_data.nelectrons + charge;
   double N_to_Neu       = (double) sys_data.nelectrons / neutral_charge;
   double Na_to_Neu      = (double) sys_data.nelectrons_alpha / neutral_charge;
   double Nb_to_Na       = (double) sys_data.nelectrons_beta / sys_data.nelectrons_alpha;
-  if(is_rhf) D_minbs_a = N_to_Neu * compute_soad(atoms);
-  if(is_uhf) {
-    D_minbs_a = Na_to_Neu * compute_soad(atoms);
-    D_minbs_b = Nb_to_Na * D_minbs_a;
+  Matrix occs;
+
+  occs = compute_soad(atoms);
+  libint2::BasisSet minbs("STO-3G", atoms);
+  minbs.set_pure(true); // Always use spherical for atomic guess
+
+  Matrix D_minbs_a = Matrix::Zero(minbs.nbf(), minbs.nbf());
+  Matrix D_minbs_b = Matrix::Zero(minbs.nbf(), minbs.nbf());
+  G_a              = Matrix::Zero(N, N);
+  G_b              = Matrix::Zero(N, N);
+
+  auto a2s_map = minbs.atom2shell(atoms);
+#if 0  
+  for(int iatom=0; iatom<atoms.size(); ++iatom){
+    auto nshells_ia = a2s_map[iatom].size();
+    auto ifirst = a2s_map[iatom][0];
+    auto ilast  = a2s_map[iatom][nshells_ia - 1];
+    // Sort Guess Basis Set by angular momenta
+    std::stable_sort(minshells.begin()+ifirst, minshells.begin()+ilast,
+      [](const libint2::Shell& a, const libint2::Shell& b){
+        return a.contr[0].l < b.contr[0].l;
+      });
   }
 
-  libint2::BasisSet minbs("STO-3G", atoms);
-  if(is_spherical) minbs.set_pure(true);
-  else minbs.set_pure(false); // use cartesian gaussians
+  libint2::BasisSet  _minbs( minshells );
+  _minbs.set_pure(true);
+  auto shell2bf_minbs = _minbs.shell2bf();
+#endif
+  auto shell2bf_minbs = minbs.shell2bf();
+  for(int iatom = 0; iatom < atoms.size(); ++iatom) {
+    auto nshells_ia = a2s_map[iatom].size();
+    auto ifirst     = a2s_map[iatom][0];
+    auto ilast      = a2s_map[iatom][nshells_ia - 1];
+    for(int ishell = ifirst; ishell <= ilast; ++ishell) {
+      int  bf1 = shell2bf_minbs[ishell];
+      int  bf2 = bf1 + minbs[ishell].size() - 1;
+      auto l   = minbs[ishell].contr[0].l;
+      if(occs(iatom, l) < 0.1) continue;
+      auto nocc = std::min(occs(iatom, l) / (2 * l + 1), 1.0);
+      for(int ibf = bf1; ibf <= bf2; ++ibf) {
+        occs(iatom, l) -= nocc;
+        D_minbs_a(ibf, ibf) = nocc;
+      }
+      nocc = std::min(occs(iatom, l) / (2 * l + 1), 1.0);
+      for(int ibf = bf1; ibf <= bf2; ++ibf) {
+        occs(iatom, l) -= nocc;
+        D_minbs_b(ibf, ibf) = nocc;
+      }
+    }
+  }
+  // D_minbs_a *= N_to_Neu;
 
 #ifndef NDEBUG
   std::tie(scf_vars.minbs_shellpair_list, scf_vars.minbs_shellpair_data) =
@@ -711,13 +974,10 @@ void compute_initial_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info,
 
                     const auto value             = buf_1234[f1234];
                     const auto value_scal_by_deg = value * s1234_deg;
-                    if(is_rhf) G_a(bf1, bf2) += 1.0 * D_minbs_a(bf3, bf4) * value_scal_by_deg;
-                    if(is_uhf) {
-                      G_a(bf1, bf2) += 1.0 * D_minbs_a(bf3, bf4) * value_scal_by_deg;
-                      G_a(bf1, bf2) += 1.0 * D_minbs_b(bf3, bf4) * value_scal_by_deg;
-                      G_b(bf1, bf2) += 1.0 * D_minbs_a(bf3, bf4) * value_scal_by_deg;
-                      G_b(bf1, bf2) += 1.0 * D_minbs_b(bf3, bf4) * value_scal_by_deg;
-                    }
+                    G_a(bf1, bf2) += 1.0 * D_minbs_a(bf3, bf4) * value_scal_by_deg;
+                    G_a(bf1, bf2) += 1.0 * D_minbs_b(bf3, bf4) * value_scal_by_deg;
+                    G_b(bf1, bf2) += 1.0 * D_minbs_a(bf3, bf4) * value_scal_by_deg;
+                    G_b(bf1, bf2) += 1.0 * D_minbs_b(bf3, bf4) * value_scal_by_deg;
                   }
                 }
               }
@@ -739,11 +999,8 @@ void compute_initial_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info,
                 const auto bf4               = f4 + bf4_first;
                 const auto value             = buf_1324[f1324];
                 const auto value_scal_by_deg = value * s12_deg;
-                if(is_rhf) G_a(bf1, bf2) -= 0.5 * D_minbs_a(bf3, bf4) * value_scal_by_deg;
-                if(is_uhf) {
-                  G_a(bf1, bf2) -= 1.0 * D_minbs_a(bf3, bf4) * value_scal_by_deg;
-                  G_b(bf1, bf2) -= 1.0 * D_minbs_b(bf3, bf4) * value_scal_by_deg;
-                }
+                G_a(bf1, bf2) -= 1.0 * D_minbs_a(bf3, bf4) * value_scal_by_deg;
+                G_b(bf1, bf2) -= 1.0 * D_minbs_b(bf3, bf4) * value_scal_by_deg;
               }
             }
           }
@@ -770,7 +1027,7 @@ void compute_initial_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info,
               << " secs" << std::endl;
 
   D_minbs_a.resize(0, 0);
-  if(is_uhf) D_minbs_b.resize(0, 0);
+  D_minbs_b.resize(0, 0);
 
   {
     // symmetrize the result
@@ -841,7 +1098,6 @@ compute_initial_guess_taskinfo(ExecutionContext& ec, SystemData& sys_data, const
   // compute guess in minimal basis
   libint2::BasisSet minbs("STO-3G", atoms);
   if(is_spherical) minbs.set_pure(true);
-  else minbs.set_pure(false); // use cartesian gaussians
 
   bool                     D_is_shelldiagonal = true;
   const libint2::BasisSet& obs                = shells;
@@ -889,9 +1145,9 @@ compute_initial_guess_taskinfo(ExecutionContext& ec, SystemData& sys_data, const
   return std::make_tuple(s1vec, s2vec, ntask_vec);
 }
 
-template void scf_guess::subshell_occvec<double>(double*& occvec, size_t size, size_t& ne);
+template void scf_guess::subshell_occvec<double>(double& occvec, size_t size, size_t& ne);
 
-template const std::vector<double>& scf_guess::sto3g_ao_occupation_vector<double>(size_t Z);
+template const std::vector<double> scf_guess::compute_ao_occupation_vector<double>(size_t Z);
 
 template void compute_dipole_ints<double>(ExecutionContext& ec, const SCFVars& spvars,
                                           Tensor<TensorType>& tensorX, Tensor<TensorType>& tensorY,
@@ -903,6 +1159,16 @@ template void compute_1body_ints<double>(ExecutionContext& ec, const SCFVars& sc
                                          Tensor<TensorType>&         tensor1e,
                                          std::vector<libint2::Atom>& atoms,
                                          libint2::BasisSet& shells, libint2::Operator otype);
+
+template void compute_pchg_ints<double>(ExecutionContext& ec, const SCFVars& scf_vars,
+                                        Tensor<TensorType>& tensor1e,
+                                        std::vector<std::pair<double, std::array<double, 3>>>& q,
+                                        libint2::BasisSet& shells, libint2::Operator otype);
+
+template void compute_ecp_ints(ExecutionContext& ec, const SCFVars& scf_vars,
+                               Tensor<TensorType>&                    tensor1e,
+                               std::vector<libecpint::GaussianShell>& shells,
+                               std::vector<libecpint::ECP>&           ecps);
 
 template void scf_diagonalize<double>(Scheduler& sch, const SystemData& sys_data,
                                       ScalapackInfo& scalapack_info, TAMMTensors& ttensors,

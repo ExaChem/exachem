@@ -135,22 +135,6 @@
           "skip_ccsd": false,
           "ccsdt_tilesize": 32
         },
-    
-        "DLPNO": {
-          "localize": false,
-          "skip_dlpno": false,
-          "df_basisset": "",
-          "max_pnos": 1,
-          "keep_npairs": 1,
-          "TCutPNO":   0,
-          "TCutEN":    0.97,
-          "TCutPre":   -1.0,
-          "TCutPairs": 0.0,
-          "TCutDO":    1e-2,
-          "TCutDOij":  1e-5,
-          "TCutDOPre": 3e-2,
-          "doubles_opt_eqns": []
-        },
 
         "EOMCCSD": {
           "eom_nroots": 1,
@@ -251,9 +235,7 @@
       "ccsd_lambda": false,
       "eom_ccsd": false,
       "rteom_ccsd": false,
-      "gfccsd": false,
-      "dlpno_ccsd": [false,"standalone"],
-      "dlpno_ccsd_t": [false,"standalone"]
+      "gfccsd": false
     }
     
 }

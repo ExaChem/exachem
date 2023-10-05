@@ -19,6 +19,8 @@
 #include <gauxc/xc_integrator/impl.hpp>
 #endif
 
+#include <libecpint.hpp>
+
 using namespace tamm;
 using libint2::Atom;
 using std::cerr;
@@ -38,11 +40,11 @@ const auto max_engine_precision = std::numeric_limits<double>::epsilon() / 1e10;
 
 struct SCFVars {
   // diis
-  int    idiis       = 0;
-  int    iediis      = 0;
-  bool   switch_diis = false;
-  double exc         = 0.0;
-  double eqed        = 0.0;
+  int                      idiis       = 0;
+  bool                     switch_diis = false;
+  double                   exc         = 0.0;
+  double                   eqed        = 0.0;
+  libecpint::ECPIntegrator ecp_factory;
 
   // AO spaces
   tamm::TiledIndexSpace   tAO, tAO_ortho, tAOt; // tAO_ld
@@ -110,10 +112,10 @@ struct TAMMTensors {
   Tensor<TensorType> ehf_tmp;
   Tensor<TensorType> ehf_beta_tmp;
 
-  Tensor<TensorType> H1;      // core hamiltonian
-  Tensor<TensorType> S1;      // overlap ints
-  Tensor<TensorType> T1;      // kinetic ints
-  Tensor<TensorType> V1;      // nuclear ints
+  Tensor<TensorType> H1; // core hamiltonian
+  Tensor<TensorType> S1; // overlap ints
+  Tensor<TensorType> T1; // kinetic ints
+  Tensor<TensorType> V1; // nuclear ints
 
   Tensor<TensorType> X_alpha;
   Tensor<TensorType> X_beta;
@@ -280,8 +282,8 @@ void scf_restart(const ExecutionContext& ec, const SystemData& sys_data,
 template<typename TensorType>
 double tt_trace(ExecutionContext& ec, Tensor<TensorType>& T1, Tensor<TensorType>& T2);
 
-void print_energies(ExecutionContext& ec, TAMMTensors& ttensors, const SystemData& sys_data,
-                    SCFVars& scf_vars, bool debug = false);
+void print_energies(ExecutionContext& ec, TAMMTensors& ttensors, EigenTensors& etensors,
+                    const SystemData& sys_data, SCFVars& scf_vars, bool debug = false);
 
 // returns {X,X^{-1},rank,A_condition_number,result_A_condition_number}, where
 // X is the generalized square-root-inverse such that X.transpose() * A * X = I
@@ -299,6 +301,12 @@ std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, SystemData& 
                                               SCFVars& scf_vars, ScalapackInfo& scalapack_info,
                                               TAMMTensors& ttensors, bool symmetric,
                                               double threshold);
+
+std::tuple<size_t, double, double>
+gensqrtinv_atscf(ExecutionContext& ec, SystemData& sys_data, SCFVars& scf_vars,
+                 ScalapackInfo& scalapack_info, Tensor<double> S1, Tensor<double>& X_alpha,
+                 Tensor<double>& X_beta, TiledIndexSpace& tao_atom, bool symmetric,
+                 double threshold);
 
 std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(const libint2::BasisSet& bs1,
                                                                   const libint2::BasisSet& _bs2,

@@ -21,12 +21,7 @@ namespace scf_guess {
 /// @param[in,out] ne the number of electrons, on return contains the number of
 /// "remaining" electrons
 template<typename Real>
-void subshell_occvec(Real*& occvec, size_t size, size_t& ne);
-
-/// @param[in] Z the atomic number of the element
-/// @throw if Z > 53
-/// @return the number of STO-3G AOs for the element with atomic number \c Z
-size_t sto3g_num_ao(size_t Z);
+void subshell_occvec(Real& occvec, size_t size, size_t& ne);
 
 /// @brief computes average orbital occupancies in the ground state of a neutral
 ///        atoms
@@ -35,7 +30,7 @@ size_t sto3g_num_ao(size_t Z);
 ///         configuration of a neutral atom with atomic number \c Z
 ///         corresponding to the orbital ordering in STO-3G basis
 template<typename Real = double>
-const std::vector<Real>& sto3g_ao_occupation_vector(size_t Z);
+const std::vector<Real> compute_ao_occupation_vector(size_t Z);
 
 } // namespace scf_guess
 
@@ -55,6 +50,16 @@ void compute_1body_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<Te
                         libint2::Operator otype);
 
 template<typename TensorType>
+void compute_pchg_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<TensorType>& tensor1e,
+                       std::vector<std::pair<double, std::array<double, 3>>>& q,
+                       libint2::BasisSet& shells, libint2::Operator otype);
+
+template<typename TensorType>
+void compute_ecp_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<TensorType>& tensor1e,
+                      std::vector<libecpint::GaussianShell>& shells,
+                      std::vector<libecpint::ECP>&           ecps);
+
+template<typename TensorType>
 void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, ScalapackInfo& scalapack_info,
                      TAMMTensors& ttensors, EigenTensors& etensors);
 
@@ -64,6 +69,12 @@ void compute_initial_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info,
                            const std::vector<libint2::Atom>& atoms, const libint2::BasisSet& shells,
                            const std::string& basis, bool is_spherical, EigenTensors& etensors,
                            TAMMTensors& ttensors, int charge, int multiplicity);
+
+template<typename TensorType>
+void compute_sad_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info, SystemData& sys_data,
+                       SCFVars& scf_vars, const std::vector<libint2::Atom>& atoms,
+                       const libint2::BasisSet& shells, const std::string& basis, bool is_spherical,
+                       EigenTensors& etensors, TAMMTensors& ttensors, int charge, int multiplicity);
 
 template<typename TensorType>
 std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>

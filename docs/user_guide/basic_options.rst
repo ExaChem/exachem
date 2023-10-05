@@ -26,7 +26,7 @@ A geometry can be specified as follows:
    :language: json
    :lines: 3-10
 
-:coordinates: The atom *symbol* followed by the *x y z* coordinates
+:coordinates: The element *symbol* followed by the *x y z* coordinates. Additional characters can be added to the element symbol to distinguish between atoms of the same element. For example, the strings ``O`` and  ``O34`` will both be interpreted as oxygen atoms, but the program will keep their distinction for further use.
 
 :units: The following possible string values are recognized ``[default=angstrom]``
 
@@ -56,31 +56,25 @@ Some common options supported are as follows:
 
 Basis set options
 ~~~~~~~~~~~~~~~~~
-Currently support basis sets consisting of generally contracted Cartesian Gaussian functions up to a maximum angular momentum of six (h functions)::
+Currently support basis sets consisting of contracted Gaussian functions up to a maximum angular momentum of six (h functions).
+Spherical-harmonic (5 *d*, 7 *f*, 9 *g*, ...) angular functions are utilized by default::
 
  "basis": {
    "basisset": "cc-pvdz",
-   "gaussian_type": "spherical",
+   "basisfile": "/path/to/basis_file_with_ecps",
    "atom_basis": {
      "H": "cc-pvtz",
      "O": "aug-cc-pvtz"
     }
  }
 
-:basisset: String specifying the basis set name.
+:basisset: String specifying the basis set name. Parsing of the basis set will be handled by *Libint*, which expects to find a ``<basisset>.g94`` file with Gaussian-style format and located at ``$LIBINT_DATA_PATH/basis`` or ``<libint2_install_prefix>/share/libint/<libint2_version>/basis`` (if ``LIBINT_DATA_PATH`` is not defined).
 
-:atom_basis: Specify the basis set for individual atoms.
+:basisfile: Currently used for ECPs only. This is a basis file containing the ECP block. Only the ECP block of this file is parsed and everthing else is ignored. The specified file should follow the NWChem format from the basis set exchange website.
+
+:atom_basis: Specify the basis set for individual atoms. The full strings specified in `Geometry`_  will be used to distinguish different atoms of the same element.
 
 ..  :df_basisset: Used to specify the auxiliary basisset for density fitting.
-
-:gaussian_type: The following values are recognized
-
-   * :strong:`spherical (default)`: spherical-harmonic (5 d, 7 f, 9 g, ...) angular functions are utilized.
-   * :strong:`cartesian`: Cartesian (6 d, 10 f, 15 g, ...) angular functions are utilized.
-
-.. note:: 
-   
-   The correlation-consistent basis sets were designed using spherical harmonics and to use these, the spherical keyword should be specified. 
 
 .. _TASK:
 

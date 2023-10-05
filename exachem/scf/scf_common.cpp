@@ -210,8 +210,6 @@ void t2e_hf_helper(const ExecutionContext& ec, tamm::Tensor<T>& ttensor, Matrix&
                    const std::string& ustr) {
   const string pstr = "(" + ustr + ")";
 
-  // auto hf_t1 = std::chrono::high_resolution_clock::now();
-
   const auto rank = ec.pg().rank();
   const auto N    = etensor.rows(); // TODO
 
@@ -225,14 +223,6 @@ void t2e_hf_helper(const ExecutionContext& ec, tamm::Tensor<T>& ttensor, Matrix&
   etensor = Eigen::Map<Matrix>(Hbuf, N, N);
   Hbufv.clear();
   Hbufv.shrink_to_fit();
-
-  // auto hf_t2 = std::chrono::high_resolution_clock::now();
-  // auto hf_time =
-  //   std::chrono::duration_cast<std::chrono::duration<double>>((hf_t2 - hf_t1)).count();
-
-  // //ec.pg().barrier(); //TODO
-  // if(rank == 0) std::cout << std::endl << "Time for tamm to eigen " << pstr << " : " << hf_time
-  // << " secs" << endl;
 }
 
 void compute_shellpair_list(const ExecutionContext& ec, const libint2::BasisSet& shells,
@@ -332,23 +322,6 @@ void compute_orthogonalizer(ExecutionContext& ec, SystemData& sys_data, SCFVars&
 
   std::tie(obs_rank, S_condition_number, XtX_condition_number) = gensqrtinv(
     ec, sys_data, scf_vars, scalapack_info, ttensors, false, S_condition_number_threshold);
-  // auto obs_nbf_omitted = (long)(sys_data.nbf_orig) - (long)obs_rank;
-  // std::cout << "overlap condition number = " << S_condition_number;
-  // if (obs_nbf_omitted > 0){
-  //   if(ec.pg().rank()==0) std::cout << " (dropped " << obs_nbf_omitted << " "
-  //             << (obs_nbf_omitted > 1 ? "fns" : "fn") << " to reduce to "
-  //             << XtX_condition_number << ")";
-  // }
-  // if(ec.pg().rank()==0) std::cout << endl;
-
-  // FIXME: UNCOMMENT?
-  // if (obs_nbf_omitted > 0) {
-  //   Matrix should_be_I = X.transpose() * S * X;
-  //   Matrix I = Matrix::Identity(should_be_I.rows(), should_be_I.cols());
-  //   if(ec.pg().rank()==0) std::cout << std::endl << "||X^t * S * X - I||_2 = " << (should_be_I -
-  //   I).norm()
-  //             << " (should be 0)" << endl;
-  // }
 
   // TODO: Redeclare TAMM S1 with new dims?
   auto hf_t2   = std::chrono::high_resolution_clock::now();
@@ -463,8 +436,8 @@ double tt_trace(ExecutionContext& ec, Tensor<TensorType>& T1, Tensor<TensorType>
   return trace;
 }
 
-void print_energies(ExecutionContext& ec, TAMMTensors& ttensors, const SystemData& sys_data,
-                    SCFVars& scf_vars, bool debug) {
+void print_energies(ExecutionContext& ec, TAMMTensors& ttensors, EigenTensors& etensors,
+                    const SystemData& sys_data, SCFVars& scf_vars, bool debug) {
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;
   const bool is_ks  = sys_data.is_ks;
@@ -866,9 +839,10 @@ Matrix compute_schwarz_ints(ExecutionContext& ec, const SCFVars& scf_vars,
 
   auto hf_t2   = std::chrono::high_resolution_clock::now();
   auto hf_time = std::chrono::duration_cast<std::chrono::duration<double>>((hf_t2 - hf_t1)).count();
-  if(ec.pg().rank() == 0)
-    std::cout << std::fixed << std::setprecision(2) << "Time to compute schwarz matrix: " << hf_time
-              << " secs" << endl;
+  // if(ec.pg().rank() == 0)
+  //   std::cout << std::fixed << std::setprecision(2) << "Time to compute schwarz matrix: " <<
+  //   hf_time
+  //             << " secs" << endl;
 
   return K;
 }
@@ -1168,6 +1142,127 @@ template double gauxc_util::compute_xcf<double>(ExecutionContext& ec, TAMMTensor
                                                 GauXC::XCIntegrator<Matrix>& xc_integrator);
 
 #endif
+
+std::tuple<size_t, double, double>
+gensqrtinv_atscf(ExecutionContext& ec, SystemData& sys_data, SCFVars& scf_vars,
+                 ScalapackInfo& scalapack_info, Tensor<double> S1, Tensor<double>& X_alpha,
+                 Tensor<double>& X_beta, TiledIndexSpace& tao_atom, bool symmetric,
+                 double threshold) {
+  using T = double;
+
+  Scheduler sch{ec};
+  // auto world = ec.pg().comm();
+  int world_rank = ec.pg().rank().value();
+  int world_size = ec.pg().size().value();
+
+  int64_t       n_cond{}, n_illcond{};
+  double        condition_number{}, result_condition_number{};
+  const int64_t N = tao_atom.index_space().num_indices();
+
+  // TODO: avoid eigen matrices
+  Matrix         X, V;
+  std::vector<T> eps(N);
+
+  if(world_rank == 0) {
+    // Eigen decompose S -> VsV**T
+    V.resize(N, N);
+    tamm_to_eigen_tensor(S1, V);
+    lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, N, V.data(), N, eps.data());
+  }
+
+  std::vector<T>::iterator first_above_thresh;
+  if(world_rank == 0) {
+    // condition_number = std::min(
+    //   eps.back() / std::max( eps.front(), std::numeric_limits<double>::min() ),
+    //   1.       / std::numeric_limits<double>::epsilon()
+    // );
+
+    // const auto threshold = eps.back() / max_condition_number;
+    first_above_thresh =
+      std::find_if(eps.begin(), eps.end(), [&](const auto& x) { return x >= threshold; });
+    result_condition_number = eps.back() / *first_above_thresh;
+
+    n_illcond = std::distance(eps.begin(), first_above_thresh);
+    n_cond    = N - n_illcond;
+
+    if(n_illcond > 0) {
+      std::cout << std::endl
+                << "WARNING: Found " << n_illcond << " linear dependencies" << std::endl;
+      cout << std::defaultfloat << "First eigen value above tol_lindep = " << *first_above_thresh
+           << endl;
+      std::cout << "The overlap matrix has " << n_illcond
+                << " vectors deemed linearly dependent with eigenvalues:" << std::endl;
+
+      for(int64_t i = 0; i < n_illcond; i++)
+        cout << std::defaultfloat << i + 1 << ": " << eps[i] << endl;
+    }
+  }
+
+  if(world_size > 1) {
+    // TODO: Should buffer this
+    ec.pg().broadcast(&n_cond, 0);
+    ec.pg().broadcast(&n_illcond, 0);
+    // ec.pg().broadcast( &condition_number,        0 );
+    ec.pg().broadcast(&result_condition_number, 0);
+  }
+
+  if(world_rank == 0) {
+    // auto* V_cond = Vbuf + n_illcond * N;
+    Matrix V_cond = V.block(n_illcond, 0, N - n_illcond, N);
+    V.resize(0, 0);
+    X.resize(N, n_cond); // Xinv.resize( N, n_cond );
+    // Matrix V_cond(n_cond,N);
+    // V_cond = Eigen::Map<Matrix>(Vbuf + n_illcond * N,n_cond,N);
+    X = V_cond.transpose();
+    V_cond.resize(0, 0);
+  }
+
+  if(world_rank == 0) {
+    // Form canonical X/Xinv
+    for(auto i = 0; i < n_cond; ++i) {
+      const double srt = std::sqrt(*(first_above_thresh + i));
+
+      // X is row major...
+      auto* X_col = X.data() + i;
+      // auto* Xinv_col = Xinv.data() + i;
+
+      blas::scal(N, 1. / srt, X_col, n_cond);
+      // blas::scal( N, srt, Xinv_col, n_cond );
+    }
+
+    if(symmetric) {
+      assert(not symmetric);
+      /*
+      // X is row major, thus we need to form X**T = V_cond * X**T
+      Matrix TMP = X;
+      X.resize( N, N );
+      blas::gemm( blas::Op::NoTrans, blas::Op::NoTrans, N, N, n_cond, 1., V_cond, N, TMP.data(),
+      n_cond, 0., X.data(), N );
+      */
+    }
+  } // compute on root
+
+  auto nbf_new = N - n_illcond;
+
+  const bool is_uhf    = (sys_data.is_unrestricted);
+  auto       tAO_ortho = TiledIndexSpace{IndexSpace{range(0, (size_t) nbf_new)},
+                                   sys_data.options_map.scf_options.AO_tilesize};
+
+  X_alpha = {tao_atom, tAO_ortho};
+  sch.allocate(X_alpha).execute();
+  if(is_uhf) {
+    X_beta = {tao_atom, tAO_ortho};
+    sch.allocate(X_beta).execute();
+  }
+
+  if(world_rank == 0) eigen_to_tamm_tensor(X_alpha, X);
+  if(is_uhf)
+    if(world_rank == 0) eigen_to_tamm_tensor(X_beta, X); // X_beta=X_alpha here
+
+  ec.pg().barrier();
+
+  return std::make_tuple(size_t(n_cond), condition_number, result_condition_number);
+}
 
 template void write_scf_mat<double>(Matrix& C, std::string matfile);
 

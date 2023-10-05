@@ -18,21 +18,14 @@ void scf_diis(ExecutionContext& ec, const TiledIndexSpace& tAO, Tensor<TensorTyp
               std::vector<Tensor<TensorType>>& fock_hist);
 
 template<typename TensorType>
-void energy_diis(ExecutionContext& ec, const TiledIndexSpace& tAO, int iter, int max_hist,
-                 Tensor<TensorType> D, Tensor<TensorType> F,
-                 std::vector<Tensor<TensorType>>& D_hist,
-                 std::vector<Tensor<TensorType>>& fock_hist,
-                 std::vector<Tensor<TensorType>>& ehf_tamm_hist);
-
-template<typename TensorType>
-std::tuple<TensorType, TensorType>
-scf_iter_body(ExecutionContext& ec, ScalapackInfo& scalapack_info, const int& iter,
-              const SystemData& sys_data, SCFVars& scf_vars, TAMMTensors& ttensors,
-              EigenTensors& etensors, bool ediis,
+std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
+                                                 ScalapackInfo& scalapack_info, const int& iter,
+                                                 const SystemData& sys_data, SCFVars& scf_vars,
+                                                 TAMMTensors& ttensors, EigenTensors& etensors,
 #if defined(USE_GAUXC)
-              GauXC::XCIntegrator<Matrix>& gauxc_integrator,
+                                                 GauXC::XCIntegrator<Matrix>& gauxc_integrator,
 #endif
-              bool scf_restart = false);
+                                                 bool scf_restart = false);
 
 template<typename TensorType>
 std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>

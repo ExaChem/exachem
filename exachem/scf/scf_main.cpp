@@ -101,6 +101,95 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   if(is_spherical) shells.set_pure(true);
   else shells.set_pure(false); // use cartesian gaussians
 
+  // parse ECP section of basis file
+  if(!scf_options.basisfile.empty()) {
+    if(!fs::exists(scf_options.basisfile)) {
+      std::string bfnf_msg = scf_options.basisfile + "not found";
+      tamm_terminate(bfnf_msg);
+    }
+    else if(rank == 0)
+      std::cout << std::endl << "Parsing ECP block in " << scf_options.basisfile << std::endl;
+
+    std::ifstream is(scf_options.basisfile);
+    std::string   line, rest;
+    bool          ecp_found{false};
+
+    do {
+      if(line.find("ECP") != std::string::npos) {
+        ecp_found = true;
+        break;
+      }
+    } while(std::getline(is, line));
+
+    if(!ecp_found) {
+      std::string bfnf_msg = "ECP block not found in " + scf_options.basisfile;
+      tamm_terminate(bfnf_msg);
+    }
+
+    int         nelec = 0;
+    int         iatom = -1;
+    std::string amlabel;
+
+    while(std::getline(is, line)) {
+      if(line.find("END") != std::string::npos) break;
+
+      std::istringstream iss{line};
+      std::string        word;
+      int                count = 0;
+      while(iss >> word) count++;
+      if(count == 0) continue;
+
+      std::string elemsymbol;
+
+      std::istringstream iss_{line};
+      iss_ >> elemsymbol;
+
+      // true if line starts with element symbol
+      bool is_es = elemsymbol.find_first_not_of("0123456789") != string::npos;
+
+      // TODO: Check if its valid symbol
+
+      if(is_es && count == 3) {
+        std::string nelec_str;
+        iss_ >> nelec_str >> nelec;
+
+        for(size_t i = 0; i < ec_atoms.size(); i++) {
+          if(elemsymbol == ec_atoms[i].esymbol) {
+            sys_data.has_ecp      = true;
+            ec_atoms[i].has_ecp   = true;
+            ec_atoms[i].ecp_nelec = nelec;
+            atoms[i].atomic_number -= nelec;
+            iatom = i;
+            break;
+          }
+        }
+        continue;
+      }
+      if(is_es && count == 2) {
+        iss_ >> amlabel;
+        continue;
+      }
+      if(!is_es && count == 3) {
+        int am = 0;
+        if(amlabel == "ul") am = -1;
+        else am = Shell::am_symbol_to_l(amlabel[0]);
+
+        int    ns = stoi(elemsymbol);
+        double _exp;
+        double _coef;
+        iss_ >> _exp >> _coef;
+        ec_atoms[iatom].ecp_ams.push_back(am);
+        ec_atoms[iatom].ecp_ns.push_back(ns);
+        ec_atoms[iatom].ecp_exps.push_back(_exp);
+        ec_atoms[iatom].ecp_coeffs.push_back(_coef);
+      }
+    }
+    while(std::getline(is, line))
+      ;
+  }
+
+  sys_data.options_map.options.ec_atoms = ec_atoms;
+
   const size_t N      = shells.nbf();
   auto         nnodes = exc.nnodes();
 
@@ -363,6 +452,34 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   const double      xHF = 1.;
 #endif
 
+    // SETUP LibECPint
+    std::vector<libecpint::ECP>           ecps;
+    std::vector<libecpint::GaussianShell> libecp_shells;
+    if(sys_data.has_ecp) {
+      for(auto shell: shells) {
+        std::array<double, 3>    O = {shell.O[0], shell.O[1], shell.O[2]};
+        libecpint::GaussianShell newshell(O, shell.contr[0].l);
+        for(size_t iprim = 0; iprim < shell.alpha.size(); iprim++)
+          newshell.addPrim(shell.alpha[iprim], shell.contr[0].coeff[iprim]);
+        libecp_shells.push_back(newshell);
+      }
+
+      for(size_t i = 0; i < ec_atoms.size(); i++) {
+        if(ec_atoms[i].has_ecp) {
+          int maxam = *std::max_element(ec_atoms[i].ecp_ams.begin(), ec_atoms[i].ecp_ams.end());
+          std::replace(ec_atoms[i].ecp_ams.begin(), ec_atoms[i].ecp_ams.end(), -1, maxam + 1);
+
+          std::array<double, 3> O = {atoms[i].x, atoms[i].y, atoms[i].z};
+          libecpint::ECP        newecp(O.data());
+          for(size_t iprim = 0; iprim < ec_atoms[i].ecp_coeffs.size(); iprim++) {
+            newecp.addPrimitive(ec_atoms[i].ecp_ns[iprim], ec_atoms[i].ecp_ams[iprim],
+                                ec_atoms[i].ecp_exps[iprim], ec_atoms[i].ecp_coeffs[iprim], true);
+          }
+          ecps.push_back(newecp);
+        }
+      }
+    }
+
     ec.pg().barrier();
 
     Scheduler sch{ec};
@@ -374,6 +491,13 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     /*** compute 1-e integrals       ***/
     /*** =========================== ***/
     compute_hamiltonian<TensorType>(ec, scf_vars, atoms, shells, ttensors, etensors);
+
+    if(sys_data.has_ecp) {
+      Tensor<TensorType> ECP{tAO, tAO};
+      Tensor<TensorType>::allocate(&ec, ECP);
+      compute_ecp_ints(ec, scf_vars, ECP, libecp_shells, ecps);
+      sch(ttensors.H1() += ECP()).deallocate(ECP).execute();
+    }
 
     /*** =========================== ***/
     /*** build initial-guess density ***/
@@ -561,86 +685,99 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
       ec.pg().barrier();
     }
     else {
-// TODO: WIP
-#if 0
-        if(sad) {
-          if(rank==0) cout << "SAD enabled" << endl;
+      std::vector<int> s1vec, s2vec, ntask_vec;
 
-          compute_sad_guess<TensorType>(ec, sys_data, atoms, shells, basis, 
-                                       is_spherical, etensors, charge, multiplicity); 
-          compute_2bf<TensorType>(ec, sys_data, scf_vars, obs, do_schwarz_screen, shell2bf, SchwarzK,
-                                         max_nprim4,shells, ttensors, etensors, false, do_density_fitting);
-          sch
-            (ttensors.F_alpha()  = ttensors.H1())
-            (ttensors.F_alpha() += ttensors.F_alpha_tmp())
-            .execute();
-          Matrix Fa_eig = tamm_to_eigen_matrix(ttensors.F_alpha);
-          Matrix X_eig  = tamm_to_eigen_matrix(ttensors.X_alpha);
-          Eigen::SelfAdjointEigenSolver<Matrix> eig_solver_guess_a(X_eig.transpose() * Fa_eig * X_eig);
-          auto C_alpha = X_eig * eig_solver_guess_a.eigenvectors();
-          auto C_occ_a = C_alpha.leftCols(sys_data.nelectrons_alpha);
-          if(is_rhf) 
-            etensors.D = 2.0 * C_occ_a * C_occ_a.transpose();
-          if(is_uhf) {
-            etensors.D = C_occ_a * C_occ_a.transpose();
-            sch
-              (ttensors.F_beta()  = ttensors.H1())
-              (ttensors.F_beta() += ttensors.F_beta_tmp())
-              .execute();
-            Matrix Fb_eig = tamm_to_eigen_matrix(ttensors.F_beta);
-            Eigen::SelfAdjointEigenSolver<Matrix> eig_solver_guess_b(X_eig.transpose() * Fb_eig * X_eig);
-            auto C_beta  = X_eig * eig_solver_guess_b.eigenvectors();
-            auto C_occ_b = C_beta.leftCols(sys_data.nelectrons_beta);
-            etensors.D_beta = C_occ_b * C_occ_b.transpose();
-          }
-        }
-        else
-#endif
-      {
-        auto [s1vec, s2vec, ntask_vec] = compute_initial_guess_taskinfo<TensorType>(
+      if(sad) {
+        if(rank == 0) cout << "Superposition of Atomic Density Guess ..." << endl;
+
+        compute_sad_guess<TensorType>(ec, scalapack_info, sys_data, scf_vars, atoms, shells, basis,
+                                      is_spherical, etensors, ttensors, charge, multiplicity);
+
+        // Collect task info
+        std::tie(s1vec, s2vec, ntask_vec) = compute_2bf_taskinfo<TensorType>(
+          ec, sys_data, scf_vars, obs, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4, shells,
+          ttensors, etensors, do_density_fitting);
+      }
+      else {
+        std::tie(s1vec, s2vec, ntask_vec) = compute_initial_guess_taskinfo<TensorType>(
           ec, sys_data, scf_vars, atoms, shells, basis, is_spherical, etensors, ttensors, charge,
           multiplicity);
+      }
 
-        auto [s1_all, s2_all, ntasks_all] =
-          gather_task_vectors<TensorType>(ec, s1vec, s2vec, ntask_vec);
+      auto [s1_all, s2_all, ntasks_all] =
+        gather_task_vectors<TensorType>(ec, s1vec, s2vec, ntask_vec);
 
-        int tmdim = 0;
-        if(rank == 0) {
-          Loads dummyLoads;
-          /***generate load balanced task map***/
-          readLoads(s1_all, s2_all, ntasks_all, dummyLoads);
-          simpleLoadBal(dummyLoads, ec.pg().size().value());
-          tmdim = std::max(dummyLoads.maxS1, dummyLoads.maxS2);
-          etensors.taskmap.resize(tmdim + 1, tmdim + 1);
-          for(int i = 0; i < tmdim + 1; i++) {
-            for(int j = 0; j < tmdim + 1; j++) {
-              // value in this array is the rank that executes task i,j
-              // -1 indicates a task i,j that can be skipped
-              etensors.taskmap(i, j) = -1;
-            }
-          }
-          createTaskMap(etensors.taskmap, dummyLoads);
+      int tmdim = 0;
+      if(rank == 0) {
+        Loads dummyLoads;
+        /***generate load balanced task map***/
+        readLoads(s1_all, s2_all, ntasks_all, dummyLoads);
+        simpleLoadBal(dummyLoads, ec.pg().size().value());
+        tmdim = std::max(dummyLoads.maxS1, dummyLoads.maxS2);
+        etensors.taskmap.resize(tmdim + 1, tmdim + 1);
+        // value in this array is the rank that executes task i,j
+        // -1 indicates a task i,j that can be skipped
+        etensors.taskmap.setConstant(-1);
+        // cout<<"creating task map"<<endl;
+        createTaskMap(etensors.taskmap, dummyLoads);
+        // cout<<"task map creation completed"<<endl;
+      }
+      ec.pg().broadcast(&tmdim, 0);
+      if(rank != 0) etensors.taskmap.resize(tmdim + 1, tmdim + 1);
+      ec.pg().broadcast(etensors.taskmap.data(), etensors.taskmap.size(), 0);
+
+      if(sad) {
+        compute_2bf<TensorType>(ec, scalapack_info, sys_data, scf_vars, obs, do_schwarz_screen,
+                                shell2bf, SchwarzK, max_nprim4, shells, ttensors, etensors,
+                                is_3c_init, do_density_fitting, 1.0);
+
+        // clang-format off
+        sch (ttensors.F_alpha() = ttensors.H1())
+            (ttensors.F_alpha() += ttensors.F_alpha_tmp())
+            .execute();
+        if(is_uhf) {
+          sch (ttensors.F_beta() = ttensors.H1())
+              (ttensors.F_beta() += ttensors.F_beta_tmp())
+              .execute();
         }
+        // clang-format on     
 
-        ec.pg().broadcast(&tmdim, 0);
-        if(rank != 0) etensors.taskmap.resize(tmdim + 1, tmdim + 1);
-        ec.pg().broadcast(etensors.taskmap.data(), etensors.taskmap.size(), 0);
-
+        scf_diagonalize<TensorType>(sch, sys_data, scalapack_info, ttensors, etensors);
+   
+        Matrix&             C_alpha          = etensors.C;
+        Matrix&             C_occ            = etensors.C_occ;
+        // compute density
+        if(rank == 0) {
+          if(is_rhf) {
+            C_occ   = C_alpha.leftCols(sys_data.nelectrons_alpha);
+            etensors.D = 2.0 * C_occ * C_occ.transpose();
+            // eigen_to_tamm_tensor(ttensors.X_alpha, C_alpha);
+          }
+          else if(is_uhf) {
+            C_occ   = C_alpha.leftCols(sys_data.nelectrons_alpha);
+            etensors.D = C_occ * C_occ.transpose();
+            C_occ  = etensors.C_beta.leftCols(sys_data.nelectrons_beta);
+            etensors.D_beta = C_occ * C_occ.transpose();
+          }
+        }
+      }
+      else
+      {
         compute_initial_guess<TensorType>(ec, scalapack_info, sys_data, scf_vars, atoms, shells,
                                           basis, is_spherical, etensors, ttensors, charge,
                                           multiplicity);
-
-        etensors.taskmap.resize(0, 0);
-        if(rank == 0) {
-          write_scf_mat<TensorType>(etensors.C, movecsfile_alpha);
-          write_scf_mat<TensorType>(etensors.D, densityfile_alpha);
-          if(is_uhf) {
-            write_scf_mat<TensorType>(etensors.C_beta, movecsfile_beta);
-            write_scf_mat<TensorType>(etensors.D_beta, densityfile_beta);
-          }
-        }
-        ec.pg().barrier();
       } // initial guess
+
+      etensors.taskmap.resize(0, 0);
+      if(rank == 0) {
+        write_scf_mat<TensorType>(etensors.C, movecsfile_alpha);
+        write_scf_mat<TensorType>(etensors.D, densityfile_alpha);
+        if(is_uhf) {
+          write_scf_mat<TensorType>(etensors.C_beta, movecsfile_beta);
+          write_scf_mat<TensorType>(etensors.D_beta, densityfile_beta);
+        }
+      }
+      ec.pg().barrier();
     }
 
     hf_t2   = std::chrono::high_resolution_clock::now();
@@ -855,7 +992,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
       if(scf_conv) break;
 
-      if(debug) print_energies(ec, ttensors, sys_data, scf_vars, debug);
+      if(debug) print_energies(ec, ttensors, etensors, sys_data, scf_vars, debug);
 
     } while((fabs(ediff) > conve) || (fabs(rmsd) > convd)); // SCF main loop
 
@@ -907,7 +1044,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     if(rank == 0)
       std::cout << std::endl
                 << "Nuclear repulsion energy = " << std::setprecision(15) << enuc << endl;
-    print_energies(ec, ttensors, sys_data, scf_vars);
+    print_energies(ec, ttensors, etensors, sys_data, scf_vars);
 
     if(rank == 0 && !scf_conv) {
       cout << "writing orbitals and density to file... ";

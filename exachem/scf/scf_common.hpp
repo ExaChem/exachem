@@ -91,8 +91,9 @@ struct SCFVars {
 };
 
 struct EigenTensors {
-  Matrix C, C_beta, C_occ; // only rank 0 allocates C_occ, C{a,b}
-  Matrix G, D, VXC;
+  Matrix C, C_beta, C_occ;    // allocated only on rank 0
+  Matrix VXC_alpha, VXC_beta; // allocated only on rank 0 when DFT is enabled
+  Matrix G, D;
   Matrix G_beta, D_beta;
   Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> taskmap;
 };
@@ -126,7 +127,8 @@ struct TAMMTensors {
   Tensor<TensorType> F_BC; // block-cyclic Fock matrix used in the scalapack code path
   // not allocated, shell tiled. tensor structure used to identify shell blocks in compute_2bf
   Tensor<TensorType> F_dummy;
-  Tensor<TensorType> VXC;
+  Tensor<TensorType> VXC_alpha;
+  Tensor<TensorType> VXC_beta;
 
   Tensor<TensorType> D_tamm;
   Tensor<TensorType> D_beta_tamm;
@@ -354,8 +356,8 @@ GauXC::Molecule make_gauxc_molecule(const std::vector<libint2::Atom>& atoms);
 GauXC::BasisSet<double> make_gauxc_basis(const libint2::BasisSet& basis);
 
 template<typename TensorType>
-TensorType compute_xcf(ExecutionContext& ec, TAMMTensors& ttensors, EigenTensors& etensors,
-                       GauXC::XCIntegrator<Matrix>& xc_integrator);
+TensorType compute_xcf(ExecutionContext& ec, const SystemData& sys_data, TAMMTensors& ttensors,
+                       EigenTensors& etensors, GauXC::XCIntegrator<Matrix>& xc_integrator);
 
 } // namespace gauxc_util
 #endif

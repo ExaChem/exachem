@@ -55,7 +55,6 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   const bool is_rhf = sys_data.is_restricted;
   const bool is_ks  = sys_data.is_ks;
   // const bool is_rohf = sys_data.is_restricted_os;
-  if(is_ks && is_uhf) tamm_terminate("UKS-DFT is currently not supported!");
 
   bool molden_file_valid = false;
   if(molden_exists) {
@@ -389,24 +388,32 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     /*** =========================== ***/
     /*** Setup GauXC types           ***/
     /*** =========================== ***/
-    size_t batch_size  = 512;
-    auto   gauxc_mol   = gauxc_util::make_gauxc_molecule(atoms);
-    auto   gauxc_basis = gauxc_util::make_gauxc_basis(shells);
-    auto   gauxc_rt    = GauXC::RuntimeEnvironment(ec.pg().comm());
+    size_t batch_size = 512;
+
+    auto gc1         = std::chrono::high_resolution_clock::now();
+    auto gauxc_mol   = gauxc_util::make_gauxc_molecule(atoms);
+    auto gauxc_basis = gauxc_util::make_gauxc_basis(shells);
+    auto gauxc_rt    = GauXC::RuntimeEnvironment(ec.pg().comm());
+    auto polar       = is_rhf ? ExchCXX::Spin::Unpolarized : ExchCXX::Spin::Polarized;
+    auto grid_type   = GauXC::AtomicGridSizeDefault::UltraFineGrid;
+    auto xc_grid_str = scf_options.xc_grid_type;
+    std::transform(xc_grid_str.begin(), xc_grid_str.end(), xc_grid_str.begin(), ::tolower);
+    if(xc_grid_str == "fine") grid_type = GauXC::AtomicGridSizeDefault::FineGrid;
+    else if(xc_grid_str == "superfine") grid_type = GauXC::AtomicGridSizeDefault::SuperFineGrid;
 
     // This options are set to get good accuracy.
-    // TODO: Modify these from the input [Unpruned, Robust, Treutler]
+    // [Unpruned, Robust, Treutler]
     auto gauxc_molgrid = GauXC::MolGridFactory::create_default_molgrid(
-      gauxc_mol, GauXC::PruningScheme::Treutler, GauXC::BatchSize(batch_size),
-      GauXC::RadialQuad::MuraKnowles, GauXC::AtomicGridSizeDefault::UltraFineGrid);
+      gauxc_mol, GauXC::PruningScheme::Robust, GauXC::BatchSize(batch_size),
+      GauXC::RadialQuad::MuraKnowles, grid_type);
     auto gauxc_molmeta = std::make_shared<GauXC::MolMeta>(gauxc_mol);
 
     // Set the load balancer
     GauXC::LoadBalancerFactory lb_factory(GauXC::ExecutionSpace::Host, "Replicated");
     auto gauxc_lb = lb_factory.get_shared_instance(gauxc_rt, gauxc_mol, gauxc_molgrid, gauxc_basis);
 
-    // TODO: Modify the weighting algorithm from the input [Becke, SSF, LKO]
-    GauXC::MolecularWeightsSettings mw_settings = {GauXC::XCWeightAlg::SSF, false};
+    // Modify the weighting algorithm from the input [Becke, SSF, LKO]
+    GauXC::MolecularWeightsSettings mw_settings = {GauXC::XCWeightAlg::LKO, false};
     GauXC::MolecularWeightsFactory  mw_factory(GauXC::ExecutionSpace::Host, "Default", mw_settings);
     auto                            mw = mw_factory.get_instance();
     mw.modify_weights(*gauxc_lb);
@@ -425,13 +432,11 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
       try {
         // Try to setup using the builtin backend.
-        kernels.push_back(ExchCXX::XCKernel(ExchCXX::Backend::builtin,
-                                            ExchCXX::kernel_map.value(xcfunc),
-                                            ExchCXX::Spin::Unpolarized));
+        kernels.push_back(
+          ExchCXX::XCKernel(ExchCXX::Backend::builtin, ExchCXX::kernel_map.value(xcfunc), polar));
       } catch(...) {
         // If the above failed, setup with LibXC backend
-        kernels.push_back(
-          ExchCXX::XCKernel(ExchCXX::libxc_name_string(xcfunc), ExchCXX::Spin::Unpolarized));
+        kernels.push_back(ExchCXX::XCKernel(ExchCXX::libxc_name_string(xcfunc), polar));
         if(strequal_case(xcfunc, "HYB_GGA_X_QED") || strequal_case(xcfunc, "HYB_GGA_XC_QED") ||
            strequal_case(xcfunc, "HYB_MGGA_XC_QED") || strequal_case(xcfunc, "HYB_MGGA_X_QED"))
           kernel_id = kernels.size() - 1;
@@ -444,6 +449,12 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     GauXC::XCIntegratorFactory<Matrix> integrator_factory(GauXC::ExecutionSpace::Host, "Replicated",
                                                           "Default", "Default", "Default");
     auto gauxc_integrator = integrator_factory.get_instance(gauxc_func, gauxc_lb);
+
+    auto gc2     = std::chrono::high_resolution_clock::now();
+    auto gc_time = std::chrono::duration_cast<std::chrono::duration<double>>((gc2 - gc1)).count();
+
+    if(rank == 0)
+      std::cout << std::fixed << std::setprecision(2) << "GauXC setup time: " << gc_time << "s\n";
 
     // TODO
     const double xHF = is_ks ? (gauxc_func.is_hyb() ? gauxc_func.hyb_exx() : 0.) : 1.;
@@ -606,8 +617,9 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     ttensors.FD_tamm     = {tAO, tAO};
     ttensors.FDS_tamm    = {tAO, tAO};
 
-    // XXX: Enable only for DFT
-    ttensors.VXC = {tAO, tAO};
+    // TODO: Enable only for DFT
+    ttensors.VXC_alpha = {tAO, tAO};
+    ttensors.VXC_beta  = {tAO, tAO};
 
     if(is_uhf) {
       ttensors.ehf_beta_tmp     = {tAO, tAO};
@@ -631,8 +643,8 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
         &ec, ttensors.F_beta, ttensors.D_beta_tamm, ttensors.D_last_beta_tamm, ttensors.F_beta_tmp,
         ttensors.ehf_beta_tmp, ttensors.FD_beta_tamm, ttensors.FDS_beta_tamm);
 
-    // XXX: Only allocate for DFT
-    if(is_ks) Tensor<TensorType>::allocate(&ec, ttensors.VXC);
+    if(is_ks) Tensor<TensorType>::allocate(&ec, ttensors.VXC_alpha);
+    if(is_ks && is_uhf) Tensor<TensorType>::allocate(&ec, ttensors.VXC_beta);
 
     const auto do_schwarz_screen = SchwarzK.cols() != 0 && SchwarzK.rows() != 0;
     // engine precision controls primitive truncation, assume worst-case scenario
@@ -731,38 +743,26 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
                                 shell2bf, SchwarzK, max_nprim4, shells, ttensors, etensors,
                                 is_3c_init, do_density_fitting, 1.0);
 
-        // clang-format off
-        sch (ttensors.F_alpha() = ttensors.H1())
-            (ttensors.F_alpha() += ttensors.F_alpha_tmp())
-            .execute();
-        if(is_uhf) {
-          sch (ttensors.F_beta() = ttensors.H1())
-              (ttensors.F_beta() += ttensors.F_beta_tmp())
-              .execute();
-        }
-        // clang-format on     
-
         scf_diagonalize<TensorType>(sch, sys_data, scalapack_info, ttensors, etensors);
-   
-        Matrix&             C_alpha          = etensors.C;
-        Matrix&             C_occ            = etensors.C_occ;
+
+        Matrix& C_alpha = etensors.C;
+        Matrix& C_occ   = etensors.C_occ;
         // compute density
         if(rank == 0) {
           if(is_rhf) {
-            C_occ   = C_alpha.leftCols(sys_data.nelectrons_alpha);
+            C_occ      = C_alpha.leftCols(sys_data.nelectrons_alpha);
             etensors.D = 2.0 * C_occ * C_occ.transpose();
             // eigen_to_tamm_tensor(ttensors.X_alpha, C_alpha);
           }
           else if(is_uhf) {
-            C_occ   = C_alpha.leftCols(sys_data.nelectrons_alpha);
-            etensors.D = C_occ * C_occ.transpose();
-            C_occ  = etensors.C_beta.leftCols(sys_data.nelectrons_beta);
+            C_occ           = C_alpha.leftCols(sys_data.nelectrons_alpha);
+            etensors.D      = C_occ * C_occ.transpose();
+            C_occ           = etensors.C_beta.leftCols(sys_data.nelectrons_beta);
             etensors.D_beta = C_occ * C_occ.transpose();
           }
         }
       }
-      else
-      {
+      else {
         compute_initial_guess<TensorType>(ec, scalapack_info, sys_data, scf_vars, atoms, shells,
                                           basis, is_spherical, etensors, ttensors, charge,
                                           multiplicity);
@@ -878,7 +878,8 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
       TensorType gauxc_exc = 0.;
 #if defined(USE_GAUXC)
       if(is_ks) {
-        gauxc_exc = gauxc_util::compute_xcf<TensorType>(ec, ttensors, etensors, gauxc_integrator);
+        gauxc_exc =
+          gauxc_util::compute_xcf<TensorType>(ec, sys_data, ttensors, etensors, gauxc_integrator);
       }
 #endif
 
@@ -1013,20 +1014,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
       // build a new Fock matrix
       compute_2bf<TensorType>(ec, scalapack_info, sys_data, scf_vars, obs, do_schwarz_screen,
                               shell2bf, SchwarzK, max_nprim4, shells, ttensors, etensors,
-                              is_3c_init, do_density_fitting, 1.0);
-
-      // clang-format off
-      sch (ttensors.F_alpha()  = ttensors.H1())
-          (ttensors.F_alpha() += ttensors.F_alpha_tmp())
-          .execute();
-      // clang-format on
-      if(is_uhf) {
-        // clang-format off
-        sch (ttensors.F_beta()   = ttensors.H1())
-            (ttensors.F_beta()  += ttensors.F_beta_tmp())
-            .execute();
-        // clang-format on
-      }
+                              is_3c_init, do_density_fitting, xHF);
     }
 
     for(auto x: ttensors.ehf_tamm_hist) Tensor<TensorType>::deallocate(x);
@@ -1081,8 +1069,12 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
         ttensors.ehf_beta_tmp, ttensors.FD_beta_tamm, ttensors.FDS_beta_tamm);
 
     if(is_ks) {
-      if(rank == 0) etensors.VXC = tamm_to_eigen_matrix(ttensors.VXC);
-      Tensor<TensorType>::deallocate(ttensors.VXC);
+      if(rank == 0) etensors.VXC_alpha = tamm_to_eigen_matrix(ttensors.VXC_alpha);
+      Tensor<TensorType>::deallocate(ttensors.VXC_alpha);
+      if(is_uhf) {
+        if(rank == 0) etensors.VXC_beta = tamm_to_eigen_matrix(ttensors.VXC_beta);
+        Tensor<TensorType>::deallocate(ttensors.VXC_beta);
+      }
     }
 
 #if SCF_THROTTLE_RESOURCES
@@ -1153,7 +1145,8 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
   Tensor<TensorType> C_alpha_tamm{scf_vars.tAO, tAO_ortho};
   Tensor<TensorType> C_beta_tamm{scf_vars.tAO, tAO_ortho};
-  ttensors.VXC = Tensor<TensorType>{scf_vars.tAO, scf_vars.tAO};
+  ttensors.VXC_alpha = Tensor<TensorType>{scf_vars.tAO, scf_vars.tAO};
+  if(is_uhf) ttensors.VXC_beta = Tensor<TensorType>{scf_vars.tAO, scf_vars.tAO};
 
 #if defined(USE_UPCXX_DISTARRAY)
   exc.set_memory_manager_cache(1);
@@ -1161,7 +1154,8 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
   schg.allocate(C_alpha_tamm);
   if(is_uhf) schg.allocate(C_beta_tamm);
-  if(is_ks) schg.allocate(ttensors.VXC);
+  if(is_ks) schg.allocate(ttensors.VXC_alpha);
+  if(is_ks && is_uhf) schg.allocate(ttensors.VXC_beta);
   schg.execute();
 #if defined(USE_UPCXX_DISTARRAY)
   exc.set_memory_manager_cache(); // resets cache to pg.size().value();
@@ -1170,11 +1164,17 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   if(rank == 0) {
     eigen_to_tamm_tensor(C_alpha_tamm, etensors.C);
     if(is_uhf) eigen_to_tamm_tensor(C_beta_tamm, etensors.C_beta);
-    if(is_ks) eigen_to_tamm_tensor(ttensors.VXC, etensors.VXC);
+    if(is_ks) {
+      eigen_to_tamm_tensor(ttensors.VXC_alpha, etensors.VXC_alpha);
+      if(is_uhf) eigen_to_tamm_tensor(ttensors.VXC_beta, etensors.VXC_beta);
+    }
   }
   if(is_ks) {
-    write_to_disk<TensorType>(ttensors.VXC, files_prefix + ".vxc");
-    schg.deallocate(ttensors.VXC);
+    write_to_disk<TensorType>(ttensors.VXC_alpha, files_prefix + ".vxc_alpha");
+    if(is_uhf) write_to_disk<TensorType>(ttensors.VXC_beta, files_prefix + ".vxc_beta");
+    schg.deallocate(ttensors.VXC_alpha);
+    if(is_uhf) schg.deallocate(ttensors.VXC_beta);
+    schg.execute();
   }
 
   exc.pg().barrier();

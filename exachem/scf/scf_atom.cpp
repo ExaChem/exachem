@@ -32,12 +32,8 @@ void compute_sad_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info, Syst
   const auto rank = ec.pg().rank();
   size_t     nao  = shells_tot.nbf();
 
-  Matrix D_tot_a;
-  Matrix D_tot_b;
-  if(rank == 0) {
-    D_tot_a = Matrix::Zero(nao, nao);
-    D_tot_b = Matrix::Zero(nao, nao);
-  }
+  Matrix& D_tot_a = etensors.D;
+  Matrix& D_tot_b = etensors.G;
 
   // Get atomic occupations
   auto occs = compute_soad(atoms);
@@ -658,18 +654,16 @@ void compute_sad_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info, Syst
   }
 
   // One-shot refinement
-  Matrix& D_a = etensors.D;
   if(rank == 0) {
-    if(is_rhf) { D_a = D_tot_a + D_tot_b; }
+    // D_tot_a -> etensors.D
+    if(is_rhf) { etensors.D += D_tot_b; }
 
-    if(is_uhf) {
-      Matrix& D_b = etensors.D_beta;
-      D_a         = D_tot_a;
-      D_b         = D_tot_b;
-    }
+    if(is_uhf) etensors.D_beta = D_tot_b;
+
+    D_tot_b.setZero();
   }
 
-  ec.pg().broadcast(D_a.data(), D_a.size(), 0);
+  ec.pg().broadcast(etensors.D.data(), etensors.D.size(), 0);
   if(is_uhf) ec.pg().broadcast(etensors.D_beta.data(), etensors.D_beta.size(), 0);
 
   // if(rank==0) cout << "in sad_guess, D_tot: " << endl << D_a << endl;

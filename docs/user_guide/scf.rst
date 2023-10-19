@@ -3,8 +3,8 @@
 .. rst-class:: dl-parameters
 
 
-Hartree-Fock
-=============
+SCF
+===
 
 | :ref:`SCF options <SCF>`
 
@@ -13,7 +13,8 @@ Hartree-Fock
 .. _SCF:
 
 The ExaChem self-consistent field (SCF) module computes closed-shell restricted Hartree-Fock (RHF) wavefunctions and spin-unrestricted Hartree-Fock (UHF) wavefunctions. 
-The values listed below are the defaults
+It also computes closed shell and open shell densities and Kohn-Sham orbitals.
+The values listed below are the defaults where few options are automatically adjusted based on the system size as explained later in this section.
 
 .. code-block:: json
 
@@ -30,10 +31,12 @@ The values listed below are the defaults
    "tilesize": 30,
    "alpha": 1.0,
    "nnodes": 1,
-   "writem": 10,
+   "writem": 1,
    "restart": false,
    "noscf": false,
    "scf_type": "restricted",
+   "xc_type": [],
+   "xc_grid_type": "UltraFine",
    "debug": false,
     "guess": {
       "atom_options":{
@@ -79,7 +82,7 @@ The values listed below are the defaults
 :tilesize: The tilesize for the AO dimension. An integer value that is automatically set to ``ceil(Nbf * 0.05)``. If **force_tilesize=true**, 
    the value specified by the user is respected. It is recommended to let the SCF module automatically determine this value.
 
-:alpha: damping (mixing) factor for the density matrix where :math:`0 \leq \alpha \leq 1`.  Specifies the percentage of the current iterations density  mixed with the previous iterations density. ``default=1.0`` (RHF only) indicates no damping. For UHF, ``default=0.8``.
+:alpha: damping (mixing) factor for the density matrix where :math:`0 \leq \alpha \leq 1`.  Specifies the percentage of the current iterations density  mixed with the previous iterations density. ``default=1.0`` (RHF only) indicates no damping.
    :math:`D_{n} = \alpha*D_{n} + (1.0-\alpha)*D_{n-1}` 
 
 :writem: ``[default=1]`` An integer specifying the frequency (as number of iterations) after which the movecs and density matrices are written to disk for restarting the calculation.
@@ -93,6 +96,18 @@ The values listed below are the defaults
    * :strong:`restricted`: for closed-shell restricted Hartree-Fock (RHF) calculation
    * :strong:`unrestricted`: for spin-unrestricted Hartree-Fock (UHF) calculation
 
+:xc_type: ``[default=[]]`` A list of strings specifying the exchange and correlation functionals for DFT calculations using `GAUXC`.
+   The list of available functionals using the `builtin` backend can be found at the `ExchCXX <https://github.com/wavefunction91/ExchCXX>` repository.
+   The `Libxc` backend is restricted to the list of LDA and GGA functionals without range separation available at `Libxc <https://tddft.org/programs/libxc/functionals/libxc-6.2.2/>`.
+
+:xc_grid_type: ``default=UltraFine`` Specifies the quality of the numerical integration grid. The following values are supported
+
+   * :strong:`Fine`: 75 radial shells with 302 angular points per shell
+   * :strong:`UltraFine`: 99 radial shells with 590 angular points per shell
+   * :strong:`SuperFine`: 175 radial shells with 974 angular points per shell for first row elements and 250 radial shells with 974 Lebedev points per shell for the rest.
+
+   All `xc_grid_type` options use a `Mura-Knowles` radial quadrature, a `Lebedev-Laikov` angular quadrature, a `Laqua-Kussmann-Ochsenfeld` partitioning scheme, and a `Robust` pruning method.
+
 :debug: ``[default=false]`` enable verbose printing for debugging a calculation.
 
 :nnodes: On a distributed machine, the number of processors for an SCF run is chosen by default depending on the problem size (i.e. number of basis functions **Nbf**).
@@ -100,7 +115,7 @@ The values listed below are the defaults
    The SCF module automatically chooses the number of processors to be ``50% * Nbf``. This option allows to override this behavior and choose a larger set of processors by specifying 
    the percentage (as an integer value) of the total number of processors to use.  
 
-:guess: This block allows specifying options for indivudal atoms for the initial guess specified as atom symbol with charge and multiplicity values.
+:guess: This block allows specifying options for individual atoms for the initial guess specified as atom symbol with charge and multiplicity values.
 
 :PRINT: This block allows specifying a couple of printing options. When enabled, they provide the following
 

@@ -142,6 +142,7 @@ public:
     n_lindep         = 0;
     scf_type         = "restricted";
     xc_type          = {}; // pbe0
+    xc_grid_type     = "UltraFine";
     alpha            = 1.0;
     nnodes           = 1;
     writem           = 1;
@@ -180,6 +181,7 @@ public:
   int         writem;
   double      alpha; // density mixing parameter
   std::string scf_type;
+  std::string xc_grid_type;
 
   std::map<std::string, std::tuple<int, int>> guess_atom_options;
 
@@ -248,6 +250,7 @@ public:
       cout << " xc_type      = [ ";
       for(auto xcfunc: xc_type) { cout << " \"" << xcfunc << "\","; }
       cout << "\b ]" << endl;
+      cout << " xc_grid_type = " << xc_grid_type << std::endl;
     }
 
     if(scalapack_np_row > 0 && scalapack_np_col > 0) {
@@ -804,6 +807,7 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   parse_option<bool>  (scf_options.debug           , jscf, "debug");
   parse_option<string>(scf_options.moldenfile      , jscf, "moldenfile");
   parse_option<string>(scf_options.scf_type        , jscf, "scf_type");
+  parse_option<string>(scf_options.xc_grid_type    , jscf, "xc_grid_type");
   parse_option<std::vector<string>>(scf_options.xc_type, jscf, "xc_type");
   parse_option<int>   (scf_options.n_lindep        , jscf, "n_lindep");
   parse_option<int>   (scf_options.restart_size    , jscf, "restart_size");
@@ -838,7 +842,7 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   const std::vector<string> valid_scf{"charge", "multiplicity", "lshift", "tol_int",
     "tol_lindep", "conve", "convd", "diis_hist","force_tilesize","tilesize","df_tilesize",
     "alpha","writem","nnodes","restart","noscf","moldenfile", "guess",
-    "debug","scf_type","xc_type","n_lindep","restart_size","scalapack_nb","riscf",
+    "debug","scf_type","xc_type", "xc_grid_type", "n_lindep","restart_size","scalapack_nb","riscf",
     "scalapack_np_row","scalapack_np_col","ext_data_path","PRINT",
     "qed_omegas","qed_lambdas","qed_volumes","qed_polvecs","comments"};
   // clang-format on
@@ -849,6 +853,16 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   }
   if(scf_options.nnodes < 1 || scf_options.nnodes > 100) {
     tamm_terminate("INPUT FILE ERROR: SCF option nnodes should be a number between 1 and 100");
+  }
+  {
+    auto xc_grid_str = scf_options.xc_grid_type;
+    xc_grid_str.erase(remove_if(xc_grid_str.begin(), xc_grid_str.end(), isspace),
+                      xc_grid_str.end());
+    scf_options.xc_grid_type = xc_grid_str;
+    std::transform(xc_grid_str.begin(), xc_grid_str.end(), xc_grid_str.begin(), ::tolower);
+    if(xc_grid_str != "fine" && xc_grid_str != "ultrafine" && xc_grid_str != "superfine")
+      tamm_terminate(
+        "INPUT FILE ERROR: SCF option xc_grid_type should be one of [Fine, UltraFine, SuperFine]");
   }
 
   // CD
@@ -1098,10 +1112,6 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   // options.print();
   // scf_options.print();
   // ccsd_options.print();
-
-  // For UHF cases, set alpha=0.8 (ie damping=20%)
-  if(scf_options.scf_type == "unrestricted" && (int) scf_options.alpha == 1)
-    scf_options.alpha = 0.8;
 
   return std::make_tuple(options, scf_options, cd_options, gw_options, ccsd_options, fci_options,
                          task_options);

@@ -5,7 +5,7 @@ Quantum Mechanical Methods
 .. toctree::
     :maxdepth: 2
  
-    hartree_fock
+    scf
     cholesky_decomposition
     coupledcluster
     gfcc/gfcc

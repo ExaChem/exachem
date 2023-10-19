@@ -455,7 +455,7 @@ void print_energies(ExecutionContext& ec, TAMMTensors& ttensors, EigenTensors& e
     energy_1e  = tt_trace(ec, ttensors.D_tamm, ttensors.H1);
     energy_2e  = 0.5 * tt_trace(ec, ttensors.D_tamm, ttensors.F_alpha_tmp);
 
-    if(is_ks) { energy_2e -= 0.5 * tt_trace(ec, ttensors.D_tamm, ttensors.VXC); }
+    if(is_ks) { energy_2e += scf_vars.exc; }
   }
   if(is_uhf) {
     nelectrons = tt_trace(ec, ttensors.D_tamm, ttensors.S1);
@@ -468,6 +468,7 @@ void print_energies(ExecutionContext& ec, TAMMTensors& ttensors, EigenTensors& e
     NE_1e += tt_trace(ec, ttensors.D_beta_tamm, ttensors.V1);
     energy_1e += tt_trace(ec, ttensors.D_beta_tamm, ttensors.H1);
     energy_2e += 0.5 * tt_trace(ec, ttensors.D_beta_tamm, ttensors.F_beta_tmp);
+    if(is_ks) { energy_2e += scf_vars.exc; }
   }
 
   if(ec.pg().rank() == 0) {
@@ -1121,24 +1122,36 @@ GauXC::BasisSet<double> gauxc_util::make_gauxc_basis(const libint2::BasisSet& ba
 }
 
 template<typename TensorType>
-TensorType gauxc_util::compute_xcf(ExecutionContext& ec, TAMMTensors& ttensors,
-                                   EigenTensors&                etensors,
+TensorType gauxc_util::compute_xcf(ExecutionContext& ec, const SystemData& sys_data,
+                                   TAMMTensors& ttensors, EigenTensors& etensors,
                                    GauXC::XCIntegrator<Matrix>& xc_integrator) {
-  // TODO:uks not implemented
-  const auto D    = 0.5 * etensors.D;
-  auto [EXC, VXC] = xc_integrator.eval_exc_vxc(D);
+  const bool is_uhf = sys_data.is_unrestricted;
+  const bool is_rhf = sys_data.is_restricted;
+  auto       rank0  = ec.pg().rank() == 0;
 
-  // if(ec.pg().rank()==0) cout << "EXC = " << EXC << endl;
+  double  EXC{};
+  Matrix& vxc_alpha = etensors.G;
+  Matrix& vxc_beta  = etensors.G_beta;
 
-  auto& VXC_tamm = ttensors.VXC;
-  eigen_to_tamm_tensor(VXC_tamm, VXC);
+  if(is_rhf) {
+    std::tie(EXC, vxc_alpha) = xc_integrator.eval_exc_vxc(0.5 * etensors.D);
+    if(rank0) eigen_to_tamm_tensor(ttensors.VXC_alpha, vxc_alpha);
+  }
+  else if(is_uhf) {
+    std::tie(EXC, vxc_alpha, vxc_beta) = xc_integrator.eval_exc_vxc(
+      0.5 * (etensors.D + etensors.D_beta), 0.5 * (etensors.D - etensors.D_beta));
+    if(rank0) {
+      eigen_to_tamm_tensor(ttensors.VXC_alpha, vxc_alpha);
+      eigen_to_tamm_tensor(ttensors.VXC_beta, vxc_beta);
+    }
+  }
   ec.pg().barrier();
 
   return EXC;
 }
 
-template double gauxc_util::compute_xcf<double>(ExecutionContext& ec, TAMMTensors& ttensors,
-                                                EigenTensors&                etensors,
+template double gauxc_util::compute_xcf<double>(ExecutionContext& ec, const SystemData& sys_data,
+                                                TAMMTensors& ttensors, EigenTensors& etensors,
                                                 GauXC::XCIntegrator<Matrix>& xc_integrator);
 
 #endif

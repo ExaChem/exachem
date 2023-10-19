@@ -11,11 +11,14 @@
 #include "scf_guess.hpp"
 
 template<typename TensorType>
-void scf_diis(ExecutionContext& ec, const TiledIndexSpace& tAO, Tensor<TensorType> D,
-              Tensor<TensorType> F, Tensor<TensorType> err_mat, int iter, int max_hist,
-              const SCFVars& scf_vars, const int n_lindep,
-              std::vector<Tensor<TensorType>>& diis_hist,
-              std::vector<Tensor<TensorType>>& fock_hist);
+void scf_diis(ExecutionContext& ec, const TiledIndexSpace& tAO, Tensor<TensorType> F_alpha,
+              Tensor<TensorType> F_beta, Tensor<TensorType> err_mat_alpha,
+              Tensor<TensorType> err_mat_beta, int iter, int max_hist, const SCFVars& scf_vars,
+              const SystemData& sys_data, const int n_lindep,
+              std::vector<Tensor<TensorType>>& diis_hist_alpha,
+              std::vector<Tensor<TensorType>>& diis_hist_beta,
+              std::vector<Tensor<TensorType>>& fock_hist_alpha,
+              std::vector<Tensor<TensorType>>& fock_hist_beta);
 
 template<typename TensorType>
 std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,

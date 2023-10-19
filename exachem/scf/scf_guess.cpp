@@ -816,8 +816,6 @@ void compute_initial_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info,
 
   Matrix D_minbs_a = Matrix::Zero(minbs.nbf(), minbs.nbf());
   Matrix D_minbs_b = Matrix::Zero(minbs.nbf(), minbs.nbf());
-  G_a              = Matrix::Zero(N, N);
-  G_b              = Matrix::Zero(N, N);
 
   auto a2s_map = minbs.atom2shell(atoms);
 #if 0  
@@ -976,8 +974,10 @@ void compute_initial_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info,
                     const auto value_scal_by_deg = value * s1234_deg;
                     G_a(bf1, bf2) += 1.0 * D_minbs_a(bf3, bf4) * value_scal_by_deg;
                     G_a(bf1, bf2) += 1.0 * D_minbs_b(bf3, bf4) * value_scal_by_deg;
-                    G_b(bf1, bf2) += 1.0 * D_minbs_a(bf3, bf4) * value_scal_by_deg;
-                    G_b(bf1, bf2) += 1.0 * D_minbs_b(bf3, bf4) * value_scal_by_deg;
+                    if(is_uhf) {
+                      G_b(bf1, bf2) += 1.0 * D_minbs_a(bf3, bf4) * value_scal_by_deg;
+                      G_b(bf1, bf2) += 1.0 * D_minbs_b(bf3, bf4) * value_scal_by_deg;
+                    }
                   }
                 }
               }
@@ -1000,7 +1000,7 @@ void compute_initial_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info,
                 const auto value             = buf_1324[f1324];
                 const auto value_scal_by_deg = value * s12_deg;
                 G_a(bf1, bf2) -= 1.0 * D_minbs_a(bf3, bf4) * value_scal_by_deg;
-                G_b(bf1, bf2) -= 1.0 * D_minbs_b(bf3, bf4) * value_scal_by_deg;
+                if(is_uhf) G_b(bf1, bf2) -= 1.0 * D_minbs_b(bf3, bf4) * value_scal_by_deg;
               }
             }
           }
@@ -1029,38 +1029,37 @@ void compute_initial_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info,
   D_minbs_a.resize(0, 0);
   D_minbs_b.resize(0, 0);
 
-  {
-    // symmetrize the result
-    Matrix Gt_a = 0.5 * (G_a + G_a.transpose());
-    G_a         = Gt_a;
-    Gt_a.resize(0, 0);
-    sch(ttensors.F_alpha_tmp() = 0).execute();
-    eigen_to_tamm_tensor_acc(ttensors.F_alpha_tmp, G_a);
-    ec.pg().barrier();
-    // G_a.resize(0,0);
-  }
-  if(is_uhf) {
-    Matrix Gt_b = 0.5 * (G_b + G_b.transpose());
-    G_b         = Gt_b;
-    Gt_b.resize(0, 0);
-    sch(ttensors.F_beta_tmp() = 0).execute();
-    eigen_to_tamm_tensor_acc(ttensors.F_beta_tmp, G_b);
-    ec.pg().barrier();
-    // G_b.resize(0,0);
-  }
+  Tensor<TensorType>& H1          = ttensors.H1;
+  Tensor<TensorType>& F_alpha     = ttensors.F_alpha;
+  Tensor<TensorType>& F_beta      = ttensors.F_beta;
+  Tensor<TensorType>& F_alpha_tmp = ttensors.F_alpha_tmp;
+  Tensor<TensorType>& F_beta_tmp  = ttensors.F_beta_tmp;
+
+  auto [mu, nu] = scf_vars.tAO.labels<2>("all");
+
+  // symmetrize the result
+  sch(F_alpha_tmp() = 0).execute();
+  eigen_to_tamm_tensor_acc(F_alpha_tmp, G_a);
 
   // clang-format off
-  sch (ttensors.F_alpha()  = ttensors.H1())
-      (ttensors.F_alpha() += ttensors.F_alpha_tmp());
+  sch 
+    (F_alpha()       = 0.5 * F_alpha_tmp())
+    (F_alpha(mu,nu) += 0.5 * F_alpha_tmp(nu,mu))
+    (F_alpha()      += H1())
+    .execute();
   // clang-format on
 
   if(is_uhf) {
+    sch(F_beta_tmp() = 0).execute();
+    eigen_to_tamm_tensor_acc(F_beta_tmp, G_b);
+
     // clang-format off
-    sch (ttensors.F_beta()   = ttensors.H1())
-        (ttensors.F_beta()  += ttensors.F_beta_tmp());
-    // clang-format on
+    sch (F_beta()   = 0.5 * F_beta_tmp())
+    (F_beta(mu,nu) += 0.5 * F_beta_tmp(nu,mu))
+    (F_beta()      += H1())
+    .execute();
+    // clang-format on    
   }
-  sch.execute();
 
   scf_diagonalize<TensorType>(sch, sys_data, scalapack_info, ttensors, etensors);
 

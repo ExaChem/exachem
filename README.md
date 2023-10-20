@@ -10,7 +10,6 @@
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 [![Documentation Status](https://readthedocs.org/projects/exachem/badge/?version=latest)](https://exachem.readthedocs.io/en/latest/?badge=latest)
-[![CLA assistant](https://cla-assistant.io/readme/badge/ExaChem/exachem)](https://cla-assistant.io/ExaChem/exachem)
 
 ## Overview
 

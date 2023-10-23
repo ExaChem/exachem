@@ -257,13 +257,8 @@ void ccsd_lambda_driver(std::string filename, OptionsMap options_map) {
   sch.allocate(dipole_mx, dipole_my, dipole_mz, lcao_t, dens, tmp1)(lcao_t(mo1, mu) = lcao(mu, mo1))
     .execute();
 
-  if(rank == 0) {
-    std::string densityfile_alpha = files_dir + "/scf/" + out_fp + ".alpha.density";
-    Matrix      d_eig             = read_scf_mat<TensorType>(densityfile_alpha);
-    eigen_to_tamm_tensor(dens, d_eig);
-    d_eig.resize(0, 0);
-  }
-  ec.pg().barrier();
+  std::string densityfile_alpha = files_dir + "/scf/" + out_fp + ".alpha.density";
+  read_from_disk<T>(dens, densityfile_alpha);
 
   // compute electronic dipole moments
   sch(dipole_mx() = dens() * DipX_ao())(dipole_my() = dens() * DipY_ao())(dipole_mz() =

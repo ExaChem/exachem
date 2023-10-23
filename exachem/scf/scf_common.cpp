@@ -277,9 +277,9 @@ compute_AO_tiles(const ExecutionContext& ec, const SystemData& sys_data, libint2
   tamm::Tile          est_ts = 0;
   std::vector<Tile>   AO_opttiles;
   std::vector<size_t> shell_tile_map;
-  for(auto s = 0U; s < shells.size(); s++) {
+  for(size_t s = 0; s < shells.size(); s++) {
     est_ts += shells[s].size();
-    if(est_ts >= tile_size) {
+    if(est_ts >= (size_t) tile_size) {
       AO_opttiles.push_back(est_ts);
       shell_tile_map.push_back(s); // shell id specifying tile boundary
       est_ts = 0;
@@ -370,8 +370,85 @@ void compute_hamiltonian(ExecutionContext& ec, const SCFVars& scf_vars,
   // tamm::scale_ip(ttensors.H1(),2.0);
 }
 
-void scf_restart_test(const ExecutionContext& ec, const SystemData& sys_data,
-                      const std::string& filename, bool restart, std::string files_prefix) {
+template<typename TensorType>
+void compute_density(ExecutionContext& ec, const SystemData& sys_data, const SCFVars& scf_vars,
+                     ScalapackInfo& scalapack_info, TAMMTensors& ttensors, EigenTensors& etensors) {
+  auto do_t1 = std::chrono::high_resolution_clock::now();
+
+  using T         = TensorType;
+  Matrix& D_alpha = etensors.D;
+  auto    rank    = ec.pg().rank();
+
+  Scheduler sch{ec};
+
+  const auto is_uhf = sys_data.is_unrestricted;
+
+#if defined(USE_SCALAPACK)
+  if(scalapack_info.comm != MPI_COMM_NULL) {
+    Tensor<T> C_a   = from_block_cyclic_tensor(ttensors.C_alpha_BC);
+    Tensor<T> C_o_a = tensor_block(C_a, {0, 0}, {sys_data.nbf_orig, sys_data.nelectrons_alpha});
+    from_dense_tensor(C_o_a, ttensors.C_occ_a);
+    Tensor<T>::deallocate(C_a, C_o_a);
+
+    if(is_uhf) {
+      Tensor<T> C_b   = from_block_cyclic_tensor(ttensors.C_beta_BC);
+      Tensor<T> C_o_b = tensor_block(C_b, {0, 0}, {sys_data.nbf_orig, sys_data.nelectrons_beta});
+      from_dense_tensor(C_o_b, ttensors.C_occ_b);
+      Tensor<T>::deallocate(C_b, C_o_b);
+    }
+  }
+#else
+  Matrix& C_alpha = etensors.C;
+  Matrix& C_beta  = etensors.C_beta;
+  if(rank == 0) {
+    Matrix& C_occ = etensors.C_occ;
+    C_occ         = C_alpha.leftCols(sys_data.nelectrons_alpha);
+    eigen_to_tamm_tensor(ttensors.C_occ_a, C_occ);
+    if(is_uhf) {
+      C_occ = C_beta.leftCols(sys_data.nelectrons_beta);
+      eigen_to_tamm_tensor(ttensors.C_occ_b, C_occ);
+    }
+  }
+  ec.pg().barrier();
+#endif
+
+  auto mu = scf_vars.mu, nu = scf_vars.nu;
+  auto mu_oa = scf_vars.mu_oa, mu_ob = scf_vars.mu_ob;
+
+  const T dfac = (is_uhf) ? 1.0 : 2.0;
+  sch(ttensors.C_occ_aT(mu_oa, mu) = ttensors.C_occ_a(mu, mu_oa))(
+    ttensors.D_tamm(mu, nu) = dfac * ttensors.C_occ_a(mu, mu_oa) * ttensors.C_occ_aT(mu_oa, nu));
+  if(is_uhf) {
+    sch(ttensors.C_occ_bT(mu_ob, mu) = ttensors.C_occ_b(mu, mu_ob))(
+      ttensors.D_beta_tamm(mu, nu) = ttensors.C_occ_b(mu, mu_ob) * ttensors.C_occ_bT(mu_ob, nu));
+  }
+  sch.execute();
+
+  // compute D in eigen for subsequent fock build
+  {
+    // Matrix& C_occ_a = etensors.G;
+    // Matrix& C_occ_b = etensors.G_beta;
+    // C_occ_a.resize(sys_data.nbf_orig, sys_data.nelectrons_alpha);
+    // if(is_uhf) C_occ_b.resize(sys_data.nbf_orig, sys_data.nelectrons_beta);
+
+    tamm_to_eigen_tensor(ttensors.D_tamm, D_alpha);
+    if(is_uhf) tamm_to_eigen_tensor(ttensors.D_beta_tamm, etensors.D_beta);
+
+    // D_alpha = dfac * C_occ_a * C_occ_a.transpose();
+    // if(is_uhf) etensors.D_beta = C_occ_b * C_occ_b.transpose();
+  }
+
+  ec.pg().barrier();
+
+  auto do_t2   = std::chrono::high_resolution_clock::now();
+  auto do_time = std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
+
+  if(rank == 0 && sys_data.options_map.scf_options.debug)
+    std::cout << std::fixed << std::setprecision(2) << "density: " << do_time << "s " << std::endl;
+}
+
+void scf_restart_test(const ExecutionContext& ec, const SystemData& sys_data, bool restart,
+                      std::string files_prefix) {
   if(!restart) return;
   const auto rank   = ec.pg().rank();
   const bool is_uhf = (sys_data.is_unrestricted);
@@ -396,32 +473,56 @@ void scf_restart_test(const ExecutionContext& ec, const SystemData& sys_data,
   if(rstatus == 0) tamm_terminate("Error reading one or all of the files: [" + fnf + "]");
 }
 
-void scf_restart(const ExecutionContext& ec, const SystemData& sys_data,
-                 const std::string& filename, EigenTensors& etensors, std::string files_prefix) {
+void rw_md_disk(ExecutionContext& ec, ScalapackInfo& scalapack_info, const SystemData& sys_data,
+                TAMMTensors& ttensors, EigenTensors& etensors, std::string files_prefix,
+                bool read) {
   const auto rank   = ec.pg().rank();
-  const auto N      = sys_data.nbf_orig;
-  const auto Northo = N - sys_data.n_lindep;
   const bool is_uhf = sys_data.is_unrestricted;
+  auto       debug  = sys_data.options_map.scf_options.debug;
 
-  EXPECTS(Northo == sys_data.nbf);
+  if(!read) {
+#if defined(USE_SCALAPACK)
+    if(scalapack_info.comm != MPI_COMM_NULL) {
+      tamm::from_block_cyclic_tensor(ttensors.C_alpha_BC, ttensors.C_alpha);
+      if(is_uhf) tamm::from_block_cyclic_tensor(ttensors.C_beta_BC, ttensors.C_beta);
+    }
+#else
+    if(rank == 0) {
+      eigen_to_tamm_tensor(ttensors.C_alpha, etensors.C);
+      if(is_uhf) eigen_to_tamm_tensor(ttensors.C_beta, etensors.C_beta);
+    }
+#endif
+    ec.pg().barrier();
+  }
 
   std::string movecsfile_alpha  = files_prefix + ".alpha.movecs";
   std::string densityfile_alpha = files_prefix + ".alpha.density";
+  std::string movecsfile_beta   = files_prefix + ".beta.movecs";
+  std::string densityfile_beta  = files_prefix + ".beta.density";
 
-  if(rank == 0) {
-    cout << "Reading movecs and density files ... ";
-    etensors.C = read_scf_mat<TensorType>(movecsfile_alpha);
-    etensors.D = read_scf_mat<TensorType>(densityfile_alpha);
-
-    if(is_uhf) {
-      std::string movecsfile_beta  = files_prefix + ".beta.movecs";
-      std::string densityfile_beta = files_prefix + ".beta.density";
-      etensors.C_beta              = read_scf_mat<TensorType>(movecsfile_beta);
-      etensors.D_beta              = read_scf_mat<TensorType>(densityfile_beta);
-    }
-    cout << "done" << endl;
+  std::vector<Tensor<TensorType>> tensor_list{ttensors.C_alpha, ttensors.D_tamm};
+  std::vector<std::string>        tensor_fnames{movecsfile_alpha, densityfile_alpha};
+  if(sys_data.is_unrestricted) {
+    tensor_list.insert(tensor_list.end(), {ttensors.C_beta, ttensors.D_beta_tamm});
+    tensor_fnames.insert(tensor_fnames.end(), {movecsfile_beta, densityfile_beta});
   }
-  ec.pg().barrier();
+
+  if(read) {
+    if(rank == 0) cout << "Reading movecs and density files from disk ... ";
+    read_from_disk_group(ec, tensor_list, tensor_fnames, debug, ec.nnodes());
+    if(rank == 0) cout << "done" << endl;
+  }
+  else write_to_disk_group(ec, tensor_list, tensor_fnames, debug, ec.nnodes());
+}
+
+void scf_restart(ExecutionContext& ec, ScalapackInfo& scalapack_info, const SystemData& sys_data,
+                 TAMMTensors& ttensors, EigenTensors& etensors, std::string files_prefix) {
+  const auto rank   = ec.pg().rank();
+  const auto N      = sys_data.nbf_orig;
+  const auto Northo = N - sys_data.n_lindep;
+  EXPECTS(Northo == sys_data.nbf);
+
+  rw_md_disk(ec, scalapack_info, sys_data, ttensors, etensors, files_prefix, true);
 }
 
 template<typename TensorType>
@@ -437,7 +538,8 @@ double tt_trace(ExecutionContext& ec, Tensor<TensorType>& T1, Tensor<TensorType>
 }
 
 void print_energies(ExecutionContext& ec, TAMMTensors& ttensors, EigenTensors& etensors,
-                    const SystemData& sys_data, SCFVars& scf_vars, bool debug) {
+                    const SystemData& sys_data, SCFVars& scf_vars, ScalapackInfo& scalapack_info,
+                    bool debug) {
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;
   const bool is_ks  = sys_data.is_ks;
@@ -538,9 +640,9 @@ std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, SystemData& 
       auto desc_V = desc_lambda(N, N);
       // scalapackpp::BlockCyclicMatrix<T> V_sca(grid, N, N, mb, mb);
 
-      auto info = scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, desc_S[2],
-                                      S_BC.access_local_buf(), 1, 1, desc_S, eps.data(),
-                                      V_sca.access_local_buf(), 1, 1, desc_V);
+      /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, desc_S[2],
+                                   S_BC.access_local_buf(), 1, 1, desc_S, eps.data(),
+                                   V_sca.access_local_buf(), 1, 1, desc_V);
 
       // Gather results
       // if( scalapack_info.pg.rank() == 0 ) V.resize(N,N);
@@ -645,7 +747,6 @@ std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, SystemData& 
   sys_data.n_lindep = n_illcond;
   sys_data.nbf      = sys_data.nbf_orig - sys_data.n_lindep;
 
-  const bool is_uhf  = (sys_data.is_unrestricted);
   scf_vars.tAO_ortho = TiledIndexSpace{IndexSpace{range(0, (size_t) (sys_data.nbf))},
                                        sys_data.options_map.scf_options.AO_tilesize};
 
@@ -657,24 +758,13 @@ std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, SystemData& 
     ttensors.X_alpha     = {scf_vars.tN_bc, scf_vars.tNortho_bc};
     ttensors.X_alpha.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
     Tensor<TensorType>::allocate(&scalapack_info.ec, ttensors.X_alpha);
-    if(is_uhf) {
-      ttensors.X_beta = {scf_vars.tN_bc, scf_vars.tNortho_bc};
-      ttensors.X_beta.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-      Tensor<TensorType>::allocate(&scalapack_info.ec, ttensors.X_beta);
-    }
   }
 #else
   ttensors.X_alpha = {scf_vars.tAO, scf_vars.tAO_ortho};
   sch.allocate(ttensors.X_alpha).execute();
-  if(is_uhf) {
-    ttensors.X_beta = {scf_vars.tAO, scf_vars.tAO_ortho};
-    sch.allocate(ttensors.X_beta).execute();
-  }
 #endif
 
   if(world_rank == 0) eigen_to_tamm_tensor(ttensors.X_alpha, X);
-  if(is_uhf)
-    if(world_rank == 0) eigen_to_tamm_tensor(ttensors.X_beta, X); // X_beta=X_alpha here
 
   ec.pg().barrier();
 
@@ -767,7 +857,7 @@ Matrix compute_schwarz_ints(ExecutionContext& ec, const SCFVars& scf_vars,
   using libint2::BraKet;
   using libint2::Engine;
 
-  auto hf_t1 = std::chrono::high_resolution_clock::now();
+  // auto hf_t1 = std::chrono::high_resolution_clock::now();
 
   const BasisSet& bs2           = (_bs2.empty() ? bs1 : _bs2);
   const auto      nsh1          = bs1.size();
@@ -785,7 +875,6 @@ Matrix compute_schwarz_ints(ExecutionContext& ec, const SCFVars& scf_vars,
 
   auto& buf = engine.results();
 
-  const std::vector<Tile>&   AO_tiles       = scf_vars.AO_tiles;
   const std::vector<size_t>& shell_tile_map = scf_vars.shell_tile_map;
 
   TiledIndexSpace    tnsh{IndexSpace{range(0, nsh1)}, static_cast<Tile>(std::ceil(nsh1 * 0.05))};
@@ -838,9 +927,9 @@ Matrix compute_schwarz_ints(ExecutionContext& ec, const SCFVars& scf_vars,
   K = tamm_to_eigen_matrix<TensorType>(schwarz_mat);
   Tensor<TensorType>::deallocate(schwarz_mat);
 
-  auto hf_t2   = std::chrono::high_resolution_clock::now();
-  auto hf_time = std::chrono::duration_cast<std::chrono::duration<double>>((hf_t2 - hf_t1)).count();
-  // if(ec.pg().rank() == 0)
+  // auto hf_t2   = std::chrono::high_resolution_clock::now();
+  // auto hf_time = std::chrono::duration_cast<std::chrono::duration<double>>((hf_t2 -
+  // hf_t1)).count(); if(ec.pg().rank() == 0)
   //   std::cout << std::fixed << std::setprecision(2) << "Time to compute schwarz matrix: " <<
   //   hf_time
   //             << " secs" << endl;
@@ -881,15 +970,15 @@ void print_mulliken(OptionsMap& options_map, libint2::BasisSet& shells, Matrix& 
   std::vector<std::vector<double>> net_charge_shell(natoms);
 
   int j = 0;
-  for(size_t x = 0; x < natoms; x++) { // loop over atoms
+  for(auto x = 0; x < natoms; x++) { // loop over atoms
     auto atom_shells = bsm.atominfo[x].shells;
     auto nshells     = atom_shells.size(); // #shells for atom x
     cs_charge_shell[x].resize(nshells);
     if(is_uhf) os_charge_shell[x].resize(nshells);
-    for(auto s = 0; s < nshells; s++) { // loop over each shell for atom x
+    for(size_t s = 0; s < nshells; s++) { // loop over each shell for atom x
       double cs_scharge = 0.0, os_scharge = 0.0;
-      for(auto si = 0; si < atom_shells[s].size(); si++) {
-        for(size_t i = 0; i < S.rows(); i++) {
+      for(size_t si = 0; si < atom_shells[s].size(); si++) {
+        for(Eigen::Index i = 0; i < S.rows(); i++) {
           const auto ds_cs = D(j, i) * S(j, i);
           cs_scharge += ds_cs;
           cs_acharge[x] += ds_cs;
@@ -909,7 +998,7 @@ void print_mulliken(OptionsMap& options_map, libint2::BasisSet& shells, Matrix& 
   net_acharge      = cs_acharge;
   net_charge_shell = cs_charge_shell;
   if(is_uhf) {
-    for(size_t x = 0; x < natoms; x++) { // loop over atoms
+    for(auto x = 0; x < natoms; x++) { // loop over atoms
       net_charge_shell[x].resize(cs_charge_shell[x].size());
       net_acharge[x] = cs_acharge[x] + os_acharge[x];
       std::transform(cs_charge_shell[x].begin(), cs_charge_shell[x].end(),
@@ -928,7 +1017,7 @@ void print_mulliken(OptionsMap& options_map, libint2::BasisSet& shells, Matrix& 
     std::cout << mksp << "----------" << mksp << "--------" << mksp << std::string(50, '-')
               << std::endl;
 
-    for(size_t x = 0; x < natoms; x++) { // loop over atoms
+    for(int x = 0; x < natoms; x++) { // loop over atoms
       const auto Z        = ec_atoms[x].atom.atomic_number;
       const auto e_symbol = ec_atoms[x].esymbol;
       std::cout << mksp << std::setw(3) << std::right << x + 1 << " " << std::left << std::setw(2)
@@ -1257,25 +1346,20 @@ gensqrtinv_atscf(ExecutionContext& ec, SystemData& sys_data, SCFVars& scf_vars,
 
   auto nbf_new = N - n_illcond;
 
-  const bool is_uhf    = (sys_data.is_unrestricted);
-  auto       tAO_ortho = TiledIndexSpace{IndexSpace{range(0, (size_t) nbf_new)},
+  auto tAO_ortho = TiledIndexSpace{IndexSpace{range(0, (size_t) nbf_new)},
                                    sys_data.options_map.scf_options.AO_tilesize};
 
   X_alpha = {tao_atom, tAO_ortho};
   sch.allocate(X_alpha).execute();
-  if(is_uhf) {
-    X_beta = {tao_atom, tAO_ortho};
-    sch.allocate(X_beta).execute();
-  }
 
   if(world_rank == 0) eigen_to_tamm_tensor(X_alpha, X);
-  if(is_uhf)
-    if(world_rank == 0) eigen_to_tamm_tensor(X_beta, X); // X_beta=X_alpha here
 
   ec.pg().barrier();
 
   return std::make_tuple(size_t(n_cond), condition_number, result_condition_number);
 }
+
+template Matrix read_scf_mat<double>(std::string matfile);
 
 template void write_scf_mat<double>(Matrix& C, std::string matfile);
 
@@ -1293,6 +1377,10 @@ template void compute_hamiltonian<double>(ExecutionContext& ec, const SCFVars& s
                                           std::vector<libint2::Atom>& atoms,
                                           libint2::BasisSet& shells, TAMMTensors& ttensors,
                                           EigenTensors& etensors);
+
+template void compute_density<double>(ExecutionContext& ec, const SystemData& sys_data,
+                                      const SCFVars& scf_vars, ScalapackInfo& scalapack_info,
+                                      TAMMTensors& ttensors, EigenTensors& etensors);
 
 template double tt_trace<double>(ExecutionContext& ec, Tensor<TensorType>& T1,
                                  Tensor<TensorType>& T2);

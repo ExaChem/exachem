@@ -92,7 +92,7 @@ SystemData::SystemData(OptionsMap options_map_, const std::string scf_type_strin
     for(auto x: options_map_.scf_options.xc_type) {
       if(strequal_case(x, "gga_xc_qed") || strequal_case(x, "mgga_xc_qed") ||
          strequal_case(x, "hyb_gga_xc_qed") || strequal_case(x, "hyb_mgga_xc_qed")) {
-        if(options_map_.scf_options.qed_omegas.size() != qed_nmodes) {
+        if(options_map_.scf_options.qed_omegas.size() != (size_t) qed_nmodes) {
           tamm_terminate("ERROR: (m)gga_xc_qed needs qed_omegas for each qed_nmode");
         }
         break;

@@ -51,6 +51,7 @@
   "common": {
     "maxiter": 200
   },
+
   "SCF": {
     "tilesize": 30,
     "restart": false,
@@ -61,7 +62,6 @@
     "convd": 1e-8,
     "charge": 3,    
     "multiplicity": 2,
-    "alpha": 0.8,
     "scf_type": "unrestricted"
   },
   "CD": {

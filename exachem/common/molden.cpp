@@ -452,16 +452,16 @@ void reorder_molden_orbitals(const bool is_spherical, std::vector<AtomInfo>& ato
 libint2::BasisSet renormalize_libint_shells(const SystemData& sys_data, libint2::BasisSet& shells) {
   using libint2::math::df_Kminus1;
   using std::pow;
-  const auto                  sqrt_Pi_cubed = double{5.56832799683170784528481798212};
+  // const auto                  sqrt_Pi_cubed = double{5.56832799683170784528481798212};
   std::vector<libint2::Shell> rshells(shells.size());
   size_t                      sid = 0;
   for(auto it = shells.begin(); it != shells.end(); it++) {
     rshells[sid] = *it;
     sid++;
   }
+#if 0 // TODO: Doesn't work - is renormalization required?
   for(auto& s: rshells) {
     const auto np = s.nprim();
-#if 0 // TODO: Doesn't work - is renormalization required?
     for(auto& c: s.contr) {
       EXPECTS(c.l <= 15); 
       for(auto p=0ul; p!=np; ++p) {
@@ -502,9 +502,9 @@ libint2::BasisSet renormalize_libint_shells(const SystemData& sys_data, libint2:
       }
       s.max_ln_coeff[p] = max_ln_c;
     }
+  } // shells
 #endif
 
-  } // shells
   libint2::BasisSet result{rshells};
 
   return result;
@@ -702,8 +702,8 @@ void read_molden(const SystemData& sys_data, libint2::BasisSet& shells,
   cout << "finished reading molden: n_occ_alpha, n_vir_alpha, n_occ_beta, n_vir_beta = "
        << n_occ_alpha << "," << n_vir_alpha << "," << n_occ_beta << "," << n_vir_beta << endl;
 
-  EXPECTS(n_occ_alpha == sys_data.nelectrons_alpha);
-  EXPECTS(n_occ_beta == sys_data.nelectrons_beta);
+  EXPECTS(n_occ_alpha == (size_t) sys_data.nelectrons_alpha);
+  EXPECTS(n_occ_beta == (size_t) sys_data.nelectrons_beta);
   EXPECTS(n_vir_alpha == Northo - n_occ_alpha);
   EXPECTS(n_vir_beta == Northo - n_occ_beta);
 }

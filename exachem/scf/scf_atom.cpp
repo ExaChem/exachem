@@ -30,7 +30,7 @@ void compute_sad_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info, Syst
   */
 
   const auto rank = ec.pg().rank();
-  size_t     nao  = shells_tot.nbf();
+  // size_t     nao  = shells_tot.nbf();
 
   Matrix& D_tot_a = etensors.D;
   Matrix& D_tot_b = etensors.G;
@@ -89,7 +89,7 @@ void compute_sad_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info, Syst
       int ncore = k.ecp_nelec;
 
       // Obtain the type of ECP depending on ncore
-      auto index = std::distance(nelecp.begin(), std::find(nelecp.begin(), nelecp.end(), ncore));
+      size_t index = std::distance(nelecp.begin(), std::find(nelecp.begin(), nelecp.end(), ncore));
       if(index > nelecp.size()) tamm_terminate("Error: ECP type not compatiable");
 
       // Start removing electrons according to occupations
@@ -663,8 +663,16 @@ void compute_sad_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info, Syst
     D_tot_b.setZero();
   }
 
-  ec.pg().broadcast(etensors.D.data(), etensors.D.size(), 0);
-  if(is_uhf) ec.pg().broadcast(etensors.D_beta.data(), etensors.D_beta.size(), 0);
+  if(rank == 0) {
+    eigen_to_tamm_tensor(ttensors.D_tamm, etensors.D);
+    if(is_uhf) { eigen_to_tamm_tensor(ttensors.D_beta_tamm, etensors.D_beta); }
+  }
+  ec.pg().barrier();
+  if(rank != 0) {
+    tamm_to_eigen_tensor(ttensors.D_tamm, etensors.D);
+    if(is_uhf) { tamm_to_eigen_tensor(ttensors.D_beta_tamm, etensors.D_beta); }
+  }
+  ec.pg().barrier();
 
   // if(rank==0) cout << "in sad_guess, D_tot: " << endl << D_a << endl;
 

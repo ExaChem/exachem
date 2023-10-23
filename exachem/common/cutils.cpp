@@ -62,14 +62,16 @@ void setup_scalapack_info(SystemData& sys_data, ScalapackInfo& scalapack_info, M
   std::iota(scalapack_ranks.begin(), scalapack_ranks.end(), 0);
   scalapack_info.scalapack_nranks = scalapack_nranks;
 
+  int& mb_ = sys_data.options_map.scf_options.scalapack_nb;
+
   if(scalapack_info.pg.rank() == 0) {
     std::cout << "scalapack_nranks = " << scalapack_nranks << std::endl;
     std::cout << "scalapack_np_row = " << scalapack_info.npr << std::endl;
     std::cout << "scalapack_np_col = " << scalapack_info.npc << std::endl;
+    std::cout << "scalapack_nb     = " << mb_ << std::endl;
   }
 
-  int&       mb_ = sys_data.options_map.scf_options.scalapack_nb;
-  const auto N   = sys_data.nbf_orig;
+  const auto N = sys_data.nbf_orig;
   if(mb_ > N / scalapack_info.npr) {
     mb_                                           = N / scalapack_info.npr;
     sys_data.options_map.scf_options.scalapack_nb = mb_;

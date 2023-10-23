@@ -41,7 +41,7 @@
     "tol_lindep": 1e-06,    
     "conve": 1e-9,
     "convd": 1e-8,    
-    "charge": 3,    
+    "charge": 3, 
     "multiplicity": 6,
     "scf_type": "unrestricted"    
   },

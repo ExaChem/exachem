@@ -47,7 +47,7 @@ struct SCFVars {
   libecpint::ECPIntegrator ecp_factory;
 
   // AO spaces
-  tamm::TiledIndexSpace   tAO, tAO_ortho, tAOt; // tAO_ld
+  tamm::TiledIndexSpace   tAO, tAO_ortho, tAO_occ_a, tAO_occ_b, tAOt; // tAO_ld
   std::vector<tamm::Tile> AO_tiles;
   std::vector<tamm::Tile> AO_opttiles;
   std::vector<size_t>     shell_tile_map;
@@ -60,6 +60,9 @@ struct SCFVars {
   // tamm::TiledIndexLabel mu_ld, nu_ld;
   tamm::TiledIndexLabel mu, nu, ku;
   tamm::TiledIndexLabel mup, nup, kup;
+
+  tamm::TiledIndexLabel mu_oa, nu_oa;
+  tamm::TiledIndexLabel mu_ob, nu_ob;
 
   // DF spaces
   libint2::BasisSet     dfbs;
@@ -119,7 +122,6 @@ struct TAMMTensors {
   Tensor<TensorType> V1; // nuclear ints
 
   Tensor<TensorType> X_alpha;
-  Tensor<TensorType> X_beta;
   Tensor<TensorType> F_alpha; // H1+F_alpha_tmp
   Tensor<TensorType> F_beta;
   Tensor<TensorType> F_alpha_tmp; // computed via call to compute_2bf(...)
@@ -129,6 +131,16 @@ struct TAMMTensors {
   Tensor<TensorType> F_dummy;
   Tensor<TensorType> VXC_alpha;
   Tensor<TensorType> VXC_beta;
+
+  Tensor<TensorType> C_alpha;
+  Tensor<TensorType> C_beta;
+  Tensor<TensorType> C_occ_a;
+  Tensor<TensorType> C_occ_b;
+  Tensor<TensorType> C_occ_aT;
+  Tensor<TensorType> C_occ_bT;
+
+  Tensor<TensorType> C_alpha_BC;
+  Tensor<TensorType> C_beta_BC;
 
   Tensor<TensorType> D_tamm;
   Tensor<TensorType> D_beta_tamm;
@@ -275,17 +287,26 @@ void compute_hamiltonian(ExecutionContext& ec, const SCFVars& scf_vars,
                          std::vector<libint2::Atom>& atoms, libint2::BasisSet& shells,
                          TAMMTensors& ttensors, EigenTensors& etensors);
 
-void scf_restart_test(const ExecutionContext& ec, const SystemData& sys_data,
-                      const std::string& filename, bool restart, std::string files_prefix);
+template<typename TensorType>
+void compute_density(ExecutionContext& ec, const SystemData& sys_data, const SCFVars& scf_vars,
+                     ScalapackInfo& scalapack_info, TAMMTensors& ttensors, EigenTensors& etensors);
 
-void scf_restart(const ExecutionContext& ec, const SystemData& sys_data,
-                 const std::string& filename, EigenTensors& etensors, std::string files_prefix);
+void scf_restart_test(const ExecutionContext& ec, const SystemData& sys_data, bool restart,
+                      std::string files_prefix);
+
+void scf_restart(ExecutionContext& ec, ScalapackInfo& scalapack_info, const SystemData& sys_data,
+                 TAMMTensors& ttensors, EigenTensors& etensors, std::string files_prefix);
+
+void rw_md_disk(ExecutionContext& ec, ScalapackInfo& scalapack_info, const SystemData& sys_data,
+                TAMMTensors& ttensors, EigenTensors& etensors, std::string files_prefix,
+                bool read = false);
 
 template<typename TensorType>
 double tt_trace(ExecutionContext& ec, Tensor<TensorType>& T1, Tensor<TensorType>& T2);
 
 void print_energies(ExecutionContext& ec, TAMMTensors& ttensors, EigenTensors& etensors,
-                    const SystemData& sys_data, SCFVars& scf_vars, bool debug = false);
+                    const SystemData& sys_data, SCFVars& scf_vars, ScalapackInfo& scalapack_info,
+                    bool debug = false);
 
 // returns {X,X^{-1},rank,A_condition_number,result_A_condition_number}, where
 // X is the generalized square-root-inverse such that X.transpose() * A * X = I

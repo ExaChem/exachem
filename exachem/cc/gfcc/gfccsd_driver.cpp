@@ -3671,7 +3671,7 @@ void gfccsd_driver(std::string filename, OptionsMap options_map) {
                 sch.allocate(i_q1_tamm_a, i_q2_tamm_aaa, i_q2_tamm_bab).execute();
                 read_from_disk_group<std::complex<T>>(
                   ec, std::vector{i_q1_tamm_a, i_q2_tamm_aaa, i_q2_tamm_bab},
-                  {q1_a_file, q2_aaa_file, q2_bab_file}, {}, gf_profile);
+                  {q1_a_file, q2_aaa_file, q2_bab_file}, gf_profile);
 
                 int q1_tamm_a_ga   = tamm_to_ga(ec, i_q1_tamm_a);
                 int q2_tamm_aaa_ga = tamm_to_ga(ec, i_q2_tamm_aaa);

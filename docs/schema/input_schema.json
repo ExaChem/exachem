@@ -99,7 +99,7 @@
         "df_tilesize": {
           "type": "number"
         },
-        "alpha": {
+        "damp": {
           "type": "number"
         },
         "nnodes": {

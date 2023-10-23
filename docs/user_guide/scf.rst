@@ -29,7 +29,7 @@ The values listed below are the defaults where few options are automatically adj
    "diis_hist": 10,
    "force_tilesize": false,
    "tilesize": 30,
-   "alpha": 1.0,
+   "damp": 100,
    "nnodes": 1,
    "writem": 1,
    "restart": false,
@@ -82,8 +82,7 @@ The values listed below are the defaults where few options are automatically adj
 :tilesize: The tilesize for the AO dimension. An integer value that is automatically set to ``ceil(Nbf * 0.05)``. If **force_tilesize=true**, 
    the value specified by the user is respected. It is recommended to let the SCF module automatically determine this value.
 
-:alpha: damping (mixing) factor for the density matrix where :math:`0 \leq \alpha \leq 1`.  Specifies the percentage of the current iterations density  mixed with the previous iterations density. ``default=1.0`` (RHF only) indicates no damping.
-   :math:`D_{n} = \alpha*D_{n} + (1.0-\alpha)*D_{n-1}` 
+:damp: damping (mixing) factor for the density matrix where :math:`0 \leq \alpha \leq 100`.  Specifies the percentage of the current iterations density mixed with the previous iterations density. ``default=100`` indicates no damping.
 
 :writem: ``[default=1]`` An integer specifying the frequency (as number of iterations) after which the movecs and density matrices are written to disk for restarting the calculation.
 
@@ -96,17 +95,17 @@ The values listed below are the defaults where few options are automatically adj
    * :strong:`restricted`: for closed-shell restricted Hartree-Fock (RHF) calculation
    * :strong:`unrestricted`: for spin-unrestricted Hartree-Fock (UHF) calculation
 
-:xc_type: ``[default=[]]`` A list of strings specifying the exchange and correlation functionals for DFT calculations using `GAUXC`.
-   The list of available functionals using the `builtin` backend can be found at the `ExchCXX <https://github.com/wavefunction91/ExchCXX>` repository.
-   The `Libxc` backend is restricted to the list of LDA and GGA functionals without range separation available at `Libxc <https://tddft.org/programs/libxc/functionals/libxc-6.2.2/>`.
+:xc_type: ``[default=[]]`` A list of strings specifying the exchange and correlation functionals for DFT calculations using `GauXC <https://github.com/wavefunction91/GauXC>`_.
+   The list of available functionals using the `builtin` backend can be found at the `ExchCXX <https://github.com/wavefunction91/ExchCXX>`_ repository.
+   The `Libxc` backend is restricted to the list of LDA and GGA functionals without range separation available at `Libxc <https://tddft.org/programs/libxc/functionals/libxc-6.2.2/>`_.
 
-:xc_grid_type: ``default=UltraFine`` Specifies the quality of the numerical integration grid. The following values are supported
+:xc_grid_type: ``[default=UltraFine]`` Specifies the quality of the numerical integration grid. The following values are supported
 
-   * :strong:`Fine`: 75 radial shells with 302 angular points per shell
-   * :strong:`UltraFine`: 99 radial shells with 590 angular points per shell
+   * :strong:`Fine`: 75 radial shells with 302 angular points per shell.
+   * :strong:`UltraFine`: 99 radial shells with 590 angular points per shell.
    * :strong:`SuperFine`: 175 radial shells with 974 angular points per shell for first row elements and 250 radial shells with 974 Lebedev points per shell for the rest.
 
-   All `xc_grid_type` options use a `Mura-Knowles` radial quadrature, a `Lebedev-Laikov` angular quadrature, a `Laqua-Kussmann-Ochsenfeld` partitioning scheme, and a `Robust` pruning method.
+   All **xc_grid_type** options use a `Mura-Knowles` radial quadrature, a `Lebedev-Laikov` angular quadrature, a `Laqua-Kussmann-Ochsenfeld` partitioning scheme, and a `Robust` pruning method.
 
 :debug: ``[default=false]`` enable verbose printing for debugging a calculation.
 

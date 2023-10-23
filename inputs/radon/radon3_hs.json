@@ -73,7 +73,6 @@
     "convd": 1e-7,    
     "charge": 2,    
     "multiplicity": 5,
-    "alpha": 0.95,
     "scf_type": "unrestricted"    
   },
   "CD": {

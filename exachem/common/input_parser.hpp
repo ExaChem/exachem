@@ -143,7 +143,7 @@ public:
     scf_type         = "restricted";
     xc_type          = {}; // pbe0
     xc_grid_type     = "UltraFine";
-    alpha            = 1.0;
+    damp             = 100;
     nnodes           = 1;
     writem           = 1;
     scalapack_nb     = 64;
@@ -179,7 +179,7 @@ public:
   std::string moldenfile;
   int         n_lindep;
   int         writem;
-  double      alpha; // density mixing parameter
+  int         damp; // density mixing parameter
   std::string scf_type;
   std::string xc_grid_type;
 
@@ -209,7 +209,7 @@ public:
     cout << " diis_hist    = " << diis_hist << endl;
     cout << " AO_tilesize  = " << AO_tilesize << endl;
     cout << " writem       = " << writem << endl;
-    cout << " alpha        = " << alpha << endl;
+    cout << " damp         = " << damp << endl;
     if(!moldenfile.empty()) {
       cout << " moldenfile   = " << moldenfile << endl;
       // cout << " n_lindep = " << n_lindep << endl;
@@ -799,7 +799,7 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   parse_option<bool>  (scf_options.force_tilesize  , jscf, "force_tilesize");
   parse_option<uint32_t>(scf_options.AO_tilesize   , jscf, "tilesize");
   parse_option<uint32_t>(scf_options.dfAO_tilesize , jscf, "df_tilesize");
-  parse_option<double>(scf_options.alpha           , jscf, "alpha");
+  parse_option<int>   (scf_options.damp            , jscf, "damp");
   parse_option<int>   (scf_options.writem          , jscf, "writem");
   parse_option<int>   (scf_options.nnodes          , jscf, "nnodes");
   parse_option<bool>  (scf_options.restart         , jscf, "restart");
@@ -841,7 +841,7 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   // clang-format off
   const std::vector<string> valid_scf{"charge", "multiplicity", "lshift", "tol_int",
     "tol_lindep", "conve", "convd", "diis_hist","force_tilesize","tilesize","df_tilesize",
-    "alpha","writem","nnodes","restart","noscf","moldenfile", "guess",
+    "damp","writem","nnodes","restart","noscf","moldenfile", "guess",
     "debug","scf_type","xc_type", "xc_grid_type", "n_lindep","restart_size","scalapack_nb","riscf",
     "scalapack_np_row","scalapack_np_col","ext_data_path","PRINT",
     "qed_omegas","qed_lambdas","qed_volumes","qed_polvecs","comments"};

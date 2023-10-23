@@ -20,7 +20,6 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
 
   const bool   is_uhf = sys_data.is_unrestricted;
   const bool   is_rhf = sys_data.is_restricted;
-  const bool   is_ks  = sys_data.is_ks;
   const double lshift = sys_data.options_map.scf_options.lshift;
 
   Tensor<TensorType>& H1       = ttensors.H1;
@@ -29,20 +28,15 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
   Tensor<TensorType>& ehf_tmp  = ttensors.ehf_tmp;
   Tensor<TensorType>& ehf_tamm = ttensors.ehf_tamm;
 
-  Matrix&             C_alpha           = etensors.C;
   Matrix&             D_alpha           = etensors.D;
-  Matrix&             C_occ             = etensors.C_occ;
   Tensor<TensorType>& F_alpha           = ttensors.F_alpha;
-  Tensor<TensorType>& F_alpha_tmp       = ttensors.F_alpha_tmp;
   Tensor<TensorType>& FD_alpha_tamm     = ttensors.FD_tamm;
   Tensor<TensorType>& FDS_alpha_tamm    = ttensors.FDS_tamm;
   Tensor<TensorType>& D_alpha_tamm      = ttensors.D_tamm;
   Tensor<TensorType>& D_last_alpha_tamm = ttensors.D_last_tamm;
 
-  Matrix&             C_beta           = etensors.C_beta;
   Matrix&             D_beta           = etensors.D_beta;
   Tensor<TensorType>& F_beta           = ttensors.F_beta;
-  Tensor<TensorType>& F_beta_tmp       = ttensors.F_beta_tmp;
   Tensor<TensorType>& FD_beta_tamm     = ttensors.FD_beta_tamm;
   Tensor<TensorType>& FDS_beta_tamm    = ttensors.FDS_beta_tamm;
   Tensor<TensorType>& D_beta_tamm      = ttensors.D_beta_tamm;
@@ -86,7 +80,8 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
   ehf = get_scalar(ehf_tamm);
 
 #if defined(USE_GAUXC)
-  double gauxc_exc = 0;
+  const bool is_ks     = sys_data.is_ks;
+  double     gauxc_exc = 0;
   if(is_ks) {
     const auto xcf_start = std::chrono::high_resolution_clock::now();
     gauxc_exc =
@@ -141,6 +136,7 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
   }
 
   if(iter >= 1) {
+    auto do_t1 = std::chrono::high_resolution_clock::now();
     if(is_rhf) {
       ++scf_vars.idiis;
       scf_diis(ec, tAO, F_alpha, F_alpha, err_mat_alpha_tamm, err_mat_alpha_tamm, iter, max_hist,
@@ -155,6 +151,12 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
       // scf_diis(ec, tAO, D_beta_tamm, F_beta, err_mat_beta_tamm, iter, max_hist, scf_vars,
       //         sys_data.n_lindep, ttensors.diis_beta_hist, ttensors.fock_beta_hist);
     }
+    auto do_t2 = std::chrono::high_resolution_clock::now();
+    auto do_time =
+      std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
+
+    if(rank == 0 && debug)
+      std::cout << std::fixed << std::setprecision(2) << "diis: " << do_time << "s, ";
   }
 
   if(!scf_restart) {
@@ -181,42 +183,16 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
 
     scf_diagonalize<TensorType>(sch, sys_data, scalapack_info, ttensors, etensors);
 
-    // compute density
-    if(rank == 0) {
-      if(is_rhf) {
-        C_occ   = C_alpha.leftCols(sys_data.nelectrons_alpha);
-        D_alpha = 2.0 * C_occ * C_occ.transpose();
-        // X_a     = C_alpha;
-        eigen_to_tamm_tensor(ttensors.X_alpha, C_alpha);
-      }
-      if(is_uhf) {
-        C_occ   = C_alpha.leftCols(sys_data.nelectrons_alpha);
-        D_alpha = C_occ * C_occ.transpose();
-        // X_a     = C_alpha;
-        C_occ  = C_beta.leftCols(sys_data.nelectrons_beta);
-        D_beta = C_occ * C_occ.transpose();
-        // X_b     = C_beta;
-        eigen_to_tamm_tensor(ttensors.X_alpha, C_alpha);
-        eigen_to_tamm_tensor(ttensors.X_beta, C_beta);
-      }
-    }
-
     auto do_t2 = std::chrono::high_resolution_clock::now();
     auto do_time =
       std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
 
     if(rank == 0 && debug)
-      std::cout << std::fixed << std::setprecision(2) << "diagonalize: " << do_time << "s, "
-                << std::endl;
+      std::cout << std::fixed << std::setprecision(2) << "diagonalize: " << do_time << "s, ";
+
+    compute_density<TensorType>(ec, sys_data, scf_vars, scalapack_info, ttensors, etensors);
+
   } // end scf_restart
-
-  if(rank == 0) {
-    eigen_to_tamm_tensor(D_alpha_tamm, D_alpha);
-    if(is_uhf) { eigen_to_tamm_tensor(D_beta_tamm, D_beta); }
-  }
-
-  ec.pg().broadcast(D_alpha.data(), D_alpha.size(), 0);
-  if(is_uhf) ec.pg().broadcast(D_beta.data(), D_beta.size(), 0);
 
   double rmsd = 0.0;
   // clang-format off
@@ -237,22 +213,25 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
     rmsd += norm(D_diff) / (double) (1.0 * N);
   }
 
-  double alpha = sys_data.options_map.scf_options.alpha;
+  const auto   damp  = sys_data.options_map.scf_options.damp;
+  const double alpha = damp / 100.0;
   // if(rmsd < 1e-6) { scf_vars.switch_diis = true; } // rmsd check
 
-  // D = alpha*D + (1.0-alpha)*D_last;
-  if(is_rhf) {
-    tamm::scale_ip(D_alpha_tamm(), alpha);
-    sch(D_alpha_tamm() += (1.0 - alpha) * D_last_alpha_tamm()).execute();
-    tamm_to_eigen_tensor(D_alpha_tamm, D_alpha);
-  }
-  if(is_uhf) {
-    tamm::scale_ip(D_alpha_tamm(), alpha);
-    sch(D_alpha_tamm() += (1.0 - alpha) * D_last_alpha_tamm()).execute();
-    tamm_to_eigen_tensor(D_alpha_tamm, D_alpha);
-    tamm::scale_ip(D_beta_tamm(), alpha);
-    sch(D_beta_tamm() += (1.0 - alpha) * D_last_beta_tamm()).execute();
-    tamm_to_eigen_tensor(D_beta_tamm, D_beta);
+  if(damp < 100) {
+    // D = alpha*D + (1.0-alpha)*D_last;
+    if(is_rhf) {
+      tamm::scale_ip(D_alpha_tamm(), alpha);
+      sch(D_alpha_tamm() += (1.0 - alpha) * D_last_alpha_tamm()).execute();
+      tamm_to_eigen_tensor(D_alpha_tamm, D_alpha);
+    }
+    if(is_uhf) {
+      tamm::scale_ip(D_alpha_tamm(), alpha);
+      sch(D_alpha_tamm() += (1.0 - alpha) * D_last_alpha_tamm()).execute();
+      tamm_to_eigen_tensor(D_alpha_tamm, D_alpha);
+      tamm::scale_ip(D_beta_tamm(), alpha);
+      sch(D_beta_tamm() += (1.0 - alpha) * D_last_beta_tamm()).execute();
+      tamm_to_eigen_tensor(D_beta_tamm, D_beta);
+    }
   }
 
   return std::make_tuple(ehf, rmsd);
@@ -793,9 +772,9 @@ void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syst
           auto desc_V = desc_lambda(ndf, ndf);
           // scalapackpp::BlockCyclicMatrix<TensorType> V_sca(grid, N, N, mb, mb);
 
-          auto info = scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower,
-                                          desc_S[2], S_BC.access_local_buf(), 1, 1, desc_S,
-                                          eps.data(), V_sca.access_local_buf(), 1, 1, desc_V);
+          /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, desc_S[2],
+                                       S_BC.access_local_buf(), 1, 1, desc_S, eps.data(),
+                                       V_sca.access_local_buf(), 1, 1, desc_V);
         }
 
         Tensor<TensorType>::deallocate(S_BC);
@@ -815,7 +794,7 @@ void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syst
       if(rank == 0) {
         Matrix Vp = V;
 
-        for(size_t j = 0; j < ndf; ++j) {
+        for(int j = 0; j < ndf; ++j) {
           double tmp = 1.0 / sqrt(eps(j));
           blas::scal(ndf, tmp, Vp.data() + j * ndf, 1);
         }

@@ -3,7 +3,7 @@ import math as m
 from argparse import ArgumentParser
 from argparse import ArgumentDefaultsHelpFormatter
 
-#python3 ccsd_t_scaling.py -oi 146 -vi 1568 -ki 1882 -ti 36 -oj 498 -vj 2120 -kj 4500
+#python3 ccsd_scaling.py -oi 146 -vi 1568 -ki 1882 -ti 36 -oj 498 -vj 2120 -kj 4500
 
 def parseargs(argv=None):
 

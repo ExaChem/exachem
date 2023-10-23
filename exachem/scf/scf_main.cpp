@@ -88,8 +88,8 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   libint2::BasisSet shells;
   {
     std::vector<libint2::Shell> bset_vec;
-    for(int i = 0; i < atoms.size(); i++) {
-      const auto        Z = atoms[i].atomic_number;
+    for(size_t i = 0; i < atoms.size(); i++) {
+      // const auto        Z = atoms[i].atomic_number;
       libint2::BasisSet ashells(ec_atoms[i].basis, {atoms[i]});
       bset_vec.insert(bset_vec.end(), ashells.begin(), ashells.end());
     }
@@ -99,6 +99,10 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
   if(is_spherical) shells.set_pure(true);
   else shells.set_pure(false); // use cartesian gaussians
+
+  auto    a2s_map = shells.atom2shell(atoms);
+  int64_t nshells{};
+  for(size_t ai = 0; ai < atoms.size(); ai++) { nshells += a2s_map[ai].size(); }
 
   // parse ECP section of basis file
   if(!scf_options.basisfile.empty()) {
@@ -189,8 +193,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
   sys_data.options_map.options.ec_atoms = ec_atoms;
 
-  const size_t N      = shells.nbf();
-  auto         nnodes = exc.nnodes();
+  const int N = shells.nbf();
 
   sys_data.nbf      = N;
   sys_data.nbf_orig = N;
@@ -265,6 +268,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
   if(rank == 0) {
     std::cout << std::endl << "Number of basis functions = " << N << std::endl;
+    std::cout << std::endl << "Total number of shells = " << nshells << std::endl;
     std::cout << std::endl << "Total number of electrons = " << nelectrons << std::endl;
     std::cout << "  # of alpha electrons    = " << sys_data.nelectrons_alpha << std::endl;
     std::cout << "  # of beta electons      = " << sys_data.nelectrons_beta << std::endl;
@@ -286,6 +290,14 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   scf_vars.tAOt                                      = {AO, scf_vars.AO_tiles};
   std::tie(scf_vars.mu, scf_vars.nu, scf_vars.ku)    = scf_vars.tAO.labels<3>("all");
   std::tie(scf_vars.mup, scf_vars.nup, scf_vars.kup) = scf_vars.tAOt.labels<3>("all");
+
+  scf_vars.tAO_occ_a = TiledIndexSpace{range(0, sys_data.nelectrons_alpha),
+                                       sys_data.options_map.scf_options.AO_tilesize};
+  scf_vars.tAO_occ_b = TiledIndexSpace{range(0, sys_data.nelectrons_beta),
+                                       sys_data.options_map.scf_options.AO_tilesize};
+
+  std::tie(scf_vars.mu_oa, scf_vars.nu_oa) = scf_vars.tAO_occ_a.labels<2>("all");
+  std::tie(scf_vars.mu_ob, scf_vars.nu_ob) = scf_vars.tAO_occ_b.labels<2>("all");
 
   auto mu = scf_vars.mu, nu = scf_vars.nu, ku = scf_vars.ku;
   auto mup = scf_vars.mup, nup = scf_vars.nup, kup = scf_vars.kup;
@@ -356,12 +368,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   const bool scf_conv = restart && scf_options.noscf;
   bool       is_conv  = true;
 
-  scf_restart_test(exc, sys_data, filename, restart, files_prefix);
-
-  std::string movecsfile_alpha  = files_prefix + ".alpha.movecs";
-  std::string densityfile_alpha = files_prefix + ".alpha.density";
-  std::string movecsfile_beta   = files_prefix + ".beta.movecs";
-  std::string densityfile_beta  = files_prefix + ".beta.density";
+  scf_restart_test(exc, sys_data, restart, files_prefix);
 
 #if SCF_THROTTLE_RESOURCES
   if(rank < hf_nranks) {
@@ -539,23 +546,13 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
           ttensors.X_alpha = {scf_vars.tN_bc, scf_vars.tNortho_bc};
           ttensors.X_alpha.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
           Tensor<TensorType>::allocate(&scalapack_info.ec, ttensors.X_alpha);
-          read_from_disk<TensorType>(ttensors.X_alpha, ortho_file);
-          if(is_uhf) {
-            ttensors.X_beta = {scf_vars.tN_bc, scf_vars.tNortho_bc};
-            ttensors.X_beta.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-            Tensor<TensorType>::allocate(&scalapack_info.ec, ttensors.X_beta);
-            Scheduler{scalapack_info.ec}(ttensors.X_beta() = ttensors.X_alpha()).execute();
-            // read_from_disk<TensorType>(ttensors.X_beta,ortho_file);
-          }
+          read_from_disk<TensorType>(ttensors.X_alpha, ortho_file, debug, sca_nnodes);
         }
       }
 #else
     ttensors.X_alpha = {scf_vars.tAO, scf_vars.tAO_ortho};
-    if(is_uhf) ttensors.X_beta = {scf_vars.tAO, scf_vars.tAO_ortho};
     sch.allocate(ttensors.X_alpha).execute();
-    if(is_uhf) sch.allocate(ttensors.X_beta).execute();
-    read_from_disk<TensorType>(ttensors.X_alpha, ortho_file);
-    if(is_uhf) read_from_disk<TensorType>(ttensors.X_beta, ortho_file);
+    read_from_disk<TensorType>(ttensors.X_alpha, ortho_file, debug, ec.nnodes());
 #endif
     }
     else {
@@ -568,9 +565,10 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
       }
       if(N >= restart_size) {
 #if defined(USE_SCALAPACK)
-        if(scacomm != MPI_COMM_NULL) write_to_disk<TensorType>(ttensors.X_alpha, ortho_file);
+        if(scacomm != MPI_COMM_NULL)
+          write_to_disk<TensorType>(ttensors.X_alpha, ortho_file, debug, sca_nnodes);
 #else
-      write_to_disk<TensorType>(ttensors.X_alpha, ortho_file);
+      write_to_disk<TensorType>(ttensors.X_alpha, ortho_file, debug, ec.nnodes());
 #endif
       }
     }
@@ -579,7 +577,14 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     if(scacomm != MPI_COMM_NULL) {
       ttensors.F_BC = {scf_vars.tN_bc, scf_vars.tN_bc};
       ttensors.F_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-      Tensor<TensorType>::allocate(&scalapack_info.ec, ttensors.F_BC);
+      ttensors.C_alpha_BC = {scf_vars.tN_bc, scf_vars.tNortho_bc};
+      ttensors.C_alpha_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
+      Tensor<TensorType>::allocate(&scalapack_info.ec, ttensors.F_BC, ttensors.C_alpha_BC);
+      if(is_uhf) {
+        ttensors.C_beta_BC = {scf_vars.tN_bc, scf_vars.tNortho_bc};
+        ttensors.C_beta_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
+        Tensor<TensorType>::allocate(&scalapack_info.ec, ttensors.C_beta_BC);
+      }
     }
 #endif
 
@@ -594,7 +599,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     std::string schwarz_matfile = files_prefix + ".schwarz";
     Matrix      SchwarzK;
     if(N >= restart_size && fs::exists(schwarz_matfile)) {
-      if(rank == 0) cout << "Read Schwarz matrix from disk... " << endl;
+      if(rank == 0) cout << "Read Schwarz matrix from disk ... " << endl;
       SchwarzK = read_scf_mat<TensorType>(schwarz_matfile);
     }
     else {
@@ -617,11 +622,18 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     ttensors.FD_tamm     = {tAO, tAO};
     ttensors.FDS_tamm    = {tAO, tAO};
 
+    ttensors.C_alpha  = {tAO, scf_vars.tAO_ortho};
+    ttensors.C_occ_a  = {tAO, scf_vars.tAO_occ_a};
+    ttensors.C_occ_aT = {scf_vars.tAO_occ_a, tAO};
+
     // TODO: Enable only for DFT
     ttensors.VXC_alpha = {tAO, tAO};
     ttensors.VXC_beta  = {tAO, tAO};
 
     if(is_uhf) {
+      ttensors.C_beta           = {tAO, scf_vars.tAO_ortho};
+      ttensors.C_occ_b          = {tAO, scf_vars.tAO_occ_b};
+      ttensors.C_occ_bT         = {scf_vars.tAO_occ_b, tAO};
       ttensors.ehf_beta_tmp     = {tAO, tAO};
       ttensors.F_beta           = {tAO, tAO};
       ttensors.D_beta_tamm      = {tAO, tAO};
@@ -635,13 +647,15 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     ec.set_memory_manager_cache(1);
 #endif
 
-    Tensor<TensorType>::allocate(&ec, ttensors.F_alpha, ttensors.D_tamm, ttensors.D_last_tamm,
+    Tensor<TensorType>::allocate(&ec, ttensors.F_alpha, ttensors.C_alpha, ttensors.C_occ_a,
+                                 ttensors.C_occ_aT, ttensors.D_tamm, ttensors.D_last_tamm,
                                  ttensors.D_diff, ttensors.F_alpha_tmp, ttensors.ehf_tmp,
                                  ttensors.ehf_tamm, ttensors.FD_tamm, ttensors.FDS_tamm);
     if(is_uhf)
       Tensor<TensorType>::allocate(
-        &ec, ttensors.F_beta, ttensors.D_beta_tamm, ttensors.D_last_beta_tamm, ttensors.F_beta_tmp,
-        ttensors.ehf_beta_tmp, ttensors.FD_beta_tamm, ttensors.FDS_beta_tamm);
+        &ec, ttensors.F_beta, ttensors.C_beta, ttensors.C_occ_b, ttensors.C_occ_bT,
+        ttensors.D_beta_tamm, ttensors.D_last_beta_tamm, ttensors.F_beta_tmp, ttensors.ehf_beta_tmp,
+        ttensors.FD_beta_tamm, ttensors.FDS_beta_tamm);
 
     if(is_ks) Tensor<TensorType>::allocate(&ec, ttensors.VXC_alpha);
     if(is_ks && is_uhf) Tensor<TensorType>::allocate(&ec, ttensors.VXC_beta);
@@ -655,11 +669,10 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     auto                     shell2bf   = obs.shell2bf();
 
     if(restart) {
-      scf_restart(ec, sys_data, filename, etensors, files_prefix);
-      if(rank == 0) {
-        eigen_to_tamm_tensor(ttensors.X_alpha, etensors.C);                // Xa = Ca;
-        if(is_uhf) eigen_to_tamm_tensor(ttensors.X_beta, etensors.C_beta); // Xb = Cb;
-      }
+      scf_restart(ec, scalapack_info, sys_data, ttensors, etensors, files_prefix);
+      tamm_to_eigen_tensor(ttensors.D_tamm, etensors.D);
+      if(is_uhf) { tamm_to_eigen_tensor(ttensors.D_beta_tamm, etensors.D_beta); }
+      ec.pg().barrier();
     }
     else if(molden_exists) {
       auto N      = sys_data.nbf_orig;
@@ -675,24 +688,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
         }
       }
 
-      // compute density
-      if(rank == 0) {
-        if(is_rhf) {
-          auto C_occ = etensors.C.leftCols(sys_data.nelectrons_alpha);
-          etensors.D = 2.0 * C_occ * C_occ.transpose();
-        }
-        else if(is_uhf) {
-          auto C_occ      = etensors.C.leftCols(sys_data.nelectrons_alpha);
-          etensors.D      = C_occ * C_occ.transpose();
-          C_occ           = etensors.C_beta.leftCols(sys_data.nelectrons_beta);
-          etensors.D_beta = C_occ * C_occ.transpose();
-        }
-      }
-
-      if(rank == 0) {
-        eigen_to_tamm_tensor(ttensors.X_alpha, etensors.C);                // Xa = Ca;
-        if(is_uhf) eigen_to_tamm_tensor(ttensors.X_beta, etensors.C_beta); // Xb = Cb;
-      }
+      compute_density<TensorType>(ec, sys_data, scf_vars, scalapack_info, ttensors, etensors);
 
       ec.pg().barrier();
     }
@@ -745,22 +741,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
         scf_diagonalize<TensorType>(sch, sys_data, scalapack_info, ttensors, etensors);
 
-        Matrix& C_alpha = etensors.C;
-        Matrix& C_occ   = etensors.C_occ;
-        // compute density
-        if(rank == 0) {
-          if(is_rhf) {
-            C_occ      = C_alpha.leftCols(sys_data.nelectrons_alpha);
-            etensors.D = 2.0 * C_occ * C_occ.transpose();
-            // eigen_to_tamm_tensor(ttensors.X_alpha, C_alpha);
-          }
-          else if(is_uhf) {
-            C_occ           = C_alpha.leftCols(sys_data.nelectrons_alpha);
-            etensors.D      = C_occ * C_occ.transpose();
-            C_occ           = etensors.C_beta.leftCols(sys_data.nelectrons_beta);
-            etensors.D_beta = C_occ * C_occ.transpose();
-          }
-        }
+        compute_density<TensorType>(ec, sys_data, scf_vars, scalapack_info, ttensors, etensors);
       }
       else {
         compute_initial_guess<TensorType>(ec, scalapack_info, sys_data, scf_vars, atoms, shells,
@@ -769,14 +750,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
       } // initial guess
 
       etensors.taskmap.resize(0, 0);
-      if(rank == 0) {
-        write_scf_mat<TensorType>(etensors.C, movecsfile_alpha);
-        write_scf_mat<TensorType>(etensors.D, densityfile_alpha);
-        if(is_uhf) {
-          write_scf_mat<TensorType>(etensors.C_beta, movecsfile_beta);
-          write_scf_mat<TensorType>(etensors.D_beta, densityfile_beta);
-        }
-      }
+      rw_md_disk(ec, scalapack_info, sys_data, ttensors, etensors, files_prefix);
       ec.pg().barrier();
     }
 
@@ -791,14 +765,6 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     /*** =========================== ***/
     double rmsd  = 1.0;
     double ediff = 0.0;
-
-    if(rank == 0) {
-      eigen_to_tamm_tensor(ttensors.D_tamm, etensors.D);
-      if(is_uhf) { eigen_to_tamm_tensor(ttensors.D_beta_tamm, etensors.D_beta); }
-    }
-
-    ec.pg().broadcast(etensors.D.data(), etensors.D.size(), 0);
-    if(is_uhf) ec.pg().broadcast(etensors.D_beta.data(), etensors.D_beta.size(), 0);
 
     if(rank == 0 && scf_options.debug && N < restart_size) {
       Matrix S(sys_data.nbf_orig, sys_data.nbf_orig);
@@ -977,13 +943,8 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
       // if(rank==0) cout << "D at the end of iteration: " << endl << std::setprecision(6) <<
       // etensors.D << endl;
-      if(rank == 0 && (scf_options.writem % iter == 0 || scf_options.writem == 1)) {
-        write_scf_mat<TensorType>(etensors.C, movecsfile_alpha);
-        write_scf_mat<TensorType>(etensors.D, densityfile_alpha);
-        if(is_uhf) {
-          write_scf_mat<TensorType>(etensors.C_beta, movecsfile_beta);
-          write_scf_mat<TensorType>(etensors.D_beta, densityfile_beta);
-        }
+      if(scf_options.writem % iter == 0 || scf_options.writem == 1) {
+        rw_md_disk(ec, scalapack_info, sys_data, ttensors, etensors, files_prefix);
       }
 
       if(iter >= maxiter) {
@@ -993,7 +954,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
       if(scf_conv) break;
 
-      if(debug) print_energies(ec, ttensors, etensors, sys_data, scf_vars, debug);
+      if(debug) print_energies(ec, ttensors, etensors, sys_data, scf_vars, scalapack_info, debug);
 
     } while((fabs(ediff) > conve) || (fabs(rmsd) > convd)); // SCF main loop
 
@@ -1032,17 +993,12 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     if(rank == 0)
       std::cout << std::endl
                 << "Nuclear repulsion energy = " << std::setprecision(15) << enuc << endl;
-    print_energies(ec, ttensors, etensors, sys_data, scf_vars);
+    print_energies(ec, ttensors, etensors, sys_data, scf_vars, scalapack_info);
 
-    if(rank == 0 && !scf_conv) {
-      cout << "writing orbitals and density to file... ";
-      write_scf_mat<TensorType>(etensors.C, movecsfile_alpha);
-      write_scf_mat<TensorType>(etensors.D, densityfile_alpha);
-      if(is_uhf) {
-        write_scf_mat<TensorType>(etensors.C_beta, movecsfile_beta);
-        write_scf_mat<TensorType>(etensors.D_beta, densityfile_beta);
-      }
-      cout << "done." << endl;
+    if(!scf_conv) {
+      if(rank == 0) cout << "writing orbitals and density to disk ... ";
+      rw_md_disk(ec, scalapack_info, sys_data, ttensors, etensors, files_prefix);
+      if(rank == 0) cout << "done." << endl;
     }
 
     if(rank == 0 && scf_options.mulliken_analysis && is_conv) {
@@ -1056,25 +1012,27 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
     if(do_density_fitting) Tensor<TensorType>::deallocate(ttensors.xyK_tamm, ttensors.C_occ_tamm);
 
-    write_to_disk<TensorType>(ttensors.H1, files_prefix + ".hcore");
+    write_to_disk<TensorType>(ttensors.H1, files_prefix + ".hcore", debug, ec.nnodes());
 
-    Tensor<TensorType>::deallocate(ttensors.H1, ttensors.S1, ttensors.T1, ttensors.V1,
-                                   ttensors.F_alpha_tmp, ttensors.ehf_tmp, ttensors.ehf_tamm,
-                                   ttensors.F_alpha, ttensors.D_tamm, ttensors.D_diff,
-                                   ttensors.D_last_tamm, ttensors.FD_tamm, ttensors.FDS_tamm);
+    Tensor<TensorType>::deallocate(
+      ttensors.H1, ttensors.S1, ttensors.T1, ttensors.V1, ttensors.F_alpha_tmp, ttensors.ehf_tmp,
+      ttensors.ehf_tamm, ttensors.F_alpha, ttensors.C_alpha, ttensors.C_occ_a, ttensors.C_occ_aT,
+      ttensors.D_tamm, ttensors.D_diff, ttensors.D_last_tamm, ttensors.FD_tamm, ttensors.FDS_tamm);
 
     if(is_uhf)
       Tensor<TensorType>::deallocate(
-        ttensors.F_beta, ttensors.D_beta_tamm, ttensors.D_last_beta_tamm, ttensors.F_beta_tmp,
-        ttensors.ehf_beta_tmp, ttensors.FD_beta_tamm, ttensors.FDS_beta_tamm);
+        ttensors.F_beta, ttensors.C_beta, ttensors.C_occ_b, ttensors.C_occ_bT, ttensors.D_beta_tamm,
+        ttensors.D_last_beta_tamm, ttensors.F_beta_tmp, ttensors.ehf_beta_tmp,
+        ttensors.FD_beta_tamm, ttensors.FDS_beta_tamm);
 
     if(is_ks) {
-      if(rank == 0) etensors.VXC_alpha = tamm_to_eigen_matrix(ttensors.VXC_alpha);
+      write_to_disk<TensorType>(ttensors.VXC_alpha, files_prefix + ".vxc_alpha", debug,
+                                ec.nnodes());
+      if(is_uhf)
+        write_to_disk<TensorType>(ttensors.VXC_beta, files_prefix + ".vxc_beta", debug,
+                                  ec.nnodes());
       Tensor<TensorType>::deallocate(ttensors.VXC_alpha);
-      if(is_uhf) {
-        if(rank == 0) etensors.VXC_beta = tamm_to_eigen_matrix(ttensors.VXC_beta);
-        Tensor<TensorType>::deallocate(ttensors.VXC_beta);
-      }
+      if(is_uhf) Tensor<TensorType>::deallocate(ttensors.VXC_beta);
     }
 
 #if SCF_THROTTLE_RESOURCES
@@ -1086,17 +1044,16 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     abort(); // Not supported currently in UPC++
 #endif
     if(scalapack_info.comm != MPI_COMM_NULL) {
-      Tensor<TensorType>::deallocate(ttensors.F_BC, ttensors.X_alpha);
-      if(is_uhf) Tensor<TensorType>::deallocate(ttensors.X_beta);
+      Tensor<TensorType>::deallocate(ttensors.F_BC, ttensors.X_alpha, ttensors.C_alpha_BC);
+      if(is_uhf) Tensor<TensorType>::deallocate(ttensors.C_beta_BC);
       scalapack_info.ec.flush_and_sync();
     }
-// Free up created comms / groups
+// Free created comms / groups
 // MPI_Comm_free( &scalapack_comm );
 // MPI_Group_free( &scalapack_group );
 // MPI_Group_free( &world_group );
 #else
   sch.deallocate(ttensors.X_alpha);
-  if(is_uhf) sch.deallocate(ttensors.X_beta);
   sch.execute();
 #endif
 
@@ -1161,21 +1118,10 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   exc.set_memory_manager_cache(); // resets cache to pg.size().value();
 #endif
 
-  if(rank == 0) {
-    eigen_to_tamm_tensor(C_alpha_tamm, etensors.C);
-    if(is_uhf) eigen_to_tamm_tensor(C_beta_tamm, etensors.C_beta);
-    if(is_ks) {
-      eigen_to_tamm_tensor(ttensors.VXC_alpha, etensors.VXC_alpha);
-      if(is_uhf) eigen_to_tamm_tensor(ttensors.VXC_beta, etensors.VXC_beta);
-    }
-  }
-  if(is_ks) {
-    write_to_disk<TensorType>(ttensors.VXC_alpha, files_prefix + ".vxc_alpha");
-    if(is_uhf) write_to_disk<TensorType>(ttensors.VXC_beta, files_prefix + ".vxc_beta");
-    schg.deallocate(ttensors.VXC_alpha);
-    if(is_uhf) schg.deallocate(ttensors.VXC_beta);
-    schg.execute();
-  }
+  std::string movecsfile_alpha = files_prefix + ".alpha.movecs";
+  std::string movecsfile_beta  = files_prefix + ".beta.movecs";
+  read_from_disk<TensorType>(C_alpha_tamm, movecsfile_alpha, debug, exc.nnodes());
+  if(is_uhf) read_from_disk<TensorType>(C_beta_tamm, movecsfile_beta, debug, exc.nnodes());
 
   exc.pg().barrier();
 

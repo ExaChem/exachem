@@ -115,7 +115,7 @@ def parse_nwchem_input(input_file):
   scf_opt["diis_hist"] = 10
   scf_opt["multiplicity"] = 1
   scf_opt["lshift"] = 0
-  scf_opt["alpha"] = 1.0
+  scf_opt["damp"] = 100
   scf_opt["type"] = "restricted"
   scf_opt["maxiter"] = 50
   scf_opt["PRINT"]["mulliken"] = False
@@ -133,7 +133,7 @@ def parse_nwchem_input(input_file):
   dft_opt["diis_hist"] = 10
   dft_opt["multiplicity"] = 1
   dft_opt["lshift"] = 0
-  dft_opt["alpha"] = 1.0
+  dft_opt["damp"] = 100
   dft_opt["type"] = "restricted"
   dft_opt["maxiter"] = 50
   dft_opt["PRINT"]["mulliken"] = False
@@ -270,7 +270,7 @@ def parse_nwchem_input(input_file):
           continue
         if line.startswith("xc") and "hfexch" in line: dft_opt["hfexch"] = True
         if 'convergence' in line:
-          if 'damp' in line: dft_opt["alpha"]    = float(100-int(get_next_word(line,"damp")))/100
+          if 'damp' in line: dft_opt["damp"]    = 100-int(get_next_word(line,"damp"))
           if 'lshift' in line: dft_opt["lshift"]  = float(get_next_word(line,"lshift"))
 
           if 'energy' in line:
@@ -453,7 +453,7 @@ if __name__ == '__main__':
   ec_scf["tol_lindep"] = scf_opt["tol_lindep"]
   ec_scf["conve"] = scf_opt["conve"]
   ec_scf["convd"] = scf_opt["convd"]
-  ec_scf["alpha"] = scf_opt["alpha"]
+  ec_scf["damp"] = scf_opt["damp"]
   ec_scf["scf_type"] = scf_opt["type"]
   ec_scf["diis_hist"] = scf_opt["diis_hist"]
   exachem_opt["common"]["maxiter"] = scf_opt["maxiter"]
@@ -471,7 +471,7 @@ if __name__ == '__main__':
     ec_scf["tol_lindep"] = dft_opt["tol_lindep"]
     ec_scf["conve"] = dft_opt["conve"]
     ec_scf["convd"] = dft_opt["convd"]
-    ec_scf["alpha"] = dft_opt["alpha"]
+    ec_scf["damp"] = dft_opt["damp"]
     ec_scf["scf_type"] = dft_opt["type"]
     ec_scf["diis_hist"] = dft_opt["diis_hist"]
     exachem_opt["common"]["maxiter"] = dft_opt["maxiter"]

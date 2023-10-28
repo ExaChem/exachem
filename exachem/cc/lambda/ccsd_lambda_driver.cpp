@@ -258,7 +258,7 @@ void ccsd_lambda_driver(std::string filename, OptionsMap options_map) {
     .execute();
 
   std::string densityfile_alpha = files_dir + "/scf/" + out_fp + ".alpha.density";
-  read_from_disk<T>(dens, densityfile_alpha);
+  rw_mat_disk<T>(dens, densityfile_alpha, debug, true); // read density
 
   // compute electronic dipole moments
   sch(dipole_mx() = dens() * DipX_ao())(dipole_my() = dens() * DipY_ao())(dipole_mz() =

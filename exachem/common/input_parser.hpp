@@ -146,7 +146,7 @@ public:
     damp             = 100;
     nnodes           = 1;
     writem           = 1;
-    scalapack_nb     = 64;
+    scalapack_nb     = 256;
     scalapack_np_row = 0;
     scalapack_np_col = 0;
     qed_omegas       = {};

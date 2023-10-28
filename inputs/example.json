@@ -55,7 +55,7 @@
         "xc_grid_type": "UltraFine",
         "debug": false,
         "restart_size": 2000,
-        "scalapack_nb": 64,
+        "scalapack_nb": 256,
         "scalapack_np_row": 0,
         "scalapack_np_col": 0,
         "n_lindep": 0,

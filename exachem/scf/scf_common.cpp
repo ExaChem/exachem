@@ -376,7 +376,7 @@ void compute_density(ExecutionContext& ec, const SystemData& sys_data, const SCF
   auto do_t1 = std::chrono::high_resolution_clock::now();
 
   using T         = TensorType;
-  Matrix& D_alpha = etensors.D;
+  Matrix& D_alpha = etensors.D_alpha;
   auto    rank    = ec.pg().rank();
 
   Scheduler sch{ec};
@@ -398,7 +398,7 @@ void compute_density(ExecutionContext& ec, const SystemData& sys_data, const SCF
     }
   }
 #else
-  Matrix& C_alpha = etensors.C;
+  Matrix& C_alpha = etensors.C_alpha;
   Matrix& C_beta  = etensors.C_beta;
   if(rank == 0) {
     Matrix& C_occ = etensors.C_occ;
@@ -417,22 +417,24 @@ void compute_density(ExecutionContext& ec, const SystemData& sys_data, const SCF
 
   const T dfac = (is_uhf) ? 1.0 : 2.0;
   sch(ttensors.C_occ_aT(mu_oa, mu) = ttensors.C_occ_a(mu, mu_oa))(
-    ttensors.D_tamm(mu, nu) = dfac * ttensors.C_occ_a(mu, mu_oa) * ttensors.C_occ_aT(mu_oa, nu));
+    ttensors.D_alpha(mu, nu) = dfac * ttensors.C_occ_a(mu, mu_oa) * ttensors.C_occ_aT(mu_oa, nu));
   if(is_uhf) {
     sch(ttensors.C_occ_bT(mu_ob, mu) = ttensors.C_occ_b(mu, mu_ob))(
-      ttensors.D_beta_tamm(mu, nu) = ttensors.C_occ_b(mu, mu_ob) * ttensors.C_occ_bT(mu_ob, nu));
+      ttensors.D_beta(mu, nu) = ttensors.C_occ_b(mu, mu_ob) * ttensors.C_occ_bT(mu_ob, nu));
   }
   sch.execute();
 
   // compute D in eigen for subsequent fock build
   {
-    // Matrix& C_occ_a = etensors.G;
+    // Matrix& C_occ_a = etensors.G_alpha;
     // Matrix& C_occ_b = etensors.G_beta;
     // C_occ_a.resize(sys_data.nbf_orig, sys_data.nelectrons_alpha);
     // if(is_uhf) C_occ_b.resize(sys_data.nbf_orig, sys_data.nelectrons_beta);
 
-    tamm_to_eigen_tensor(ttensors.D_tamm, D_alpha);
-    if(is_uhf) tamm_to_eigen_tensor(ttensors.D_beta_tamm, etensors.D_beta);
+    if(!scf_vars.do_dens_fit) {
+      tamm_to_eigen_tensor(ttensors.D_alpha, D_alpha);
+      if(is_uhf) tamm_to_eigen_tensor(ttensors.D_beta, etensors.D_beta);
+    }
 
     // D_alpha = dfac * C_occ_a * C_occ_a.transpose();
     // if(is_uhf) etensors.D_beta = C_occ_b * C_occ_b.transpose();
@@ -473,12 +475,37 @@ void scf_restart_test(const ExecutionContext& ec, const SystemData& sys_data, bo
   if(rstatus == 0) tamm_terminate("Error reading one or all of the files: [" + fnf + "]");
 }
 
+template<typename T>
+void rw_mat_disk(Tensor<T> tensor, std::string tfilename, bool profile, bool read) {
+#if !defined(USE_UPCXX)
+  if(read) read_from_disk<T>(tensor, tfilename, true, {}, profile);
+  else write_to_disk<T>(tensor, tfilename, true, profile);
+#else
+  if((tensor.execution_context())->pg().rank() == 0) {
+    if(read) {
+      Matrix teig = read_scf_mat<T>(tfilename);
+      eigen_to_tamm_tensor(tensor, teig);
+    }
+    else {
+      Matrix teig = tamm_to_eigen_matrix(tensor);
+      write_scf_mat<T>(teig, tfilename);
+    }
+  }
+  tensor.execution_context()->pg().barrier();
+#endif
+}
+
 void rw_md_disk(ExecutionContext& ec, ScalapackInfo& scalapack_info, const SystemData& sys_data,
                 TAMMTensors& ttensors, EigenTensors& etensors, std::string files_prefix,
                 bool read) {
   const auto rank   = ec.pg().rank();
   const bool is_uhf = sys_data.is_unrestricted;
   auto       debug  = sys_data.options_map.scf_options.debug;
+
+  std::string movecsfile_alpha  = files_prefix + ".alpha.movecs";
+  std::string densityfile_alpha = files_prefix + ".alpha.density";
+  std::string movecsfile_beta   = files_prefix + ".beta.movecs";
+  std::string densityfile_beta  = files_prefix + ".beta.density";
 
   if(!read) {
 #if defined(USE_SCALAPACK)
@@ -488,31 +515,48 @@ void rw_md_disk(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syste
     }
 #else
     if(rank == 0) {
-      eigen_to_tamm_tensor(ttensors.C_alpha, etensors.C);
+      eigen_to_tamm_tensor(ttensors.C_alpha, etensors.C_alpha);
       if(is_uhf) eigen_to_tamm_tensor(ttensors.C_beta, etensors.C_beta);
     }
 #endif
     ec.pg().barrier();
   }
 
-  std::string movecsfile_alpha  = files_prefix + ".alpha.movecs";
-  std::string densityfile_alpha = files_prefix + ".alpha.density";
-  std::string movecsfile_beta   = files_prefix + ".beta.movecs";
-  std::string densityfile_beta  = files_prefix + ".beta.density";
-
-  std::vector<Tensor<TensorType>> tensor_list{ttensors.C_alpha, ttensors.D_tamm};
+  std::vector<Tensor<TensorType>> tensor_list{ttensors.C_alpha, ttensors.D_alpha};
   std::vector<std::string>        tensor_fnames{movecsfile_alpha, densityfile_alpha};
   if(sys_data.is_unrestricted) {
-    tensor_list.insert(tensor_list.end(), {ttensors.C_beta, ttensors.D_beta_tamm});
+    tensor_list.insert(tensor_list.end(), {ttensors.C_beta, ttensors.D_beta});
     tensor_fnames.insert(tensor_fnames.end(), {movecsfile_beta, densityfile_beta});
   }
 
+#if !defined(USE_UPCXX)
   if(read) {
     if(rank == 0) cout << "Reading movecs and density files from disk ... ";
-    read_from_disk_group(ec, tensor_list, tensor_fnames, debug, ec.nnodes());
+    read_from_disk_group(ec, tensor_list, tensor_fnames, debug);
     if(rank == 0) cout << "done" << endl;
   }
-  else write_to_disk_group(ec, tensor_list, tensor_fnames, debug, ec.nnodes());
+  else write_to_disk_group(ec, tensor_list, tensor_fnames, debug);
+
+#else
+  if(read) {
+    if(rank == 0) cout << "Reading movecs and density files from disk ... ";
+    rw_mat_disk(ttensors.C_alpha, movecsfile_alpha, debug, true);
+    rw_mat_disk(ttensors.D_alpha, densityfile_alpha, debug, true);
+    if(is_uhf) {
+      rw_mat_disk(ttensors.C_beta, movecsfile_beta, debug, true);
+      rw_mat_disk(ttensors.D_beta, densityfile_beta, debug, true);
+    }
+    if(rank == 0) cout << "done" << endl;
+  }
+  else {
+    rw_mat_disk(ttensors.C_alpha, movecsfile_alpha, debug);
+    rw_mat_disk(ttensors.D_alpha, densityfile_alpha, debug);
+    if(is_uhf) {
+      rw_mat_disk(ttensors.C_beta, movecsfile_beta, debug);
+      rw_mat_disk(ttensors.D_beta, densityfile_beta, debug);
+    }
+  }
+#endif
 }
 
 void scf_restart(ExecutionContext& ec, ScalapackInfo& scalapack_info, const SystemData& sys_data,
@@ -551,25 +595,25 @@ void print_energies(ExecutionContext& ec, TAMMTensors& ttensors, EigenTensors& e
   double energy_2e  = 0.0;
 
   if(is_rhf) {
-    nelectrons = tt_trace(ec, ttensors.D_tamm, ttensors.S1);
-    kinetic_1e = tt_trace(ec, ttensors.D_tamm, ttensors.T1);
-    NE_1e      = tt_trace(ec, ttensors.D_tamm, ttensors.V1);
-    energy_1e  = tt_trace(ec, ttensors.D_tamm, ttensors.H1);
-    energy_2e  = 0.5 * tt_trace(ec, ttensors.D_tamm, ttensors.F_alpha_tmp);
+    nelectrons = tt_trace(ec, ttensors.D_alpha, ttensors.S1);
+    kinetic_1e = tt_trace(ec, ttensors.D_alpha, ttensors.T1);
+    NE_1e      = tt_trace(ec, ttensors.D_alpha, ttensors.V1);
+    energy_1e  = tt_trace(ec, ttensors.D_alpha, ttensors.H1);
+    energy_2e  = 0.5 * tt_trace(ec, ttensors.D_alpha, ttensors.F_alpha_tmp);
 
     if(is_ks) { energy_2e += scf_vars.exc; }
   }
   if(is_uhf) {
-    nelectrons = tt_trace(ec, ttensors.D_tamm, ttensors.S1);
-    kinetic_1e = tt_trace(ec, ttensors.D_tamm, ttensors.T1);
-    NE_1e      = tt_trace(ec, ttensors.D_tamm, ttensors.V1);
-    energy_1e  = tt_trace(ec, ttensors.D_tamm, ttensors.H1);
-    energy_2e  = 0.5 * tt_trace(ec, ttensors.D_tamm, ttensors.F_alpha_tmp);
-    nelectrons += tt_trace(ec, ttensors.D_beta_tamm, ttensors.S1);
-    kinetic_1e += tt_trace(ec, ttensors.D_beta_tamm, ttensors.T1);
-    NE_1e += tt_trace(ec, ttensors.D_beta_tamm, ttensors.V1);
-    energy_1e += tt_trace(ec, ttensors.D_beta_tamm, ttensors.H1);
-    energy_2e += 0.5 * tt_trace(ec, ttensors.D_beta_tamm, ttensors.F_beta_tmp);
+    nelectrons = tt_trace(ec, ttensors.D_alpha, ttensors.S1);
+    kinetic_1e = tt_trace(ec, ttensors.D_alpha, ttensors.T1);
+    NE_1e      = tt_trace(ec, ttensors.D_alpha, ttensors.V1);
+    energy_1e  = tt_trace(ec, ttensors.D_alpha, ttensors.H1);
+    energy_2e  = 0.5 * tt_trace(ec, ttensors.D_alpha, ttensors.F_alpha_tmp);
+    nelectrons += tt_trace(ec, ttensors.D_beta, ttensors.S1);
+    kinetic_1e += tt_trace(ec, ttensors.D_beta, ttensors.T1);
+    NE_1e += tt_trace(ec, ttensors.D_beta, ttensors.V1);
+    energy_1e += tt_trace(ec, ttensors.D_beta, ttensors.H1);
+    energy_2e += 0.5 * tt_trace(ec, ttensors.D_beta, ttensors.F_beta_tmp);
     if(is_ks) { energy_2e += scf_vars.exc; }
   }
 
@@ -693,11 +737,12 @@ std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, SystemData& 
 
   if(world_size > 1) {
     // TODO: Should buffer this
-    ec.pg().broadcast(&n_cond, 0);
+    // ec.pg().broadcast(&n_cond, 0);
     ec.pg().broadcast(&n_illcond, 0);
     // ec.pg().broadcast( &condition_number,        0 );
-    ec.pg().broadcast(&result_condition_number, 0);
+    // ec.pg().broadcast(&result_condition_number, 0);
   }
+  n_cond = N - n_illcond;
 
 #if defined(USE_SCALAPACK)
   if(scalapack_info.comm != MPI_COMM_NULL) {
@@ -1219,16 +1264,16 @@ TensorType gauxc_util::compute_xcf(ExecutionContext& ec, const SystemData& sys_d
   auto       rank0  = ec.pg().rank() == 0;
 
   double  EXC{};
-  Matrix& vxc_alpha = etensors.G;
+  Matrix& vxc_alpha = etensors.G_alpha;
   Matrix& vxc_beta  = etensors.G_beta;
 
   if(is_rhf) {
-    std::tie(EXC, vxc_alpha) = xc_integrator.eval_exc_vxc(0.5 * etensors.D);
+    std::tie(EXC, vxc_alpha) = xc_integrator.eval_exc_vxc(0.5 * etensors.D_alpha);
     if(rank0) eigen_to_tamm_tensor(ttensors.VXC_alpha, vxc_alpha);
   }
   else if(is_uhf) {
     std::tie(EXC, vxc_alpha, vxc_beta) = xc_integrator.eval_exc_vxc(
-      0.5 * (etensors.D + etensors.D_beta), 0.5 * (etensors.D - etensors.D_beta));
+      (etensors.D_alpha + etensors.D_beta), (etensors.D_alpha - etensors.D_beta));
     if(rank0) {
       eigen_to_tamm_tensor(ttensors.VXC_alpha, vxc_alpha);
       eigen_to_tamm_tensor(ttensors.VXC_beta, vxc_beta);
@@ -1362,6 +1407,9 @@ gensqrtinv_atscf(ExecutionContext& ec, SystemData& sys_data, SCFVars& scf_vars,
 template Matrix read_scf_mat<double>(std::string matfile);
 
 template void write_scf_mat<double>(Matrix& C, std::string matfile);
+
+template void rw_mat_disk<double>(Tensor<double> tensor, std::string tfilename, bool profile,
+                                  bool read);
 
 template std::vector<size_t> sort_indexes<double>(std::vector<double>& v);
 

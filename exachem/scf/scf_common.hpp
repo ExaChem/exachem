@@ -44,6 +44,7 @@ struct SCFVars {
   bool                     switch_diis = false;
   double                   exc         = 0.0;
   double                   eqed        = 0.0;
+  bool                     do_dens_fit = false;
   libecpint::ECPIntegrator ecp_factory;
 
   // AO spaces
@@ -94,11 +95,12 @@ struct SCFVars {
 };
 
 struct EigenTensors {
-  Matrix C, C_beta, C_occ;    // allocated only on rank 0
-  Matrix VXC_alpha, VXC_beta; // allocated only on rank 0 when DFT is enabled
-  Matrix G, D;
-  Matrix G_beta, D_beta;
-  Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> taskmap;
+  Matrix C_alpha, C_beta, C_occ; // allocated only on rank 0 when scalapack is not used
+  Matrix VXC_alpha, VXC_beta;    // allocated only on rank 0 when DFT is enabled
+  Matrix G_alpha, D_alpha;       // allocated on all ranks for 4c HF, only on rank 0 otherwise.
+  Matrix G_beta, D_beta; // allocated on all ranks for 4c HF, only D_beta on rank 0 otherwise.
+  Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+    taskmap; // on all ranks for 4c HF only
 };
 
 struct TAMMTensors {
@@ -142,21 +144,20 @@ struct TAMMTensors {
   Tensor<TensorType> C_alpha_BC;
   Tensor<TensorType> C_beta_BC;
 
-  Tensor<TensorType> D_tamm;
-  Tensor<TensorType> D_beta_tamm;
+  Tensor<TensorType> D_alpha;
+  Tensor<TensorType> D_beta;
   Tensor<TensorType> D_diff;
-  Tensor<TensorType> D_last_tamm;
-  Tensor<TensorType> D_last_beta_tamm;
+  Tensor<TensorType> D_last_alpha;
+  Tensor<TensorType> D_last_beta;
 
-  Tensor<TensorType> FD_tamm;
-  Tensor<TensorType> FDS_tamm;
-  Tensor<TensorType> FD_beta_tamm;
-  Tensor<TensorType> FDS_beta_tamm;
+  Tensor<TensorType> FD_alpha;
+  Tensor<TensorType> FDS_alpha;
+  Tensor<TensorType> FD_beta;
+  Tensor<TensorType> FDS_beta;
 
   // DF
-  Tensor<TensorType> xyK_tamm;   // n,n,ndf
-  Tensor<TensorType> C_occ_tamm; // n,nocc
-  Tensor<TensorType> Zxy_tamm;   // ndf,n,n
+  Tensor<TensorType> xyK; // n,n,ndf
+  Tensor<TensorType> Zxy; // ndf,n,n
 };
 
 // DENSITY FITTING
@@ -300,6 +301,9 @@ void scf_restart(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syst
 void rw_md_disk(ExecutionContext& ec, ScalapackInfo& scalapack_info, const SystemData& sys_data,
                 TAMMTensors& ttensors, EigenTensors& etensors, std::string files_prefix,
                 bool read = false);
+
+template<typename T>
+void rw_mat_disk(Tensor<T> tensor, std::string tfilename, bool profile, bool read = false);
 
 template<typename TensorType>
 double tt_trace(ExecutionContext& ec, Tensor<TensorType>& T1, Tensor<TensorType>& T2);

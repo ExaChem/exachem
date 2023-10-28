@@ -30,10 +30,17 @@ void compute_sad_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info, Syst
   */
 
   const auto rank = ec.pg().rank();
-  // size_t     nao  = shells_tot.nbf();
+  size_t     N    = shells_tot.nbf();
 
-  Matrix& D_tot_a = etensors.D;
-  Matrix& D_tot_b = etensors.G;
+  // D,G,D_b are only allocated on rank 0 for SAD when DF-HF is enabled
+  if(scf_vars.do_dens_fit && rank == 0) {
+    etensors.D_alpha = Matrix::Zero(N, N);
+    etensors.G_alpha = Matrix::Zero(N, N);
+    if(is_uhf) etensors.D_beta = Matrix::Zero(N, N);
+  }
+
+  Matrix& D_tot_a = etensors.D_alpha;
+  Matrix& D_tot_b = etensors.G_alpha;
 
   // Get atomic occupations
   auto occs = compute_soad(atoms);
@@ -655,8 +662,8 @@ void compute_sad_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info, Syst
 
   // One-shot refinement
   if(rank == 0) {
-    // D_tot_a -> etensors.D
-    if(is_rhf) { etensors.D += D_tot_b; }
+    // D_tot_a -> etensors.D_alpha
+    if(is_rhf) { etensors.D_alpha += D_tot_b; }
 
     if(is_uhf) etensors.D_beta = D_tot_b;
 
@@ -664,17 +671,24 @@ void compute_sad_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info, Syst
   }
 
   if(rank == 0) {
-    eigen_to_tamm_tensor(ttensors.D_tamm, etensors.D);
-    if(is_uhf) { eigen_to_tamm_tensor(ttensors.D_beta_tamm, etensors.D_beta); }
-  }
-  ec.pg().barrier();
-  if(rank != 0) {
-    tamm_to_eigen_tensor(ttensors.D_tamm, etensors.D);
-    if(is_uhf) { tamm_to_eigen_tensor(ttensors.D_beta_tamm, etensors.D_beta); }
+    eigen_to_tamm_tensor(ttensors.D_alpha, etensors.D_alpha);
+    if(is_uhf) { eigen_to_tamm_tensor(ttensors.D_beta, etensors.D_beta); }
   }
   ec.pg().barrier();
 
-  // if(rank==0) cout << "in sad_guess, D_tot: " << endl << D_a << endl;
+  if(scf_vars.do_dens_fit && rank == 0) {
+    etensors.D_alpha.resize(0, 0);
+    etensors.G_alpha.resize(0, 0);
+    if(is_uhf) etensors.D_beta.resize(0, 0);
+  }
+
+  // needed only for 4c HF
+  if(rank != 0 && !scf_vars.do_dens_fit) {
+    tamm_to_eigen_tensor(ttensors.D_alpha, etensors.D_alpha);
+    if(is_uhf) { tamm_to_eigen_tensor(ttensors.D_beta, etensors.D_beta); }
+  }
+
+  ec.pg().barrier();
 
   auto ig2     = std::chrono::high_resolution_clock::now();
   auto ig_time = std::chrono::duration_cast<std::chrono::duration<double>>((ig2 - ig1)).count();

@@ -25,10 +25,9 @@ void subshell_occvec(Real& occvec, size_t size, size_t& ne);
 
 /// @brief computes average orbital occupancies in the ground state of a neutral
 ///        atoms
-/// @throw if Z > 53
 /// @return occupation vector corresponding to the ground state electronic
 ///         configuration of a neutral atom with atomic number \c Z
-///         corresponding to the orbital ordering in STO-3G basis
+///         corresponding to the orbital ordering.
 template<typename Real = double>
 const std::vector<Real> compute_ao_occupation_vector(size_t Z);
 

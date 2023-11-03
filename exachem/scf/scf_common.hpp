@@ -195,12 +195,6 @@ std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, SystemData& 
                                               TAMMTensors& ttensors, bool symmetric = false,
                                               double threshold = 1e-5);
 
-// size_t nbasis(const libint2::BasisSet& shells) {
-//     size_t n = 0;
-//     for(const auto& shell : shells) n += shell.size();
-//     return n;
-// }
-
 inline size_t max_nprim(const libint2::BasisSet& shells) {
   size_t n = 0;
   for(auto shell: shells) n = std::max(shell.nprim(), n);
@@ -329,11 +323,10 @@ std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, SystemData& 
                                               TAMMTensors& ttensors, bool symmetric,
                                               double threshold);
 
-std::tuple<size_t, double, double>
+std::tuple<Matrix, size_t, double, double>
 gensqrtinv_atscf(ExecutionContext& ec, SystemData& sys_data, SCFVars& scf_vars,
-                 ScalapackInfo& scalapack_info, Tensor<double> S1, Tensor<double>& X_alpha,
-                 Tensor<double>& X_beta, TiledIndexSpace& tao_atom, bool symmetric,
-                 double threshold);
+                 ScalapackInfo& scalapack_info, Tensor<double> S1, TiledIndexSpace& tao_atom,
+                 bool symmetric, double threshold);
 
 std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(const libint2::BasisSet& bs1,
                                                                   const libint2::BasisSet& _bs2,
@@ -356,23 +349,6 @@ gather_task_vectors(ExecutionContext& ec, std::vector<int>& s1vec, std::vector<i
                     std::vector<int>& ntask_vec);
 
 #if defined(USE_GAUXC)
-
-// template<typename T=double>
-// std::ostream& operator<<(std::ostream& os, const GauXC::Shell<T>& sh) {
-//   os << "GauXC::Shell:( O={" << sh.O()[0] << "," << sh.O()[1] << "," << sh.O()[2] << "}"
-//      << std::endl;
-//   os << "  ";
-//   os << " {l=" << sh.l() << ",sph=" << sh.pure() << "}";
-//   os << std::endl;
-
-//   for(auto i = 0ul; i < sh.nprim(); ++i) {
-//     os << "  " << sh.alpha()[i];
-//     os << " " << sh.coeff().at(i);
-//     os << std::endl;
-//   }
-
-//   return os;
-// }
 
 namespace gauxc_util {
 

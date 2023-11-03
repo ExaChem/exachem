@@ -13,7 +13,9 @@
 #include "exachem/cc/eom/eomccsd_opt.hpp"
 // clang-format on
 
-#if !defined(USE_UPCXX)
+#define EC_COMPLEX
+
+#if !defined(USE_UPCXX) and defined(EC_COMPLEX)
 void gfccsd_driver(std::string filename, OptionsMap options_map);
 void rt_eom_cd_ccsd_driver(std::string filename, OptionsMap options_map);
 #include "exachem/fci/fci.hpp"
@@ -107,13 +109,15 @@ int main(int argc, char* argv[]) {
   else if(task.ccsd_lambda) ccsd_lambda_driver(filename, options_map);
   else if(task.eom_ccsd) eom_ccsd_driver(filename, options_map);
   else if(task.ducc) ducc_driver(filename, options_map);
-#if !defined(USE_UPCXX)
+#if !defined(USE_UPCXX) and defined(EC_COMPLEX)
   else if(task.fci || task.fcidump) fci_driver(filename, options_map);
   else if(task.gfccsd) gfccsd_driver(filename, options_map);
   else if(task.rteom_ccsd) rt_eom_cd_ccsd_driver(filename, options_map);
 #endif
 
-  else tamm_terminate("[INPUT FILE ERROR] No task specified!");
+  else
+    tamm_terminate(
+      "[ERROR] Unsupported task specified (or) code for the specified task is not built");
 
   tamm::finalize();
 

@@ -299,11 +299,10 @@ void compute_sad_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info, Syst
     // std::tie(X_atom, Xinv, obs_rank, S_condition_number, XtX_condition_number, n_illcond) =
     //     gensqrtinv(ec, S_atom_eig, false, S_condition_number_threshold);
 
-    Tensor<TensorType> X_alpha, X_beta;
-    std::tie(obs_rank, S_condition_number, XtX_condition_number) =
-      gensqrtinv_atscf(ec, sys_data, scf_vars, scalapack_info, S_atom, X_alpha, X_beta, tAO_atom,
-                       false, S_condition_number_threshold);
-    Matrix X_atom = tamm_to_eigen_matrix(X_alpha);
+    Matrix X_atom;
+    std::tie(X_atom, obs_rank, S_condition_number, XtX_condition_number) =
+      gensqrtinv_atscf(ec, sys_data, scf_vars, scalapack_info, S_atom, tAO_atom, false,
+                       S_condition_number_threshold);
 
     // if(rank == 0) cout << std::setprecision(6) << "X_atom: " << endl << X_atom << endl;
 

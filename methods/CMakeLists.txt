@@ -6,6 +6,8 @@ include(TargetMacros)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(EXACHEM_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../exachem)
 
+option(EC_COMPLEX "enable complex codes" ON)
+
 #TODO: cleanup
 include_directories(${EXACHEM_SRC_DIR})
 include_directories(${EXACHEM_SRC_DIR}/util/external)
@@ -22,9 +24,9 @@ include(${EXACHEM_SRC_DIR}/cc/ccsd_t/ccsd_t.cmake)
 include(${EXACHEM_SRC_DIR}/cc/lambda/lambda.cmake)
 include(${EXACHEM_SRC_DIR}/cc/ducc/ducc.cmake)
 
-if(NOT USE_UPCXX)
-include(${EXACHEM_SRC_DIR}/cc/gfcc/gfcc.cmake)
-include(${EXACHEM_SRC_DIR}/cc/rteom/rteom.cmake)
+if(NOT USE_UPCXX AND EC_COMPLEX)
+  include(${EXACHEM_SRC_DIR}/cc/gfcc/gfcc.cmake)
+  include(${EXACHEM_SRC_DIR}/cc/rteom/rteom.cmake)
 endif()
 
 set(CoupledCluster_SRCS ${CC_SRCS} ${CC2_SRCS} ${CCSD_SRCS} ${CCSD_T_SRCS} 

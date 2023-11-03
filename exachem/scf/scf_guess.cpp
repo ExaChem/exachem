@@ -127,7 +127,6 @@ void compute_dipole_ints(ExecutionContext& ec, const SCFVars& spvars, Tensor<Ten
   Engine engine(otype, max_nprim(shells), max_l(shells), 0);
 
   // engine.set(otype);
-
   // auto& buf = (engine.results());
 
   auto compute_dipole_ints_lambda = [&](const IndexVector& blockid) {
@@ -141,9 +140,6 @@ void compute_dipole_ints(ExecutionContext& ec, const SCFVars& spvars, Tensor<Ten
     std::vector<TensorType> dbufZ(size);
 
     auto bd1 = block_dims[1];
-
-    // cout << "blockid: [" << blockid[0] <<"," << blockid[1] << "], dims(0,1) = " <<
-    //  block_dims[0] << ", " << block_dims[1] << endl;
 
     // auto s1 = blockid[0];
     auto                  s1range_end   = shell_tile_map[bi0];
@@ -191,20 +187,12 @@ void compute_dipole_ints(ExecutionContext& ec, const SCFVars& spvars, Tensor<Ten
         // "map" buffer to a const Eigen Matrix, and copy it to the
         // corresponding blocks of the result
 
-        // cout << buf[1].size() << endl;
-        // cout << buf[2].size() << endl;
-        // cout << buf[3].size() << endl;
-
         Eigen::Map<const Matrix> buf_mat_X(buf[1], n1, n2);
         Eigen::Map<Matrix>(&tbufX[0], n1, n2) = buf_mat_X;
         Eigen::Map<const Matrix> buf_mat_Y(buf[2], n1, n2);
         Eigen::Map<Matrix>(&tbufY[0], n1, n2) = buf_mat_Y;
         Eigen::Map<const Matrix> buf_mat_Z(buf[3], n1, n2);
         Eigen::Map<Matrix>(&tbufZ[0], n1, n2) = buf_mat_Z;
-
-        // cout << "buf_mat_X :" << buf_mat_X << endl;
-        // cout << "buf_mat_Y :" << buf_mat_Y << endl;
-        // cout << "buf_mat_Z :" << buf_mat_Z << endl;
 
         auto curshelloffset_i = 0U;
         auto curshelloffset_j = 0U;
@@ -270,9 +258,6 @@ void compute_1body_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<Te
 
     auto bd1 = block_dims[1];
 
-    // cout << "blockid: [" << blockid[0] <<"," << blockid[1] << "], dims(0,1) = " <<
-    //  block_dims[0] << ", " << block_dims[1] << endl;
-
     // auto s1 = blockid[0];
     auto                  s1range_end   = shell_tile_map[bi0];
     decltype(s1range_end) s1range_start = 0l;
@@ -309,8 +294,6 @@ void compute_1body_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<Te
         auto n2 = shells[s2].size();
 
         std::vector<TensorType> tbuf(n1 * n2);
-        // cout << "s1,s2,n1,n2 = "  << s1 << "," << s2 <<
-        //       "," << n1 <<"," << n2 <<endl;
 
         // compute shell pair; return is the pointer to the buffer
         engine.compute(shells[s1], shells[s2]);
@@ -329,10 +312,6 @@ void compute_1body_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<Te
         size_t c    = 0;
         auto   dimi = curshelloffset_i + AO_tiles[s1];
         auto   dimj = curshelloffset_j + AO_tiles[s2];
-
-        // cout << "curshelloffset_i,curshelloffset_j,dimi,dimj = "  << curshelloffset_i << "," <<
-        // curshelloffset_j <<
-        //       "," << dimi <<"," << dimj <<endl;
 
         for(size_t i = curshelloffset_i; i < dimi; i++) {
           for(size_t j = curshelloffset_j; j < dimj; j++, c++) { dbuf[i * bd1 + j] = tbuf[c]; }
@@ -388,9 +367,6 @@ void compute_ecp_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<Tens
     std::vector<TensorType> dbuf(size);
 
     auto bd1 = block_dims[1];
-
-    // cout << "blockid: [" << blockid[0] <<"," << blockid[1] << "], dims(0,1) = " <<
-    //  block_dims[0] << ", " << block_dims[1] << endl;
 
     // auto s1 = blockid[0];
     auto                  s1range_end   = shell_tile_map[bi0];
@@ -518,9 +494,6 @@ void compute_pchg_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<Ten
     std::vector<TensorType> dbuf(size);
 
     auto bd1 = block_dims[1];
-
-    // cout << "blockid: [" << blockid[0] <<"," << blockid[1] << "], dims(0,1) = " <<
-    //  block_dims[0] << ", " << block_dims[1] << endl;
 
     // auto s1 = blockid[0];
     auto                  s1range_end   = shell_tile_map[bi0];

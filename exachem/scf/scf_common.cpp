@@ -290,14 +290,6 @@ compute_AO_tiles(const ExecutionContext& ec, const SystemData& sys_data, libint2
     shell_tile_map.push_back(shells.size() - 1);
   }
 
-  // std::vector<int> vtc(AO_tiles.size());
-  // std::iota (std::begin(vtc), std::end(vtc), 0);
-  // cout << "AO tile indexes = " << vtc;
-  // cout << "orig AO tiles = " << AO_tiles;
-
-  // cout << "print new opt AO tiles = " << AO_opttiles;
-  // cout << "print shell-tile map = " << shell_tile_map;
-
   return std::make_tuple(shell_tile_map, AO_tiles, AO_opttiles);
 }
 
@@ -312,10 +304,7 @@ void compute_orthogonalizer(ExecutionContext& ec, SystemData& sys_data, SCFVars&
   auto rank  = ec.pg().rank();
 
   // compute orthogonalizer X such that X.transpose() . S . X = I
-  double XtX_condition_number; // condition number of "re-conditioned"
-                               // overlap obtained as Xinv.transpose() . Xinv
-  // by default assume can manage to compute with condition number of S <= 1/eps
-  // this is probably too optimistic, but in well-behaved cases even 10^11 is OK
+  double XtX_condition_number;
   size_t obs_rank;
   double S_condition_number;
   double S_condition_number_threshold = sys_data.options_map.scf_options.tol_lindep;
@@ -366,8 +355,6 @@ void compute_hamiltonian(ExecutionContext& ec, const SCFVars& scf_vars,
     (ttensors.H1(mu, nu)  =  ttensors.T1(mu, nu))
     (ttensors.H1(mu, nu) +=  ttensors.V1(mu, nu)).execute();
   // clang-format on
-
-  // tamm::scale_ip(ttensors.H1(),2.0);
 }
 
 template<typename TensorType>
@@ -425,19 +412,9 @@ void compute_density(ExecutionContext& ec, const SystemData& sys_data, const SCF
   sch.execute();
 
   // compute D in eigen for subsequent fock build
-  {
-    // Matrix& C_occ_a = etensors.G_alpha;
-    // Matrix& C_occ_b = etensors.G_beta;
-    // C_occ_a.resize(sys_data.nbf_orig, sys_data.nelectrons_alpha);
-    // if(is_uhf) C_occ_b.resize(sys_data.nbf_orig, sys_data.nelectrons_beta);
-
-    if(!scf_vars.do_dens_fit) {
-      tamm_to_eigen_tensor(ttensors.D_alpha, D_alpha);
-      if(is_uhf) tamm_to_eigen_tensor(ttensors.D_beta, etensors.D_beta);
-    }
-
-    // D_alpha = dfac * C_occ_a * C_occ_a.transpose();
-    // if(is_uhf) etensors.D_beta = C_occ_b * C_occ_b.transpose();
+  if(!scf_vars.do_dens_fit) {
+    tamm_to_eigen_tensor(ttensors.D_alpha, D_alpha);
+    if(is_uhf) tamm_to_eigen_tensor(ttensors.D_beta, etensors.D_beta);
   }
 
   ec.pg().barrier();
@@ -665,8 +642,9 @@ std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, SystemData& 
     scalapackpp::BlockCyclicDist2D* blockcyclic_dist = scalapack_info.blockcyclic_dist.get();
     const tamm::Tile                mb               = blockcyclic_dist->mb();
 
-    TiledIndexSpace tN_bc{IndexSpace{range(sys_data.nbf_orig)}, mb};
-    Tensor<T>       S_BC{tN_bc, tN_bc};
+    scf_vars.tN_bc         = TiledIndexSpace{IndexSpace{range(sys_data.nbf_orig)}, mb};
+    TiledIndexSpace& tN_bc = scf_vars.tN_bc;
+    Tensor<T>        S_BC{tN_bc, tN_bc};
     V_sca = {tN_bc, tN_bc};
     S_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
     V_sca.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
@@ -682,15 +660,10 @@ std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, SystemData& 
     if(grid.ipr() >= 0 and grid.ipc() >= 0) {
       auto desc_S = desc_lambda(N, N);
       auto desc_V = desc_lambda(N, N);
-      // scalapackpp::BlockCyclicMatrix<T> V_sca(grid, N, N, mb, mb);
 
       /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, desc_S[2],
                                    S_BC.access_local_buf(), 1, 1, desc_S, eps.data(),
                                    V_sca.access_local_buf(), 1, 1, desc_V);
-
-      // Gather results
-      // if( scalapack_info.pg.rank() == 0 ) V.resize(N,N);
-      // V_sca.gather_from( N, N, V.data(), N, 0, 0 );
     }
 
     Tensor<T>::deallocate(S_BC);
@@ -735,70 +708,30 @@ std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, SystemData& 
     }
   }
 
-  if(world_size > 1) {
-    // TODO: Should buffer this
-    // ec.pg().broadcast(&n_cond, 0);
-    ec.pg().broadcast(&n_illcond, 0);
-    // ec.pg().broadcast( &condition_number,        0 );
-    // ec.pg().broadcast(&result_condition_number, 0);
-  }
+  if(world_size > 1) ec.pg().broadcast(&n_illcond, 0);
   n_cond = N - n_illcond;
 
-#if defined(USE_SCALAPACK)
-  if(scalapack_info.comm != MPI_COMM_NULL) {
-    Tensor<T> V_t = from_block_cyclic_tensor(V_sca);
-    Tensor<T> X_t = tensor_block(V_t, {n_illcond, 0}, {N, N}, {1, 0});
-    if(scalapack_info.pg.rank() == 0) X = tamm_to_eigen_matrix<T>(X_t);
-    Tensor<T>::deallocate(V_sca, V_t, X_t);
-  }
-#else
-  if(world_rank == 0) {
-    // auto* V_cond = Vbuf + n_illcond * N;
-    Matrix V_cond = V.block(n_illcond, 0, N - n_illcond, N);
-    V.resize(0, 0);
-    X.resize(N, n_cond); // Xinv.resize( N, n_cond );
-    // Matrix V_cond(n_cond,N);
-    // V_cond = Eigen::Map<Matrix>(Vbuf + n_illcond * N,n_cond,N);
-    X = V_cond.transpose();
-    V_cond.resize(0, 0);
-  }
-#endif
-
-  if(world_rank == 0) {
-    // Form canonical X/Xinv
-    for(auto i = 0; i < n_cond; ++i) {
-      const double srt = std::sqrt(*(first_above_thresh + i));
-
-      // X is row major...
-      auto* X_col = X.data() + i;
-      // auto* Xinv_col = Xinv.data() + i;
-
-      blas::scal(N, 1. / srt, X_col, n_cond);
-      // blas::scal( N, srt, Xinv_col, n_cond );
-    }
-
-    if(symmetric) {
-      assert(not symmetric);
-      /*
-      // X is row major, thus we need to form X**T = V_cond * X**T
-      Matrix TMP = X;
-      X.resize( N, N );
-      blas::gemm( blas::Op::NoTrans, blas::Op::NoTrans, N, N, n_cond, 1., V_cond, N, TMP.data(),
-      n_cond, 0., X.data(), N );
-      */
-    }
-  } // compute on root
-
   sys_data.n_lindep = n_illcond;
-  sys_data.nbf      = sys_data.nbf_orig - sys_data.n_lindep;
+  sys_data.nbf      = n_cond;
 
-  scf_vars.tAO_ortho = TiledIndexSpace{IndexSpace{range(0, (size_t) (sys_data.nbf))},
+  scf_vars.tAO_ortho = TiledIndexSpace{IndexSpace{range((size_t) sys_data.nbf)},
                                        sys_data.options_map.scf_options.AO_tilesize};
+
+  Tensor<T> X_tmp{scf_vars.tAO, scf_vars.tAO_ortho};
+  Tensor<T> eps_tamm{scf_vars.tAO_ortho};
+  Tensor<T>::allocate(&ec, X_tmp, eps_tamm);
+
+  if(world_rank == 0) {
+    std::vector<T> epso(first_above_thresh, eps.end());
+    std::transform(epso.begin(), epso.end(), epso.begin(),
+                   [](auto& c) { return 1.0 / std::sqrt(c); });
+    tamm::vector_to_tamm_tensor(eps_tamm, epso);
+  }
+  ec.pg().barrier();
 
 #if defined(USE_SCALAPACK)
   if(scalapack_info.comm != MPI_COMM_NULL) {
     const tamm::Tile _mb = (scalapack_info.blockcyclic_dist.get())->mb();
-    scf_vars.tN_bc       = TiledIndexSpace{IndexSpace{range(sys_data.nbf_orig)}, _mb};
     scf_vars.tNortho_bc  = TiledIndexSpace{IndexSpace{range(sys_data.nbf)}, _mb};
     ttensors.X_alpha     = {scf_vars.tN_bc, scf_vars.tNortho_bc};
     ttensors.X_alpha.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
@@ -809,9 +742,45 @@ std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, SystemData& 
   sch.allocate(ttensors.X_alpha).execute();
 #endif
 
-  if(world_rank == 0) eigen_to_tamm_tensor(ttensors.X_alpha, X);
-
+#if defined(USE_SCALAPACK)
+  if(scalapack_info.comm != MPI_COMM_NULL) {
+    Tensor<T> V_t = from_block_cyclic_tensor(V_sca);
+    Tensor<T> X_t = tensor_block(V_t, {n_illcond, 0}, {N, N}, {1, 0});
+    tamm::from_dense_tensor(X_t, X_tmp);
+    Tensor<T>::deallocate(V_sca, V_t, X_t);
+  }
+#else
+  if(world_rank == 0) {
+    // auto* V_cond = Vbuf + n_illcond * N;
+    Matrix V_cond = V.block(n_illcond, 0, N - n_illcond, N);
+    V.resize(0, 0);
+    X.resize(N, n_cond);
+    X = V_cond.transpose();
+    V_cond.resize(0, 0);
+    eigen_to_tamm_tensor(X_tmp, X);
+    X.resize(0, 0);
+  }
   ec.pg().barrier();
+#endif
+
+  Tensor<T> X_comp{scf_vars.tAO, scf_vars.tAO_ortho};
+  auto      mu   = scf_vars.tAO.label("all");
+  auto      mu_o = scf_vars.tAO_ortho.label("all");
+
+#if defined(USE_SCALAPACK)
+  sch.allocate(X_comp).execute();
+#else
+  X_comp = ttensors.X_alpha;
+#endif
+
+  sch(X_comp(mu, mu_o) = X_tmp(mu, mu_o) * eps_tamm(mu_o)).deallocate(X_tmp, eps_tamm).execute();
+
+#if defined(USE_SCALAPACK)
+  if(scalapack_info.comm != MPI_COMM_NULL) {
+    tamm::to_block_cyclic_tensor(X_comp, ttensors.X_alpha);
+  }
+  sch.deallocate(X_comp).execute();
+#endif
 
   return std::make_tuple(size_t(n_cond), condition_number, result_condition_number);
 }
@@ -971,13 +940,6 @@ Matrix compute_schwarz_ints(ExecutionContext& ec, const SCFVars& scf_vars,
 
   K = tamm_to_eigen_matrix<TensorType>(schwarz_mat);
   Tensor<TensorType>::deallocate(schwarz_mat);
-
-  // auto hf_t2   = std::chrono::high_resolution_clock::now();
-  // auto hf_time = std::chrono::duration_cast<std::chrono::duration<double>>((hf_t2 -
-  // hf_t1)).count(); if(ec.pg().rank() == 0)
-  //   std::cout << std::fixed << std::setprecision(2) << "Time to compute schwarz matrix: " <<
-  //   hf_time
-  //             << " secs" << endl;
 
   return K;
 }
@@ -1290,11 +1252,10 @@ template double gauxc_util::compute_xcf<double>(ExecutionContext& ec, const Syst
 
 #endif
 
-std::tuple<size_t, double, double>
+std::tuple<Matrix, size_t, double, double>
 gensqrtinv_atscf(ExecutionContext& ec, SystemData& sys_data, SCFVars& scf_vars,
-                 ScalapackInfo& scalapack_info, Tensor<double> S1, Tensor<double>& X_alpha,
-                 Tensor<double>& X_beta, TiledIndexSpace& tao_atom, bool symmetric,
-                 double threshold) {
+                 ScalapackInfo& scalapack_info, Tensor<double> S1, TiledIndexSpace& tao_atom,
+                 bool symmetric, double threshold) {
   using T = double;
 
   Scheduler sch{ec};
@@ -1345,21 +1306,14 @@ gensqrtinv_atscf(ExecutionContext& ec, SystemData& sys_data, SCFVars& scf_vars,
     }
   }
 
-  if(world_size > 1) {
-    // TODO: Should buffer this
-    ec.pg().broadcast(&n_cond, 0);
-    ec.pg().broadcast(&n_illcond, 0);
-    // ec.pg().broadcast( &condition_number,        0 );
-    ec.pg().broadcast(&result_condition_number, 0);
-  }
+  if(world_size > 1) { ec.pg().broadcast(&n_illcond, 0); }
+  n_cond = N - n_illcond;
 
   if(world_rank == 0) {
     // auto* V_cond = Vbuf + n_illcond * N;
     Matrix V_cond = V.block(n_illcond, 0, N - n_illcond, N);
     V.resize(0, 0);
-    X.resize(N, n_cond); // Xinv.resize( N, n_cond );
-    // Matrix V_cond(n_cond,N);
-    // V_cond = Eigen::Map<Matrix>(Vbuf + n_illcond * N,n_cond,N);
+    X.resize(N, n_cond);
     X = V_cond.transpose();
     V_cond.resize(0, 0);
   }
@@ -1377,31 +1331,21 @@ gensqrtinv_atscf(ExecutionContext& ec, SystemData& sys_data, SCFVars& scf_vars,
       // blas::scal( N, srt, Xinv_col, n_cond );
     }
 
-    if(symmetric) {
-      assert(not symmetric);
-      /*
-      // X is row major, thus we need to form X**T = V_cond * X**T
-      Matrix TMP = X;
-      X.resize( N, N );
-      blas::gemm( blas::Op::NoTrans, blas::Op::NoTrans, N, N, n_cond, 1., V_cond, N, TMP.data(),
-      n_cond, 0., X.data(), N );
-      */
-    }
   } // compute on root
 
-  auto nbf_new = N - n_illcond;
+  TiledIndexSpace tAO_atom_ortho{IndexSpace{range((size_t) n_cond)},
+                                 sys_data.options_map.scf_options.AO_tilesize};
 
-  auto tAO_ortho = TiledIndexSpace{IndexSpace{range(0, (size_t) nbf_new)},
-                                   sys_data.options_map.scf_options.AO_tilesize};
+  Tensor<T> x_tamm{tao_atom, tAO_atom_ortho};
+  sch.allocate(x_tamm).execute();
 
-  X_alpha = {tao_atom, tAO_ortho};
-  sch.allocate(X_alpha).execute();
-
-  if(world_rank == 0) eigen_to_tamm_tensor(X_alpha, X);
-
+  if(world_rank == 0) eigen_to_tamm_tensor(x_tamm, X);
   ec.pg().barrier();
 
-  return std::make_tuple(size_t(n_cond), condition_number, result_condition_number);
+  X = tamm_to_eigen_matrix(x_tamm);
+  sch.deallocate(x_tamm).execute();
+
+  return std::make_tuple(X, size_t(n_cond), condition_number, result_condition_number);
 }
 
 template Matrix read_scf_mat<double>(std::string matfile);
@@ -1432,14 +1376,6 @@ template void compute_density<double>(ExecutionContext& ec, const SystemData& sy
 
 template double tt_trace<double>(ExecutionContext& ec, Tensor<TensorType>& T1,
                                  Tensor<TensorType>& T2);
-
-// template Matrix compute_schwarz_ints<libint2::Operator>(ExecutionContext& ec, const SCFVars&
-// scf_vars,
-//                             const libint2::BasisSet& bs1, const libint2::BasisSet& _bs2,
-//                             bool use_2norm,
-//                             typename
-//                             libint2::operator_traits<libint2::Operator>::oper_params_type
-//                             params);
 
 template std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
 gather_task_vectors<double>(ExecutionContext& ec, std::vector<int>& s1vec, std::vector<int>& s2vec,

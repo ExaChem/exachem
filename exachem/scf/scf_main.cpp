@@ -99,10 +99,6 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   if(is_spherical) shells.set_pure(true);
   else shells.set_pure(false); // use cartesian gaussians
 
-  auto    a2s_map = shells.atom2shell(atoms);
-  int64_t nshells{};
-  for(size_t ai = 0; ai < atoms.size(); ai++) { nshells += a2s_map[ai].size(); }
-
   // parse ECP section of basis file
   if(!scf_options.basisfile.empty()) {
     if(!fs::exists(scf_options.basisfile)) {
@@ -267,7 +263,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
   if(rank == 0) {
     std::cout << std::endl << "Number of basis functions = " << N << std::endl;
-    std::cout << std::endl << "Total number of shells = " << nshells << std::endl;
+    std::cout << std::endl << "Total number of shells = " << shells.size() << std::endl;
     std::cout << std::endl << "Total number of electrons = " << nelectrons << std::endl;
     std::cout << "  # of alpha electrons    = " << sys_data.nelectrons_alpha << std::endl;
     std::cout << "  # of beta electons      = " << sys_data.nelectrons_beta << std::endl;
@@ -600,14 +596,17 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     // pre-compute data for Schwarz bounds
     std::string schwarz_matfile = files_prefix + ".schwarz";
     Matrix      SchwarzK;
-    if(N >= restart_size && fs::exists(schwarz_matfile)) {
-      if(rank == 0) cout << "Read Schwarz matrix from disk ... " << endl;
-      SchwarzK = read_scf_mat<TensorType>(schwarz_matfile);
-    }
-    else {
-      // if(rank == 0) cout << "pre-computing data for Schwarz bounds... " << endl;
-      SchwarzK = compute_schwarz_ints<>(ec, scf_vars, shells);
-      if(rank == 0) write_scf_mat<TensorType>(SchwarzK, schwarz_matfile);
+
+    if(!do_density_fitting) {
+      if(N >= restart_size && fs::exists(schwarz_matfile)) {
+        if(rank == 0) cout << "Read Schwarz matrix from disk ... " << endl;
+        SchwarzK = read_scf_mat<TensorType>(schwarz_matfile);
+      }
+      else {
+        // if(rank == 0) cout << "pre-computing data for Schwarz bounds... " << endl;
+        SchwarzK = compute_schwarz_ints<>(ec, scf_vars, shells);
+        if(rank == 0) write_scf_mat<TensorType>(SchwarzK, schwarz_matfile);
+      }
     }
 
     hf_t1 = std::chrono::high_resolution_clock::now();
@@ -717,8 +716,8 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
       if(!do_density_fitting) {
         // Collect task info
         std::tie(s1vec, s2vec, ntask_vec) = compute_2bf_taskinfo<TensorType>(
-          ec, sys_data, scf_vars, obs, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4, shells,
-          ttensors, etensors, do_density_fitting);
+          ec, sys_data, scf_vars, obs, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4, ttensors,
+          etensors, do_density_fitting);
 
         auto [s1_all, s2_all, ntasks_all] =
           gather_task_vectors<TensorType>(ec, s1vec, s2vec, ntask_vec);
@@ -744,8 +743,8 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
       }
 
       compute_2bf<TensorType>(ec, scalapack_info, sys_data, scf_vars, obs, do_schwarz_screen,
-                              shell2bf, SchwarzK, max_nprim4, shells, ttensors, etensors,
-                              is_3c_init, do_density_fitting, 1.0);
+                              shell2bf, SchwarzK, max_nprim4, ttensors, etensors, is_3c_init,
+                              do_density_fitting, 1.0);
 
       scf_diagonalize<TensorType>(sch, sys_data, scalapack_info, ttensors, etensors);
 
@@ -795,8 +794,8 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     if(!do_density_fitting) {
       // Collect task info
       auto [s1vec, s2vec, ntask_vec] = compute_2bf_taskinfo<TensorType>(
-        ec, sys_data, scf_vars, obs, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4, shells,
-        ttensors, etensors, do_density_fitting);
+        ec, sys_data, scf_vars, obs, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4, ttensors,
+        etensors, do_density_fitting);
 
       auto [s1_all, s2_all, ntasks_all] =
         gather_task_vectors<TensorType>(ec, s1vec, s2vec, ntask_vec);
@@ -827,8 +826,8 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
       if(is_uhf) { sch(ttensors.F_beta_tmp() = 0).execute(); }
       // F1 = H1 + F_alpha_tmp
       compute_2bf<TensorType>(ec, scalapack_info, sys_data, scf_vars, obs, do_schwarz_screen,
-                              shell2bf, SchwarzK, max_nprim4, shells, ttensors, etensors,
-                              is_3c_init, do_density_fitting, xHF);
+                              shell2bf, SchwarzK, max_nprim4, ttensors, etensors, is_3c_init,
+                              do_density_fitting, xHF);
 
       TensorType gauxc_exc = 0.;
 #if defined(USE_GAUXC)
@@ -891,8 +890,8 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
       // build a new Fock matrix
       compute_2bf<TensorType>(ec, scalapack_info, sys_data, scf_vars, obs, do_schwarz_screen,
-                              shell2bf, SchwarzK, max_nprim4, shells, ttensors, etensors,
-                              is_3c_init, do_density_fitting, xHF);
+                              shell2bf, SchwarzK, max_nprim4, ttensors, etensors, is_3c_init,
+                              do_density_fitting, xHF);
 
       std::tie(ehf, rmsd) = scf_iter_body<TensorType>(ec, scalapack_info, iter, sys_data, scf_vars,
                                                       ttensors, etensors,
@@ -963,8 +962,8 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
       // build a new Fock matrix
       compute_2bf<TensorType>(ec, scalapack_info, sys_data, scf_vars, obs, do_schwarz_screen,
-                              shell2bf, SchwarzK, max_nprim4, shells, ttensors, etensors,
-                              is_3c_init, do_density_fitting, xHF);
+                              shell2bf, SchwarzK, max_nprim4, ttensors, etensors, is_3c_init,
+                              do_density_fitting, xHF);
     }
 
     for(auto x: ttensors.ehf_tamm_hist) Tensor<TensorType>::deallocate(x);

@@ -35,13 +35,13 @@ std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
 compute_2bf_taskinfo(ExecutionContext& ec, const SystemData& sys_data, const SCFVars& scf_vars,
                      const libint2::BasisSet& obs, const bool do_schwarz_screen,
                      const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
-                     const size_t& max_nprim4, libint2::BasisSet& shells, TAMMTensors& ttensors,
-                     EigenTensors& etensors, const bool cs1s2 = false);
+                     const size_t& max_nprim4, TAMMTensors& ttensors, EigenTensors& etensors,
+                     const bool cs1s2 = false);
 
 template<typename TensorType>
 void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const SystemData& sys_data,
                  const SCFVars& scf_vars, const libint2::BasisSet& obs,
                  const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
-                 const Matrix& SchwarzK, const size_t& max_nprim4, libint2::BasisSet& shells,
-                 TAMMTensors& ttensors, EigenTensors& etensors, bool& is_3c_init,
-                 const bool do_density_fitting = false, double xHF = 1.);
+                 const Matrix& SchwarzK, const size_t& max_nprim4, TAMMTensors& ttensors,
+                 EigenTensors& etensors, bool& is_3c_init, const bool do_density_fitting = false,
+                 double xHF = 1.);

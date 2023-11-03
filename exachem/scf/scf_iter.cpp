@@ -242,8 +242,8 @@ std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
 compute_2bf_taskinfo(ExecutionContext& ec, const SystemData& sys_data, const SCFVars& scf_vars,
                      const libint2::BasisSet& obs, const bool do_schwarz_screen,
                      const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
-                     const size_t& max_nprim4, libint2::BasisSet& shells, TAMMTensors& ttensors,
-                     EigenTensors& etensors, const bool cs1s2) {
+                     const size_t& max_nprim4, TAMMTensors& ttensors, EigenTensors& etensors,
+                     const bool cs1s2) {
   Matrix&             D       = etensors.D_alpha;
   Matrix&             D_beta  = etensors.D_beta;
   Tensor<TensorType>& F_dummy = ttensors.F_dummy;
@@ -319,8 +319,8 @@ compute_2bf_taskinfo(ExecutionContext& ec, const SystemData& sys_data, const SCF
 template<typename TensorType>
 void compute_2bf_ri(ExecutionContext& ec, ScalapackInfo& scalapack_info, const SystemData& sys_data,
                     const SCFVars& scf_vars, const libint2::BasisSet& obs,
-                    const std::vector<size_t>& shell2bf, libint2::BasisSet& shells,
-                    TAMMTensors& ttensors, EigenTensors& etensors, bool& is_3c_init, double xHF) {
+                    const std::vector<size_t>& shell2bf, TAMMTensors& ttensors,
+                    EigenTensors& etensors, bool& is_3c_init, double xHF) {
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
@@ -515,10 +515,14 @@ void compute_2bf_ri(ExecutionContext& ec, ScalapackInfo& scalapack_info, const S
 
     block_for(ec, K_tamm(), compute_2body_2index_ints_lambda);
 
-    Matrix          V;
-    Eigen::VectorXd eps(ndf);
+    Matrix                  V;
+    std::vector<TensorType> eps(ndf);
 
     auto ig1 = std::chrono::high_resolution_clock::now();
+
+    Tensor<TensorType> v_tmp{scf_vars.tdfAO, scf_vars.tdfAO};
+    Tensor<TensorType> eps_tamm{scf_vars.tdfAO};
+    Tensor<TensorType>::allocate(&ec, v_tmp, eps_tamm);
 
 #if defined(USE_SCALAPACK)
     Tensor<TensorType> V_sca;
@@ -545,7 +549,6 @@ void compute_2bf_ri(ExecutionContext& ec, ScalapackInfo& scalapack_info, const S
       if(grid.ipr() >= 0 and grid.ipc() >= 0) {
         auto desc_S = desc_lambda(ndf, ndf);
         auto desc_V = desc_lambda(ndf, ndf);
-        // scalapackpp::BlockCyclicMatrix<TensorType> V_sca(grid, N, N, mb, mb);
 
         /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, desc_S[2],
                                      S_BC.access_local_buf(), 1, 1, desc_S, eps.data(),
@@ -553,8 +556,7 @@ void compute_2bf_ri(ExecutionContext& ec, ScalapackInfo& scalapack_info, const S
       }
 
       Tensor<TensorType>::deallocate(S_BC);
-      if(scalapack_info.pg.rank() == 0) V = tamm_to_eigen_matrix<TensorType>(V_sca);
-      Tensor<TensorType>::deallocate(V_sca);
+      tamm::from_block_cyclic_tensor(V_sca, v_tmp);
     }
 
 #else
@@ -563,29 +565,20 @@ void compute_2bf_ri(ExecutionContext& ec, ScalapackInfo& scalapack_info, const S
       tamm_to_eigen_tensor(K_tamm, V);
 
       lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, ndf, V.data(), ndf, eps.data());
+      tamm::eigen_to_tamm_tensor(v_tmp, V);
     }
 #endif
 
     if(rank == 0) {
-      Matrix Vp = V;
-
-      for(int j = 0; j < ndf; ++j) {
-        double tmp = 1.0 / sqrt(eps(j));
-        blas::scal(ndf, tmp, Vp.data() + j * ndf, 1);
-      }
-
-      Matrix ke(ndf, ndf);
-      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans, ndf, ndf, ndf, 1,
-                 Vp.data(), ndf, V.data(), ndf, 0, ke.data(), ndf);
-      eigen_to_tamm_tensor(K_tamm, ke);
-      V.resize(0, 0);
+      std::transform(eps.begin(), eps.end(), eps.begin(),
+                     [](auto& c) { return 1.0 / std::sqrt(c); });
+      tamm::vector_to_tamm_tensor(eps_tamm, eps);
     }
-    eps.resize(0);
-    // sch
-    // (k_tmp(d_mu,d_nu) = V_tamm(d_ku,d_mu) * V_tamm(d_ku,d_nu))
-    // (K_tamm(d_mu,d_nu) = eps_tamm(d_mu,d_ku) * k_tmp(d_ku,d_nu)) .execute();
+    ec.pg().barrier();
 
-    // Tensor<TensorType>::deallocate(k_tmp, eps_tamm, V_tamm);
+    sch(K_tamm(d_mu, d_nu) = v_tmp(d_nu, d_mu) * eps_tamm(d_nu))
+      .deallocate(v_tmp, eps_tamm)
+      .execute();
 
     auto ig2    = std::chrono::high_resolution_clock::now();
     auto igtime = std::chrono::duration_cast<std::chrono::duration<double>>((ig2 - ig1)).count();
@@ -593,8 +586,6 @@ void compute_2bf_ri(ExecutionContext& ec, ScalapackInfo& scalapack_info, const S
     if(rank == 0 && debug)
       std::cout << std::fixed << std::setprecision(2) << "V^-1/2: " << igtime << "s, ";
 
-    // contract(1.0, Zxy, {1, 2, 3}, K, {1, 4}, 0.0, xyK, {2, 3, 4});
-    // Tensor3D xyK = Zxy.contract(K,aidx_00);
     sch(xyK(mu, nu, d_nu) = Zxy(d_mu, mu, nu) * K_tamm(d_mu, d_nu))
       .deallocate(K_tamm, Zxy) // release memory Zxy
       .execute(exhw);
@@ -670,9 +661,9 @@ template<typename TensorType>
 void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const SystemData& sys_data,
                  const SCFVars& scf_vars, const libint2::BasisSet& obs,
                  const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
-                 const Matrix& SchwarzK, const size_t& max_nprim4, libint2::BasisSet& shells,
-                 TAMMTensors& ttensors, EigenTensors& etensors, bool& is_3c_init,
-                 const bool do_density_fitting, double xHF) {
+                 const Matrix& SchwarzK, const size_t& max_nprim4, TAMMTensors& ttensors,
+                 EigenTensors& etensors, bool& is_3c_init, const bool do_density_fitting,
+                 double xHF) {
   using libint2::Operator;
 
   const bool is_uhf = sys_data.is_unrestricted;
@@ -711,7 +702,6 @@ void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syst
   engine.set_precision(engine_precision);
   const auto& buf = engine.results();
 
-#if 1
   auto comp_2bf_lambda = [&](IndexVector blockid) {
     auto s1        = blockid[0];
     auto bf1_first = shell2bf[s1];
@@ -847,7 +837,6 @@ void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syst
       }
     }
   };
-#endif
 
   decltype(do_t1) do_t2;
   double          do_time;
@@ -881,8 +870,8 @@ void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syst
     // ec.pg().barrier();
   }
   else {
-    compute_2bf_ri<TensorType>(ec, scalapack_info, sys_data, scf_vars, obs, shell2bf, shells,
-                               ttensors, etensors, is_3c_init, xHF);
+    compute_2bf_ri<TensorType>(ec, scalapack_info, sys_data, scf_vars, obs, shell2bf, ttensors,
+                               etensors, is_3c_init, xHF);
   } // end density fitting
 
   Scheduler sch{ec};
@@ -1138,20 +1127,18 @@ compute_2bf_taskinfo<double>(ExecutionContext& ec, const SystemData& sys_data,
                              const SCFVars& scf_vars, const libint2::BasisSet& obs,
                              const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
                              const Matrix& SchwarzK, const size_t& max_nprim4,
-                             libint2::BasisSet& shells, TAMMTensors& ttensors,
-                             EigenTensors& etensors, const bool cs1s2);
+                             TAMMTensors& ttensors, EigenTensors& etensors, const bool cs1s2);
 
 template void compute_2bf<double>(ExecutionContext& ec, ScalapackInfo& scalapack_info,
                                   const SystemData& sys_data, const SCFVars& scf_vars,
                                   const libint2::BasisSet& obs, const bool do_schwarz_screen,
                                   const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
-                                  const size_t& max_nprim4, libint2::BasisSet& shells,
-                                  TAMMTensors& ttensors, EigenTensors& etensors, bool& is_3c_init,
+                                  const size_t& max_nprim4, TAMMTensors& ttensors,
+                                  EigenTensors& etensors, bool& is_3c_init,
                                   const bool do_density_fitting, double xHF);
 
 template void compute_2bf_ri<double>(ExecutionContext& ec, ScalapackInfo& scalapack_info,
                                      const SystemData& sys_data, const SCFVars& scf_vars,
                                      const libint2::BasisSet&   obs,
-                                     const std::vector<size_t>& shell2bf, libint2::BasisSet& shells,
-                                     TAMMTensors& ttensors, EigenTensors& etensors,
-                                     bool& is_3c_init, double xHF);
+                                     const std::vector<size_t>& shell2bf, TAMMTensors& ttensors,
+                                     EigenTensors& etensors, bool& is_3c_init, double xHF);

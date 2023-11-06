@@ -167,8 +167,8 @@ void cc2_cs::cc2_t2_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledInd
   auto chol3d_oo = chol3d_se[0];
   auto chol3d_ov = chol3d_se[1];
   auto chol3d_vv = chol3d_se[2];
-  auto hw        = sch.ec().exhw();
-  auto rank      = sch.ec().pg().rank();
+  // auto hw     = sch.ec().exhw();
+  // auto rank = sch.ec().pg().rank();
 
   Tensor<T> ph{{a, i, cind}, {1, 1}};
   Tensor<T> ph_1{{a, i, cind}, {1, 1}};
@@ -389,8 +389,6 @@ std::tuple<double, double> cc2_cs::cd_cc2_cs_driver(
     std::cout << std::endl
               << "Total CPU memory required for Closed Shell Cholesky CC2 calculation: "
               << std::fixed << std::setprecision(2) << total_cc2_mem << " GiB" << std::endl;
-    // std::cout << " (V^4 intermediate size: " << std::fixed << std::setprecision(2) << v4int_size
-    //           << " GiB)" << std::endl;
   }
   check_memory_requirements(ec, total_cc2_mem);
 

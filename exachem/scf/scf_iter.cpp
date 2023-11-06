@@ -248,10 +248,10 @@ compute_2bf_taskinfo(ExecutionContext& ec, const SystemData& sys_data, const SCF
   Matrix&             D_beta  = etensors.D_beta;
   Tensor<TensorType>& F_dummy = ttensors.F_dummy;
 
-  double     fock_precision = std::min(sys_data.options_map.scf_options.tol_int,
-                                       1e-3 * sys_data.options_map.scf_options.conve);
-  auto       rank           = ec.pg().rank();
-  const bool is_uhf         = sys_data.is_unrestricted;
+  double fock_precision = std::min(sys_data.options_map.scf_options.tol_int,
+                                   1e-3 * sys_data.options_map.scf_options.conve);
+  // auto       rank           = ec.pg().rank();
+  const bool is_uhf = sys_data.is_unrestricted;
 
   Matrix D_shblk_norm = compute_shellblock_norm(obs, D); // matrix of infty-norms of shell blocks
   if(is_uhf) D_shblk_norm += compute_shellblock_norm(obs, D_beta);

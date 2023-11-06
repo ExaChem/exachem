@@ -245,6 +245,8 @@ inline void recompute_tilesize(tamm::Tile& tile_size, const int N, const bool fo
   }
 }
 
+int get_nfcore(SystemData& sys_data);
+
 BasisSetMap construct_basisset_maps(std::vector<libint2::Atom>& atoms, libint2::BasisSet& shells,
                                     bool is_spherical = true);
 

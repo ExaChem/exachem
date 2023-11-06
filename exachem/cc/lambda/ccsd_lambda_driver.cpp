@@ -271,7 +271,7 @@ void ccsd_lambda_driver(std::string filename, OptionsMap options_map) {
   auto dmz = get_scalar(dipole_mz);
 
   // compute nuclear dipole moments
-  for(int i = 0; i < atoms.size(); i++) {
+  for(size_t i = 0; i < atoms.size(); i++) {
     dmx += atoms[i].x * atoms[i].atomic_number;
     dmy += atoms[i].y * atoms[i].atomic_number;
     dmz += atoms[i].z * atoms[i].atomic_number;

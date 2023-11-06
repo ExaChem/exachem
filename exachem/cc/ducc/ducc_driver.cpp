@@ -14,7 +14,7 @@ namespace fs = std::filesystem;
 template<typename T>
 void DUCC_T_CCSD_Driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
                         Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1, V2Tensors<T>& v2tensors,
-                        int nactv, ExecutionHW ex_hw);
+                        size_t nactv, ExecutionHW ex_hw);
 
 void ducc_driver(std::string filename, OptionsMap options_map) {
   using T = double;

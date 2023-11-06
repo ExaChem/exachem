@@ -36,10 +36,11 @@ int util_my_smp_index() {
 }
 
 std::string check_memory_req(const int cc_t_ts, const int nbf) {
-  size_t      free_gpu_mem{0}, total_gpu_mem{0};
+  size_t      total_gpu_mem{0};
   std::string errmsg = "";
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
+  size_t free_gpu_mem{0};
   tamm::gpuMemGetInfo(&free_gpu_mem, &total_gpu_mem);
 #endif
 

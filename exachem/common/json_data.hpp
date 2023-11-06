@@ -35,6 +35,7 @@ struct SystemData {
   int        nact{};
   int        focc{};
   int        qed_nmodes{};
+  bool       freeze_atomic{};
   bool       is_restricted{};
   bool       is_unrestricted{};
   bool       is_restricted_os{};
@@ -92,5 +93,7 @@ inline std::string getfilename(std::string filename) {
   auto   fname     = filename.substr(0, lastindex);
   return fname.substr(fname.find_last_of("/") + 1, fname.length());
 }
+
+void write_sinfo(SystemData& sys_data, libint2::BasisSet& shells);
 
 void write_json_data(SystemData& sys_data, const std::string cmodule);

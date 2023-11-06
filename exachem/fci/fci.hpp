@@ -23,7 +23,7 @@ std::string generate_fcidump(SystemData sys_data, ExecutionContext& ec, const Ti
   Scheduler sch{ec};
 
   std::cout.precision(15);
-  const auto rank = ec.pg().rank();
+  // const auto rank = ec.pg().rank();
 
   auto [z1, z2] = MSO.labels<2>("all");
 

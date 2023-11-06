@@ -200,7 +200,7 @@ void gfccsd_driver_ip_a(
 
   const TiledIndexSpace& O = MO("occ");
   const TiledIndexSpace& V = MO("virt");
-  const TiledIndexSpace& N = MO("all");
+  // const TiledIndexSpace& N = MO("all");
   // auto [u1] = unit_tis.labels<1>("all");
 
   const int otiles  = O.num_tiles();
@@ -741,10 +741,10 @@ void gfccsd_driver_ip_a(
             H(i, k)     = temp;
           }
 
-          std::complex<double> scr1   = H(k, k);
-          std::complex<double> scr2   = H(k + 1, k);
-          std::complex<double> s_scr  = std::complex<double>(0.0, 0.0);
-          T                    cnk0_r = cn(k, 0).real();
+          std::complex<double> scr1 = H(k, k);
+          std::complex<double> scr2 = H(k + 1, k);
+          // std::complex<double> s_scr  = std::complex<double>(0.0, 0.0);
+          T cnk0_r = cn(k, 0).real();
           blas::rotg(&scr1, &scr2, &cnk0_r, &sn(k, 0));
           cn(k, 0) = std::complex<T>(cnk0_r, cn(k, 0).imag());
 
@@ -2744,9 +2744,9 @@ void gfccsd_driver(std::string filename, OptionsMap options_map) {
   const TAMM_SIZE nocc = sys_data.nocc;
   const TAMM_SIZE nvir = sys_data.nvir;
   const TAMM_SIZE noa  = sys_data.n_occ_alpha;
-  const TAMM_SIZE nob  = sys_data.n_occ_beta;
-  const TAMM_SIZE nva  = sys_data.n_vir_alpha;
-  const TAMM_SIZE nvb  = sys_data.n_vir_beta;
+  // const TAMM_SIZE nob  = sys_data.n_occ_beta;
+  // const TAMM_SIZE nva  = sys_data.n_vir_alpha;
+  // const TAMM_SIZE nvb  = sys_data.n_vir_beta;
 
   ndiis                = ccsd_options.gf_ndiis;
   ngmres               = ccsd_options.gf_ngmres;
@@ -4317,8 +4317,8 @@ void gfccsd_driver(std::string filename, OptionsMap options_map) {
     } // end while
     // end of alpha
 
-    level               = 1;
-    size_t prev_qr_rank = 0;
+    level = 1;
+    // size_t prev_qr_rank = 0;
 
 ////////////////////////////////////////////////
 //                                            //

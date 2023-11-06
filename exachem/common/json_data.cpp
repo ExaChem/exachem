@@ -49,6 +49,7 @@ void SystemData::print() {
   if(nelectrons_active) std::cout << "nelectrons_active = " << nelectrons_active << std::endl;
   std::cout << "nelectrons_alpha = " << nelectrons_alpha << std::endl;
   std::cout << "nelectrons_beta = " << nelectrons_beta << std::endl;
+  if(freeze_atomic) std::cout << "freeze atomic = true" << std::endl;
   std::cout << "n_frozen_core = " << n_frozen_core << std::endl;
   std::cout << "n_frozen_virtual = " << n_frozen_virtual << std::endl;
   std::cout << "----------------------------" << std::endl;
@@ -63,6 +64,7 @@ SystemData::SystemData(OptionsMap options_map_, const std::string scf_type_strin
   is_ks            = false;
   is_qed           = false;
   do_qed           = false;
+  freeze_atomic    = false;
   if(scf_type_string == "restricted") {
     focc          = 1;
     is_restricted = true;
@@ -104,6 +106,42 @@ SystemData::SystemData(OptionsMap options_map_, const std::string scf_type_strin
       }
     }
   }
+}
+
+void write_sinfo(SystemData& sys_data, libint2::BasisSet& shells) {
+  auto        atoms       = sys_data.options_map.options.atoms;
+  auto        ec_atoms    = sys_data.options_map.options.ec_atoms;
+  SCFOptions  scf_options = sys_data.options_map.scf_options;
+  std::string basis       = scf_options.basis;
+
+  std::string out_fp    = sys_data.options_map.options.output_file_prefix + "." + scf_options.basis;
+  std::string files_dir = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type;
+  std::string files_prefix = /*out_fp;*/ files_dir + "/" + out_fp;
+  if(!fs::exists(files_dir)) fs::create_directories(files_dir);
+
+  json results;
+
+  // const auto mname = sys_data.output_file_prefix;
+  results["molecule"]["name"]         = sys_data.options_map.options.output_file_prefix;
+  results["molecule"]["basis"]["all"] = basis;
+
+  for(size_t i = 0; i < atoms.size(); i++) {
+    ECAtom& iatom = ec_atoms[i];
+    if(iatom.basis != basis) results["molecule"]["basis"][iatom.esymbol] = iatom.basis;
+  }
+
+  results["molecule"]["nbf"]              = shells.nbf();
+  results["molecule"]["nshells"]          = shells.size();
+  results["molecule"]["nelectrons"]       = sys_data.nelectrons;
+  results["molecule"]["nelectrons_alpha"] = sys_data.nelectrons_alpha;
+  results["molecule"]["nelectrons_beta"]  = sys_data.nelectrons_beta;
+
+  std::string json_file   = files_prefix + ".sinfo.json";
+  bool        json_exists = std::filesystem::exists(json_file);
+  if(json_exists) std::filesystem::remove(json_file);
+
+  std::ofstream res_file(json_file);
+  res_file << std::setw(2) << results << std::endl;
 }
 
 void write_json_data(SystemData& sys_data, const std::string cmodule) {

@@ -111,8 +111,11 @@
         "ndiis": 5,
         "ccsd_maxiter": 50,
         "nactive": 0,
-        "freeze_core": 0,
-        "freeze_virtual": 0,
+        "freeze": {
+          "atomic": false,
+          "core": 0,
+          "virtual": 0
+        },
 
         "readt": false,
         "writet": false,

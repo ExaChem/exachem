@@ -161,7 +161,7 @@ void ccsd_t2_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
   auto chol3d_ov = chol3d_se[1];
   auto chol3d_vv = chol3d_se[2];
   auto hw        = sch.ec().exhw();
-  auto rank      = sch.ec().pg().rank();
+  // auto rank      = sch.ec().pg().rank();
 
   //_a022("abab")(p1_va,p2_vb,p2_va,p1_vb) = _a021("aa")(p1_va,p2_va,cind) *
   //_a021("bb")(p2_vb,p1_vb,cind)

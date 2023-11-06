@@ -34,7 +34,8 @@ void ccsd_t_driver(std::string filename, OptionsMap options_map) {
   CCSDOptions& ccsd_options   = sys_data.options_map.ccsd_options;
   const int    ccsdt_tilesize = ccsd_options.ccsdt_tilesize;
 
-  sys_data.n_frozen_core    = sys_data.options_map.ccsd_options.freeze_core;
+  sys_data.freeze_atomic    = sys_data.options_map.ccsd_options.freeze_atomic;
+  sys_data.n_frozen_core    = get_nfcore(sys_data);
   sys_data.n_frozen_virtual = sys_data.options_map.ccsd_options.freeze_virtual;
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)

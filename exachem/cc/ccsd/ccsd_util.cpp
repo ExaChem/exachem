@@ -184,7 +184,7 @@ std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vect
            std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>>
 setupTensors(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndiis,
              bool ccsd_restart) {
-  auto rank = ec.pg().rank();
+  // auto rank = ec.pg().rank();
 
   TiledIndexSpace O = MO("occ");
   TiledIndexSpace V = MO("virt");
@@ -234,7 +234,7 @@ std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vect
            std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>>
 setupTensors_cs(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndiis,
                 bool ccsd_restart) {
-  auto rank = ec.pg().rank();
+  // auto rank = ec.pg().rank();
 
   const TiledIndexSpace& O = MO("occ");
   const TiledIndexSpace& V = MO("virt");
@@ -538,7 +538,8 @@ cd_svd_driver(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO, T
 
   auto itile_size = sys_data.options_map.cd_options.itilesize;
 
-  sys_data.n_frozen_core    = sys_data.options_map.ccsd_options.freeze_core;
+  sys_data.freeze_atomic    = sys_data.options_map.ccsd_options.freeze_atomic;
+  sys_data.n_frozen_core    = get_nfcore(sys_data);
   sys_data.n_frozen_virtual = sys_data.options_map.ccsd_options.freeze_virtual;
   bool do_freeze            = sys_data.n_frozen_core > 0 || sys_data.n_frozen_virtual > 0;
 

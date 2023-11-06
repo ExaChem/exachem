@@ -140,14 +140,16 @@ def parse_nwchem_input(input_file):
   dft_opt["PRINT"]["mo_vectors"] = [False,0.15]
 
   nwchem_opt["TCE"] = {}
+  nwchem_opt["TCE"]["freeze"] = {}
   nwchem_opt["TCE"]["PRINT"] = {}
   tce_opt = nwchem_opt["TCE"]
   tce_opt["threshold"] = 1e-6
   tce_opt["ndiis"] = 5
   tce_opt["lshift"] = 0 
   tce_opt["ccsd_maxiter"] = 50
-  tce_opt["freeze_core"] = 0 
-  tce_opt["freeze_virtual"] = 0 
+  tce_opt["freeze"]["atomic"] = False 
+  tce_opt["freeze"]["core"] = 0 
+  tce_opt["freeze"]["virtual"] = 0 
 
   with open(input_file, 'r') as f:
     #Collect all tasks
@@ -324,10 +326,10 @@ def parse_nwchem_input(input_file):
         #TODO: double-check freeze syntax
         #freeze atomic, freeze core 10 (or freeze 10), freeze virtual 5
         if "freeze" in line:
-          if "atomic" in line: unsupported.append("tce freeze atomic not supported (ignored)")
-          elif "core" in line: tce_opt["freeze_core"] = int(get_next_word(line,"core"))
-          elif "virtual" in line: tce_opt["freeze_virtual"] = int(get_next_word(line,"virtual"))
-          else: tce_opt["freeze_core"] = int(get_next_word(line,"freeze"))
+          if "atomic" in line: tce_opt["freeze"]["atomic"] = True
+          elif "core" in line: tce_opt["freeze"]["core"] = int(get_next_word(line,"core"))
+          elif "virtual" in line: tce_opt["freeze"]["virtual"] = int(get_next_word(line,"virtual"))
+          else: tce_opt["freeze"]["core"] = int(get_next_word(line,"freeze"))
 
         #TODO: eomccsd
         if nwchem_opt["task_tce"]:
@@ -506,14 +508,16 @@ if __name__ == '__main__':
 
   tce_opt = nwchem_opt["TCE"]
   exachem_opt["CC"] = {}
+  exachem_opt["CC"]["freeze"] = {}
   # exachem_opt["CC"]["PRINT"] = {}
   cc_opt = exachem_opt["CC"]
   cc_opt["threshold"]      = tce_opt["threshold"]
   cc_opt["ndiis"]           = tce_opt["ndiis"]
   cc_opt["lshift"]         = tce_opt["lshift"]
   cc_opt["ccsd_maxiter"]   = tce_opt["ccsd_maxiter"]
-  cc_opt["freeze_core"]    = tce_opt["freeze_core"]
-  cc_opt["freeze_virtual"] = tce_opt["freeze_virtual"]
+  cc_opt["freeze"]["atomic"]  = tce_opt["freeze"]["atomic"]
+  cc_opt["freeze"]["core"]    = tce_opt["freeze"]["core"]
+  cc_opt["freeze"]["virtual"] = tce_opt["freeze"]["virtual"]
 
   """
     MISC

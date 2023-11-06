@@ -97,6 +97,7 @@ class TaskOptions: public Options {
 public:
   TaskOptions() = default;
   TaskOptions(Options o): Options(o) {}
+  bool                         sinfo{false};
   bool                         scf{false};
   bool                         mp2{false};
   bool                         gw{false};
@@ -473,10 +474,11 @@ public:
   std::pair<bool, double> tamplitudes{false, 0.05};
   std::vector<int>        cc_rdm{};
 
-  int nactive;
-  int ccsd_maxiter;
-  int freeze_core;
-  int freeze_virtual;
+  int  nactive;
+  int  ccsd_maxiter;
+  bool freeze_atomic{false};
+  int  freeze_core;
+  int  freeze_virtual;
 
   // RT-EOMCC
   int    pcore;      // pth core orbital
@@ -558,6 +560,7 @@ public:
     if(nactive > 0) cout << " nactive              = " << nactive << endl;
     if(pcore > 0) cout << " pcore                = " << pcore << endl;
     cout << " ccsd_maxiter         = " << ccsd_maxiter << endl;
+    print_bool(" freeze_atomic        ", freeze_atomic);
     cout << " freeze_core          = " << freeze_core << endl;
     cout << " freeze_virtual       = " << freeze_virtual << endl;
     if(lshift != 0) cout << " lshift               = " << lshift << endl;
@@ -910,11 +913,10 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   // CC
   json                      jcc = jinput["CC"];
   const std::vector<string> valid_cc{
-    "CCSD(T)",  "DLPNO",     "EOMCCSD",        "RT-EOMCC",      "GFCCSD",
-    "comments", "threshold", "force_tilesize", "tilesize",      "computeTData",
-    "lshift",   "ndiis",     "ccsd_maxiter",   "freeze_core",   "freeze_virtual",
-    "PRINT",    "readt",     "writet",         "writev",        "writet_iter",
-    "debug",    "nactive",   "profile_ccsd",   "balance_tiles", "ext_data_path"};
+    "CCSD(T)",      "DLPNO",          "EOMCCSD",  "RT-EOMCC",     "GFCCSD",        "comments",
+    "threshold",    "force_tilesize", "tilesize", "computeTData", "lshift",        "ndiis",
+    "ccsd_maxiter", "freeze",         "PRINT",    "readt",        "writet",        "writev",
+    "writet_iter",  "debug",          "nactive",  "profile_ccsd", "balance_tiles", "ext_data_path"};
   for(auto& el: jcc.items()) {
     if(std::find(valid_cc.begin(), valid_cc.end(), el.key()) == valid_cc.end())
       tamm_terminate("INPUT FILE ERROR: Invalid CC option [" + el.key() + "] in the input file");
@@ -923,8 +925,6 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   parse_option<int>   (ccsd_options.ndiis         , jcc, "ndiis");
   parse_option<int>   (ccsd_options.nactive       , jcc, "nactive");
   parse_option<int>   (ccsd_options.ccsd_maxiter  , jcc, "ccsd_maxiter");
-  parse_option<int>   (ccsd_options.freeze_core   , jcc, "freeze_core");
-  parse_option<int>   (ccsd_options.freeze_virtual, jcc, "freeze_virtual");
   parse_option<double>(ccsd_options.lshift        , jcc, "lshift");
   parse_option<double>(ccsd_options.threshold     , jcc, "threshold");
   parse_option<int>   (ccsd_options.tilesize      , jcc, "tilesize");
@@ -943,6 +943,11 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   parse_option<bool> (ccsd_options.ccsd_diagnostics, jcc_print, "ccsd_diagnostics");
   parse_option<std::vector<int>>(ccsd_options.cc_rdm, jcc_print, "rdm");
   parse_option<std::pair<bool, double>>(ccsd_options.tamplitudes, jcc_print, "tamplitudes");
+
+  json jcc_freeze = jcc["freeze"];
+  parse_option<bool>(ccsd_options.freeze_atomic,  jcc_freeze, "atomic");
+  parse_option<int> (ccsd_options.freeze_core,    jcc_freeze, "core");
+  parse_option<int> (ccsd_options.freeze_virtual, jcc_freeze, "virtual");
 
   //RT-EOMCC
   json jrt_eom = jcc["RT-EOMCC"];
@@ -1078,9 +1083,9 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   // TASK
   json                      jtask = jinput["TASK"];
   const std::vector<string> valid_tasks{
-    "scf",         "fci",          "fcidump",   "mp2",        "gw",      "cd_2e",  "cc2",
-    "dlpno_ccsd",  "dlpno_ccsd_t", "ducc",      "ccsd",       "ccsd_sf", "ccsd_t", "gfccsd",
-    "ccsd_lambda", "eom_ccsd",     "rteom_cc2", "rteom_ccsd", "comments"};
+    "sinfo",  "scf",         "fci",          "fcidump",   "mp2",        "gw",      "cd_2e",
+    "cc2",    "dlpno_ccsd",  "dlpno_ccsd_t", "ducc",      "ccsd",       "ccsd_sf", "ccsd_t",
+    "gfccsd", "ccsd_lambda", "eom_ccsd",     "rteom_cc2", "rteom_ccsd", "comments"};
 
   for(auto& el: jtask.items()) {
     if(std::find(valid_tasks.begin(), valid_tasks.end(), el.key()) == valid_tasks.end())
@@ -1088,6 +1093,7 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   }
 
   // clang-format off
+  parse_option<bool>(task_options.sinfo       , jtask, "sinfo");
   parse_option<bool>(task_options.scf         , jtask, "scf");
   parse_option<bool>(task_options.mp2         , jtask, "mp2");
   parse_option<bool>(task_options.gw          , jtask, "gw");

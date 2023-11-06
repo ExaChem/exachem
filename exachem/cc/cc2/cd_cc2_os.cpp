@@ -243,8 +243,8 @@ void cc2_os::cc2_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledInd
   auto chol3d_vo = chol3d_se[2];
   auto chol3d_vv = chol3d_se[3];
 
-  auto hw   = sch.ec().exhw();
-  auto rank = sch.ec().pg().rank();
+  // auto hw   = sch.ec().exhw();
+  // auto rank = sch.ec().pg().rank();
 
   Tensor<T> ph{{a, i, cind}, {1, 1}};
   Tensor<T> ph_1{{a, i, cind}, {1, 1}};

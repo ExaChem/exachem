@@ -15,9 +15,6 @@ template<typename T>
 void eomccsd_x1(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const Tensor<T>& t1,
                 const Tensor<T>& t2, const Tensor<T>& x1, const Tensor<T>& x2, const Tensor<T>& f1,
                 V2Tensors<T>& v2tensors, EOM_X1Tensors<T>& x1tensors) {
-  const TiledIndexSpace& O = MO("occ");
-  const TiledIndexSpace& V = MO("virt");
-
   auto [h1, h3, h4, h5, h6, h8] = MO.labels<6>("occ");
   auto [p2, p3, p4, p5, p6, p7] = MO.labels<6>("virt");
 
@@ -76,9 +73,6 @@ template<typename T>
 void eomccsd_x2(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const Tensor<T>& t1,
                 const Tensor<T>& t2, const Tensor<T>& x1, const Tensor<T>& x2, const Tensor<T>& f1,
                 V2Tensors<T>& v2tensors, EOM_X2Tensors<T>& x2tensors) {
-  const TiledIndexSpace& O = MO("occ");
-  const TiledIndexSpace& V = MO("virt");
-
   TiledIndexLabel h1, h2, h5, h6, h7, h8, h9, h10;
   TiledIndexLabel p3, p4, p5, p6, p7, p8, p9;
 
@@ -277,7 +271,6 @@ void right_eomccsd_driver(SystemData sys_data, ExecutionContext& ec, const Tiled
 
   const TiledIndexSpace& O = MO("occ");
   const TiledIndexSpace& V = MO("virt");
-  const TiledIndexSpace& N = MO("all");
 
   std::cout.precision(15);
 

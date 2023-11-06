@@ -270,6 +270,8 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     std::cout << std::endl
               << "Nuclear repulsion energy  = " << std::setprecision(15) << enuc << std::endl
               << std::endl;
+
+    write_sinfo(sys_data, shells);
   }
 
   // Compute non-negligible shell-pair list

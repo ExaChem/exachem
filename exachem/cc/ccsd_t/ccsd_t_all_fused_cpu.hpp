@@ -153,7 +153,9 @@ void total_fused_ccsd_t_cpu(
     double* host_d1_t2_9 = df_host_pinned_d1_t2 + max_dim_d1_t2 * flag_d1_9;
     double* host_d1_v2_9 = df_host_pinned_d1_v2 + max_dim_d1_v2 * flag_d1_9;
 
+#ifdef _OPENMP
 #pragma omp parallel for collapse(6)
+#endif
     for(int t3_h3 = 0; t3_h3 < d1_base_size_h3b; t3_h3++)
       for(int t3_h2 = 0; t3_h2 < d1_base_size_h2b; t3_h2++)
         for(int t3_h1 = 0; t3_h1 < d1_base_size_h1b; t3_h1++)
@@ -309,7 +311,9 @@ void total_fused_ccsd_t_cpu(
     double* host_d2_t2_9 = df_host_pinned_d2_t2 + max_dim_d2_t2 * flag_d2_9;
     double* host_d2_v2_9 = df_host_pinned_d2_v2 + max_dim_d2_v2 * flag_d2_9;
 
+#ifdef _OPENMP
 #pragma omp parallel for collapse(6)
+#endif
     for(int t3_h3 = 0; t3_h3 < d2_base_size_h3b; t3_h3++)
       for(int t3_h2 = 0; t3_h2 < d2_base_size_h2b; t3_h2++)
         for(int t3_h1 = 0; t3_h1 < d2_base_size_h1b; t3_h1++)
@@ -449,8 +453,9 @@ void total_fused_ccsd_t_cpu(
     double* host_s1_t2;
     double* host_s1_v2;
 
-//
+#ifdef _OPENMP
 #pragma omp parallel for collapse(6)
+#endif
     for(int t3_h3 = 0; t3_h3 < s1_base_size_h3b; t3_h3++)
       for(int t3_h2 = 0; t3_h2 < s1_base_size_h2b; t3_h2++)
         for(int t3_h1 = 0; t3_h1 < s1_base_size_h1b; t3_h1++)

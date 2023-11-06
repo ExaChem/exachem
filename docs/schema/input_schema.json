@@ -296,11 +296,16 @@
         "nactive": {
           "type": "number"
         },
-        "freeze_core": {
-          "type": "number"
-        },
-        "freeze_virtual": {
-          "type": "number"
+        "freeze": {
+          "atomic": {
+            "type": "boolean"
+          },        
+          "core": {
+            "type": "number"
+          },
+          "virtual": {
+            "type": "number"
+          }
         },
         "readt": {
           "type": "boolean"

@@ -81,8 +81,8 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(SystemData sys_data, bool tripl
 
   TAMM_SIZE nmo         = sys_data.nmo;
   TAMM_SIZE n_vir_alpha = sys_data.n_vir_alpha;
-  TAMM_SIZE n_vir_beta  = sys_data.n_vir_beta;
-  TAMM_SIZE nocc        = sys_data.nocc;
+  // TAMM_SIZE n_vir_beta  = sys_data.n_vir_beta;
+  TAMM_SIZE nocc = sys_data.nocc;
 
   const TAMM_SIZE total_orbitals = nmo;
 
@@ -408,15 +408,15 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
 
     auto bd1 = block_dims[1];
 
-    auto s1range_start = 0l;
-    auto s1range_end   = shell_tile_map[bi0];
+    size_t s1range_start = 0;
+    auto   s1range_end   = shell_tile_map[bi0];
     if(bi0 > 0) s1range_start = shell_tile_map[bi0 - 1] + 1;
 
     for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
       auto n1 = shells[s1].size();
 
-      auto s2range_start = 0l;
-      auto s2range_end   = shell_tile_map[bi1];
+      size_t s2range_start = 0;
+      auto   s2range_end   = shell_tile_map[bi1];
       if(bi1 > 0) s2range_start = shell_tile_map[bi1 - 1] + 1;
 
       for(size_t s2 = s2range_start; s2 <= s2range_end; ++s2) {
@@ -598,8 +598,8 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
 #if defined(USE_UPCXX)
         if(g_r_tamm.is_local_element(0, 0, bf3_first, bf4_first)) {
 #else
-        if(lo_r[0] <= bf3_first && bf3_first <= hi_r[0] && lo_r[1] <= bf4_first &&
-           bf4_first <= hi_r[1]) {
+        if(lo_r[0] <= cd_ncast<size_t>(bf3_first) && cd_ncast<size_t>(bf3_first) <= hi_r[0] &&
+           lo_r[1] <= cd_ncast<size_t>(bf4_first) && cd_ncast<size_t>(bf4_first) <= hi_r[1]) {
 #endif
           engine.compute(shells[s3], shells[s4], shells[s1], shells[s2]);
           const auto* buf_3412 = buf[0];

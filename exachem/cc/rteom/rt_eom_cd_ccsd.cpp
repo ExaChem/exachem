@@ -573,13 +573,10 @@ void rt_eom_cd_ccsd(SystemData& sys_data, ExecutionContext& ec, const TiledIndex
   bool   writet      = sys_data.options_map.ccsd_options.writet;
   int    writet_iter = sys_data.options_map.ccsd_options.writet_iter;
   // double zshiftl     = sys_data.options_map.ccsd_options.lshift;
-  bool profile  = sys_data.options_map.ccsd_options.profile_ccsd;
-  T    residual = 0.0;
-  T    energy   = 0.0;
+  bool profile = sys_data.options_map.ccsd_options.profile_ccsd;
+  // T    residual = 0.0;
+  // T    energy   = 0.0;
   // int    niter       = 0;
-
-  const TAMM_SIZE n_occ_alpha = static_cast<TAMM_SIZE>(sys_data.n_occ_alpha);
-  const TAMM_SIZE n_occ_beta  = static_cast<TAMM_SIZE>(sys_data.n_occ_beta);
 
   std::cout.precision(15);
 

@@ -32,6 +32,12 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
    "debug": false,
    "profile_ccsd": false,
 
+   "freeze": {
+      "atomic": false,
+      "core": 0,
+      "virtual": 0
+   },   
+
    "PRINT": {
       "tamplitudes": [false,0.05],
       "ccsd_diagnostics" : false,
@@ -60,6 +66,12 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
 :debug: ``[default=false]`` enable verbose printing for debugging a CC calculation.
 
 :profile_ccsd: ``[default=false]`` When enabled, writes a csv file containing the performance data for every tensor contraction. Useful for profiling contractions in a single iteration by setting ``ccsd_maxiter=1``.
+
+:freeze: This block allows specifying freezing options. Some of the lowest-lying core orbitals and/or some of the highest-lying virtual orbitals may be excluded using this block. No orbitals are frozen by default.
+
+   * :strong:`atomic`:  Enable to exclude the atom-like core regions altogether. (H-He: 0, Li-Ne: 1, Na-Ar: 5, K-Kr: 9, Rb-Xe: 18, Cs-Rn: 27, Fr-Og: 43).
+   * :strong:`core`: The specified number of lowest-lying occupied orbitals are excluded.
+   * :strong:`virtual`: The specified number of highest-lying virtual orbitals are excluded.
 
 :PRINT: This block allows specifying a couple of printing options. When enabled, they provide the following
 

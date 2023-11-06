@@ -238,12 +238,26 @@ void compute_shellpair_list(const ExecutionContext& ec, const libint2::BasisSet&
               << shells.size() * (shells.size() + 1) / 2 << "," << nsp << "}" << endl;
 }
 
+int get_nfcore(SystemData& sys_data) {
+  if(sys_data.options_map.ccsd_options.freeze_atomic) {
+    auto& atoms  = sys_data.options_map.options.atoms;
+    int   nfcore = 0;
+    for(size_t i = 0; i < atoms.size(); ++i) {
+      const auto Z = atoms[i].atomic_number;
+      if(Z >= 3 && Z <= 10) nfcore += 1;
+      else if(Z >= 11 && Z <= 18) nfcore += 5;
+      else if(Z >= 19 && Z <= 36) nfcore += 9;
+      else if(Z >= 37 && Z <= 54) nfcore += 18;
+      else if(Z >= 55 && Z <= 86) nfcore += 27;
+      else if(Z >= 87 && Z <= 118) nfcore += 43;
+    }
+    return nfcore;
+  }
+
+  return sys_data.options_map.ccsd_options.freeze_core;
+}
+
 std::tuple<int, double> compute_NRE(const ExecutionContext& ec, std::vector<libint2::Atom>& atoms) {
-  auto rank = ec.pg().rank();
-  //  std::cout << "Geometries in bohr units " << std::endl;
-  //  for (auto i = 0; i < atoms.size(); ++i)
-  //    std::cout << atoms[i].atomic_number << "  " << atoms[i].x<< "  " <<
-  //    atoms[i].y<< "  " << atoms[i].z << endl;
   // count the number of electrons
   auto nelectron = 0;
   for(size_t i = 0; i < atoms.size(); ++i) nelectron += atoms[i].atomic_number;
@@ -538,7 +552,6 @@ void rw_md_disk(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syste
 
 void scf_restart(ExecutionContext& ec, ScalapackInfo& scalapack_info, const SystemData& sys_data,
                  TAMMTensors& ttensors, EigenTensors& etensors, std::string files_prefix) {
-  const auto rank   = ec.pg().rank();
   const auto N      = sys_data.nbf_orig;
   const auto Northo = N - sys_data.n_lindep;
   EXPECTS(Northo == sys_data.nbf);

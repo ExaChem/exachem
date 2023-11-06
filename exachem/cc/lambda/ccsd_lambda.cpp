@@ -68,9 +68,9 @@ void lambda_ccsd_y1(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexS
                     Tensor<T>& i0, const Tensor<T>& t1, const Tensor<T>& t2, const Tensor<T>& y1,
                     const Tensor<T>& y2, const Tensor<T>& f1, V2Tensors<T>& v2tensors,
                     Tensor<T>& cv3d, Y1Tensors<T>& y1tensors) {
-  const TiledIndexSpace& O = MO("occ");
-  const TiledIndexSpace& V = MO("virt");
-  auto [cind]              = CI.labels<1>("all");
+  // const TiledIndexSpace& O = MO("occ");
+  // const TiledIndexSpace& V = MO("virt");
+  auto [cind] = CI.labels<1>("all");
 
   TiledIndexLabel p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11;
   TiledIndexLabel h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12;
@@ -273,9 +273,9 @@ void lambda_ccsd_y2(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexS
                     Tensor<T>& i0, const Tensor<T>& t1, Tensor<T>& t2, const Tensor<T>& y1,
                     Tensor<T>& y2, const Tensor<T>& f1, V2Tensors<T>& v2tensors, Tensor<T>& cv3d,
                     Y2Tensors<T>& y2tensors) {
-  const TiledIndexSpace& O = MO("occ");
-  const TiledIndexSpace& V = MO("virt");
-  auto [cind]              = CI.labels<1>("all");
+  // const TiledIndexSpace& O = MO("occ");
+  // const TiledIndexSpace& V = MO("virt");
+  auto [cind] = CI.labels<1>("all");
 
   TiledIndexLabel p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11;
   TiledIndexLabel h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12;

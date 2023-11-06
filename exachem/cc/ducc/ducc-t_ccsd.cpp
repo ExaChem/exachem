@@ -18,7 +18,7 @@ void H_0(Scheduler& sch, const TiledIndexSpace& MO,
             const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
             const Tensor<T>& vtijkl, const Tensor<T>& vtijka,
             const Tensor<T>& vtaijb, const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
-            const Tensor<T>& f1, V2Tensors<T>& v2tensors, int nactv, ExecutionHW ex_hw = ExecutionHW::CPU){
+            const Tensor<T>& f1, V2Tensors<T>& v2tensors, size_t nactv, ExecutionHW ex_hw = ExecutionHW::CPU){
 
   auto [i, j, k, l] = MO.labels<4>("occ");
   auto [a, b, c, d] = MO.labels<4>("virt_int");
@@ -44,7 +44,7 @@ void F_1(Scheduler& sch, const TiledIndexSpace& MO,
             const Tensor<T>& vtijkl, const Tensor<T>& vtijka,
             const Tensor<T>& vtaijb, const Tensor<T>& vtijab, const Tensor<T>& vtiabc,
             const Tensor<T>& vtabcd, const Tensor<T>& f1,
-            const Tensor<T>& t1, const Tensor<T>& t2, int nactv, ExecutionHW ex_hw = ExecutionHW::CPU){
+            const Tensor<T>& t1, const Tensor<T>& t2, size_t nactv, ExecutionHW ex_hw = ExecutionHW::CPU){
 
   TiledIndexLabel a, b, c, d;
   TiledIndexLabel i, j, k, l;
@@ -148,11 +148,7 @@ void V_1(Scheduler& sch, const TiledIndexSpace& MO,
             const Tensor<T>& vtijkl, const Tensor<T>& vtijka,
             const Tensor<T>& vtaijb, const Tensor<T>& vtijab, const Tensor<T>& vtiabc,
             const Tensor<T>& vtabcd, V2Tensors<T>& v2tensors,
-            const Tensor<T>& t1, const Tensor<T>& t2, int nactv, ExecutionHW ex_hw = ExecutionHW::CPU){
-
-  const TiledIndexSpace& O = MO("occ");
-  const TiledIndexSpace& Vi = MO("virt_int");
-
+            const Tensor<T>& t1, const Tensor<T>& t2, size_t nactv, ExecutionHW ex_hw = ExecutionHW::CPU){
 
   TiledIndexLabel a, b, c, d;
   TiledIndexLabel i, j, k, l;
@@ -318,7 +314,7 @@ void F_2(Scheduler& sch, const TiledIndexSpace& MO,
             const Tensor<T>& vtijkl, const Tensor<T>& vtijka,
             const Tensor<T>& vtaijb, const Tensor<T>& vtijab, const Tensor<T>& vtiabc,
             const Tensor<T>& vtabcd, const Tensor<T>& f1,
-            const Tensor<T>& t1, const Tensor<T>& t2, int nactv, ExecutionHW ex_hw = ExecutionHW::CPU){
+            const Tensor<T>& t1, const Tensor<T>& t2, size_t nactv, ExecutionHW ex_hw = ExecutionHW::CPU){
 
   TiledIndexLabel a, b, c, d;
   TiledIndexLabel i, j, k, l;
@@ -542,17 +538,17 @@ void ducc_tensors_io(ExecutionContext& ec, std::vector<Tensor<T>>& rwtensors,
 template<typename T>
 void DUCC_T_CCSD_Driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
                         Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1, V2Tensors<T>& v2tensors,
-                        int nactv, ExecutionHW ex_hw = ExecutionHW::CPU) {
+                        size_t nactv, ExecutionHW ex_hw = ExecutionHW::CPU) {
   Scheduler sch{ec};
 
-  const TiledIndexSpace& O  = MO("occ");
-  const TiledIndexSpace& V  = MO("virt");
+  const TiledIndexSpace& O = MO("occ");
+  // const TiledIndexSpace& V  = MO("virt");
   const TiledIndexSpace& Vi = MO("virt_int");
   // const TiledIndexSpace& N = MO("all");
-  //   const TiledIndexSpace& Vai = MO("virt_alpha_int");
-  //   const TiledIndexSpace& Vbi = MO("virt_beta_int");
-  //   const TiledIndexSpace& Vae = MO("virt_alpha_ext");
-  //   const TiledIndexSpace& Vbe = MO("virt_beta_ext");
+  // const TiledIndexSpace& Vai = MO("virt_alpha_int");
+  // const TiledIndexSpace& Vbi = MO("virt_beta_int");
+  // const TiledIndexSpace& Vae = MO("virt_alpha_ext");
+  // const TiledIndexSpace& Vbe = MO("virt_beta_ext");
 
   auto [z1, z2, z3, z4]     = MO.labels<4>("all");
   auto [h1, h2, h3, h4]     = MO.labels<4>("occ");
@@ -710,9 +706,9 @@ void DUCC_T_CCSD_Driver(SystemData sys_data, ExecutionContext& ec, const TiledIn
   cc_t1 = std::chrono::high_resolution_clock::now();
   ExecutionContext ec_dense{ec.pg(), DistributionKind::dense,
                             MemoryManagerKind::ga}; // create ec_dense once
-  const auto       nelectrons       = sys_data.nelectrons;
-  const auto       nelectrons_alpha = sys_data.nelectrons_alpha;
-  auto             print_blockstr = [](std::string filename, std::string val, bool append = false) {
+  // const auto       nelectrons       = sys_data.nelectrons;
+  const size_t nelectrons_alpha = sys_data.nelectrons_alpha;
+  auto         print_blockstr   = [](std::string filename, std::string val, bool append = false) {
     if(!filename.empty()) {
       std::ofstream tos;
       if(append) tos.open(filename + ".txt", std::ios::app);
@@ -893,5 +889,5 @@ void DUCC_T_CCSD_Driver(SystemData sys_data, ExecutionContext& ec, const TiledIn
 using T = double;
 template void DUCC_T_CCSD_Driver<T>(SystemData sys_data, ExecutionContext& ec,
                                     const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
-                                    Tensor<T>& f1, V2Tensors<T>& v2tensors, int nactv,
+                                    Tensor<T>& f1, V2Tensors<T>& v2tensors, size_t nactv,
                                     ExecutionHW ex_hw);

@@ -602,7 +602,6 @@
     "molecule": {
       "name": "h2o_eom",
       "basisset": "cc-pvdz",
-      "gaussian_type": "spherical",
       "geometry_units": "bohr"
     },
     "SCF": {

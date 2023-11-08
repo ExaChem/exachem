@@ -860,6 +860,7 @@ std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(const libint2:
 
   // compute shellpair data assuming that we are computing to default_epsilon
   // N.B. only parallelized over 1 shell index
+  const auto       max_engine_precision    = std::numeric_limits<double>::epsilon() / 1e10;
   const auto       ln_max_engine_precision = std::log(max_engine_precision);
   shellpair_data_t spdata(splist.size());
 

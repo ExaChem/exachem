@@ -157,12 +157,13 @@ void write_json_data(SystemData& sys_data, const std::string cmodule) {
     return "false";
   };
 
-  results["input"]["molecule"]["name"]           = sys_data.input_molecule;
-  results["input"]["molecule"]["basisset"]       = scf.basis;
-  results["input"]["molecule"]["gaussian_type"]  = scf.gaussian_type;
+  results["input"]["molecule"]["name"]     = sys_data.input_molecule;
+  results["input"]["molecule"]["basisset"] = scf.basis;
+  // results["input"]["molecule"]["gaussian_type"]  = scf.gaussian_type;
   results["input"]["molecule"]["geometry_units"] = scf.geom_units;
   // SCF options
   results["input"]["SCF"]["tol_int"]        = scf.tol_int;
+  results["input"]["SCF"]["tol_sch"]        = scf.tol_sch;
   results["input"]["SCF"]["tol_lindep"]     = scf.tol_lindep;
   results["input"]["SCF"]["conve"]          = scf.conve;
   results["input"]["SCF"]["convd"]          = scf.convd;

@@ -125,10 +125,11 @@ public:
     charge           = 0;
     multiplicity     = 1;
     lshift           = 0;
-    tol_int          = 1e-12;
+    tol_int          = 1e-22;
+    tol_sch          = 1e-10;
     tol_lindep       = 1e-5;
     conve            = 1e-8;
-    convd            = 1e-6;
+    convd            = 1e-7;
     diis_hist        = 10;
     AO_tilesize      = 30;
     dfAO_tilesize    = 50;
@@ -159,7 +160,8 @@ public:
   int         charge;
   int         multiplicity;
   double      lshift;     // level shift factor, +ve value b/w 0 and 1
-  double      tol_int;    // tolerance for integral engine
+  double      tol_int;    // tolerance for integral primitive screening
+  double      tol_sch;    // tolerance for schwarz screening
   double      tol_lindep; // tolerance for linear dependencies
   double      conve;      // energy convergence
   double      convd;      // density convergence
@@ -204,6 +206,7 @@ public:
     cout << " multiplicity = " << multiplicity << endl;
     cout << " level shift  = " << lshift << endl;
     cout << " tol_int      = " << tol_int << endl;
+    cout << " tol_sch      = " << tol_sch << endl;
     cout << " tol_lindep   = " << tol_lindep << endl;
     cout << " conve        = " << conve << endl;
     cout << " convd        = " << convd << endl;
@@ -747,8 +750,8 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   parse_option<string>(options.dfbasis, jbasis, "df_basisset");
 
   to_lower(options.basis);
-  const std::vector<string> valid_basis{"comments",      "basisset",    "basisfile",
-                                        "gaussian_type", "df_basisset", "atom_basis"};
+  const std::vector<string> valid_basis{"comments", "basisset", "basisfile",
+                                        /*"gaussian_type",*/ "df_basisset", "atom_basis"};
   for(auto& el: jbasis.items()) {
     if(std::find(valid_basis.begin(), valid_basis.end(), el.key()) == valid_basis.end())
       tamm_terminate("INPUT FILE ERROR: Invalid basis section option [" + el.key() +
@@ -795,6 +798,7 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   parse_option<int>   (scf_options.multiplicity    , jscf, "multiplicity");
   parse_option<double>(scf_options.lshift          , jscf, "lshift");
   parse_option<double>(scf_options.tol_int         , jscf, "tol_int");
+  parse_option<double>(scf_options.tol_sch         , jscf, "tol_sch");
   parse_option<double>(scf_options.tol_lindep      , jscf, "tol_lindep");
   parse_option<double>(scf_options.conve           , jscf, "conve");
   parse_option<double>(scf_options.convd           , jscf, "convd");
@@ -842,7 +846,7 @@ parse_json(json& jinput, std::vector<ECAtom>& ec_atoms) {
   if(riscf_str == "J") scf_options.riscf = 1;
   else if(riscf_str == "K") scf_options.riscf = 2;
   // clang-format off
-  const std::vector<string> valid_scf{"charge", "multiplicity", "lshift", "tol_int",
+  const std::vector<string> valid_scf{"charge", "multiplicity", "lshift", "tol_int", "tol_sch",
     "tol_lindep", "conve", "convd", "diis_hist","force_tilesize","tilesize","df_tilesize",
     "damp","writem","nnodes","restart","noscf","moldenfile", "guess",
     "debug","scf_type","xc_type", "xc_grid_type", "n_lindep","restart_size","scalapack_nb","riscf",

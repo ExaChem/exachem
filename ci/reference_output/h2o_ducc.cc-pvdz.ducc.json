@@ -240,7 +240,6 @@
     "molecule": {
       "name": "h2o_ducc",
       "basisset": "cc-pvdz",
-      "gaussian_type": "spherical",
       "geometry_units": "bohr"
     },
     "SCF": {

@@ -34,8 +34,6 @@ using shellpair_data_t =
   std::vector<std::vector<std::shared_ptr<libint2::ShellPair>>>; // in same order as
                                                                  // shellpair_list_t
 
-const auto max_engine_precision = std::numeric_limits<double>::epsilon() / 1e10;
-
 // Tensor<TensorType> vxc_tamm; // TODO: cleanup
 
 struct SCFVars {
@@ -45,6 +43,7 @@ struct SCFVars {
   double                   exc         = 0.0;
   double                   eqed        = 0.0;
   bool                     do_dens_fit = false;
+  bool                     do_load_bal = false;
   libecpint::ECPIntegrator ecp_factory;
 
   // AO spaces

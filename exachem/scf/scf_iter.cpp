@@ -248,8 +248,8 @@ compute_2bf_taskinfo(ExecutionContext& ec, const SystemData& sys_data, const SCF
   Matrix&             D_beta  = etensors.D_beta;
   Tensor<TensorType>& F_dummy = ttensors.F_dummy;
 
-  double fock_precision = std::min(sys_data.options_map.scf_options.tol_int,
-                                   1e-3 * sys_data.options_map.scf_options.conve);
+  double fock_precision = std::min(sys_data.options_map.scf_options.tol_sch,
+                                   1e-2 * sys_data.options_map.scf_options.conve);
   // auto       rank           = ec.pg().rank();
   const bool is_uhf = sys_data.is_unrestricted;
 
@@ -674,12 +674,12 @@ void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syst
   Matrix& G_beta = etensors.G_beta;
   Matrix& D_beta = etensors.D_beta;
 
-  // Tensor<TensorType>& F_dummy  = ttensors.F_dummy;
+  Tensor<TensorType>& F_dummy     = ttensors.F_dummy;
   Tensor<TensorType>& F_alpha_tmp = ttensors.F_alpha_tmp;
   Tensor<TensorType>& F_beta_tmp  = ttensors.F_beta_tmp;
 
-  double fock_precision = std::min(sys_data.options_map.scf_options.tol_int,
-                                   1e-3 * sys_data.options_map.scf_options.conve);
+  double fock_precision = std::min(sys_data.options_map.scf_options.tol_sch,
+                                   1e-2 * sys_data.options_map.scf_options.conve);
   auto   rank           = ec.pg().rank();
   auto   N              = sys_data.nbf_orig;
   auto   debug          = sys_data.options_map.scf_options.debug;
@@ -687,13 +687,7 @@ void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syst
   auto   do_t1 = std::chrono::high_resolution_clock::now();
   Matrix D_shblk_norm;
 
-  // TODO: Revisit
-  double engine_precision = fock_precision;
-
-  if(rank == 0)
-    assert(engine_precision > max_engine_precision &&
-           "using precomputed shell pair data limits the max engine precision"
-           " ... make max_engine_precision smaller and recompile");
+  double engine_precision = sys_data.options_map.scf_options.tol_int; // default: 1e-22
 
   // construct the 2-electron repulsion integrals engine pool
   using libint2::Engine;
@@ -847,14 +841,16 @@ void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syst
 
     G.setZero(N, N);
     if(is_uhf) G_beta.setZero(N, N);
-    // block_for(ec, F_dummy(), comp_2bf_lambda);
-    for(Eigen::Index i1 = 0; i1 < etensors.taskmap.rows(); i1++)
-      for(Eigen::Index j1 = 0; j1 < etensors.taskmap.cols(); j1++) {
-        if(etensors.taskmap(i1, j1) == -1 || etensors.taskmap(i1, j1) != rank) continue;
-        IndexVector blockid{(tamm::Index) i1, (tamm::Index) j1};
-        comp_2bf_lambda(blockid);
-      }
-    ec.pg().barrier();
+    if(!scf_vars.do_load_bal) block_for(ec, F_dummy(), comp_2bf_lambda);
+    else {
+      for(Eigen::Index i1 = 0; i1 < etensors.taskmap.rows(); i1++)
+        for(Eigen::Index j1 = 0; j1 < etensors.taskmap.cols(); j1++) {
+          if(etensors.taskmap(i1, j1) == -1 || etensors.taskmap(i1, j1) != rank) continue;
+          IndexVector blockid{(tamm::Index) i1, (tamm::Index) j1};
+          comp_2bf_lambda(blockid);
+        }
+      ec.pg().barrier();
+    }
 
     // Matrix Gt = 0.5 * (G + G.transpose()); G=Gt
     // Gt     = 0.5 * (G_beta + G_beta.transpose());

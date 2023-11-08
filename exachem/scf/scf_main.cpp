@@ -248,6 +248,12 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
   SCFVars scf_vars; // init vars
 
+  if(rank == 0) {
+    const double fock_precision = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
+    if(fock_precision < scf_options.tol_sch)
+      cout << "**** Resetting tol_sch to " << fock_precision << endl;
+  }
+
   // Compute Nuclear repulsion energy.
   auto [nelectrons, enuc] = compute_NRE(exc, atoms);
   // Might be actually useful to store?
@@ -365,6 +371,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
   const bool scf_conv = restart && scf_options.noscf;
   bool       is_conv  = true;
+  const bool load_bal = scf_vars.do_load_bal;
 
   scf_restart_test(exc, sys_data, restart, files_prefix);
 
@@ -715,7 +722,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
       compute_sad_guess<TensorType>(ec, scalapack_info, sys_data, scf_vars, atoms, shells, basis,
                                     is_spherical, etensors, ttensors, charge, multiplicity);
 
-      if(!do_density_fitting) {
+      if(!do_density_fitting && load_bal) {
         // Collect task info
         std::tie(s1vec, s2vec, ntask_vec) = compute_2bf_taskinfo<TensorType>(
           ec, sys_data, scf_vars, obs, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4, ttensors,
@@ -752,7 +759,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
       compute_density<TensorType>(ec, sys_data, scf_vars, scalapack_info, ttensors, etensors);
 
-      if(!do_density_fitting) etensors.taskmap.resize(0, 0);
+      if(!do_density_fitting && load_bal) etensors.taskmap.resize(0, 0);
       rw_md_disk(ec, scalapack_info, sys_data, ttensors, etensors, files_prefix);
       ec.pg().barrier();
     }
@@ -793,7 +800,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
     /*** Generate task mapping ***/
 
-    if(!do_density_fitting) {
+    if(!do_density_fitting && load_bal) {
       // Collect task info
       auto [s1vec, s2vec, ntask_vec] = compute_2bf_taskinfo<TensorType>(
         ec, sys_data, scf_vars, obs, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4, ttensors,

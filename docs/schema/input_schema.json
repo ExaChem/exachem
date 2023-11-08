@@ -24,9 +24,6 @@
       "properties": {
         "basisset": {
           "type": "string"
-        },
-        "gaussian_type": {
-          "type": "string"
         }
       },
       "required": [
@@ -78,6 +75,9 @@
         "tol_int": {
           "type": "number"
         },
+        "tol_sch": {
+          "type": "number"
+        },        
         "tol_lindep": {
           "type": "number"
         },

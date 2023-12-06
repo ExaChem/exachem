@@ -400,7 +400,7 @@ void ccsd_t_driver(std::string filename, OptionsMap options_map) {
   }
 
   Tensor<T>::allocate(&ec, t_d_t1, t_d_t2);
-  if(skip_ccsd) v2tensors.allocate(ec, MO1);
+  if(skip_ccsd || !computeTData) v2tensors.allocate(ec, MO1);
 
   bool ccsd_t_restart = fs::exists(t1file) && fs::exists(t2file) && fs::exists(f1file) &&
                         v2tensors.exist_on_disk(files_prefix);

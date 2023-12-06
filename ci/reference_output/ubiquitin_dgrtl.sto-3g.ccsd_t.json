@@ -403,6 +403,24 @@
       }
     }
   },
+  "CCSD(T)": {
+    "[T]Energies": {
+      "correction": -0.0657873314488546,
+      "correlation": -2.54039478862664,
+      "total": -1869.54460908806
+    },
+    "(T)Energies": {
+      "correction": -0.05708711351332907,
+      "correlation": -2.5316945706911147,
+      "total": -1869.5359088701246
+    },
+    "performance": {
+      "total_time": 740.535832414,
+      "gflops": 5919.356692951201,
+      "total_num_ops": 4.38349573597e+15,
+      "load_imbalance": 8.763572221526239e-05
+    }
+  },
   "input": {
     "molecule": {
       "name": "ubiquitin_dgrtl",

@@ -941,7 +941,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
       // if(rank==0) cout << "D at the end of iteration: " << endl << std::setprecision(6) <<
       // etensors.D_alpha << endl;
       if(scf_options.writem % iter == 0 || scf_options.writem == 1) {
-        rw_md_disk(ec, scalapack_info, sys_data, ttensors, etensors, files_prefix);
+        if(!scf_conv) rw_md_disk(ec, scalapack_info, sys_data, ttensors, etensors, files_prefix);
       }
 
       if(iter >= maxiter) {

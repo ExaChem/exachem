@@ -52,7 +52,12 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
                             //
                             T* dev_evl_sorted_h1b, T* dev_evl_sorted_h2b, T* dev_evl_sorted_h3b,
                             T* dev_evl_sorted_p4b, T* dev_evl_sorted_p5b, T* dev_evl_sorted_p6b,
-                            T* partial_energies, gpuEvent_t* done_copy);
+                            T* partial_energies, gpuEvent_t* done_copy
+#if defined(USE_DPCPP)
+                            , int* s1_size, int* s1_exec, int* d1_size, int* d1_exec, int* d2_size,
+                            int* d2_exec
+#endif
+                            );
 #if defined(USE_CUDA) && defined(USE_NV_TC)
 // driver for fully-fused kernel for 3rd gen. tensor core (FP64)
 template<typename T>
@@ -250,6 +255,22 @@ void ccsd_t_fully_fused_none_df_none_task(
 
 #endif // OPT_KERNEL_TIMING
 
+#if defined(USE_DPCPP)
+  int* s1_size = static_cast<int*>(memPool.allocate(sizeof(int) * (6)));
+  int* s1_exec = static_cast<int*>(memPool.allocate(sizeof(int) * (9)));
+  int* d1_size = static_cast<int*>(memPool.allocate(sizeof(int) * (7 * noab)));
+  int* d1_exec = static_cast<int*>(memPool.allocate(sizeof(int) * (9 * noab)));
+  int* d2_size = static_cast<int*>(memPool.allocate(sizeof(int) * (7 * nvab)));
+  int* d2_exec = static_cast<int*>(memPool.allocate(sizeof(int) * (9 * nvab)));
+
+  stream.memcpy(s1_size, df_simple_s1_size, sizeof(int) * (6) );
+  stream.memcpy(s1_exec, df_simple_s1_exec, sizeof(int) * (9) );
+  stream.memcpy(d1_size, df_simple_d1_size, sizeof(int) * (7 * noab) );
+  stream.memcpy(d1_exec, df_simple_d1_exec, sizeof(int) * (9 * noab) );
+  stream.memcpy(d2_size, df_simple_d2_size, sizeof(int) * (7 * nvab) );
+  (*done_copy) = stream.memcpy(d2_exec, df_simple_d2_exec, sizeof(int) * (9 * nvab) );
+#endif
+
 #if defined(USE_DPCPP) || defined(USE_HIP) || (defined(USE_CUDA) && !defined(USE_NV_TC))
   fully_fused_ccsd_t_gpu(stream, num_blocks, k_range[t_h1b], k_range[t_h2b], k_range[t_h3b],
                          k_range[t_p4b], k_range[t_p5b], k_range[t_p6b],
@@ -270,7 +291,11 @@ void ccsd_t_fully_fused_none_df_none_task(
                          dev_evl_sorted_h1b, dev_evl_sorted_h2b, dev_evl_sorted_h3b,
                          dev_evl_sorted_p4b, dev_evl_sorted_p5b, dev_evl_sorted_p6b,
                          //
-                         dev_energies, done_copy);
+                         dev_energies, done_copy
+#if defined(USE_DPCPP)
+                         , s1_size, s1_exec, d1_size, d1_exec, d2_size, d2_exec
+#endif
+                         );
 #elif defined(USE_CUDA) && defined(USE_NV_TC)
   ccsd_t_fully_fused_nvidia_tc_fp64(stream, num_blocks, k_range[t_h3b], k_range[t_h2b],
                                     k_range[t_h1b], k_range[t_p6b], k_range[t_p5b], k_range[t_p4b],
@@ -294,7 +319,7 @@ void ccsd_t_fully_fused_none_df_none_task(
                                     dev_energies, done_copy);
 #endif
 
-#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
+#if defined(USE_CUDA) || defined(USE_HIP)
   gpuMemcpyAsync<T>(host_energies, dev_energies, num_blocks * 2, gpuMemcpyDeviceToHost, stream);
 
   reduceData->num_blocks    = num_blocks;
@@ -302,17 +327,25 @@ void ccsd_t_fully_fused_none_df_none_task(
   reduceData->result_energy = energy_l.data();
   reduceData->factor        = factor;
 
+#elif defined(USE_DPCPP)
+auto last_copy = stream.memcpy(host_energies, dev_energies, num_blocks * 2 * sizeof(T));
+reduceData->result_energy = energy_l.data();
+(*done_compute) = stream.submit(
+    [=](sycl::handler& cgh) {
+      cgh.depends_on(last_copy);
+      cgh.host_task([=]() {
+        reduceData->num_blocks    = num_blocks;
+        reduceData->factor        = factor;
+        reduceData->host_energies = host_energies;
+        hostEnergyReduce(reduceData);
+      }); });
+#endif
 #ifdef USE_CUDA
   CUDA_SAFE(cudaLaunchHostFunc(stream, hostEnergyReduce, reduceData));
   CUDA_SAFE(cudaEventRecord(*done_compute, stream));
 #elif defined(USE_HIP)
   HIP_SAFE(hipLaunchHostFunc(stream, hostEnergyReduce, reduceData));
   HIP_SAFE(hipEventRecord(*done_compute, stream));
-#elif defined(USE_DPCPP)
-  // TODO: the sync might not be needed (stream.first.ext_oneapi_submit_barrier)
-  auto host_task_event = stream.submit(
-    [&](sycl::handler& cgh) { cgh.host_task([=]() { hostEnergyReduce(reduceData); }); });
-  (*done_compute) = stream.ext_oneapi_submit_barrier({host_task_event});
 #endif
 
   //  free device mem back to pool
@@ -322,6 +355,13 @@ void ccsd_t_fully_fused_none_df_none_task(
   memPool.deallocate(static_cast<void*>(dev_evl_sorted_p4b), sizeof(T) * base_size_p4b);
   memPool.deallocate(static_cast<void*>(dev_evl_sorted_p5b), sizeof(T) * base_size_p5b);
   memPool.deallocate(static_cast<void*>(dev_evl_sorted_p6b), sizeof(T) * base_size_p6b);
-
+#if defined(USE_DPCPP)
+  memPool.deallocate(static_cast<void*>(s1_size), sizeof(int) * (6));
+  memPool.deallocate(static_cast<void*>(s1_exec), sizeof(int) * (9));
+  memPool.deallocate(static_cast<void*>(d1_size), sizeof(int) * (7 * noab));
+  memPool.deallocate(static_cast<void*>(d1_exec), sizeof(int) * (9 * noab));
+  memPool.deallocate(static_cast<void*>(d2_size), sizeof(int) * (7 * nvab));
+  memPool.deallocate(static_cast<void*>(d2_exec), sizeof(int) * (9 * nvab));
+#endif
 #endif // if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
 }

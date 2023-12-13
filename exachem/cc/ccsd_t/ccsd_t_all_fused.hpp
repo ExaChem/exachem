@@ -319,33 +319,24 @@ void ccsd_t_fully_fused_none_df_none_task(
                                     dev_energies, done_copy);
 #endif
 
-#if defined(USE_CUDA) || defined(USE_HIP)
+#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
   gpuMemcpyAsync<T>(host_energies, dev_energies, num_blocks * 2, gpuMemcpyDeviceToHost, stream);
-
   reduceData->num_blocks    = num_blocks;
   reduceData->host_energies = host_energies;
   reduceData->result_energy = energy_l.data();
   reduceData->factor        = factor;
-
-#elif defined(USE_DPCPP)
-auto last_copy = stream.memcpy(host_energies, dev_energies, num_blocks * 2 * sizeof(T));
-reduceData->result_energy = energy_l.data();
-(*done_compute) = stream.submit(
-    [=](sycl::handler& cgh) {
-      cgh.depends_on(last_copy);
-      cgh.host_task([=]() {
-        reduceData->num_blocks    = num_blocks;
-        reduceData->factor        = factor;
-        reduceData->host_energies = host_energies;
-        hostEnergyReduce(reduceData);
-      }); });
-#endif
 #ifdef USE_CUDA
   CUDA_SAFE(cudaLaunchHostFunc(stream, hostEnergyReduce, reduceData));
   CUDA_SAFE(cudaEventRecord(*done_compute, stream));
 #elif defined(USE_HIP)
   HIP_SAFE(hipLaunchHostFunc(stream, hostEnergyReduce, reduceData));
   HIP_SAFE(hipEventRecord(*done_compute, stream));
+#elif defined(USE_DPCPP)
+  (*done_compute) = stream.submit(
+    [&](sycl::handler& cgh) {
+       cgh.host_task([=]() {
+        hostEnergyReduce(reduceData);
+        }); });
 #endif
 
   //  free device mem back to pool

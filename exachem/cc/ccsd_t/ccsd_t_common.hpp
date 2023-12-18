@@ -14,7 +14,7 @@
 #include <string>
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-#include "tamm/gpu_memory_pool.hpp"
+#include "tamm/gpu_streams.hpp"
 using tamm::gpuEvent_t;
 using tamm::gpuStream_t;
 #endif
@@ -65,9 +65,13 @@ void        initMemModule();
 std::string check_memory_req(const int cc_t_ts, const int nbf);
 
 void* getGpuMem(size_t bytes);
+void* getPinnedMem(size_t bytes);
 void* getHostMem(size_t bytes);
+void* getPinnedMem(size_t bytes);
 void  freeHostMem(void* p);
+void  freePinnedMem(void* p);
 void  freeGpuMem(void* p);
+void  freePinnedMem(void* p);
 
 void finalizeMemModule();
 

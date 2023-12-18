@@ -111,8 +111,6 @@ void ccsd_t_fully_fused_none_df_none_task(
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
   // get (round-robin) GPU stream from pool
   gpuStream_t& stream = tamm::GPUStreamPool::getInstance().getStream();
-  // get GPU memory handle from pool
-  auto& memPool = tamm::GPUPooledStorageManager::getInstance();
 #endif
 
   // Index p4b,p5b,p6b,h1b,h2b,h3b;
@@ -140,12 +138,12 @@ void ccsd_t_fully_fused_none_df_none_task(
   T* host_evl_sorted_p6b = &k_evl_sorted[k_offset[t_p6b]];
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-  T* dev_evl_sorted_h1b = static_cast<T*>(memPool.allocate(sizeof(T) * base_size_h1b));
-  T* dev_evl_sorted_h2b = static_cast<T*>(memPool.allocate(sizeof(T) * base_size_h2b));
-  T* dev_evl_sorted_h3b = static_cast<T*>(memPool.allocate(sizeof(T) * base_size_h3b));
-  T* dev_evl_sorted_p4b = static_cast<T*>(memPool.allocate(sizeof(T) * base_size_p4b));
-  T* dev_evl_sorted_p5b = static_cast<T*>(memPool.allocate(sizeof(T) * base_size_p5b));
-  T* dev_evl_sorted_p6b = static_cast<T*>(memPool.allocate(sizeof(T) * base_size_p6b));
+  T* dev_evl_sorted_h1b = static_cast<T*>(getGpuMem(sizeof(T) * base_size_h1b));
+  T* dev_evl_sorted_h2b = static_cast<T*>(getGpuMem(sizeof(T) * base_size_h2b));
+  T* dev_evl_sorted_h3b = static_cast<T*>(getGpuMem(sizeof(T) * base_size_h3b));
+  T* dev_evl_sorted_p4b = static_cast<T*>(getGpuMem(sizeof(T) * base_size_p4b));
+  T* dev_evl_sorted_p5b = static_cast<T*>(getGpuMem(sizeof(T) * base_size_p5b));
+  T* dev_evl_sorted_p6b = static_cast<T*>(getGpuMem(sizeof(T) * base_size_p6b));
 
   if(!gpuEventQuery(*done_copy)) { gpuEventSynchronize(*done_copy); }
 #endif
@@ -218,38 +216,6 @@ void ccsd_t_fully_fused_none_df_none_task(
   size_t num_blocks = CEIL(base_size_h3b, 4) * CEIL(base_size_h2b, 4) * CEIL(base_size_h1b, 4) *
                       CEIL(base_size_p6b, 4) * CEIL(base_size_p5b, 4) * CEIL(base_size_p4b, 4);
 
-#ifdef OPT_KERNEL_TIMING
-  //
-  long double task_num_ops_s1    = 0;
-  long double task_num_ops_d1    = 0;
-  long double task_num_ops_d2    = 0;
-  long double task_num_ops_total = 0;
-
-  //
-  helper_calculate_num_ops(noab, nvab, df_simple_s1_size, df_simple_d1_size, df_simple_d2_size,
-                           df_simple_s1_exec, df_simple_d1_exec, df_simple_d2_exec, task_num_ops_s1,
-                           task_num_ops_d1, task_num_ops_d2, total_num_ops_s1, total_num_ops_d1,
-                           total_num_ops_d2);
-
-  //
-  task_num_ops_total = task_num_ops_s1 + task_num_ops_d1 + task_num_ops_d2;
-#endif
-
-#ifdef OPT_KERNEL_TIMING
-  gpuEvent_t start_kernel_only, stop_kernel_only;
-
-#if defined(USE_CUDA)
-  CUDA_SAFE(cudaEventCreate(&start_kernel_only));
-  CUDA_SAFE(cudaEventCreate(&stop_kernel_only));
-  CUDA_SAFE(cudaEventRecord(start_kernel_only));
-#elif defined(USE_HIP)
-  HIP_SAFE(hipEventCreate(&start_kernel_only));
-  HIP_SAFE(hipEventCreate(&stop_kernel_only));
-  HIP_SAFE(hipEventRecord(start_kernel_only));
-#endif
-
-#endif // OPT_KERNEL_TIMING
-
 #if defined(USE_DPCPP) || defined(USE_HIP) || (defined(USE_CUDA) && !defined(USE_NV_TC))
   fully_fused_ccsd_t_gpu(stream, num_blocks, k_range[t_h1b], k_range[t_h2b], k_range[t_h3b],
                          k_range[t_p4b], k_range[t_p5b], k_range[t_p6b],
@@ -303,25 +269,23 @@ void ccsd_t_fully_fused_none_df_none_task(
   reduceData->factor        = factor;
 
 #ifdef USE_CUDA
-  CUDA_SAFE(cudaLaunchHostFunc(stream, hostEnergyReduce, reduceData));
-  CUDA_SAFE(cudaEventRecord(*done_compute, stream));
+  CUDA_SAFE(cudaLaunchHostFunc(stream.first, hostEnergyReduce, reduceData));
+  CUDA_SAFE(cudaEventRecord(*done_compute, stream.first));
 #elif defined(USE_HIP)
-  HIP_SAFE(hipLaunchHostFunc(stream, hostEnergyReduce, reduceData));
-  HIP_SAFE(hipEventRecord(*done_compute, stream));
+  HIP_SAFE(hipLaunchHostFunc(stream.first, hostEnergyReduce, reduceData));
+  HIP_SAFE(hipEventRecord(*done_compute, stream.first));
 #elif defined(USE_DPCPP)
   // TODO: the sync might not be needed (stream.first.ext_oneapi_submit_barrier)
-  auto host_task_event = stream.submit(
+  auto host_task_event = stream.first.submit(
     [&](sycl::handler& cgh) { cgh.host_task([=]() { hostEnergyReduce(reduceData); }); });
-  (*done_compute) = stream.ext_oneapi_submit_barrier({host_task_event});
+  (*done_compute) = stream.first.ext_oneapi_submit_barrier({host_task_event});
 #endif
 
-  //  free device mem back to pool
-  memPool.deallocate(static_cast<void*>(dev_evl_sorted_h1b), sizeof(T) * base_size_h1b);
-  memPool.deallocate(static_cast<void*>(dev_evl_sorted_h2b), sizeof(T) * base_size_h2b);
-  memPool.deallocate(static_cast<void*>(dev_evl_sorted_h3b), sizeof(T) * base_size_h3b);
-  memPool.deallocate(static_cast<void*>(dev_evl_sorted_p4b), sizeof(T) * base_size_p4b);
-  memPool.deallocate(static_cast<void*>(dev_evl_sorted_p5b), sizeof(T) * base_size_p5b);
-  memPool.deallocate(static_cast<void*>(dev_evl_sorted_p6b), sizeof(T) * base_size_p6b);
-
-#endif // if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
+  freeGpuMem(dev_evl_sorted_h1b);
+  freeGpuMem(dev_evl_sorted_h2b);
+  freeGpuMem(dev_evl_sorted_h3b);
+  freeGpuMem(dev_evl_sorted_p4b);
+  freeGpuMem(dev_evl_sorted_p5b);
+  freeGpuMem(dev_evl_sorted_p6b);
+#endif
 }

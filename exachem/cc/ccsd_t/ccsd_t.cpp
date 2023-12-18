@@ -450,6 +450,11 @@ void ccsd_t_driver(std::string filename, OptionsMap options_map) {
 
   bool is_restricted = is_rhf;
 
+  // Given the singleton pool created by the TAMM is not used by the (T) kernel calculation.
+  // We artifically destroy the pool
+  tamm::reset_rmm_pool();
+  // tamm::reinitialize_rmm_pool();
+
   if(rank == 0) {
     if(is_restricted) cout << endl << "Running Closed Shell CCSD(T) calculation" << endl;
     else cout << endl << "Running Open Shell CCSD(T) calculation" << endl;

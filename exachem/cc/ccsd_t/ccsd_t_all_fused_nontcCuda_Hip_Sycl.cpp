@@ -188,7 +188,9 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 
   int base_size_h7b, base_size_p7b;
 
+#pragma unroll 4
   for(int i = 0; i < 4; i++)
+#pragma unroll 4
     for(int j = 0; j < 4; j++) {
       reg_tile[i][j]    = 0.0;
       reg_singles[i][j] = 0.0;
@@ -327,6 +329,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_b[ll][idx_h3 + (idx_h2) *FUSION_SIZE_SLICE_2_H3 + 32];
           temp_bv[3] = sm_b[ll][idx_h3 + (idx_h2) *FUSION_SIZE_SLICE_2_H3 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_a[ll][idx_p6 + (idx_h1) *FUSION_SIZE_SLICE_1_P6 + (xx * 16)];
 
@@ -395,6 +398,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_b[ll][idx_h3 + (idx_h1) *FUSION_SIZE_SLICE_2_H3 + 32];
           temp_bv[3] = sm_b[ll][idx_h3 + (idx_h1) *FUSION_SIZE_SLICE_2_H3 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_a[ll][idx_p6 + (idx_h2) *FUSION_SIZE_SLICE_2_P4 + (xx * 16)];
 
@@ -462,6 +466,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_b[ll][idx_h2 + (idx_h1) *FUSION_SIZE_SLICE_2_H2 + 32];
           temp_bv[3] = sm_b[ll][idx_h2 + (idx_h1) *FUSION_SIZE_SLICE_2_H2 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_a[ll][idx_p6 + (idx_h3) *FUSION_SIZE_SLICE_2_P4 + (xx * 16)];
 
@@ -604,6 +609,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_a[ll][idx_h1 + (idx_h2) *FUSION_SIZE_SLICE_2_H1 + 32];
           temp_bv[3] = sm_a[ll][idx_h1 + (idx_h2) *FUSION_SIZE_SLICE_2_H1 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_b[ll][idx_h3 + (idx_p6) *FUSION_SIZE_SLICE_2_H3 + (xx * 16)];
 
@@ -678,6 +684,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_a[ll][idx_h2 + (idx_h3) *FUSION_SIZE_SLICE_2_H2 + 32];
           temp_bv[3] = sm_a[ll][idx_h2 + (idx_h3) *FUSION_SIZE_SLICE_2_H2 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_b[ll][idx_h1 + (idx_p6) *FUSION_SIZE_SLICE_2_H1 + (xx * 16)];
 
@@ -752,6 +759,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_a[ll][idx_h1 + (idx_h3) *FUSION_SIZE_SLICE_2_H1 + 32];
           temp_bv[3] = sm_a[ll][idx_h1 + (idx_h3) *FUSION_SIZE_SLICE_2_H1 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_b[ll][idx_h2 + (idx_p6) *FUSION_SIZE_SLICE_2_H2 + (xx * 16)];
 
@@ -1106,6 +1114,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_b[ll][idx_h3 + (idx_h2) *FUSION_SIZE_SLICE_1_H3 + 32];
           temp_bv[3] = sm_b[ll][idx_h3 + (idx_h2) *FUSION_SIZE_SLICE_1_H3 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_a[ll][idx_p6 + (idx_h1) *FUSION_SIZE_SLICE_1_P6 + (xx * 16)];
 
@@ -1175,6 +1184,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_b[ll][idx_h3 + (idx_h1) *FUSION_SIZE_SLICE_1_H3 + 32];
           temp_bv[3] = sm_b[ll][idx_h3 + (idx_h1) *FUSION_SIZE_SLICE_1_H3 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_a[ll][idx_p6 + (idx_h2) *FUSION_SIZE_SLICE_1_P6 + (xx * 16)];
 
@@ -1244,6 +1254,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_b[ll][idx_h2 + (idx_h1) *FUSION_SIZE_SLICE_1_H2 + 32];
           temp_bv[3] = sm_b[ll][idx_h2 + (idx_h1) *FUSION_SIZE_SLICE_1_H2 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_a[ll][idx_p6 + (idx_h3) *FUSION_SIZE_SLICE_1_P6 + (xx * 16)];
 
@@ -1312,6 +1323,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_a[ll][idx_p6 + (idx_h1) *FUSION_SIZE_SLICE_1_P6 + 32];
           temp_bv[3] = sm_a[ll][idx_p6 + (idx_h1) *FUSION_SIZE_SLICE_1_P6 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_b[ll][idx_h3 + (idx_h2) *FUSION_SIZE_SLICE_1_H3 + (xx * 16)];
 
@@ -1380,6 +1392,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_a[ll][idx_p6 + (idx_h2) *FUSION_SIZE_SLICE_1_P6 + 32];
           temp_bv[3] = sm_a[ll][idx_p6 + (idx_h2) *FUSION_SIZE_SLICE_1_P6 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_b[ll][idx_h3 + (idx_h1) *FUSION_SIZE_SLICE_1_H3 + (xx * 16)];
 
@@ -1448,6 +1461,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_a[ll][idx_p6 + (idx_h3) *FUSION_SIZE_SLICE_1_P6 + 32];
           temp_bv[3] = sm_a[ll][idx_p6 + (idx_h3) *FUSION_SIZE_SLICE_1_P6 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_b[ll][idx_h2 + (idx_h1) *FUSION_SIZE_SLICE_1_H2 + (xx * 16)];
 
@@ -1589,6 +1603,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_a[ll][idx_h1 + (idx_h2) *FUSION_SIZE_SLICE_1_H1 + 32];
           temp_bv[3] = sm_a[ll][idx_h1 + (idx_h2) *FUSION_SIZE_SLICE_1_H1 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_b[ll][idx_h3 + (idx_p6) *FUSION_SIZE_SLICE_1_H3 + (xx * 16)];
 
@@ -1658,6 +1673,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_a[ll][idx_h2 + (idx_h3) *FUSION_SIZE_SLICE_1_H2 + 32];
           temp_bv[3] = sm_a[ll][idx_h2 + (idx_h3) *FUSION_SIZE_SLICE_1_H2 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_b[ll][idx_h1 + (idx_p6) *FUSION_SIZE_SLICE_1_H1 + (xx * 16)];
 
@@ -1727,6 +1743,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_a[ll][idx_h1 + (idx_h3) *FUSION_SIZE_SLICE_1_H1 + 32];
           temp_bv[3] = sm_a[ll][idx_h1 + (idx_h3) *FUSION_SIZE_SLICE_1_H1 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_b[ll][idx_h2 + (idx_p6) *FUSION_SIZE_SLICE_1_H2 + (xx * 16)];
 
@@ -1796,6 +1813,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_b[ll][idx_h3 + (idx_p6) *FUSION_SIZE_SLICE_1_H1 + 32];
           temp_bv[3] = sm_b[ll][idx_h3 + (idx_p6) *FUSION_SIZE_SLICE_1_H1 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_a[ll][idx_h1 + (idx_h2) *FUSION_SIZE_SLICE_1_H1 + (xx * 16)];
 
@@ -1865,6 +1883,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_b[ll][idx_h1 + (idx_p6) *FUSION_SIZE_SLICE_1_H1 + 32];
           temp_bv[3] = sm_b[ll][idx_h1 + (idx_p6) *FUSION_SIZE_SLICE_1_H1 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) {
             temp_av = sm_a[ll][idx_h2 + (idx_h3) *FUSION_SIZE_SLICE_1_H2 + (xx * 16)];
 
@@ -1934,6 +1953,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           temp_bv[2] = sm_b[ll][idx_h2 + (idx_p6) *FUSION_SIZE_SLICE_1_H2 + 32];
           temp_bv[3] = sm_b[ll][idx_h2 + (idx_p6) *FUSION_SIZE_SLICE_1_H2 + 48];
 
+#pragma unroll 4
           for(int xx = 0; xx < 4; xx++) // 4 -> rng_p4: Local Transactions...
           {
             temp_av = sm_a[ll][idx_h1 + (idx_h3) *FUSION_SIZE_SLICE_1_H1 + (xx * 16)];
@@ -2699,7 +2719,9 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
   //
   if(idx_h3 < energy_rng_h3 && idx_h2 < energy_rng_h2 && idx_p6 < energy_rng_p6 &&
      idx_h1 < energy_rng_h1) {
+#pragma unroll 4
     for(int i = 0; i < FUSION_SIZE_SLICE_1_P5; i++) {
+#pragma unroll 4
       for(int j = 0; j < FUSION_SIZE_SLICE_1_P4; j++) {
         if(i < energy_rng_p5 && j < energy_rng_p4) {
           //
@@ -2798,28 +2820,28 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
                             T* partial_energies, gpuEvent_t* done_copy) {
 #ifdef USE_CUDA
   cudaMemcpyToSymbolAsync(const_df_s1_size, host_s1_size, sizeof(int) * (6), 0,
-                          cudaMemcpyHostToDevice, stream);
+                          cudaMemcpyHostToDevice, stream.first);
   cudaMemcpyToSymbolAsync(const_df_s1_exec, host_s1_exec, sizeof(int) * (9), 0,
-                          cudaMemcpyHostToDevice, stream);
+                          cudaMemcpyHostToDevice, stream.first);
 
   cudaMemcpyToSymbolAsync(const_df_d1_size, host_d1_size, sizeof(int) * (7 * size_noab), 0,
-                          cudaMemcpyHostToDevice, stream);
+                          cudaMemcpyHostToDevice, stream.first);
   cudaMemcpyToSymbolAsync(const_df_d1_exec, host_d1_exec, sizeof(int) * (9 * size_noab), 0,
-                          cudaMemcpyHostToDevice, stream);
+                          cudaMemcpyHostToDevice, stream.first);
 
   cudaMemcpyToSymbolAsync(const_df_d2_size, host_d2_size, sizeof(int) * (7 * size_nvab), 0,
-                          cudaMemcpyHostToDevice, stream);
+                          cudaMemcpyHostToDevice, stream.first);
   cudaMemcpyToSymbolAsync(const_df_d2_exec, host_d2_exec, sizeof(int) * (9 * size_nvab), 0,
-                          cudaMemcpyHostToDevice, stream);
+                          cudaMemcpyHostToDevice, stream.first);
 
-  CUDA_SAFE(cudaEventRecord(*done_copy, stream));
+  CUDA_SAFE(cudaEventRecord(*done_copy, stream.first));
 
   //    Depends on # of Fused Kernel
   dim3 gridsize_1(num_blocks);
   dim3 blocksize_1(FUSION_SIZE_TB_1_X, FUSION_SIZE_TB_1_Y);
 
   //    to call the fused kernel for singles, doubles and energies.
-  revised_jk_ccsd_t_fully_fused_kernel<T><<<gridsize_1, blocksize_1, 0, stream>>>(
+  revised_jk_ccsd_t_fully_fused_kernel<T><<<gridsize_1, blocksize_1, 0, stream.first>>>(
     (int) size_noab, (int) size_nvab, (int) size_max_dim_s1_t1, (int) size_max_dim_s1_v2,
     (int) size_max_dim_d1_t2, (int) size_max_dim_d1_v2, (int) size_max_dim_d2_t2,
     (int) size_max_dim_d2_v2, df_dev_d1_t2_all, df_dev_d1_v2_all, df_dev_d2_t2_all,
@@ -2833,19 +2855,23 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
 
 #elif defined(USE_HIP)
   HIP_SAFE(hipMemcpyToSymbolAsync(HIP_SYMBOL(const_df_s1_size), host_s1_size, sizeof(int) * (6), 0,
-                                  hipMemcpyHostToDevice, stream));
+                                  hipMemcpyHostToDevice, stream.first));
   HIP_SAFE(hipMemcpyToSymbolAsync(HIP_SYMBOL(const_df_s1_exec), host_s1_exec, sizeof(int) * (9), 0,
-                                  hipMemcpyHostToDevice, stream));
+                                  hipMemcpyHostToDevice, stream.first));
   HIP_SAFE(hipMemcpyToSymbolAsync(HIP_SYMBOL(const_df_d1_size), host_d1_size,
-                                  sizeof(int) * (7 * size_noab), 0, hipMemcpyHostToDevice, stream));
+                                  sizeof(int) * (7 * size_noab), 0, hipMemcpyHostToDevice,
+                                  stream.first));
   HIP_SAFE(hipMemcpyToSymbolAsync(HIP_SYMBOL(const_df_d1_exec), host_d1_exec,
-                                  sizeof(int) * (9 * size_noab), 0, hipMemcpyHostToDevice, stream));
+                                  sizeof(int) * (9 * size_noab), 0, hipMemcpyHostToDevice,
+                                  stream.first));
   HIP_SAFE(hipMemcpyToSymbolAsync(HIP_SYMBOL(const_df_d2_size), host_d2_size,
-                                  sizeof(int) * (7 * size_nvab), 0, hipMemcpyHostToDevice, stream));
+                                  sizeof(int) * (7 * size_nvab), 0, hipMemcpyHostToDevice,
+                                  stream.first));
   HIP_SAFE(hipMemcpyToSymbolAsync(HIP_SYMBOL(const_df_d2_exec), host_d2_exec,
-                                  sizeof(int) * (9 * size_nvab), 0, hipMemcpyHostToDevice, stream));
+                                  sizeof(int) * (9 * size_nvab), 0, hipMemcpyHostToDevice,
+                                  stream.first));
 
-  HIP_SAFE(hipEventRecord(*done_copy, stream));
+  HIP_SAFE(hipEventRecord(*done_copy, stream.first));
 
   //    Depends on # of Fused Kernel
   dim3 gridsize_1(num_blocks);
@@ -2854,12 +2880,12 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
   //    to call the fused kernel for singles, doubles and energies.
   hipLaunchKernelGGL(
     HIP_KERNEL_NAME(revised_jk_ccsd_t_fully_fused_kernel<T>), dim3(gridsize_1), dim3(blocksize_1),
-    0, stream, (int) size_noab, (int) size_nvab, (int) size_max_dim_s1_t1, (int) size_max_dim_s1_v2,
-    (int) size_max_dim_d1_t2, (int) size_max_dim_d1_v2, (int) size_max_dim_d2_t2,
-    (int) size_max_dim_d2_v2, df_dev_d1_t2_all, df_dev_d1_v2_all, df_dev_d2_t2_all,
-    df_dev_d2_v2_all, df_dev_s1_t1_all, df_dev_s1_v2_all, dev_evl_sorted_h1b, dev_evl_sorted_h2b,
-    dev_evl_sorted_h3b, dev_evl_sorted_p4b, dev_evl_sorted_p5b, dev_evl_sorted_p6b,
-    partial_energies, CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3),
+    0, stream.first, (int) size_noab, (int) size_nvab, (int) size_max_dim_s1_t1,
+    (int) size_max_dim_s1_v2, (int) size_max_dim_d1_t2, (int) size_max_dim_d1_v2,
+    (int) size_max_dim_d2_t2, (int) size_max_dim_d2_v2, df_dev_d1_t2_all, df_dev_d1_v2_all,
+    df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_s1_t1_all, df_dev_s1_v2_all, dev_evl_sorted_h1b,
+    dev_evl_sorted_h2b, dev_evl_sorted_h3b, dev_evl_sorted_p4b, dev_evl_sorted_p5b,
+    dev_evl_sorted_p6b, partial_energies, CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3),
     CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2), CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1),
     CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6), CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5),
     CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4), (int) base_size_h1b, (int) base_size_h2b,
@@ -2870,7 +2896,7 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
   sycl::range<2> blocksize(FUSION_SIZE_TB_1_Y, FUSION_SIZE_TB_1_X);
   auto           global_range = gridsize * blocksize;
 
-  stream.parallel_for(sycl::nd_range<2>(global_range, blocksize), [=](auto item) {
+  stream.first.parallel_for(sycl::nd_range<2>(global_range, blocksize), [=](auto item) {
     revised_jk_ccsd_t_fully_fused_kernel(
       size_noab, size_nvab, size_max_dim_s1_t1, size_max_dim_s1_v2, size_max_dim_d1_t2,
       size_max_dim_d1_v2, size_max_dim_d2_t2, size_max_dim_d2_v2, df_dev_d1_t2_all,

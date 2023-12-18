@@ -14,7 +14,6 @@ namespace cc2_cs {
 using CCEType = double;
 CCSE_Tensors<CCEType> _a021;
 TiledIndexSpace       o_alpha, v_alpha, o_beta, v_beta;
-bool                  has_gpu_tmp;
 
 Tensor<CCEType>       _a01V, _a02V, _a007V;
 CCSE_Tensors<CCEType> _a01, _a02, _a03, _a04, _a05, _a06, _a001, _a004, _a006, _a008, _a009, _a017,
@@ -303,7 +302,6 @@ std::tuple<double, double> cc2_cs::cd_cc2_cs_driver(
   const TiledIndexSpace& O = MO("occ");
   const TiledIndexSpace& V = MO("virt");
   auto [cind]              = CI.labels<1>("all");
-  has_gpu_tmp              = ec.has_gpu();
 
   const int otiles  = O.num_tiles();
   const int vtiles  = V.num_tiles();

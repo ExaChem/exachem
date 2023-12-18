@@ -166,47 +166,54 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   size_t size_T_d2_t2 = max_d2_kernels_pertask * (max_pdim * max_pdim) * (max_hdim * max_hdim);
   size_t size_T_d2_v2 = max_d2_kernels_pertask * (max_pdim * max_pdim * max_pdim) * (max_hdim);
 
-  T* df_host_pinned_s1_t1 = (T*) getHostMem(sizeof(T) * size_T_s1_t1);
-  T* df_host_pinned_s1_v2 = (T*) getHostMem(sizeof(T) * size_T_s1_v2);
-  T* df_host_pinned_d1_t2 = (T*) getHostMem(sizeof(T) * size_T_d1_t2);
-  T* df_host_pinned_d1_v2 = (T*) getHostMem(sizeof(T) * size_T_d1_v2);
-  T* df_host_pinned_d2_t2 = (T*) getHostMem(sizeof(T) * size_T_d2_t2);
-  T* df_host_pinned_d2_v2 = (T*) getHostMem(sizeof(T) * size_T_d2_v2);
+  T* df_host_pinned_s1_t1{nullptr};
+  T* df_host_pinned_s1_v2{nullptr};
+  T* df_host_pinned_d1_t2{nullptr};
+  T* df_host_pinned_d1_v2{nullptr};
+  T* df_host_pinned_d2_t2{nullptr};
+  T* df_host_pinned_d2_v2{nullptr};
 
-  //
-  int* df_simple_s1_size = (int*) getHostMem(sizeof(int) * (6));
-  int* df_simple_s1_exec = (int*) getHostMem(sizeof(int) * (9));
+  int* df_simple_s1_size = static_cast<int*>(getHostMem(sizeof(int) * (6)));
+  int* df_simple_s1_exec = static_cast<int*>(getHostMem(sizeof(int) * (9)));
+  int* df_simple_d1_size = static_cast<int*>(getHostMem(sizeof(int) * (7 * noab)));
+  int* df_simple_d1_exec = static_cast<int*>(getHostMem(sizeof(int) * (9 * noab)));
+  int* df_simple_d2_size = static_cast<int*>(getHostMem(sizeof(int) * (7 * nvab)));
+  int* df_simple_d2_exec = static_cast<int*>(getHostMem(sizeof(int) * (9 * nvab)));
 
-  int* host_d1_size      = (int*) getHostMem(sizeof(int) * (noab));
-  int* df_simple_d1_size = (int*) getHostMem(sizeof(int) * (7 * noab));
-  int* df_simple_d1_exec = (int*) getHostMem(sizeof(int) * (9 * noab));
+  int* host_d1_size = static_cast<int*>(getHostMem(sizeof(int) * (noab)));
+  int* host_d2_size = static_cast<int*>(getHostMem(sizeof(int) * (nvab)));
 
-  int* host_d2_size      = (int*) getHostMem(sizeof(int) * (nvab));
-  int* df_simple_d2_size = (int*) getHostMem(sizeof(int) * (7 * nvab));
-  int* df_simple_d2_exec = (int*) getHostMem(sizeof(int) * (9 * nvab));
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-  // get GPU memory handle from pool
-  auto& memPool = tamm::GPUPooledStorageManager::getInstance();
+  T* df_dev_s1_t1_all = static_cast<T*>(getGpuMem(sizeof(T) * size_T_s1_t1));
+  T* df_dev_s1_v2_all = static_cast<T*>(getGpuMem(sizeof(T) * size_T_s1_v2));
+  T* df_dev_d1_t2_all = static_cast<T*>(getGpuMem(sizeof(T) * size_T_d1_t2));
+  T* df_dev_d1_v2_all = static_cast<T*>(getGpuMem(sizeof(T) * size_T_d1_v2));
+  T* df_dev_d2_t2_all = static_cast<T*>(getGpuMem(sizeof(T) * size_T_d2_t2));
+  T* df_dev_d2_v2_all = static_cast<T*>(getGpuMem(sizeof(T) * size_T_d2_v2));
 
-  T* df_dev_s1_t1_all = static_cast<T*>(memPool.allocate(sizeof(T) * size_T_s1_t1));
-  T* df_dev_s1_v2_all = static_cast<T*>(memPool.allocate(sizeof(T) * size_T_s1_v2));
-  T* df_dev_d1_t2_all = static_cast<T*>(memPool.allocate(sizeof(T) * size_T_d1_t2));
-  T* df_dev_d1_v2_all = static_cast<T*>(memPool.allocate(sizeof(T) * size_T_d1_v2));
-  T* df_dev_d2_t2_all = static_cast<T*>(memPool.allocate(sizeof(T) * size_T_d2_t2));
-  T* df_dev_d2_v2_all = static_cast<T*>(memPool.allocate(sizeof(T) * size_T_d2_v2));
+  df_host_pinned_s1_t1 = static_cast<T*>(getPinnedMem(sizeof(T) * size_T_s1_t1));
+  df_host_pinned_s1_v2 = static_cast<T*>(getPinnedMem(sizeof(T) * size_T_s1_v2));
+  df_host_pinned_d1_t2 = static_cast<T*>(getPinnedMem(sizeof(T) * size_T_d1_t2));
+  df_host_pinned_d1_v2 = static_cast<T*>(getPinnedMem(sizeof(T) * size_T_d1_v2));
+  df_host_pinned_d2_t2 = static_cast<T*>(getPinnedMem(sizeof(T) * size_T_d2_t2));
+  df_host_pinned_d2_v2 = static_cast<T*>(getPinnedMem(sizeof(T) * size_T_d2_v2));
+#else // cpu
+  df_host_pinned_s1_t1 = static_cast<T*>(getHostMem(sizeof(T) * size_T_s1_t1));
+  df_host_pinned_s1_v2 = static_cast<T*>(getHostMem(sizeof(T) * size_T_s1_v2));
+  df_host_pinned_d1_t2 = static_cast<T*>(getHostMem(sizeof(T) * size_T_d1_t2));
+  df_host_pinned_d1_v2 = static_cast<T*>(getHostMem(sizeof(T) * size_T_d1_v2));
+  df_host_pinned_d2_t2 = static_cast<T*>(getHostMem(sizeof(T) * size_T_d2_t2));
+  df_host_pinned_d2_v2 = static_cast<T*>(getHostMem(sizeof(T) * size_T_d2_v2));
 #endif
 
-  //
   size_t max_num_blocks = sys_data.options_map.ccsd_options.ccsdt_tilesize;
   max_num_blocks        = std::ceil((max_num_blocks + 4 - 1) / 4.0);
 
-  T* df_host_energies = (T*) getHostMem(sizeof(T) * std::pow(max_num_blocks, 6) * 2);
+  T* df_host_energies = static_cast<T*>(getHostMem(sizeof(T) * std::pow(max_num_blocks, 6) * 2));
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-  T* df_dev_energies =
-    static_cast<T*>(memPool.allocate(sizeof(T) * std::pow(max_num_blocks, 6) * 2));
+  T* df_dev_energies = static_cast<T*>(getGpuMem(sizeof(T) * std::pow(max_num_blocks, 6) * 2));
 #endif
 
-  //
   int num_task = 0;
   if(!seq_h3b) {
     if(rank == 0) {
@@ -406,19 +413,9 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
   gpuDeviceSynchronize();
 #endif
-  //
+
   energy1 = energy_l[0];
   energy2 = energy_l[1];
-
-  //
-  //  free shared host mem.
-  //
-  freeHostMem(df_host_pinned_s1_t1);
-  freeHostMem(df_host_pinned_s1_v2);
-  freeHostMem(df_host_pinned_d1_t2);
-  freeHostMem(df_host_pinned_d1_v2);
-  freeHostMem(df_host_pinned_d2_t2);
-  freeHostMem(df_host_pinned_d2_v2);
 
   freeHostMem(df_simple_s1_exec);
   freeHostMem(df_simple_s1_size);
@@ -428,22 +425,33 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   freeHostMem(df_simple_d2_exec);
   freeHostMem(df_simple_d2_size);
   freeHostMem(host_d2_size);
-
   freeHostMem(df_host_energies);
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-  memPool.deallocate(static_cast<void*>(df_dev_s1_t1_all), sizeof(T) * size_T_s1_t1);
-  memPool.deallocate(static_cast<void*>(df_dev_s1_v2_all), sizeof(T) * size_T_s1_v2);
-  memPool.deallocate(static_cast<void*>(df_dev_d1_t2_all), sizeof(T) * size_T_d1_t2);
-  memPool.deallocate(static_cast<void*>(df_dev_d1_v2_all), sizeof(T) * size_T_d1_v2);
-  memPool.deallocate(static_cast<void*>(df_dev_d2_t2_all), sizeof(T) * size_T_d2_t2);
-  memPool.deallocate(static_cast<void*>(df_dev_d2_v2_all), sizeof(T) * size_T_d2_v2);
+  freeGpuMem(df_dev_s1_t1_all);
+  freeGpuMem(df_dev_s1_v2_all);
+  freeGpuMem(df_dev_d1_t2_all);
+  freeGpuMem(df_dev_d1_v2_all);
+  freeGpuMem(df_dev_d2_t2_all);
+  freeGpuMem(df_dev_d2_v2_all);
+  freeGpuMem(df_dev_energies);
 
-  memPool.deallocate(static_cast<void*>(df_dev_energies),
-                     sizeof(T) * std::pow(max_num_blocks, 6) * 2);
+  freePinnedMem(df_host_pinned_s1_t1);
+  freePinnedMem(df_host_pinned_s1_v2);
+  freePinnedMem(df_host_pinned_d1_t2);
+  freePinnedMem(df_host_pinned_d1_v2);
+  freePinnedMem(df_host_pinned_d2_t2);
+  freePinnedMem(df_host_pinned_d2_v2);
+
+#else // cpu
+freeHostMem(df_host_pinned_s1_t1);
+freeHostMem(df_host_pinned_s1_v2);
+freeHostMem(df_host_pinned_d1_t2);
+freeHostMem(df_host_pinned_d1_v2);
+freeHostMem(df_host_pinned_d2_t2);
+freeHostMem(df_host_pinned_d2_v2);
 #endif
 
-  //
   finalizememmodule();
 
   auto cc_t2 = std::chrono::high_resolution_clock::now();

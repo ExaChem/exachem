@@ -13,7 +13,6 @@ namespace cc2_os {
 using CCEType = double;
 CCSE_Tensors<CCEType> _a021_os;
 TiledIndexSpace       o_alpha_os, v_alpha_os, o_beta_os, v_beta_os;
-bool                  has_gpu_tmp_os;
 
 Tensor<CCEType>       _a01V_os, _a02V_os, _a007V_os;
 CCSE_Tensors<CCEType> _a01_os, _a02_os, _a03_os, _a04_os, _a05_os, _a06_os, _a001_os, _a004_os,

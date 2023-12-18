@@ -2591,18 +2591,18 @@ void ccsd_t_fully_fused_nvidia_tc_fp64(gpuStream_t& stream_id, size_t numBlks, s
   //    constant memories
   //
   cudaMemcpyToSymbolAsync(const_d1_h7b, host_size_d1_h7b, sizeof(int) * size_noab, 0,
-                          cudaMemcpyHostToDevice, stream_id);
+                          cudaMemcpyHostToDevice, stream_id.first);
   cudaMemcpyToSymbolAsync(const_d2_p7b, host_size_d2_p7b, sizeof(int) * size_nvab, 0,
-                          cudaMemcpyHostToDevice, stream_id);
+                          cudaMemcpyHostToDevice, stream_id.first);
 
   cudaMemcpyToSymbolAsync(const_s1_exec, host_exec_s1, sizeof(int) * (9), 0, cudaMemcpyHostToDevice,
-                          stream_id);
+                          stream_id.first);
   cudaMemcpyToSymbolAsync(const_d1_exec, host_exec_d1, sizeof(int) * (9 * size_noab), 0,
-                          cudaMemcpyHostToDevice, stream_id);
+                          cudaMemcpyHostToDevice, stream_id.first);
   cudaMemcpyToSymbolAsync(const_d2_exec, host_exec_d2, sizeof(int) * (9 * size_nvab), 0,
-                          cudaMemcpyHostToDevice, stream_id);
+                          cudaMemcpyHostToDevice, stream_id.first);
 
-  CUDA_SAFE(cudaEventRecord(*done_copy, stream_id));
+  CUDA_SAFE(cudaEventRecord(*done_copy, stream_id.first));
 
   // printf ("[new] s1: %d,%d,%d/%d,%d,%d/%d,%d,%d\n", host_exec_s1[0], host_exec_s1[1],
   // host_exec_s1[2], host_exec_s1[3], host_exec_s1[4], host_exec_s1[5], host_exec_s1[6],
@@ -2637,7 +2637,7 @@ void ccsd_t_fully_fused_nvidia_tc_fp64(gpuStream_t& stream_id, size_t numBlks, s
 
   // T host_energies_zero[2] = {0.0, 0.0};
   // cudaMemcpyAsync(dev_energies, host_energies_zero, sizeof(T) * 2, cudaMemcpyHostToDevice,
-  // stream_id);
+  // stream_id.first);
 
   //
   // cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
@@ -2647,7 +2647,7 @@ void ccsd_t_fully_fused_nvidia_tc_fp64(gpuStream_t& stream_id, size_t numBlks, s
   // CUCHK(cudaFuncSetAttribute(fused_kernel_d2, cudaFuncAttributeMaxDynamicSharedMemorySize,
   // maxbytes));
   fully_fused_kernel_ccsd_t_nvidia_tc_fp64<T>
-    <<<gridsize_1, blocksize_1, 2 * NUM_STAGE * 8 * STAGE_OFFSET, stream_id>>>(
+    <<<gridsize_1, blocksize_1, 2 * NUM_STAGE * 8 * STAGE_OFFSET, stream_id.first>>>(
       (int) size_noab, (int) size_nvab,
       //
       (int) size_max_dim_s1_t1, (int) size_max_dim_s1_v2, (int) size_max_dim_d1_t2,

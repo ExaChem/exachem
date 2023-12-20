@@ -1,6 +1,6 @@
 ### Computing Resources Acknowledgements
 
-- Allocation on [OLCF Summit](https://www.olcf.ornl.gov/summit), [NERSC Perlmutter](https://docs.nersc.gov/systems/perlmutter), [ALCF Sunspot](https://www.alcf.anl.gov/support-center/aurora-sunspot), and [OLCF Frontier](https://www.olcf.ornl.gov/frontier) for the [NWChemEx project](https://nwchemex-project.github.io/NWChemEx) (2017-2023) through the [Exascale Computing Project ECP](https://www.exascaleproject.org) (17-SC-20-SC). 
+- Allocation on [OLCF Summit](https://www.olcf.ornl.gov/summit), [NERSC Perlmutter](https://docs.nersc.gov/systems/perlmutter), [ALCF Sunspot](https://www.alcf.anl.gov/support-center/aurora-sunspot), and [OLCF Frontier](https://www.olcf.ornl.gov/frontier) for the [NWChemEx project](https://nwchemex.github.io/NWChemEx) (2017-2023) through the [Exascale Computing Project ECP](https://www.exascaleproject.org) (17-SC-20-SC). 
 
 - [NERSC Perlmutter](https://docs.nersc.gov/systems/perlmutter) allocations through the DOE Basic Energy Sciences (BES) Chemical Sciences, Geosciences, & Biosciences (CSGB) program:
   * BES-CSGB-ERCAP0024325 (2020 - current): Scalable Predictive Methods for Excitations and Correlated Phenomena [(SPEC)](https://spec.labworks.org/home).

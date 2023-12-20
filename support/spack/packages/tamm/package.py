@@ -12,9 +12,9 @@ class Tamm(CMakePackage,CudaPackage):
     See https://doi.org/10.1063/5.0142433 for further information.
     """
 
-    homepage = "https://github.com/NWChemEx-Project/TAMM"
-    # url      = "https://github.com/NWChemEx-Project/TAMM"
-    git      = "https://github.com/NWChemEx-Project/TAMM.git"
+    homepage = "https://github.com/NWChemEx/TAMM"
+    # url      = "https://github.com/NWChemEx/TAMM"
+    git      = "https://github.com/NWChemEx/TAMM.git"
 
     tags = ['ecp', 'ecp-apps']
 

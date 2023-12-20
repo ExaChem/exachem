@@ -1,5 +1,5 @@
 
-The installation instructions for this repository are the same as those for the [TAMM Library](https://github.com/NWChemEx-Project/TAMM).
+The installation instructions for this repository are the same as those for the [TAMM Library](https://github.com/NWChemEx/TAMM).
 
 Installation
 =============
@@ -11,7 +11,7 @@ Build instructions for a quick start
 =====================================
 ## Step 1
 ```
-git clone https://github.com/NWChemEx-Project/TAMM.git
+git clone https://github.com/NWChemEx/TAMM.git
 cd TAMM && mkdir build && cd build
 ```
 - ### A detailed list of the cmake build options available are listed [here](https://tamm.readthedocs.io/en/latest/install.html)

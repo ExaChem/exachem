@@ -73,8 +73,6 @@ void ccsd_t_driver(std::string filename, OptionsMap options_map) {
 
   Scheduler sub_sch{*sub_ec};
 
-  // force writet on
-  ccsd_options.writet       = true;
   ccsd_options.computeTData = true;
 
   auto debug     = ccsd_options.debug;
@@ -455,9 +453,19 @@ void ccsd_t_driver(std::string filename, OptionsMap options_map) {
   tamm::reset_rmm_pool();
   // tamm::reinitialize_rmm_pool();
 
+  std::string dev_str = "[CPU]";
+#if defined(USE_CUDA)
+  dev_str = "[Nvidia GPU]";
+#elif defined(USE_HIP)
+  dev_str = "[AMD GPU]";
+#elif defined(USE_DPCPP)
+  dev_str = "[Intel GPU]";
+#endif
+
   if(rank == 0) {
-    if(is_restricted) cout << endl << "Running Closed Shell CCSD(T) calculation" << endl;
-    else cout << endl << "Running Open Shell CCSD(T) calculation" << endl;
+    if(is_restricted)
+      cout << endl << dev_str << " Running Closed Shell CCSD(T) calculation" << endl;
+    else cout << endl << dev_str << " Running Open Shell CCSD(T) calculation" << endl;
   }
 
   bool                            seq_h3b = true;

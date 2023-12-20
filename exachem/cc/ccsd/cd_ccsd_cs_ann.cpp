@@ -390,10 +390,9 @@ void ccsd_t2_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
 
       // A*B
       {
+#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
         TensorElType2* abuf_dev{nullptr};
         TensorElType3* bbuf_dev{nullptr};
-
-#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
         if(hw == ExecutionHW::GPU) {
           abuf_dev =
             static_cast<TensorElType2*>(memDevicePool.allocate(asize * sizeof(TensorElType2)));

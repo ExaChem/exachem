@@ -57,6 +57,8 @@ else: print("RHF calculation")
 V = v_alpha + v_beta
 O = o_alpha + o_beta
 
+nbf=o_alpha + v_alpha
+
 ccsd_mem = 0
 
 #setup tensors
@@ -115,6 +117,9 @@ f1_vo = f1_ov
 #cv3d {MO,MO,CI}
 cv3d = CI*d_f1
 
+#(MOxMOxCI + MOxAOxCI)
+chol_mem = CI*(d_f1+ 2*nbf*nbf) 
+
 #chol3d_oo, chol3d_ov, chol3d_vv
 chol3d_oo = CI*f1_oo  #{O, O, CI}, {"aa", "bb"}
 chol3d_ov = CI*f1_ov  #{O, V, CI}, {"aa", "bb"}
@@ -172,6 +177,8 @@ ccsd_mem += _a01 + _a04 + _a05 + _a06 + _a001 + _a004 + _a006 \
 gib=1024*1024*1024.0
 
 ccsd_mem = round(ccsd_mem*8/gib,2) #bytes
+chol_mem = round(chol_mem*8/gib,2) #bytes 
+print("Total CPU memory required for Cholesky decomp of the 2e integrals: " + str(chol_mem) + " GiB")
 print("Total CPU memory required for CCSD calculation: " + str(ccsd_mem) + " GiB")
 
 v4_mem = v_alpha*v_alpha*v_beta*v_beta

@@ -38,12 +38,14 @@ using shellpair_data_t =
 
 struct SCFVars {
   // diis
-  int                      idiis       = 0;
-  bool                     switch_diis = false;
-  double                   exc         = 0.0;
-  double                   eqed        = 0.0;
-  bool                     do_dens_fit = false;
-  bool                     do_load_bal = false;
+  int                      idiis        = 0;
+  bool                     switch_diis  = false;
+  double                   exc          = 0.0;
+  double                   eqed         = 0.0;
+  bool                     do_dens_fit  = false;
+  bool                     do_load_bal  = false;
+  bool                     lshift_reset = false;
+  bool                     lshift       = 0;
   libecpint::ECPIntegrator ecp_factory;
 
   // AO spaces

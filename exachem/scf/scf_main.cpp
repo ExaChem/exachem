@@ -247,6 +247,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
   }
 
   SCFVars scf_vars; // init vars
+  scf_vars.lshift = sys_data.options_map.scf_options.lshift;
 
   if(rank == 0) {
     const double fock_precision = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
@@ -755,7 +756,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
                               shell2bf, SchwarzK, max_nprim4, ttensors, etensors, is_3c_init,
                               do_density_fitting, 1.0);
 
-      scf_diagonalize<TensorType>(sch, sys_data, scalapack_info, ttensors, etensors);
+      scf_diagonalize<TensorType>(sch, sys_data, scf_vars, scalapack_info, ttensors, etensors);
 
       compute_density<TensorType>(ec, sys_data, scf_vars, scalapack_info, ttensors, etensors);
 
@@ -952,6 +953,9 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
       if(scf_conv) break;
 
       if(debug) print_energies(ec, ttensors, etensors, sys_data, scf_vars, scalapack_info, debug);
+
+      // Reset lshift to input option.
+      if(fabs(ediff) > 1e-2) scf_vars.lshift = sys_data.options_map.scf_options.lshift;
 
     } while((fabs(ediff) > conve) || (fabs(rmsd) > convd)); // SCF main loop
 

@@ -581,8 +581,8 @@ void compute_pchg_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<Ten
 }
 
 template<typename TensorType>
-void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, ScalapackInfo& scalapack_info,
-                     TAMMTensors& ttensors, EigenTensors& etensors) {
+void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, SCFVars& scf_vars,
+                     ScalapackInfo& scalapack_info, TAMMTensors& ttensors, EigenTensors& etensors) {
   auto rank = sch.ec().pg().rank();
   // const bool debug      = sys_data.options_map.scf_options.debug && rank==0;
 
@@ -598,6 +598,9 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, ScalapackInfo& 
   const int64_t N      = sys_data.nbf_orig;
   const bool    is_uhf = sys_data.is_unrestricted;
   // const bool is_rhf = sys_data.is_restricted;
+  const int nelectrons_alpha = sys_data.nelectrons_alpha;
+  const int nelectrons_beta  = sys_data.nelectrons_beta;
+  double    hl_gap           = 0;
 
 #if defined(USE_SCALAPACK)
 
@@ -686,11 +689,11 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, ScalapackInfo& 
                            1, 1, TMP1_sca.desc(), 0., Fp_sca.data(), 1, 1, Fp_sca.desc());
 
         // Solve EVP
-        std::vector<double> eps_a(Northo);
+        std::vector<double> eps_b(Northo);
         // scalapackpp::hereigd( scalapackpp::Job::Vec, scalapackpp::Uplo::Lower,
-        //                       Fp_sca, eps_a.data(), Ca_sca );
+        //                       Fp_sca, eps_b.data(), Ca_sca );
         /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, Fp_sca.m(),
-                                     Fp_sca.data(), 1, 1, Fp_sca.desc(), eps_a.data(),
+                                     Fp_sca.data(), 1, 1, Fp_sca.desc(), eps_b.data(),
                                      Ca_sca.data(), 1, 1, Ca_sca.desc());
 
         // Backtransform TMP = X * Cb -> TMP**T = Cb**T * X
@@ -703,6 +706,10 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, ScalapackInfo& 
         // Gather results
         // if(scalapack_info.pg.rank() == 0) C_beta.resize(N, Northo);
         // TMP2_sca.gather_from(Northo, N, C_beta.data(), Northo, 0, 0);
+
+        if(!scf_vars.lshift_reset)
+          hl_gap = std::min(eps_a[nelectrons_alpha], eps_b[nelectrons_beta]) -
+                   std::max(eps_a[nelectrons_alpha - 1], eps_b[nelectrons_beta - 1]);
       }
 
     } // rank participates in ScaLAPACK call
@@ -715,7 +722,8 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, ScalapackInfo& 
 
   const int64_t Northo_a = sys_data.nbf; // X_a.cols();
   // TODO: avoid eigen Fp
-  Matrix X_a;
+  Matrix              X_a;
+  std::vector<double> eps_a;
   if(rank == 0) {
     // alpha
     Matrix Fp = tamm_to_eigen_matrix(ttensors.F_alpha);
@@ -725,7 +733,7 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, ScalapackInfo& 
                Fp.data(), N, X_a.data(), Northo_a, 0., C_alpha.data(), N);
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, Northo_a, Northo_a, N,
                1., X_a.data(), Northo_a, C_alpha.data(), N, 0., Fp.data(), Northo_a);
-    std::vector<double> eps_a(Northo_a);
+    eps_a.resize(Northo_a);
     lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, Northo_a, Fp.data(), Northo_a,
                   eps_a.data());
     blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, Northo_a, N, Northo_a,
@@ -748,9 +756,23 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, ScalapackInfo& 
                     eps_b.data());
       blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, Northo_b, N, Northo_b,
                  1., Fp.data(), Northo_b, X_b.data(), Northo_b, 0., C_beta.data(), Northo_b);
+
+      if(!scf_vars.lshift_reset) {
+        hl_gap = std::min(eps_a[nelectrons_alpha], eps_b[nelectrons_beta]) -
+                 std::max(eps_a[nelectrons_alpha - 1], eps_b[nelectrons_beta - 1]);
+      }
     }
+    if(!scf_vars.lshift_reset) sch.ec().pg().broadcast(&hl_gap, 1, 0);
   }
 #endif
+
+  if(!scf_vars.lshift_reset && is_uhf) {
+    if(hl_gap < 1e-2) {
+      scf_vars.lshift_reset = true;
+      scf_vars.lshift       = 0.5;
+      if(rank == 0) cout << "Resetting lshift to 0.5" << endl;
+    }
+  }
 }
 
 template void scf_guess::subshell_occvec<double>(double& occvec, size_t size, size_t& ne);
@@ -778,6 +800,6 @@ template void compute_ecp_ints(ExecutionContext& ec, const SCFVars& scf_vars,
                                std::vector<libecpint::GaussianShell>& shells,
                                std::vector<libecpint::ECP>&           ecps);
 
-template void scf_diagonalize<double>(Scheduler& sch, const SystemData& sys_data,
+template void scf_diagonalize<double>(Scheduler& sch, const SystemData& sys_data, SCFVars& scf_vars,
                                       ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
                                       EigenTensors& etensors);

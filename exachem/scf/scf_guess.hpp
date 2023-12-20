@@ -59,8 +59,8 @@ void compute_ecp_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<Tens
                       std::vector<libecpint::ECP>&           ecps);
 
 template<typename TensorType>
-void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, ScalapackInfo& scalapack_info,
-                     TAMMTensors& ttensors, EigenTensors& etensors);
+void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, SCFVars& scf_vars,
+                     ScalapackInfo& scalapack_info, TAMMTensors& ttensors, EigenTensors& etensors);
 
 template<typename TensorType>
 void compute_sad_guess(ExecutionContext& ec, ScalapackInfo& scalapack_info, SystemData& sys_data,

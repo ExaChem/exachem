@@ -17,7 +17,7 @@ if( NOT ${CMakeBuild_FOUND} )
 
   FetchContent_Declare(
     CMakeBuild
-    GIT_REPOSITORY https://github.com/NWChemEx-Project/CMakeBuild.git
+    GIT_REPOSITORY https://github.com/NWChemEx/CMakeBuild.git
     GIT_TAG ${CMSB_TAG}
   )
 

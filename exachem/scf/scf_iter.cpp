@@ -20,7 +20,7 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
 
   const bool   is_uhf = sys_data.is_unrestricted;
   const bool   is_rhf = sys_data.is_restricted;
-  const double lshift = sys_data.options_map.scf_options.lshift;
+  const double lshift = scf_vars.lshift;
 
   Tensor<TensorType>& H1       = ttensors.H1;
   Tensor<TensorType>& S1       = ttensors.S1;
@@ -181,7 +181,7 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
 
     auto do_t1 = std::chrono::high_resolution_clock::now();
 
-    scf_diagonalize<TensorType>(sch, sys_data, scalapack_info, ttensors, etensors);
+    scf_diagonalize<TensorType>(sch, sys_data, scf_vars, scalapack_info, ttensors, etensors);
 
     auto do_t2 = std::chrono::high_resolution_clock::now();
     auto do_time =

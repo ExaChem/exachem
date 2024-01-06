@@ -7,6 +7,8 @@
  */
 
 // clang-format off
+#include <tamm/tamm_git.hpp>
+#include <exachem/exachem_git.hpp>
 #include "cc/ccsd/cd_ccsd_os_ann.hpp"
 #include "cc/ccsd_t/ccsd_t_fused_driver.hpp"
 #include "exachem/cc/lambda/ccsd_lambda.hpp"
@@ -69,6 +71,11 @@ int main(int argc, char* argv[]) {
     std::tie(options_map, jinput) = parse_input(is);
     if(options_map.options.output_file_prefix.empty())
       options_map.options.output_file_prefix = getfilename(filename);
+
+    if(rank == 0) {
+      std::cout << exachem_git_info() << std::endl;
+      std::cout << tamm_git_info() << std::endl;
+    }
 
     if(rank == 0) {
       cout << endl << "date: " << std::put_time(cur_local_time, "%c") << endl;

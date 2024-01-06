@@ -6,6 +6,4 @@
  * See LICENSE.txt for details
  */
 
-#include "exachem.hpp"
-
-void exachem() {}
+void exachem();

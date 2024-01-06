@@ -6,7 +6,7 @@ include(TargetMacros)
 set(EXACHEM_SRCS exachem.cpp)
 
 #Add the current directory's header files to the list
-set(EXACHEM_INCLUDES )
+set(EXACHEM_INCLUDES exachem.hpp)
 
 set(EXACHEM_CFLAGS )
 set(EXACHEM_LFLAGS )

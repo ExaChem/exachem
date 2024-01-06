@@ -5,7 +5,7 @@ num_gpus=4
 # need to assign GPUs in reverse order due to topology
 # See Polaris Device Affinity Information https://www.alcf.anl.gov/support/user-guides/polaris/hardware-overview/machine-overview/index.html
 
-#Usage: mpiexec -n 5 --ppn 5 -d 8 --cpu-bind depth --env OMP_NUM_THREADS=1 $PWD/set_affinity_gpu_polaris.sh
+#Usage: mpiexec -n 5 --ppn 5 --cpu-bind list:24:16:8:0:23 --env OMP_NUM_THREADS=1 $PWD/set_affinity_gpu_polaris.sh
 
 gpu=$((${num_gpus} - 1 - ${PMI_LOCAL_RANK} % ${num_gpus}))
 export CUDA_VISIBLE_DEVICES=$gpu

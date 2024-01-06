@@ -1,0 +1,38 @@
+
+#pragma once
+
+#include <string>
+#include <sstream>
+#include <fstream>
+
+inline std::string exachem_git_info() {
+    std::string gitinfo{};
+    gitinfo += "\nExaChem Git Information\n{\n";
+
+    if(!@GIT_RETRIEVED_STATE@) {
+        gitinfo += " WARNING: Failed to retrieve the current git state.\n}\n";
+        return gitinfo;
+    }
+
+    gitinfo += " Branch: @GIT_BRANCH@\n"; 
+    gitinfo += " Commit Hash: @GIT_DESCRIBE@";
+    gitinfo += " [@GIT_HEAD_SHA1@]\n";
+    gitinfo += " Commit Date: @GIT_COMMIT_DATE_ISO8601@\n"; 
+    gitinfo += " Commit Message: @GIT_COMMIT_SUBJECT@\n"; 
+
+    if(@GIT_IS_DIRTY@) {
+        gitinfo += "\n WARNING: The following ExaChem sources have uncommitted changes at build-time.\n\n";
+        gitinfo += R"(@GIT_STATUS@)";
+        gitinfo += "\n\n";
+        std::ifstream gdiff("@GIT_DIFF_MINIMAL@");
+        std::stringstream diff_text;
+        if(gdiff.is_open()) {
+            diff_text << gdiff.rdbuf();
+            gitinfo += diff_text.str();
+        }
+        else gitinfo += " The detailed list of changes to the above sources could not be provided!";
+        gitinfo += "\n\n";
+    }
+    gitinfo += "}\n";
+    return gitinfo;
+}

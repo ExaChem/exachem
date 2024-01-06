@@ -13,7 +13,7 @@
 
 using namespace tamm;
 
-void cd_ccsd(std::string filename, OptionsMap options_map);
+void cd_ccsd(std::string filename, ECOptions options_map);
 
 template<typename T>
 void ccsd_e_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI, Tensor<T>& de,

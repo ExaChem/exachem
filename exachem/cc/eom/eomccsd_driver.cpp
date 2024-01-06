@@ -8,7 +8,7 @@
 
 #include "eomccsd_opt.hpp"
 
-void eom_ccsd_driver(std::string filename, OptionsMap options_map) {
+void eom_ccsd_driver(std::string filename, ECOptions options_map) {
   using T = double;
 
   ProcGroup        pg = ProcGroup::create_world_coll();

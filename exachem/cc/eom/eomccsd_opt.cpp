@@ -713,7 +713,7 @@ void right_eomccsd_driver(SystemData sys_data, ExecutionContext& ec, const Tiled
         std::cout << std::fixed << std::setprecision(2) << iter_time << " secs" << std::endl;
         sys_data.results["output"]["EOMCCSD"]["iter"][std::to_string(iter + 1)]["performance"]
                         ["total_time"] = iter_time;
-        write_json_data(sys_data, "EOMCCSD");
+        sys_data.write_json_data("EOMCCSD");
       }
 
       //################################################################################

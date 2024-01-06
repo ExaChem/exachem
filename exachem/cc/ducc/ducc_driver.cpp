@@ -16,7 +16,7 @@ void DUCC_T_CCSD_Driver(SystemData sys_data, ExecutionContext& ec, const TiledIn
                         Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1, V2Tensors<T>& v2tensors,
                         size_t nactv, ExecutionHW ex_hw);
 
-void ducc_driver(std::string filename, OptionsMap options_map) {
+void ducc_driver(std::string filename, ECOptions options_map) {
   using T = double;
 
   ProcGroup        pg = ProcGroup::create_world_coll();

@@ -16,7 +16,7 @@ debug*
 build*
 .xlsx
 .csv
-
+bkp/
 #editor backups
 *~
 

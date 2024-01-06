@@ -286,7 +286,7 @@ cc2_v2_driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& 
     sys_data.results["output"]["CCSD"]["final_energy"]["correlation"] = energy;
     sys_data.results["output"]["CCSD"]["final_energy"]["total"] = sys_data.scf_energy + energy;
 
-    write_json_data(sys_data, "CCSD");
+    sys_data.write_json_data("CCSD");
   }
 
   return std::make_tuple(residual, energy);
@@ -294,7 +294,7 @@ cc2_v2_driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& 
 
 }; // namespace cc2_canonical
 
-void cc2_canonical_driver(std::string filename, OptionsMap options_map) {
+void cc2_canonical_driver(std::string filename, ECOptions options_map) {
   using T = double;
 
   ProcGroup        pg = ProcGroup::create_world_coll();

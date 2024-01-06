@@ -883,7 +883,7 @@ void DUCC_T_CCSD_Driver(SystemData sys_data, ExecutionContext& ec, const TiledIn
   free_tensors(ftij, vtijkl);
   if(nactv > 0) { free_tensors(ftia, ftab, vtijka, vtaijb, vtijab, vtiabc, vtabcd); }
 
-  if(rank == 0) write_json_data(sys_data, "DUCC");
+  if(rank == 0) sys_data.write_json_data("DUCC");
 }
 
 using T = double;

@@ -12,7 +12,7 @@
 
 using namespace tamm;
 
-void ccsd_lambda_driver(std::string filename, OptionsMap options_map);
+void ccsd_lambda_driver(std::string filename, ECOptions options_map);
 
 void iteration_print_lambda(const ProcGroup& pg, int iter, double residual, double time);
 

@@ -121,7 +121,7 @@ void write_results_to_json(ExecutionContext& ec, SystemData& sys_data, int level
       sys_data.results["output"]["GFCCSD"][gfcc_type][lvl_str][std::to_string(ni)]["A_a"] =
         ni_A[ni];
     }
-    write_json_data(sys_data, "GFCCSD");
+    sys_data.write_json_data("GFCCSD");
   }
 }
 
@@ -2507,7 +2507,7 @@ void gfccsd_driver_ea_b(
 #endif // gfccsd_driver_ea_b
 
 ////////////////////main entry point///////////////////////////
-void gfccsd_driver(std::string filename, OptionsMap options_map) {
+void gfccsd_driver(std::string filename, ECOptions options_map) {
   using T = double;
 
   ProcGroup        pg = ProcGroup::create_world_coll();
@@ -4296,7 +4296,7 @@ void gfccsd_driver(std::string filename, OptionsMap options_map) {
         write_string_to_disk(ec, spfe.str(), extrap_file);
         if(rank == 0) {
           sys_data.results["output"]["GFCCSD"]["retarded_alpha"]["nlevels"] = level;
-          write_json_data(sys_data, "GFCCSD");
+          sys_data.write_json_data("GFCCSD");
         }
         sch.deallocate(xsub_local_a, o_local_a, Cp_local_a, hsub_tamm_a, bsub_tamm_a, Cp_a)
           .execute();
@@ -4816,7 +4816,7 @@ void gfccsd_driver(std::string filename, OptionsMap options_map) {
         write_string_to_disk(ec, spfe.str(), extrap_file);
         if(rank == 0) {
           sys_data.results["output"]["GFCCSD"]["retarded_beta"]["nlevels"] = level;
-          write_json_data(sys_data, "GFCCSD");
+          sys_data.write_json_data( "GFCCSD");
         }
 
         sch.deallocate(xsub_local_b, o_local_b, Cp_local_b, hsub_tamm_b, bsub_tamm_b, Cp_b)
@@ -5740,7 +5740,7 @@ void gfccsd_driver(std::string filename, OptionsMap options_map) {
         write_string_to_disk(ec, spfe.str(), extrap_file);
         if(rank == 0) {
           sys_data.results["output"]["GFCCSD"]["advanced_alpha"]["nlevels"] = level;
-          write_json_data(sys_data, "GFCCSD");
+          sys_data.write_json_data( "GFCCSD");
         }
 
         sch_l.deallocate(Cp_local_a).execute();
@@ -6304,7 +6304,7 @@ void gfccsd_driver(std::string filename, OptionsMap options_map) {
         write_string_to_disk(ec, spfe.str(), extrap_file);
         if(rank == 0) {
           sys_data.results["output"]["GFCCSD"]["advanced_beta"]["nlevels"] = level;
-          write_json_data(sys_data, "GFCCSD");
+          sys_data.write_json_data( "GFCCSD");
         }
 
         sch.deallocate(ysub_local_b, o_local_b, Cp_local_b, hsub_tamm_b, bsub_tamm_b, Cp_b)

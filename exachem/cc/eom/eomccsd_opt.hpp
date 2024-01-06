@@ -12,7 +12,7 @@
 
 using namespace tamm;
 
-void eom_ccsd_driver(std::string filename, OptionsMap options_map);
+void eom_ccsd_driver(std::string filename, ECOptions options_map);
 
 template<typename T>
 struct EOM_X1Tensors {

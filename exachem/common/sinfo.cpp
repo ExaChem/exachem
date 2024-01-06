@@ -21,7 +21,7 @@ using std::cout;
 using std::endl;
 using std::string;
 
-void sinfo(std::string filename, OptionsMap options_map) {
+void sinfo(std::string filename, ECOptions options_map) {
   ProcGroup        pg = ProcGroup::create_world_coll();
   ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
   auto             rank = ec.pg().rank();
@@ -79,7 +79,7 @@ void sinfo(std::string filename, OptionsMap options_map) {
     std::cout << "  # of beta electons      = " << sys_data.nelectrons_beta << std::endl;
   }
 
-  if(rank == 0) write_sinfo(sys_data, shells);
+  if(rank == 0) sys_data.write_sinfo(shells);
 
   ec.flush_and_sync();
 }

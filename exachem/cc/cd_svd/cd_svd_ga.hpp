@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "common/json_data.hpp"
+#include "common/system_data.hpp"
 #include "scf/scf_main.hpp"
 #include "tamm/eigen_utils.hpp"
 

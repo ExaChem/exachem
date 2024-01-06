@@ -977,7 +977,7 @@ Matrix compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A) {
   return Ash;
 }
 
-void print_mulliken(OptionsMap& options_map, libint2::BasisSet& shells, Matrix& D, Matrix& D_beta,
+void print_mulliken(ECOptions& options_map, libint2::BasisSet& shells, Matrix& D, Matrix& D_beta,
                     Matrix& S, bool is_uhf) {
   auto        ec_atoms = options_map.options.ec_atoms;
   BasisSetMap bsm      = construct_basisset_maps(options_map.options.atoms, shells);
@@ -1198,6 +1198,92 @@ gather_task_vectors(ExecutionContext& ec, std::vector<int>& s1vec, std::vector<i
 }
 
 #if defined(USE_GAUXC)
+
+std::tuple<std::shared_ptr<GauXC::XCIntegrator<Matrix>>, double>
+gauxc_util::setup_gauxc(ExecutionContext& ec, const SystemData& sys_data, const SCFVars& scf_vars,
+                        const std::vector<libint2::Atom>& atoms, const libint2::BasisSet& shells) {
+  size_t     batch_size = 512;
+  const bool is_rhf     = sys_data.is_restricted;
+  // const bool is_ks      = sys_data.is_ks;
+  // const bool is_qed     = sys_data.is_qed;
+  // const bool do_qed     = sys_data.do_qed;
+  auto rank = ec.pg().rank();
+
+  auto gc1 = std::chrono::high_resolution_clock::now();
+
+  auto gauxc_mol   = make_gauxc_molecule(atoms);
+  auto gauxc_basis = make_gauxc_basis(shells);
+  auto gauxc_rt    = GauXC::RuntimeEnvironment(ec.pg().comm());
+  auto polar       = is_rhf ? ExchCXX::Spin::Unpolarized : ExchCXX::Spin::Polarized;
+  auto grid_type   = GauXC::AtomicGridSizeDefault::UltraFineGrid;
+  auto xc_grid_str = sys_data.options_map.scf_options.xc_grid_type;
+
+  std::transform(xc_grid_str.begin(), xc_grid_str.end(), xc_grid_str.begin(), ::tolower);
+  if(xc_grid_str == "fine") grid_type = GauXC::AtomicGridSizeDefault::FineGrid;
+  else if(xc_grid_str == "superfine") grid_type = GauXC::AtomicGridSizeDefault::SuperFineGrid;
+
+  // This options are set to get good accuracy.
+  // [Unpruned, Robust, Treutler]
+  auto gauxc_molgrid = GauXC::MolGridFactory::create_default_molgrid(
+    gauxc_mol, GauXC::PruningScheme::Robust, GauXC::BatchSize(batch_size),
+    GauXC::RadialQuad::MuraKnowles, grid_type);
+  auto gauxc_molmeta = std::make_shared<GauXC::MolMeta>(gauxc_mol);
+
+  // Set the load balancer
+  GauXC::LoadBalancerFactory lb_factory(GauXC::ExecutionSpace::Host, "Replicated");
+  auto gauxc_lb = lb_factory.get_shared_instance(gauxc_rt, gauxc_mol, gauxc_molgrid, gauxc_basis);
+
+  // Modify the weighting algorithm from the input [Becke, SSF, LKO]
+  GauXC::MolecularWeightsSettings mw_settings = {GauXC::XCWeightAlg::LKO, false};
+  GauXC::MolecularWeightsFactory  mw_factory(GauXC::ExecutionSpace::Host, "Default", mw_settings);
+  auto                            mw = mw_factory.get_instance();
+  mw.modify_weights(*gauxc_lb);
+
+  std::vector<std::string>       xc_vector = sys_data.options_map.scf_options.xc_type;
+  std::vector<ExchCXX::XCKernel> kernels   = {};
+  std::vector<double>            params(2049, 0.0);
+  int                            kernel_id = -1;
+
+  // TODO: Refactor DFT code path when we eventually enable GauXC by default.
+  // is_ks=false, so we setup, but do not run DFT.
+  for(std::string& xcfunc: xc_vector) {
+    std::transform(xcfunc.begin(), xcfunc.end(), xcfunc.begin(), ::toupper);
+    if(rank == 0) cout << "Functional: " << xcfunc << endl;
+
+    try {
+      // Try to setup using the builtin backend.
+      kernels.push_back(
+        ExchCXX::XCKernel(ExchCXX::Backend::builtin, ExchCXX::kernel_map.value(xcfunc), polar));
+    } catch(...) {
+      // If the above failed, setup with LibXC backend
+      kernels.push_back(ExchCXX::XCKernel(ExchCXX::libxc_name_string(xcfunc), polar));
+      txtutils caseChange;
+      if(caseChange.strequal_case(xcfunc, "HYB_GGA_X_QED") ||
+         caseChange.strequal_case(xcfunc, "HYB_GGA_XC_QED") ||
+         caseChange.strequal_case(xcfunc, "HYB_MGGA_XC_QED") ||
+         caseChange.strequal_case(xcfunc, "HYB_MGGA_X_QED"))
+        kernel_id = kernels.size() - 1;
+    }
+  }
+
+  // QED functionals need lambdas and omegas
+  // if(is_qed && kernel_id > -1) qed_functionals_setup(params, sys_data);
+  // gauxc_integrator.set_ext_params( params );
+
+  GauXC::functional_type gauxc_func = GauXC::functional_type(kernels);
+
+  // Initialize GauXC integrator
+  GauXC::XCIntegratorFactory<Matrix> integrator_factory(GauXC::ExecutionSpace::Host, "Replicated",
+                                                        "Default", "Default", "Default");
+  auto                               gc2 = std::chrono::high_resolution_clock::now();
+  auto gc_time = std::chrono::duration_cast<std::chrono::duration<double>>((gc2 - gc1)).count();
+
+  double xHF = gauxc_func.is_hyb() ? gauxc_func.hyb_exx() : 0.0;
+
+  if(rank == 0)
+    std::cout << std::fixed << std::setprecision(2) << "GauXC setup time: " << gc_time << "s\n";
+  return std::make_tuple(integrator_factory.get_shared_instance(gauxc_func, gauxc_lb), xHF);
+};
 
 GauXC::Molecule gauxc_util::make_gauxc_molecule(const std::vector<libint2::Atom>& atoms) {
   GauXC::Molecule mol;

@@ -545,7 +545,7 @@ std::tuple<double, double> cc2_cs::cd_cc2_cs_driver(
     sys_data.results["output"]["CC2"]["n_iterations"]                = niter + 1;
     sys_data.results["output"]["CC2"]["final_energy"]["correlation"] = energy;
     sys_data.results["output"]["CC2"]["final_energy"]["total"]       = sys_data.scf_energy + energy;
-    write_json_data(sys_data, "CC2");
+    sys_data.write_json_data("CC2");
   }
 
   sch.deallocate(d_e, i0_temp, t2_aaaa_temp, _a01V);

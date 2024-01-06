@@ -950,7 +950,7 @@ void rt_eom_cd_ccsd(SystemData& sys_data, ExecutionContext& ec, const TiledIndex
   } // end timestep loop
 
   if(ec.print()) {
-    if(ts_start < ntimesteps) write_json_data(sys_data, "RT-EOMCCSD");
+    if(ts_start < ntimesteps) sys_data.write_json_data("RT-EOMCCSD");
 
     if(profile) {
       std::string   profile_csv = out_fp + "_profile.csv";
@@ -980,7 +980,7 @@ void rt_eom_cd_ccsd(SystemData& sys_data, ExecutionContext& ec, const TiledIndex
 
 }; // namespace rteomcc
 
-void rt_eom_cd_ccsd_driver(std::string filename, OptionsMap options_map) {
+void rt_eom_cd_ccsd_driver(std::string filename, ECOptions options_map) {
   using T             = double;
   using ComplexTensor = Tensor<rteomcc::CCEType>;
 

@@ -17,16 +17,16 @@
 
 #define EC_COMPLEX
 
-void sinfo(std::string filename, OptionsMap options_map);
+void sinfo(std::string filename, ECOptions options_map);
 
 #if !defined(USE_UPCXX) and defined(EC_COMPLEX)
-void gfccsd_driver(std::string filename, OptionsMap options_map);
-void rt_eom_cd_ccsd_driver(std::string filename, OptionsMap options_map);
+void gfccsd_driver(std::string filename, ECOptions options_map);
+void rt_eom_cd_ccsd_driver(std::string filename, ECOptions options_map);
 #include "exachem/fci/fci.hpp"
 #endif
 
-void cd_cc2_driver(std::string filename, OptionsMap options_map);
-void ducc_driver(std::string filename, OptionsMap options_map);
+void cd_cc2_driver(std::string filename, ECOptions options_map);
+void ducc_driver(std::string filename, ECOptions options_map);
 
 int main(int argc, char* argv[]) {
   tamm::initialize(argc, argv);
@@ -64,13 +64,17 @@ int main(int argc, char* argv[]) {
 
     // read geometry from a json file
     json jinput;
-    check_json(filename);
-    auto is = std::ifstream(filename);
 
-    OptionsMap options_map;
-    std::tie(options_map, jinput) = parse_input(is);
+    ECParse parse(filename);
+    jinput = parse.jinput;
+    // ECOptions options_map(parse.jinput, parse.ec_atoms, parse.atoms);
+    ECOptions options_map(parse);
+
+    // std::tie(options_map, jinput) = parse_input(is);
+    // ECOptions options_map;
+    // parseInput pInput(options_map, jinput, filename);
     if(options_map.options.output_file_prefix.empty())
-      options_map.options.output_file_prefix = getfilename(filename);
+      options_map.options.output_file_prefix = ECParse::getfilename(filename);
 
     if(rank == 0) {
       std::cout << exachem_git_info() << std::endl;
@@ -91,7 +95,7 @@ int main(int argc, char* argv[]) {
     }
 
     // if(rank == 0) {
-    //   std::ofstream res_file(getfilename(filename)+".json");
+    //   std::ofstream res_file(ECParse::getfilename(filename)+".json");
     //   res_file << std::setw(2) << jinput << std::endl;
     // }
 

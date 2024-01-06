@@ -50,6 +50,6 @@ namespace fs = std::filesystem;
 std::tuple<SystemData, double, libint2::BasisSet, std::vector<size_t>, Tensor<TensorType>,
            Tensor<TensorType>, Tensor<TensorType>, Tensor<TensorType>, TiledIndexSpace,
            TiledIndexSpace, bool>
-hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_map);
+hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map);
 
-void scf(std::string filename, OptionsMap options_map);
+void scf(std::string filename, ECOptions options_map);

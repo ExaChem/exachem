@@ -21,7 +21,7 @@ double ccsdt_d2_v2_GetTime  = 0;
 double genTime              = 0;
 double ccsd_t_data_per_rank = 0; // in GB
 
-void ccsd_t_driver(std::string filename, OptionsMap options_map) {
+void ccsd_t_driver(std::string filename, ECOptions options_map) {
   using T = double;
 
   ProcGroup        pg = ProcGroup::create_world_coll();
@@ -567,7 +567,7 @@ void ccsd_t_driver(std::string filename, OptionsMap options_map) {
     sys_data.results["output"]["CCSD(T)"]["performance"]["gflops"]         = n_gflops;
     sys_data.results["output"]["CCSD(T)"]["performance"]["total_num_ops"]  = total_num_ops;
     sys_data.results["output"]["CCSD(T)"]["performance"]["load_imbalance"] = load_imb;
-    write_json_data(sys_data, "CCSD_T");
+    sys_data.write_json_data("CCSD_T");
   }
 
   comm_stats("S1-T1 GetTime", ccsdt_s1_t1_GetTime);

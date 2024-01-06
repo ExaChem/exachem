@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "json_data.hpp"
 #include "misc.hpp"
+#include "system_data.hpp"
 #include <iostream>
 
 template<typename T>

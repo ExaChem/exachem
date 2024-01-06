@@ -15,8 +15,11 @@
 #include "common/molden.hpp"
 
 #if defined(USE_GAUXC)
+#include <gauxc/molecular_weights.hpp>
+#include <gauxc/molgrid/defaults.hpp>
 #include <gauxc/xc_integrator.hpp>
 #include <gauxc/xc_integrator/impl.hpp>
+#include <gauxc/xc_integrator/integrator_factory.hpp>
 #endif
 
 #include <libecpint.hpp>
@@ -343,7 +346,7 @@ Matrix compute_schwarz_ints(ExecutionContext& ec, const SCFVars& scf_vars,
 
 Matrix compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A);
 
-void print_mulliken(OptionsMap& options_map, libint2::BasisSet& shells, Matrix& D, Matrix& D_beta,
+void print_mulliken(ECOptions& options_map, libint2::BasisSet& shells, Matrix& D, Matrix& D_beta,
                     Matrix& S, bool is_uhf);
 
 template<typename TensorType>
@@ -354,6 +357,10 @@ gather_task_vectors(ExecutionContext& ec, std::vector<int>& s1vec, std::vector<i
 #if defined(USE_GAUXC)
 
 namespace gauxc_util {
+
+std::tuple<std::shared_ptr<GauXC::XCIntegrator<Matrix>>, double>
+setup_gauxc(ExecutionContext& ec, const SystemData& sys_data, const SCFVars& scf_vars,
+            const std::vector<libint2::Atom>& atoms, const libint2::BasisSet& shells);
 
 GauXC::Molecule make_gauxc_molecule(const std::vector<libint2::Atom>& atoms);
 

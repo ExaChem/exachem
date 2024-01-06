@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "json_data.hpp"
+#include "system_data.hpp"
 
 void SystemData::update(bool spin_orbital) {
   EXPECTS(nbf == n_occ_alpha + n_vir_alpha); // lin-deps
@@ -55,7 +55,7 @@ void SystemData::print() {
   std::cout << "----------------------------" << std::endl;
 }
 
-SystemData::SystemData(OptionsMap options_map_, const std::string scf_type_string):
+SystemData::SystemData(ECOptions options_map_, const std::string scf_type_string):
   options_map(options_map_), scf_type_string(scf_type_string) {
   results          = json::object();
   is_restricted    = false;
@@ -90,39 +90,43 @@ SystemData::SystemData(OptionsMap options_map_, const std::string scf_type_strin
     is_qed = true;
     do_qed = true;
   }
+  txtutils caseChange;
   if(is_qed && is_ks) {
     for(auto x: options_map_.scf_options.xc_type) {
-      if(strequal_case(x, "gga_xc_qed") || strequal_case(x, "mgga_xc_qed") ||
-         strequal_case(x, "hyb_gga_xc_qed") || strequal_case(x, "hyb_mgga_xc_qed")) {
+      if(caseChange.strequal_case(x, "gga_xc_qed") || caseChange.strequal_case(x, "mgga_xc_qed") ||
+         caseChange.strequal_case(x, "hyb_gga_xc_qed") ||
+         caseChange.strequal_case(x, "hyb_mgga_xc_qed")) {
         if(options_map_.scf_options.qed_omegas.size() != (size_t) qed_nmodes) {
           tamm_terminate("ERROR: (m)gga_xc_qed needs qed_omegas for each qed_nmode");
         }
         break;
       }
-      else if(strequal_case(x, "gga_x_qed") || strequal_case(x, "mgga_x_qed") ||
-              strequal_case(x, "hyb_gga_x_qed") || strequal_case(x, "hyb_mgga_x_qed")) {
+      else if(caseChange.strequal_case(x, "gga_x_qed") ||
+              caseChange.strequal_case(x, "mgga_x_qed") ||
+              caseChange.strequal_case(x, "hyb_gga_x_qed") ||
+              caseChange.strequal_case(x, "hyb_mgga_x_qed")) {
         do_qed = false;
         break;
       }
     }
   }
-}
+} // end of SystemData::SystemData(ECOptions options_map_, const std::string scf_type_string)
 
-void write_sinfo(SystemData& sys_data, libint2::BasisSet& shells) {
-  auto        atoms       = sys_data.options_map.options.atoms;
-  auto        ec_atoms    = sys_data.options_map.options.ec_atoms;
-  SCFOptions  scf_options = sys_data.options_map.scf_options;
+void SystemData::write_sinfo(libint2::BasisSet& shells) {
+  auto        atoms       = options_map.options.atoms;
+  auto        ec_atoms    = options_map.options.ec_atoms;
+  SCFOptions  scf_options = options_map.scf_options;
   std::string basis       = scf_options.basis;
 
-  std::string out_fp    = sys_data.options_map.options.output_file_prefix + "." + scf_options.basis;
-  std::string files_dir = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type;
+  std::string out_fp       = options_map.options.output_file_prefix + "." + scf_options.basis;
+  std::string files_dir    = out_fp + "_files/" + options_map.scf_options.scf_type;
   std::string files_prefix = /*out_fp;*/ files_dir + "/" + out_fp;
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
 
   json results;
 
-  // const auto mname = sys_data.output_file_prefix;
-  results["molecule"]["name"]         = sys_data.options_map.options.output_file_prefix;
+  // const auto mname = output_file_prefix;
+  results["molecule"]["name"]         = options_map.options.output_file_prefix;
   results["molecule"]["basis"]["all"] = basis;
 
   for(size_t i = 0; i < atoms.size(); i++) {
@@ -132,9 +136,9 @@ void write_sinfo(SystemData& sys_data, libint2::BasisSet& shells) {
 
   results["molecule"]["nbf"]              = shells.nbf();
   results["molecule"]["nshells"]          = shells.size();
-  results["molecule"]["nelectrons"]       = sys_data.nelectrons;
-  results["molecule"]["nelectrons_alpha"] = sys_data.nelectrons_alpha;
-  results["molecule"]["nelectrons_beta"]  = sys_data.nelectrons_beta;
+  results["molecule"]["nelectrons"]       = nelectrons;
+  results["molecule"]["nelectrons_alpha"] = nelectrons_alpha;
+  results["molecule"]["nelectrons_beta"]  = nelectrons_beta;
 
   std::string json_file   = files_prefix + ".sinfo.json";
   bool        json_exists = std::filesystem::exists(json_file);
@@ -144,20 +148,17 @@ void write_sinfo(SystemData& sys_data, libint2::BasisSet& shells) {
   res_file << std::setw(2) << results << std::endl;
 }
 
-void write_json_data(SystemData& sys_data, const std::string cmodule) {
-  auto options = sys_data.options_map;
-  auto scf     = options.scf_options;
-  auto cd      = options.cd_options;
-  auto ccsd    = options.ccsd_options;
-
-  json& results = sys_data.results;
+void SystemData::write_json_data(const std::string cmodule) {
+  auto scf  = options_map.scf_options;
+  auto cd   = options_map.cd_options;
+  auto ccsd = options_map.ccsd_options;
 
   auto str_bool = [=](const bool val) {
     if(val) return "true";
     return "false";
   };
 
-  results["input"]["molecule"]["name"]     = sys_data.input_molecule;
+  results["input"]["molecule"]["name"]     = input_molecule;
   results["input"]["molecule"]["basisset"] = scf.basis;
   // results["input"]["molecule"]["gaussian_type"]  = scf.gaussian_type;
   results["input"]["molecule"]["geometry_units"] = scf.geom_units;
@@ -260,10 +261,11 @@ void write_json_data(SystemData& sys_data, const std::string cmodule) {
   }
 
   std::string l_module = cmodule;
-  to_lower(l_module);
+  txtutils    caseChange;
+  caseChange.to_lower(l_module);
 
-  std::string out_fp = sys_data.output_file_prefix + "." + sys_data.options_map.ccsd_options.basis;
-  std::string files_dir = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type + "/json";
+  std::string out_fp    = output_file_prefix + "." + options_map.ccsd_options.basis;
+  std::string files_dir = out_fp + "_files/" + options_map.scf_options.scf_type + "/json";
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
   std::string files_prefix = files_dir + "/" + out_fp;
   std::string json_file    = files_prefix + "." + l_module + ".json";

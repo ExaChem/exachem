@@ -199,7 +199,7 @@ setupTensors_cs(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int n
 template<typename T>
 std::tuple<SystemData, double, libint2::BasisSet, std::vector<size_t>, Tensor<T>, Tensor<T>,
            Tensor<T>, Tensor<T>, TiledIndexSpace, TiledIndexSpace, bool>
-hartree_fock_driver(ExecutionContext& ec, const string filename, OptionsMap options_map);
+hartree_fock_driver(ExecutionContext& ec, const string filename, ECOptions options_map);
 
 void ccsd_stats(ExecutionContext& ec, double hf_energy, double residual, double energy,
                 double thresh);
@@ -224,6 +224,6 @@ cd_svd_driver(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO, T
               libint2::BasisSet& shells, std::vector<size_t>& shell_tile_map, bool readv2 = false,
               std::string cholfile = "", bool is_dlpno = false, bool is_mso = true);
 
-void cd_2e_driver(std::string filename, OptionsMap options_map);
+void cd_2e_driver(std::string filename, ECOptions options_map);
 
-void cd_mp2(std::string filename, OptionsMap options_map);
+void cd_mp2(std::string filename, ECOptions options_map);

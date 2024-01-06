@@ -808,7 +808,7 @@ std::tuple<double, double> cd_ccsd_cs_driver(
     sys_data.results["output"]["CCSD"]["n_iterations"]                = niter + 1;
     sys_data.results["output"]["CCSD"]["final_energy"]["correlation"] = energy;
     sys_data.results["output"]["CCSD"]["final_energy"]["total"] = sys_data.scf_energy + energy;
-    write_json_data(sys_data, "CCSD");
+    sys_data.write_json_data("CCSD");
   }
 
   sch.deallocate(d_e, i0_temp, t2_aaaa_temp, _a01V);

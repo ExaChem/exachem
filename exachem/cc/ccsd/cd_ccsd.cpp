@@ -12,7 +12,7 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
-void cd_ccsd(std::string filename, OptionsMap options_map) {
+void cd_ccsd(std::string filename, ECOptions options_map) {
   using T = double;
 
   ProcGroup        pg = ProcGroup::create_world_coll();

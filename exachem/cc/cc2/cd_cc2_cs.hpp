@@ -15,7 +15,7 @@ using namespace tamm;
 
 namespace cc2_cs {
 
-// void cd_cc2_driver(std::string filename, OptionsMap options_map);
+// void cd_cc2_driver(std::string filename, ECOptions options_map);
 
 template<typename T>
 void cc2_e_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI, Tensor<T>& de,

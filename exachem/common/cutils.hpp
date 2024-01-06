@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "json_data.hpp"
+#include "system_data.hpp"
 using namespace tamm;
 
 #if defined(USE_SCALAPACK)

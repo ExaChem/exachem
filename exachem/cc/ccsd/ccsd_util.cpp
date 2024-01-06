@@ -295,7 +295,7 @@ setupTensors_cs(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int n
 template<typename T>
 std::tuple<SystemData, double, libint2::BasisSet, std::vector<size_t>, Tensor<T>, Tensor<T>,
            Tensor<T>, Tensor<T>, TiledIndexSpace, TiledIndexSpace, bool>
-hartree_fock_driver(ExecutionContext& ec, const string filename, OptionsMap options_map) {
+hartree_fock_driver(ExecutionContext& ec, const string filename, ECOptions options_map) {
   auto rank = ec.pg().rank();
 
   double              hf_energy{0.0};
@@ -313,7 +313,7 @@ hartree_fock_driver(ExecutionContext& ec, const string filename, OptionsMap opti
 
   std::tie(sys_data, hf_energy, shells, shell_tile_map, C_AO, F_AO, C_beta_AO, F_beta_AO, tAO, tAOt,
            scf_conv)          = hartree_fock(ec, filename, options_map);
-  sys_data.input_molecule     = getfilename(filename);
+  sys_data.input_molecule     = ECParse::getfilename(filename);
   sys_data.output_file_prefix = options_map.options.output_file_prefix;
 
   auto hf_t2 = std::chrono::high_resolution_clock::now();
@@ -652,7 +652,7 @@ cd_svd_driver(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO, T
   return std::make_tuple(cholVpr, d_f1, lcao, chol_count, max_cvecs, CI);
 }
 
-void cd_2e_driver(std::string filename, OptionsMap options_map) {
+void cd_2e_driver(std::string filename, ECOptions options_map) {
   using T = double;
 
   ProcGroup        pg = ProcGroup::create_world_coll();
@@ -745,7 +745,7 @@ setupTensors_cs<T>(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, in
 
 template std::tuple<SystemData, double, libint2::BasisSet, std::vector<size_t>, Tensor<T>,
                     Tensor<T>, Tensor<T>, Tensor<T>, TiledIndexSpace, TiledIndexSpace, bool>
-hartree_fock_driver<T>(ExecutionContext& ec, const string filename, OptionsMap options_map);
+hartree_fock_driver<T>(ExecutionContext& ec, const string filename, ECOptions options_map);
 
 template std::tuple<Tensor<T>, Tensor<T>, Tensor<T>, TAMM_SIZE, tamm::Tile, TiledIndexSpace>
 cd_svd_driver<T>(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO,

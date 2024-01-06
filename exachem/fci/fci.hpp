@@ -63,7 +63,7 @@ std::string generate_fcidump(SystemData sys_data, ExecutionContext& ec, const Ti
   return files_prefix;
 }
 
-void fci_driver(std::string filename, OptionsMap options_map) {
+void fci_driver(std::string filename, ECOptions options_map) {
   using T = double;
 
   ProcGroup        pg = ProcGroup::create_world_coll();

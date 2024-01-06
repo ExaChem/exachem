@@ -727,7 +727,7 @@ std::tuple<double, double> cc2_os::cd_cc2_os_driver(
     sys_data.results["output"]["CC2"]["final_energy"]["correlation"] = energy;
     sys_data.results["output"]["CC2"]["final_energy"]["total"]       = sys_data.scf_energy + energy;
 
-    write_json_data(sys_data, "CC2");
+    sys_data.write_json_data("CC2");
   }
 
   CCSE_Tensors<T>::deallocate_list(sch, _a02_os, _a03_os);

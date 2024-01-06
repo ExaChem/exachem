@@ -8,7 +8,7 @@
 
 #include "molden.hpp"
 #include "misc.hpp"
-
+#include "txtutils.hpp"
 string read_option(string line) {
   std::istringstream       oss(line);
   std::vector<std::string> option_string{std::istream_iterator<std::string>{oss},
@@ -32,8 +32,9 @@ inline bool is_comment(const std::string line) {
 bool is_in_line(const std::string str, const std::string line) {
   auto        found = true;
   std::string str_u = str, str_l = str;
-  to_upper(str_u);
-  to_lower(str_l);
+  txtutils    caseChange;
+  caseChange.to_upper(str_u);
+  caseChange.to_lower(str_l);
 
   if(is_comment(line)) found = false;
   else {

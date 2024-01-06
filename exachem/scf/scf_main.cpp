@@ -24,7 +24,7 @@
 std::tuple<SystemData, double, libint2::BasisSet, std::vector<size_t>, Tensor<TensorType>,
            Tensor<TensorType>, Tensor<TensorType>, Tensor<TensorType>, TiledIndexSpace,
            TiledIndexSpace, bool>
-hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_map) {
+hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map) {
   using libint2::Atom;
   using libint2::BasisSet;
   using libint2::Engine;
@@ -278,7 +278,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
               << "Nuclear repulsion energy  = " << std::setprecision(15) << enuc << std::endl
               << std::endl;
 
-    write_sinfo(sys_data, shells);
+    sys_data.write_sinfo(shells);
   }
 
   // Compute non-negligible shell-pair list
@@ -398,79 +398,14 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 #endif
 
 #if defined(USE_GAUXC)
-    /*** =========================== ***/
-    /*** Setup GauXC types           ***/
-    /*** =========================== ***/
-    size_t batch_size = 512;
-
-    auto gc1         = std::chrono::high_resolution_clock::now();
-    auto gauxc_mol   = gauxc_util::make_gauxc_molecule(atoms);
-    auto gauxc_basis = gauxc_util::make_gauxc_basis(shells);
-    auto gauxc_rt    = GauXC::RuntimeEnvironment(ec.pg().comm());
-    auto polar       = is_rhf ? ExchCXX::Spin::Unpolarized : ExchCXX::Spin::Polarized;
-    auto grid_type   = GauXC::AtomicGridSizeDefault::UltraFineGrid;
-    auto xc_grid_str = scf_options.xc_grid_type;
-    std::transform(xc_grid_str.begin(), xc_grid_str.end(), xc_grid_str.begin(), ::tolower);
-    if(xc_grid_str == "fine") grid_type = GauXC::AtomicGridSizeDefault::FineGrid;
-    else if(xc_grid_str == "superfine") grid_type = GauXC::AtomicGridSizeDefault::SuperFineGrid;
-
-    // This options are set to get good accuracy.
-    // [Unpruned, Robust, Treutler]
-    auto gauxc_molgrid = GauXC::MolGridFactory::create_default_molgrid(
-      gauxc_mol, GauXC::PruningScheme::Robust, GauXC::BatchSize(batch_size),
-      GauXC::RadialQuad::MuraKnowles, grid_type);
-    auto gauxc_molmeta = std::make_shared<GauXC::MolMeta>(gauxc_mol);
-
-    // Set the load balancer
-    GauXC::LoadBalancerFactory lb_factory(GauXC::ExecutionSpace::Host, "Replicated");
-    auto gauxc_lb = lb_factory.get_shared_instance(gauxc_rt, gauxc_mol, gauxc_molgrid, gauxc_basis);
-
-    // Modify the weighting algorithm from the input [Becke, SSF, LKO]
-    GauXC::MolecularWeightsSettings mw_settings = {GauXC::XCWeightAlg::LKO, false};
-    GauXC::MolecularWeightsFactory  mw_factory(GauXC::ExecutionSpace::Host, "Default", mw_settings);
-    auto                            mw = mw_factory.get_instance();
-    mw.modify_weights(*gauxc_lb);
-
-    std::vector<std::string>       xc_vector = scf_options.xc_type;
-    std::vector<ExchCXX::XCKernel> kernels   = {};
-    std::vector<double>            params(2049, 0.0);
-    int                            kernel_id = -1;
-
-    // TODO: Refactor DFT code path when we eventually enable GauXC by default.
-    // is_ks=false, so we setup, but do not run DFT.
-    if(xc_vector.empty()) xc_vector = {"PBE0"};
-    for(std::string& xcfunc: xc_vector) {
-      std::transform(xcfunc.begin(), xcfunc.end(), xcfunc.begin(), ::toupper);
-      if(rank == 0) cout << "Functional: " << xcfunc << endl;
-
-      try {
-        // Try to setup using the builtin backend.
-        kernels.push_back(
-          ExchCXX::XCKernel(ExchCXX::Backend::builtin, ExchCXX::kernel_map.value(xcfunc), polar));
-      } catch(...) {
-        // If the above failed, setup with LibXC backend
-        kernels.push_back(ExchCXX::XCKernel(ExchCXX::libxc_name_string(xcfunc), polar));
-        if(strequal_case(xcfunc, "HYB_GGA_X_QED") || strequal_case(xcfunc, "HYB_GGA_XC_QED") ||
-           strequal_case(xcfunc, "HYB_MGGA_XC_QED") || strequal_case(xcfunc, "HYB_MGGA_X_QED"))
-          kernel_id = kernels.size() - 1;
-      }
-    }
-
-    GauXC::functional_type gauxc_func = GauXC::functional_type(kernels);
-
-    // Initialize GauXC integrator
-    GauXC::XCIntegratorFactory<Matrix> integrator_factory(GauXC::ExecutionSpace::Host, "Replicated",
-                                                          "Default", "Default", "Default");
-    auto gauxc_integrator = integrator_factory.get_instance(gauxc_func, gauxc_lb);
-
-    auto gc2     = std::chrono::high_resolution_clock::now();
-    auto gc_time = std::chrono::duration_cast<std::chrono::duration<double>>((gc2 - gc1)).count();
-
-    if(rank == 0)
-      std::cout << std::fixed << std::setprecision(2) << "GauXC setup time: " << gc_time << "s\n";
-
-    // TODO
-    const double xHF = is_ks ? (gauxc_func.is_hyb() ? gauxc_func.hyb_exx() : 0.) : 1.;
+    double                                       xHF;
+    std::shared_ptr<GauXC::XCIntegrator<Matrix>> gauxc_integrator_ptr;
+    if(is_ks)
+      std::tie(gauxc_integrator_ptr, xHF) =
+        gauxc_util::setup_gauxc(ec, sys_data, scf_vars, atoms, shells);
+    else xHF = 1.0;
+    auto gauxc_integrator = is_ks ? GauXC::XCIntegrator<Matrix>(std::move(*gauxc_integrator_ptr))
+                                  : GauXC::XCIntegrator<Matrix>();
     if(rank == 0) cout << "HF exch = " << xHF << endl;
 #else
   const double      xHF = 1.;
@@ -533,7 +468,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
     if(N >= restart_size && fs::exists(ortho_file)) {
       if(rank == 0) {
         cout << "Reading orthogonalizer from disk ..." << endl << endl;
-        auto jX           = json_from_file(ortho_jfile);
+        auto jX           = ECParse::json_from_file(ortho_jfile);
         auto Xdims        = jX["ortho_dims"].get<std::vector<int>>();
         sys_data.n_lindep = sys_data.nbf_orig - Xdims[1];
       }
@@ -567,7 +502,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
       if(rank == 0) {
         json jX;
         jX["ortho_dims"] = {sys_data.nbf_orig, sys_data.nbf};
-        json_to_file(jX, ortho_jfile);
+        ECParse::json_to_file(jX, ortho_jfile);
       }
       if(N >= restart_size) {
 #if defined(USE_SCALAPACK)
@@ -1089,7 +1024,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
 
   sys_data.update();
   if(rank == 0 && debug) sys_data.print();
-  // sys_data.input_molecule = getfilename(filename);
+  // sys_data.input_molecule = ECParse::getfilename(filename);
   sys_data.scf_energy = ehf;
   // iter not broadcasted, but fine since only rank 0 writes to json
   if(rank == 0) {
@@ -1122,7 +1057,7 @@ hartree_fock(ExecutionContext& exc, const string filename, OptionsMap options_ma
                          C_beta_tamm, Fb_global, scf_vars.tAO, scf_vars.tAOt, scf_conv);
 }
 
-void scf(std::string filename, OptionsMap options_map) {
+void scf(std::string filename, ECOptions options_map) {
   using T = double;
 
   ProcGroup        pg = ProcGroup::create_world_coll();
@@ -1141,7 +1076,7 @@ void scf(std::string filename, OptionsMap options_map) {
     sys_data.output_file_prefix                   = options_map.options.output_file_prefix;
     sys_data.input_molecule                       = sys_data.output_file_prefix;
     sys_data.results["input"]["molecule"]["name"] = sys_data.output_file_prefix;
-    write_json_data(sys_data, "SCF");
+    sys_data.write_json_data("SCF");
   }
 
   auto hf_t2 = std::chrono::high_resolution_clock::now();

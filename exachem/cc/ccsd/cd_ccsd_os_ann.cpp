@@ -1158,7 +1158,7 @@ cd_ccsd_os_driver(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSp
     sys_data.results["output"]["CCSD"]["final_energy"]["correlation"] = energy;
     sys_data.results["output"]["CCSD"]["final_energy"]["total"] = sys_data.scf_energy + energy;
 
-    write_json_data(sys_data, "CCSD");
+    sys_data.write_json_data("CCSD");
   }
 
   CCSE_Tensors<T>::deallocate_list(sch, _a02_os, _a03_os);

@@ -16,7 +16,7 @@
 #endif
 #include "ccsd_t_common.hpp"
 
-void ccsd_t_driver(std::string filename, OptionsMap options_map);
+void ccsd_t_driver(std::string filename, ECOptions options_map);
 
 void finalizememmodule();
 

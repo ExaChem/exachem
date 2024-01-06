@@ -15,7 +15,7 @@ template<typename T>
 void compute_rdm(std::vector<int>&, std::string, Scheduler&, TiledIndexSpace&, Tensor<T>, Tensor<T>,
                  Tensor<T>, Tensor<T>);
 
-void ccsd_lambda_driver(std::string filename, OptionsMap options_map) {
+void ccsd_lambda_driver(std::string filename, ECOptions options_map) {
   using T = double;
 
   ProcGroup        pg = ProcGroup::create_world_coll();
@@ -378,7 +378,7 @@ void ccsd_lambda_driver(std::string filename, OptionsMap options_map) {
     sys_data.results["output"]["CCSD_Lambda"]["dipole"]["Z"]               = dmz;
     sys_data.results["output"]["CCSD_Lambda"]["dipole"]["Total"]           = total_dip_val;
     sys_data.results["output"]["CCSD_Lambda"]["performance"]["total_time"] = ccsd_time;
-    write_json_data(sys_data, "CCSD_Lambda");
+    sys_data.write_json_data("CCSD_Lambda");
   }
 
   compute_rdm(ccsd_options.cc_rdm, files_prefix, sch, MO, d_t1, d_t2, d_y1, d_y2);

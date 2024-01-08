@@ -43,7 +43,7 @@ public:
   std::vector<string> geom_bohr;
   const double        angstrom_to_bohr = 1.8897259878858;
   json                jinput;
-  std::string         geom_units;
+  std::string         geom_units{"angstrom"};
   ECParse(std::string_view filename);
   void               convertUnits();
   static void        check_json(std::string filename);

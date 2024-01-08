@@ -100,7 +100,7 @@ public:
 
   void print() {
     std::cout << std::defaultfloat;
-    std::cout << std::endl << "Common COptions" << std::endl;
+    std::cout << std::endl << "Common Options" << std::endl;
     std::cout << "{" << std::endl;
     std::cout << " maxiter    = " << maxiter << std::endl;
     std::cout << " basis      = " << basis << " ";

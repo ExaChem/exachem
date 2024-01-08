@@ -243,6 +243,8 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
     cout << "Number of nodes, processes per node, total processes used for Scalapack operations: "
          << sca_nnodes << ", " << sca_nranks / sca_nnodes << ", " << sca_nranks << endl;
 #endif
+
+    sys_data.options_map.options.print();
     scf_options.print();
   }
 

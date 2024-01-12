@@ -214,6 +214,8 @@ jobs:
       if: ${{ matrix.backend == 'ga' }}
       id: build_exachem
       run: |
+        echo "CI_NRANKS=3" >> $GITHUB_ENV
+
         # TAMM build
         git clone https://github.com/NWChemEx/TAMM $GITHUB_WORKSPACE/TAMM
         cd $GITHUB_WORKSPACE/TAMM
@@ -241,6 +243,7 @@ jobs:
         export CPATH=$CPATH:/usr/lib/x86_64-linux-gnu/openmpi/include
         echo "UPCXX_SHARED_HEAP_SIZE=MAX" >> $GITHUB_ENV
         echo "CI_MPIEXEC=upcxx-run" >> $GITHUB_ENV
+        echo "CI_NRANKS=2" >> $GITHUB_ENV
         echo "UPCXX_MISSING_TESTS=1" >> $GITHUB_ENV
 
         # TAMM build
@@ -255,7 +258,7 @@ jobs:
 
         # Chem build
         cd $GITHUB_WORKSPACE
-        UPCXX_CODEMODE=O3 CXX=upcxx cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES="CC" -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DUSE_UPCXX=ON -DMPIRUN_EXECUTABLE="upcxx-run"
+        UPCXX_CODEMODE=O3 CXX=upcxx cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES="CC" -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DUSE_UPCXX=ON -DMPIRUN_EXECUTABLE=${{ env.CI_MPIEXEC }}
         cd build
         UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make -j${{ env.EC_NPROC }}
 
@@ -265,7 +268,7 @@ jobs:
         cd $GITHUB_WORKSPACE/build
         export PATH=$PATH:$GITHUB_WORKSPACE/install/bin
         # ctest -VV
-        $GITHUB_WORKSPACE/ci/scripts/run_ci $GITHUB_WORKSPACE $GITHUB_WORKSPACE/build/methods_stage/${{ env.INSTALL_PATH }}/methods/ExaChem 3 ${{ env.CI_MPIEXEC }} ${{ env.UPCXX_MISSING_TESTS }}
+        $GITHUB_WORKSPACE/ci/scripts/run_ci $GITHUB_WORKSPACE $GITHUB_WORKSPACE/build/methods_stage/${{ env.INSTALL_PATH }}/methods/ExaChem ${{ env.CI_NRANKS }} ${{ env.CI_MPIEXEC }} ${{ env.UPCXX_MISSING_TESTS }}
     # - name: gcovr
     #   run: |
     #     cd $GITHUB_WORKSPACE

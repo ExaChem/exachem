@@ -90,7 +90,7 @@ The values listed below are the defaults where few options are automatically adj
 
 :restart: ``[default=false]`` indicates the calculation be restarted.
 
-:noscf: ``[default=false]`` typically used together with `restart` option. Computes only the SCF energy upon restart.
+:noscf: ``[default=false]`` Computes only the SCF energy upon restart.
 
 :scf_type: ``[default=restricted]``  The following values are supported
 

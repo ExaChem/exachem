@@ -24,11 +24,12 @@ template<typename TensorType>
 std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
                                                  ScalapackInfo& scalapack_info, const int& iter,
                                                  const SystemData& sys_data, SCFVars& scf_vars,
-                                                 TAMMTensors& ttensors, EigenTensors& etensors,
+                                                 TAMMTensors& ttensors, EigenTensors& etensors
 #if defined(USE_GAUXC)
-                                                 GauXC::XCIntegrator<Matrix>& gauxc_integrator,
+                                                 ,
+                                                 GauXC::XCIntegrator<Matrix>& gauxc_integrator
 #endif
-                                                 bool scf_restart = false);
+);
 
 template<typename TensorType>
 std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>

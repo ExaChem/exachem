@@ -372,11 +372,11 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
   EigenTensors etensors;
   TAMMTensors  ttensors;
 
-  const bool scf_conv = restart && scf_options.noscf;
+  const bool no_scf   = scf_options.noscf;
   bool       is_conv  = true;
   const bool load_bal = scf_vars.do_load_bal;
 
-  scf_restart_test(exc, sys_data, restart, files_prefix);
+  scf_restart_test(exc, sys_data, restart || no_scf, files_prefix);
 
 #if SCF_THROTTLE_RESOURCES
   if(rank < hf_nranks) {
@@ -625,7 +625,7 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
     auto                     max_nprim4 = max_nprim * max_nprim * max_nprim * max_nprim;
     auto                     shell2bf   = obs.shell2bf();
 
-    if(restart) {
+    if(restart || no_scf) {
       scf_restart(ec, scalapack_info, sys_data, ttensors, etensors, files_prefix);
       if(!do_density_fitting) {
         tamm_to_eigen_tensor(ttensors.D_alpha, etensors.D_alpha);
@@ -704,7 +704,7 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
 
     hf_t2   = std::chrono::high_resolution_clock::now();
     hf_time = std::chrono::duration_cast<std::chrono::duration<double>>((hf_t2 - hf_t1)).count();
-    if(rank == 0)
+    if(rank == 0 && !no_scf && !restart)
       std::cout << std::fixed << std::setprecision(2)
                 << "Total Time to compute initial guess: " << hf_time << " secs" << endl;
 
@@ -724,12 +724,11 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
       }
     }
 
-    if(rank == 0) {
+    if(rank == 0 && !no_scf) {
       std::cout << std::endl << std::endl;
       std::cout << " SCF iterations" << endl;
       std::cout << std::string(65, '-') << endl;
       std::string sph = " Iter     Energy            E-Diff       RMSD          Time(s)";
-      if(scf_conv) sph = " Iter     Energy            E-Diff       Time(s)";
       std::cout << sph << endl;
       std::cout << std::string(65, '-') << endl;
     }
@@ -767,7 +766,7 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
       ec.pg().broadcast(etensors.taskmap.data(), etensors.taskmap.size(), 0);
     }
 
-    if(restart || molden_exists) {
+    if(restart || no_scf || molden_exists) {
       sch(ttensors.F_alpha_tmp() = 0).execute();
 
       if(is_uhf) { sch(ttensors.F_beta_tmp() = 0).execute(); }
@@ -812,6 +811,8 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
 
     // SCF main loop
     do {
+      if(no_scf) break;
+
       const auto loop_start = std::chrono::high_resolution_clock::now();
       ++iter;
 
@@ -841,11 +842,12 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
                               do_density_fitting, xHF);
 
       std::tie(ehf, rmsd) = scf_iter_body<TensorType>(ec, scalapack_info, iter, sys_data, scf_vars,
-                                                      ttensors, etensors,
+                                                      ttensors, etensors
 #if defined(USE_GAUXC)
-                                                      gauxc_integrator,
+                                                      ,
+                                                      gauxc_integrator
 #endif
-                                                      scf_conv);
+      );
 
       ehf += enuc;
       // compute difference with last iteration
@@ -866,7 +868,7 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
           std::cout << std::scientific << std::setprecision(2);
         }
         std::cout << ' ' << std::scientific << std::setw(12) << ediff;
-        if(!scf_conv) std::cout << ' ' << std::setw(12) << rmsd << ' ';
+        std::cout << ' ' << std::setw(12) << rmsd << ' ';
         std::cout << ' ' << std::setw(10) << std::fixed << std::setprecision(1) << loop_time << ' '
                   << endl;
 
@@ -879,15 +881,13 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
       // if(rank==0) cout << "D at the end of iteration: " << endl << std::setprecision(6) <<
       // etensors.D_alpha << endl;
       if(scf_options.writem % iter == 0 || scf_options.writem == 1) {
-        if(!scf_conv) rw_md_disk(ec, scalapack_info, sys_data, ttensors, etensors, files_prefix);
+        rw_md_disk(ec, scalapack_info, sys_data, ttensors, etensors, files_prefix);
       }
 
       if(iter >= maxiter) {
         is_conv = false;
         break;
       }
-
-      if(scf_conv) break;
 
       if(debug) print_energies(ec, ttensors, etensors, sys_data, scf_vars, scalapack_info, debug);
 
@@ -910,10 +910,13 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
       sch(ttensors.F_alpha_tmp() = 0).execute();
       if(is_uhf) sch(ttensors.F_beta_tmp() = 0).execute();
 
+      auto xHF_adjust = xHF;
+      // TODO: skip for non-CC methods
+      if(!sys_data.options_map.task_options.scf) xHF_adjust = 1.0;
       // build a new Fock matrix
       compute_2bf<TensorType>(ec, scalapack_info, sys_data, scf_vars, obs, do_schwarz_screen,
                               shell2bf, SchwarzK, max_nprim4, ttensors, etensors, is_3c_init,
-                              do_density_fitting, xHF);
+                              do_density_fitting, xHF_adjust);
     }
 
     for(auto x: ttensors.ehf_tamm_hist) Tensor<TensorType>::deallocate(x);
@@ -933,7 +936,7 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
                 << "Nuclear repulsion energy = " << std::setprecision(15) << enuc << endl;
     print_energies(ec, ttensors, etensors, sys_data, scf_vars, scalapack_info);
 
-    if(!scf_conv) {
+    if(!no_scf) {
       if(rank == 0) cout << "writing orbitals and density to disk ... ";
       rw_md_disk(ec, scalapack_info, sys_data, ttensors, etensors, files_prefix);
       if(rank == 0) cout << "done." << endl;
@@ -1056,7 +1059,7 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
   exc.pg().barrier();
 
   return std::make_tuple(sys_data, ehf, shells, scf_vars.shell_tile_map, C_alpha_tamm, Fa_global,
-                         C_beta_tamm, Fb_global, scf_vars.tAO, scf_vars.tAOt, scf_conv);
+                         C_beta_tamm, Fb_global, scf_vars.tAO, scf_vars.tAOt, no_scf);
 }
 
 void scf(std::string filename, ECOptions options_map) {
@@ -1069,7 +1072,7 @@ void scf(std::string filename, ECOptions options_map) {
   auto hf_t1 = std::chrono::high_resolution_clock::now();
 
   auto [sys_data, hf_energy, shells, shell_tile_map, C_AO, F_AO, C_beta_AO, F_beta_AO, AO_opt,
-        AO_tis, scf_conv] = hartree_fock(ec, filename, options_map);
+        AO_tis, no_scf] = hartree_fock(ec, filename, options_map);
 
   Tensor<T>::deallocate(C_AO, F_AO);
   if(sys_data.is_unrestricted) Tensor<T>::deallocate(C_beta_AO, F_beta_AO);

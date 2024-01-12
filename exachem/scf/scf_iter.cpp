@@ -12,11 +12,12 @@ template<typename TensorType>
 std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
                                                  ScalapackInfo& scalapack_info, const int& iter,
                                                  const SystemData& sys_data, SCFVars& scf_vars,
-                                                 TAMMTensors& ttensors, EigenTensors& etensors,
+                                                 TAMMTensors& ttensors, EigenTensors& etensors
 #if defined(USE_GAUXC)
-                                                 GauXC::XCIntegrator<Matrix>& gauxc_integrator,
+                                                 ,
+                                                 GauXC::XCIntegrator<Matrix>& gauxc_integrator
 #endif
-                                                 bool scf_restart) {
+) {
 
   const bool   is_uhf = sys_data.is_unrestricted;
   const bool   is_rhf = sys_data.is_restricted;
@@ -159,40 +160,36 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
       std::cout << std::fixed << std::setprecision(2) << "diis: " << do_time << "s, ";
   }
 
-  if(!scf_restart) {
-    if(lshift > 0) {
-      double lval = is_rhf ? 0.5 * lshift : lshift;
+  if(lshift > 0) {
+    double lval = is_rhf ? 0.5 * lshift : lshift;
+    // clang-format off
+    sch
+    (ehf_tmp(mu,ku) = S1(mu,nu) * D_last_alpha_tamm(nu,ku))
+    (F_alpha(mu,ku) -= lval * ehf_tmp(mu,nu) * S1(nu,ku))
+    .execute();
+    // clang-format on
+
+    if(is_uhf) {
       // clang-format off
       sch
-      (ehf_tmp(mu,ku) = S1(mu,nu) * D_last_alpha_tamm(nu,ku))
-      (F_alpha(mu,ku) -= lval * ehf_tmp(mu,nu) * S1(nu,ku))
+      (ehf_tmp(mu,ku) = S1(mu,nu) * D_last_beta_tamm(nu,ku))
+      (F_beta(mu,ku) -= lval * ehf_tmp(mu,nu) * S1(nu,ku))
       .execute();
       // clang-format on
-
-      if(is_uhf) {
-        // clang-format off
-        sch
-        (ehf_tmp(mu,ku) = S1(mu,nu) * D_last_beta_tamm(nu,ku))
-        (F_beta(mu,ku) -= lval * ehf_tmp(mu,nu) * S1(nu,ku))
-        .execute();
-        // clang-format on
-      }
     }
+  }
 
-    auto do_t1 = std::chrono::high_resolution_clock::now();
+  auto do_t1 = std::chrono::high_resolution_clock::now();
 
-    scf_diagonalize<TensorType>(sch, sys_data, scf_vars, scalapack_info, ttensors, etensors);
+  scf_diagonalize<TensorType>(sch, sys_data, scf_vars, scalapack_info, ttensors, etensors);
 
-    auto do_t2 = std::chrono::high_resolution_clock::now();
-    auto do_time =
-      std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
+  auto do_t2   = std::chrono::high_resolution_clock::now();
+  auto do_time = std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
 
-    if(rank == 0 && debug)
-      std::cout << std::fixed << std::setprecision(2) << "diagonalize: " << do_time << "s, ";
+  if(rank == 0 && debug)
+    std::cout << std::fixed << std::setprecision(2) << "diagonalize: " << do_time << "s, ";
 
-    compute_density<TensorType>(ec, sys_data, scf_vars, scalapack_info, ttensors, etensors);
-
-  } // end scf_restart
+  compute_density<TensorType>(ec, sys_data, scf_vars, scalapack_info, ttensors, etensors);
 
   double rmsd = 0.0;
   // clang-format off
@@ -1112,11 +1109,12 @@ void scf_diis(ExecutionContext& ec, const TiledIndexSpace& tAO, Tensor<TensorTyp
 template std::tuple<double, double>
 scf_iter_body<double>(ExecutionContext& ec, ScalapackInfo& scalapack_info, const int& iter,
                       const SystemData& sys_data, SCFVars& scf_vars, TAMMTensors& ttensors,
-                      EigenTensors& etensors,
+                      EigenTensors& etensors
 #if defined(USE_GAUXC)
-                      GauXC::XCIntegrator<Matrix>& gauxc_integrator,
+                      ,
+                      GauXC::XCIntegrator<Matrix>& gauxc_integrator
 #endif
-                      bool scf_restart);
+);
 
 template std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
 compute_2bf_taskinfo<double>(ExecutionContext& ec, const SystemData& sys_data,

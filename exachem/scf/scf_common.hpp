@@ -48,7 +48,7 @@ struct SCFVars {
   bool                     do_dens_fit  = false;
   bool                     do_load_bal  = false;
   bool                     lshift_reset = false;
-  bool                     lshift       = 0;
+  double                   lshift       = 0;
   libecpint::ECPIntegrator ecp_factory;
 
   // AO spaces

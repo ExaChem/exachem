@@ -663,6 +663,8 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, SCFVars& scf_va
                          Ca_sca.m(), 1., Ca_sca.data(), 1, 1, Ca_sca.desc(), Xa_tamm_lptr, 1, 1,
                          desc_Xa, 0., Ca_tamm_lptr, 1, 1, desc_Xa);
 
+      if(!scf_vars.lshift_reset) hl_gap = eps_a[nelectrons_alpha] - eps_a[nelectrons_alpha - 1];
+
       // Gather results
       // if(scalapack_info.pg.rank() == 0) C_alpha.resize(N, Northo);
       // TMP2_sca.gather_from(Northo, N, C_alpha.data(), Northo, 0, 0);
@@ -708,10 +710,8 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, SCFVars& scf_va
         // TMP2_sca.gather_from(Northo, N, C_beta.data(), Northo, 0, 0);
 
         if(!scf_vars.lshift_reset)
-          hl_gap = std::min(eps_a[nelectrons_alpha], eps_b[nelectrons_beta]) -
-                   std::max(eps_a[nelectrons_alpha - 1], eps_b[nelectrons_beta - 1]);
+          hl_gap = std::min(hl_gap, eps_b[nelectrons_beta] - eps_b[nelectrons_beta - 1]);
       }
-
     } // rank participates in ScaLAPACK call
   }
 
@@ -738,6 +738,7 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, SCFVars& scf_va
                   eps_a.data());
     blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, Northo_a, N, Northo_a,
                1., Fp.data(), Northo_a, X_a.data(), Northo_a, 0., C_alpha.data(), Northo_a);
+    if(!scf_vars.lshift_reset) hl_gap = eps_a[nelectrons_alpha] - eps_a[nelectrons_alpha - 1];
   }
 
   if(is_uhf) {
@@ -757,20 +758,21 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, SCFVars& scf_va
       blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, Northo_b, N, Northo_b,
                  1., Fp.data(), Northo_b, X_b.data(), Northo_b, 0., C_beta.data(), Northo_b);
 
-      if(!scf_vars.lshift_reset) {
-        hl_gap = std::min(eps_a[nelectrons_alpha], eps_b[nelectrons_beta]) -
-                 std::max(eps_a[nelectrons_alpha - 1], eps_b[nelectrons_beta - 1]);
-      }
+      if(!scf_vars.lshift_reset)
+        hl_gap = std::min(hl_gap, eps_b[nelectrons_beta] - eps_b[nelectrons_beta - 1]);
     }
-    if(!scf_vars.lshift_reset) sch.ec().pg().broadcast(&hl_gap, 1, 0);
   }
 #endif
 
-  if(!scf_vars.lshift_reset && is_uhf) {
+  // Remove the level-shift from the hl_gap
+  hl_gap -= scf_vars.lshift;
+
+  if(!scf_vars.lshift_reset) {
+    sch.ec().pg().broadcast(&hl_gap, 1, 0);
     if(hl_gap < 1e-2) {
       scf_vars.lshift_reset = true;
       scf_vars.lshift       = 0.5;
-      if(rank == 0) cout << "Resetting lshift to 0.5" << endl;
+      if(rank == 0) cout << "Resetting lshift to " << scf_vars.lshift << endl;
     }
   }
 }

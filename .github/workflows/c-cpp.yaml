@@ -19,7 +19,7 @@ jobs:
       matrix:
         os: 
           - [self-hosted, ubuntu18]
-          # - [self-hosted, macos]
+          - [self-hosted, macos]
         backend:
           - ga
           - upcxx
@@ -68,23 +68,23 @@ jobs:
             backend: ga
             use_cuda: no-cuda
             use_scalapack: scalapack
-        #   - os: [self-hosted, macos]
-        #     mpi_impl: openmpi
-        #     cxx: g++
-        #     cc: gcc
-        #     fc: gfortran
-        #     backend: ga
-        #     use_cuda: no-cuda
-        #     use_scalapack: no-scalapack
-        # exclude:
-        #   - os: [self-hosted, macos]
-        #     mpi_impl: openmpi
-        #     cxx: g++
-        #     cc: gcc
-        #     fc: gfortran
-        #     backend: upcxx
-        #     use_cuda: no-cuda
-        #     use_scalapack: no-scalapack
+          - os: [self-hosted, macos]
+            mpi_impl: openmpi
+            cxx: g++
+            cc: gcc
+            fc: gfortran
+            backend: ga
+            use_cuda: no-cuda
+            use_scalapack: no-scalapack
+        exclude:
+          - os: [self-hosted, macos]
+            mpi_impl: openmpi
+            cxx: g++
+            cc: gcc
+            fc: gfortran
+            backend: upcxx
+            use_cuda: no-cuda
+            use_scalapack: no-scalapack
       fail-fast: true
 
     env:
@@ -102,12 +102,12 @@ jobs:
         echo "simd=$(${GITHUB_WORKSPACE}/.github/workflows/scripts/check_simd.sh)" >> $GITHUB_ENV
       shell: bash
 
-    # - name: Set cache path mac
-    #   if: ${{ matrix.os[1] == 'macos' }}
-    #   id: set-cache-path-mac
-    #   run: |
-    #     echo "exachem_cache_path=$HOME/software/CI/cache/exachem_cache" >> $GITHUB_ENV
-    #   shell: bash
+    - name: Set cache path mac
+      if: ${{ matrix.os[1] == 'macos' }}
+      id: set-cache-path-mac
+      run: |
+        echo "exachem_cache_path=$HOME/software/CI/cache/exachem_cache" >> $GITHUB_ENV
+      shell: bash
 
     - name: Set cache path linux
       if: ${{ matrix.os[1] == 'ubuntu18' }}
@@ -123,6 +123,7 @@ jobs:
         echo "USE_CUDA=OFF" >> $GITHUB_ENV
         echo "USE_SCALAPACK=OFF" >> $GITHUB_ENV
         echo "EC_NPROC=12" >> $GITHUB_ENV
+        echo "LA_VENDOR=BLIS" >> $GITHUB_ENV
       shell: bash
 
     - name: Set cuda build options
@@ -145,13 +146,13 @@ jobs:
         echo "CC=$(which clang)" >> $GITHUB_ENV
         echo "CXX=$(which clang++)" >> $GITHUB_ENV
 
-    # - name: macos env
-    #   if: ${{ matrix.os[1] == 'macos' }}
-    #   shell: bash
-    #   run: |
-    #     echo "CC=gcc-13" >> $GITHUB_ENV
-    #     echo "CXX=g++-13" >> $GITHUB_ENV
-    #     echo "EC_NPROC=2" >> $GITHUB_ENV
+    - name: macos env
+      if: ${{ matrix.os[1] == 'macos' }}
+      shell: bash
+      run: |
+        echo "CC=gcc-13" >> $GITHUB_ENV
+        echo "CXX=g++-13" >> $GITHUB_ENV
+        echo "LA_VENDOR=OpenBLAS" >> $GITHUB_ENV
 
     - name: Cache install steps (backend = ga)
       if: ${{ matrix.backend == 'ga' }}
@@ -219,7 +220,7 @@ jobs:
         # TAMM build
         git clone https://github.com/NWChemEx/TAMM $GITHUB_WORKSPACE/TAMM
         cd $GITHUB_WORKSPACE/TAMM
-        cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DGPU_ARCH=70 -DMODULES="CC" -DUSE_CUDA=${{ env.USE_CUDA }} -DUSE_SCALAPACK=${{ env.USE_SCALAPACK }}
+        cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DLINALG_VENDOR=${{ env.LA_VENDOR }} -DGPU_ARCH=70 -DMODULES="CC" -DUSE_CUDA=${{ env.USE_CUDA }} -DUSE_SCALAPACK=${{ env.USE_SCALAPACK }}
         cd build
         make -j${{ env.EC_NPROC }}
         make install

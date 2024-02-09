@@ -585,25 +585,25 @@ void print_energies(ExecutionContext& ec, TAMMTensors& ttensors, EigenTensors& e
   double energy_2e  = 0.0;
 
   if(is_rhf) {
-    nelectrons = tt_trace(ec, ttensors.D_alpha, ttensors.S1);
-    kinetic_1e = tt_trace(ec, ttensors.D_alpha, ttensors.T1);
-    NE_1e      = tt_trace(ec, ttensors.D_alpha, ttensors.V1);
-    energy_1e  = tt_trace(ec, ttensors.D_alpha, ttensors.H1);
-    energy_2e  = 0.5 * tt_trace(ec, ttensors.D_alpha, ttensors.F_alpha_tmp);
+    nelectrons = tt_trace(ec, ttensors.D_last_alpha, ttensors.S1);
+    kinetic_1e = tt_trace(ec, ttensors.D_last_alpha, ttensors.T1);
+    NE_1e      = tt_trace(ec, ttensors.D_last_alpha, ttensors.V1);
+    energy_1e  = tt_trace(ec, ttensors.D_last_alpha, ttensors.H1);
+    energy_2e  = 0.5 * tt_trace(ec, ttensors.D_last_alpha, ttensors.F_alpha_tmp);
 
     if(is_ks) { energy_2e += scf_vars.exc; }
   }
   if(is_uhf) {
-    nelectrons = tt_trace(ec, ttensors.D_alpha, ttensors.S1);
-    kinetic_1e = tt_trace(ec, ttensors.D_alpha, ttensors.T1);
-    NE_1e      = tt_trace(ec, ttensors.D_alpha, ttensors.V1);
-    energy_1e  = tt_trace(ec, ttensors.D_alpha, ttensors.H1);
-    energy_2e  = 0.5 * tt_trace(ec, ttensors.D_alpha, ttensors.F_alpha_tmp);
-    nelectrons += tt_trace(ec, ttensors.D_beta, ttensors.S1);
-    kinetic_1e += tt_trace(ec, ttensors.D_beta, ttensors.T1);
-    NE_1e += tt_trace(ec, ttensors.D_beta, ttensors.V1);
-    energy_1e += tt_trace(ec, ttensors.D_beta, ttensors.H1);
-    energy_2e += 0.5 * tt_trace(ec, ttensors.D_beta, ttensors.F_beta_tmp);
+    nelectrons = tt_trace(ec, ttensors.D_last_alpha, ttensors.S1);
+    kinetic_1e = tt_trace(ec, ttensors.D_last_alpha, ttensors.T1);
+    NE_1e      = tt_trace(ec, ttensors.D_last_alpha, ttensors.V1);
+    energy_1e  = tt_trace(ec, ttensors.D_last_alpha, ttensors.H1);
+    energy_2e  = 0.5 * tt_trace(ec, ttensors.D_last_alpha, ttensors.F_alpha_tmp);
+    nelectrons += tt_trace(ec, ttensors.D_last_beta, ttensors.S1);
+    kinetic_1e += tt_trace(ec, ttensors.D_last_beta, ttensors.T1);
+    NE_1e += tt_trace(ec, ttensors.D_last_beta, ttensors.V1);
+    energy_1e += tt_trace(ec, ttensors.D_last_beta, ttensors.H1);
+    energy_2e += 0.5 * tt_trace(ec, ttensors.D_last_beta, ttensors.F_beta_tmp);
     if(is_ks) { energy_2e += scf_vars.exc; }
   }
 

@@ -914,16 +914,27 @@ void scf_diis(ExecutionContext& ec, const TiledIndexSpace& tAO, Tensor<TensorTyp
     auto maxe = 0;
     if(!scf_vars.switch_diis) {
       std::vector<TensorType> max_err(diis_hist_alpha.size());
-      for(size_t i = 0; i < diis_hist_alpha.size(); i++) {
+      max_err[diis_hist_alpha.size() - 1] = 0.0;
+      for(size_t i = 0; i < diis_hist_alpha.size() - 1; i++) {
         max_err[i] = tamm::norm(diis_hist_alpha[i]);
       }
-
+      if(is_uhf) {
+        for(size_t i = 0; i < diis_hist_beta.size() - 1; i++) {
+          max_err[i] = pow(max_err[i], 2) + pow(tamm::norm(diis_hist_beta[i]), 2);
+        }
+      }
       maxe = std::distance(max_err.begin(), std::max_element(max_err.begin(), max_err.end()));
     }
     Tensor<TensorType>::deallocate(diis_hist_alpha[maxe]);
     Tensor<TensorType>::deallocate(fock_hist_alpha[maxe]);
     diis_hist_alpha.erase(diis_hist_alpha.begin() + maxe);
     fock_hist_alpha.erase(fock_hist_alpha.begin() + maxe);
+    if(is_uhf) {
+      Tensor<TensorType>::deallocate(diis_hist_beta[maxe]);
+      Tensor<TensorType>::deallocate(fock_hist_beta[maxe]);
+      diis_hist_beta.erase(diis_hist_beta.begin() + maxe);
+      fock_hist_beta.erase(fock_hist_beta.begin() + maxe);
+    }
   }
   else {
     if(ndiis == (int) (max_hist / 2) && n_lindep > 1) {
@@ -931,27 +942,7 @@ void scf_diis(ExecutionContext& ec, const TiledIndexSpace& tAO, Tensor<TensorTyp
       for(auto x: fock_hist_alpha) Tensor<TensorType>::deallocate(x);
       diis_hist_alpha.clear();
       fock_hist_alpha.clear();
-    }
-  }
-
-  if(is_uhf) {
-    if(ndiis > max_hist) {
-      auto maxe = 0;
-      if(!scf_vars.switch_diis) {
-        std::vector<TensorType> max_err(diis_hist_beta.size());
-        for(size_t i = 0; i < diis_hist_beta.size(); i++) {
-          max_err[i] = tamm::norm(diis_hist_beta[i]);
-        }
-
-        maxe = std::distance(max_err.begin(), std::max_element(max_err.begin(), max_err.end()));
-      }
-      Tensor<TensorType>::deallocate(diis_hist_beta[maxe]);
-      Tensor<TensorType>::deallocate(fock_hist_beta[maxe]);
-      diis_hist_beta.erase(diis_hist_beta.begin() + maxe);
-      fock_hist_beta.erase(fock_hist_beta.begin() + maxe);
-    }
-    else {
-      if(ndiis == (int) (max_hist / 2) && n_lindep > 1) {
+      if(is_uhf) {
         for(auto x: diis_hist_beta) Tensor<TensorType>::deallocate(x);
         for(auto x: fock_hist_beta) Tensor<TensorType>::deallocate(x);
         diis_hist_beta.clear();

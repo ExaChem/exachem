@@ -727,10 +727,11 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
     if(rank == 0 && !no_scf) {
       std::cout << std::endl << std::endl;
       std::cout << " SCF iterations" << endl;
-      std::cout << std::string(65, '-') << endl;
-      std::string sph = " Iter     Energy            E-Diff       RMSD          Time(s)";
+      std::cout << std::string(77, '-') << endl;
+      std::string sph =
+        " Iter     Energy            E-Diff       RMSD        |[F,P]|^2       Time(s)";
       std::cout << sph << endl;
-      std::cout << std::string(65, '-') << endl;
+      std::cout << std::string(77, '-') << endl;
     }
 
     std::cout << std::fixed << std::setprecision(2);
@@ -810,6 +811,10 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
     }
 
     // SCF main loop
+    TensorType   ediis;
+    size_t       nbumps     = 0;
+    const size_t nbumps_max = 3;
+
     do {
       if(no_scf) break;
 
@@ -849,9 +854,32 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
 #endif
       );
 
+      // DIIS error
+      size_t ndiis = ttensors.diis_hist.size();
+      ediis        = pow(tamm::norm(ttensors.diis_hist[ndiis - 1]), 2);
+      if(is_uhf) ediis += pow(tamm::norm(ttensors.diis_beta_hist[ndiis - 1]), 2);
+
       ehf += enuc;
       // compute difference with last iteration
       ediff = ehf - ehf_last;
+
+      if(ediff > 0.0) nbumps += 1;
+
+      if(nbumps > nbumps_max && ndiis >= (size_t) sys_data.options_map.scf_options.diis_hist) {
+        nbumps         = 0;
+        scf_vars.idiis = 0;
+        if(rank == 0) std::cout << "Resetting DIIS" << std::endl;
+        for(auto x: ttensors.diis_hist) Tensor<TensorType>::deallocate(x);
+        for(auto x: ttensors.fock_hist) Tensor<TensorType>::deallocate(x);
+        ttensors.diis_hist.clear();
+        ttensors.fock_hist.clear();
+        if(is_uhf) {
+          for(auto x: ttensors.diis_beta_hist) Tensor<TensorType>::deallocate(x);
+          for(auto x: ttensors.fock_beta_hist) Tensor<TensorType>::deallocate(x);
+          ttensors.diis_beta_hist.clear();
+          ttensors.fock_beta_hist.clear();
+        }
+      };
 
       const auto loop_stop = std::chrono::high_resolution_clock::now();
       const auto loop_time =
@@ -868,12 +896,13 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
           std::cout << std::scientific << std::setprecision(2);
         }
         std::cout << ' ' << std::scientific << std::setw(12) << ediff;
-        std::cout << ' ' << std::setw(12) << rmsd << ' ';
+        std::cout << ' ' << std::setw(12) << rmsd;
+        std::cout << ' ' << std::setw(12) << ediis << ' ';
         std::cout << ' ' << std::setw(10) << std::fixed << std::setprecision(1) << loop_time << ' '
                   << endl;
 
         sys_data.results["output"]["SCF"]["iter"][std::to_string(iter)] = {
-          {"energy", ehf}, {"e_diff", ediff}, {"rmsd", rmsd}};
+          {"energy", ehf}, {"e_diff", ediff}, {"rmsd", rmsd}, {"ediis", ediis}};
         sys_data.results["output"]["SCF"]["iter"][std::to_string(iter)]["performance"] = {
           {"total_time", loop_time}};
       }
@@ -894,7 +923,8 @@ hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map
       // Reset lshift to input option.
       if(fabs(ediff) > 1e-2) scf_vars.lshift = sys_data.options_map.scf_options.lshift;
 
-    } while((fabs(ediff) > conve) || (fabs(rmsd) > convd)); // SCF main loop
+    } while((fabs(ediff) > conve) || (fabs(rmsd) > convd) ||
+            (fabs(ediis) > 10.0 * conve)); // SCF main loop
 
     if(rank == 0) {
       std::cout.precision(13);

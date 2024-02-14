@@ -12,6 +12,7 @@
     "TNO": 47
   },
   "tile_size" : 80,
+  "niter": 1,
   "do_profile" : true
 }
 

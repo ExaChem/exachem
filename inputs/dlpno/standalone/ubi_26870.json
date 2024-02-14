@@ -1,0 +1,18 @@
+{
+  "tis_sizes" : {
+    "AO" :  26870,
+    "MO" : 26870,
+    "MO_occ" : 2296,
+    "MO_virt" : 24574,
+    "AUX" : 1196, 
+    "LMOP" : 24007,
+    "PAO" : 596,
+    "PNO" : 55,
+    "LMOT": 300000,
+    "TNO": 60
+  },
+  "tile_size" : 80,
+  "niter": 1,
+  "do_profile" : true
+}
+

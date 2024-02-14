@@ -586,14 +586,14 @@ void rt_eom_cd_ccsd(SystemData& sys_data, ExecutionContext& ec, const TiledIndex
   const int otiles  = O.num_tiles();
   const int vtiles  = V.num_tiles();
   const int oatiles = MO("occ_alpha").num_tiles();
-  const int obtiles = MO("occ_beta").num_tiles();
+  // const int obtiles = MO("occ_beta").num_tiles();
   const int vatiles = MO("virt_alpha").num_tiles();
-  const int vbtiles = MO("virt_beta").num_tiles();
+  // const int vbtiles = MO("virt_beta").num_tiles();
 
   o_alpha = {MO("occ"), range(oatiles)};
   v_alpha = {MO("virt"), range(vatiles)};
-  o_beta  = {MO("occ"), range(obtiles, otiles)};
-  v_beta  = {MO("virt"), range(vbtiles, vtiles)};
+  o_beta  = {MO("occ"), range(oatiles, otiles)};
+  v_beta  = {MO("virt"), range(vatiles, vtiles)};
 
   auto [cind]                       = CI.labels<1>("all");
   auto [p1_va, p2_va, p3_va, p4_va] = v_alpha.labels<4>("all");

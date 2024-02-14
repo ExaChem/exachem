@@ -86,14 +86,14 @@ void cd_mp2(std::string filename, ECOptions options_map) {
   const int otiles  = O.num_tiles();
   const int vtiles  = V.num_tiles();
   const int oatiles = MO("occ_alpha").num_tiles();
-  const int obtiles = MO("occ_beta").num_tiles();
+  // const int obtiles = MO("occ_beta").num_tiles();
   const int vatiles = MO("virt_alpha").num_tiles();
-  const int vbtiles = MO("virt_beta").num_tiles();
+  // const int vbtiles = MO("virt_beta").num_tiles();
 
   TiledIndexSpace o_alpha = {MO("occ"), range(oatiles)};
   TiledIndexSpace v_alpha = {MO("virt"), range(vatiles)};
-  TiledIndexSpace o_beta  = {MO("occ"), range(obtiles, otiles)};
-  TiledIndexSpace v_beta  = {MO("virt"), range(vbtiles, vtiles)};
+  TiledIndexSpace o_beta  = {MO("occ"), range(oatiles, otiles)};
+  TiledIndexSpace v_beta  = {MO("virt"), range(vatiles, vtiles)};
 
   auto [p1, p2] = MO.labels<2>("virt");
   auto [h1, h2] = MO.labels<2>("occ");

@@ -17,6 +17,8 @@ build*
 .xlsx
 .csv
 bkp/
+.so
+.pyc
 #editor backups
 *~
 

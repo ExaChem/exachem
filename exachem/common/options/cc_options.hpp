@@ -54,6 +54,7 @@ public:
     dlpno_dfbasis = "";
     TCutEN        = 0.97;
     TCutPNO       = 1.0e-6;
+    TCutTNO       = 1.0e-6;
     TCutPre       = 1.0e-3;
     TCutPairs     = 1.0e-3;
     TCutDO        = 1e-2;
@@ -157,6 +158,7 @@ public:
   size_t           keep_npairs;
   double           TCutEN;
   double           TCutPNO;
+  double           TCutTNO;
   double           TCutPre;
   double           TCutPairs;
   double           TCutDO;
@@ -263,6 +265,7 @@ public:
   parse_option<double>(TCutDO       , jdlpno, "TCutDO");
   parse_option<double>(TCutEN       , jdlpno, "TCutEN");
   parse_option<double>(TCutPNO      , jdlpno, "TCutPNO");
+  parse_option<double>(TCutTNO      , jdlpno, "TCutTNO");
   parse_option<double>(TCutPre      , jdlpno, "TCutPre");
   parse_option<double>(TCutPairs    , jdlpno, "TCutPairs");
   parse_option<double>(TCutDOij     , jdlpno, "TCutDOij");

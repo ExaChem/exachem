@@ -206,16 +206,16 @@ void gfccsd_driver_ip_a(
   const int otiles  = O.num_tiles();
   const int vtiles  = V.num_tiles();
   const int oatiles = MO("occ_alpha").num_tiles();
-  const int obtiles = MO("occ_beta").num_tiles();
+  // const int obtiles = MO("occ_beta").num_tiles();
   const int vatiles = MO("virt_alpha").num_tiles();
-  const int vbtiles = MO("virt_beta").num_tiles();
+  // const int vbtiles = MO("virt_beta").num_tiles();
 
   TiledIndexSpace o_alpha, v_alpha, o_beta, v_beta;
 
   o_alpha = {MO("occ"), range(oatiles)};
   v_alpha = {MO("virt"), range(vatiles)};
-  o_beta  = {MO("occ"), range(obtiles, otiles)};
-  v_beta  = {MO("virt"), range(vbtiles, vtiles)};
+  o_beta  = {MO("occ"), range(oatiles, otiles)};
+  v_beta  = {MO("virt"), range(vatiles, vtiles)};
 
   auto [p1_va]        = v_alpha.labels<1>("all");
   auto [p1_vb]        = v_beta.labels<1>("all");
@@ -956,14 +956,14 @@ void gfccsd_driver_ip_b(
   const int otiles  = O.num_tiles();
   const int vtiles  = V.num_tiles();
   const int oatiles = MO("occ_alpha").num_tiles();
-  const int obtiles = MO("occ_beta").num_tiles();
+  // const int obtiles = MO("occ_beta").num_tiles();
   const int vatiles = MO("virt_alpha").num_tiles();
-  const int vbtiles = MO("virt_beta").num_tiles();
+  // const int vbtiles = MO("virt_beta").num_tiles();
 
   o_alpha = {MO("occ"), range(oatiles)};
   v_alpha = {MO("virt"), range(vatiles)};
-  o_beta  = {MO("occ"), range(obtiles, otiles)};
-  v_beta  = {MO("virt"), range(vbtiles, vtiles)};
+  o_beta  = {MO("occ"), range(oatiles, otiles)};
+  v_beta  = {MO("virt"), range(vatiles, vtiles)};
 
   auto [p1_va]        = v_alpha.labels<1>("all");
   auto [p1_vb]        = v_beta.labels<1>("all");
@@ -1459,14 +1459,14 @@ void gfccsd_driver_ea_a(
   const int otiles  = O.num_tiles();
   const int vtiles  = V.num_tiles();
   const int oatiles = MO("occ_alpha").num_tiles();
-  const int obtiles = MO("occ_beta").num_tiles();
+  // const int obtiles = MO("occ_beta").num_tiles();
   const int vatiles = MO("virt_alpha").num_tiles();
-  const int vbtiles = MO("virt_beta").num_tiles();
+  // const int vbtiles = MO("virt_beta").num_tiles();
 
   o_alpha = {MO("occ"), range(oatiles)};
   v_alpha = {MO("virt"), range(vatiles)};
-  o_beta  = {MO("occ"), range(obtiles, otiles)};
-  v_beta  = {MO("virt"), range(vbtiles, vtiles)};
+  o_beta  = {MO("occ"), range(oatiles, otiles)};
+  v_beta  = {MO("virt"), range(vatiles, vtiles)};
 
   auto [p1_va, p2_va] = v_alpha.labels<2>("all");
   auto [p1_vb, p2_vb] = v_beta.labels<2>("all");
@@ -2032,14 +2032,14 @@ void gfccsd_driver_ea_b(
   const int otiles  = O.num_tiles();
   const int vtiles  = V.num_tiles();
   const int oatiles = MO("occ_alpha").num_tiles();
-  const int obtiles = MO("occ_beta").num_tiles();
+  // const int obtiles = MO("occ_beta").num_tiles();
   const int vatiles = MO("virt_alpha").num_tiles();
-  const int vbtiles = MO("virt_beta").num_tiles();
+  // const int vbtiles = MO("virt_beta").num_tiles();
 
   o_alpha = {MO("occ"), range(oatiles)};
   v_alpha = {MO("virt"), range(vatiles)};
-  o_beta  = {MO("occ"), range(obtiles, otiles)};
-  v_beta  = {MO("virt"), range(vbtiles, vtiles)};
+  o_beta  = {MO("occ"), range(oatiles, otiles)};
+  v_beta  = {MO("virt"), range(vatiles, vtiles)};
 
   auto [p1_va, p2_va] = v_alpha.labels<2>("all");
   auto [p1_vb, p2_vb] = v_beta.labels<2>("all");
@@ -2800,14 +2800,14 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
   const int otiles  = O.num_tiles();
   const int vtiles  = V.num_tiles();
   const int oatiles = MO("occ_alpha").num_tiles();
-  const int obtiles = MO("occ_beta").num_tiles();
+  // const int obtiles = MO("occ_beta").num_tiles();
   const int vatiles = MO("virt_alpha").num_tiles();
-  const int vbtiles = MO("virt_beta").num_tiles();
+  // const int vbtiles = MO("virt_beta").num_tiles();
 
   o_alpha = {MO("occ"), range(oatiles)};
   v_alpha = {MO("virt"), range(vatiles)};
-  o_beta  = {MO("occ"), range(obtiles, otiles)};
-  v_beta  = {MO("virt"), range(vbtiles, vtiles)};
+  o_beta  = {MO("occ"), range(oatiles, otiles)};
+  v_beta  = {MO("virt"), range(vatiles, vtiles)};
 
   auto [p1, p2, p3, p4, p5, p6, p7, p8, p9, p10] = MO.labels<10>("virt");
   auto [h1, h2, h3, h4, h5, h6, h7, h8, h9, h10] = MO.labels<10>("occ");

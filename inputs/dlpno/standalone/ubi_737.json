@@ -11,7 +11,8 @@
     "LMOT": 1769,
     "TNO": 50
   },
-  "tile_size" : 60,
+  "tile_size" : 60, 
+  "niter": 1,
   "do_profile" : false
 }
 

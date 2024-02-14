@@ -242,15 +242,15 @@ setupTensors_cs(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int n
   const int otiles  = O.num_tiles();
   const int vtiles  = V.num_tiles();
   const int oatiles = MO("occ_alpha").num_tiles();
-  const int obtiles = MO("occ_beta").num_tiles();
+  // const int obtiles = MO("occ_beta").num_tiles();
   const int vatiles = MO("virt_alpha").num_tiles();
-  const int vbtiles = MO("virt_beta").num_tiles();
+  // const int vbtiles = MO("virt_beta").num_tiles();
 
   TiledIndexSpace o_alpha, v_alpha, o_beta, v_beta;
   o_alpha = {MO("occ"), range(oatiles)};
   v_alpha = {MO("virt"), range(vatiles)};
-  o_beta  = {MO("occ"), range(obtiles, otiles)};
-  v_beta  = {MO("virt"), range(vbtiles, vtiles)};
+  o_beta  = {MO("occ"), range(oatiles, otiles)};
+  v_beta  = {MO("virt"), range(vatiles, vtiles)};
 
   std::vector<T> p_evl_sorted = tamm::diagonal(d_f1);
 

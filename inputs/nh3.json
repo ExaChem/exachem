@@ -32,7 +32,6 @@
     "max_cvecs": 40
   },
   "CC": {
-    "pcore": 0,
     "threshold": 1e-6,
     "ndiis": 5,
     "writet": false,

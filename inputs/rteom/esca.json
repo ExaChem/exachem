@@ -42,11 +42,6 @@
     "max_cvecs": 40
   },
   "CC": {
-    "pcore"  : 6,
-    "ntimesteps": 4001,
-    "rt_microiter": 4,
-    "rt_step_size": 0.05,
-    "rt_multiplier": 0.5,
     "threshold": 1e-6,
     "ndiis": 5,
     "writet": true,
@@ -57,6 +52,13 @@
     "debug": false,
     "EOMCCSD": {
       "eom_nroots": 4
+    },
+    "RT-EOMCC": {
+      "pcore"  : 6,
+      "ntimesteps": 4001,
+      "rt_microiter": 4,
+      "rt_step_size": 0.05,
+      "rt_multiplier": 0.5
     }
   },
   "TASK": {

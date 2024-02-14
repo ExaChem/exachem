@@ -45,7 +45,7 @@ print("")
 print("Estimating time for O,V=%s,%s on %s nodes.." %(o_j,v_j,k_j))
 
 #Tj = Ti x *(Ki/Kj) x (No^2_j x Nv^4_j / No^2_i x Nv^4_i) - for problems with varying Nocc for CCSD
-t_j = t_i * (k_i/k_j) * (m.pow(o_j,2) * m.pow(v_j,4)) / (m.pow(o_i,2) * m.pow(v_i,4))
+t_j = t_i * (k_i/k_j) * ((m.pow(o_j,2) * m.pow(v_j,4)) / (m.pow(o_i,2) * m.pow(v_i,4)))
 print("Time per CCSD iteration: " + str(t_j))
 
 t_j = t_j / (60*24*365)

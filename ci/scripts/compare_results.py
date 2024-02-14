@@ -43,7 +43,7 @@ else:
     ref_files = os.listdir(ref_res_path)
     cur_files = os.listdir(cur_res_path)
 
-ref_notreq = ["ubiquitin_dgrtl","uracil.cc-pvdz.ccsd_t.json"]
+ref_notreq = ["ubiquitin_dgrtl","uracil.cc-pvdz.ccsd_t.json","ch4.def2-tzvp.ccsd_t.json"]
 for rf in ref_notreq:
     if rf not in cur_files:
         ref_files.remove(rf)

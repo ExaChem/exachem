@@ -10,23 +10,23 @@
     "units": "angstrom"
   },
   "basis": {
-    "basisset": "cc-pvdz"
+    "basisset": "def2-tzvp"
   },
   "common": {
     "maxiter": 100
   },
   "SCF": {
-    "tol_int": 1e-16,
-    "tol_lindep": 1e-06,
+    "tol_int": 1e-22,
+    "tol_sch": 1e-12,
     "conve": 1e-7,
     "convd": 1e-6,
     "diis_hist": 20,
     "charge": 0,
-    "multiplicity": 1,
-    "scf_type": "restricted",  
+    "multiplicity": 3,
+    "scf_type": "unrestricted",  
     "writem": 10,
-    "force_tilesize": false,
-    "tilesize": 30
+    "noscf": false,
+    "debug": false
   },
   "CD": {
     "diagtol": 1e-12,
@@ -34,22 +34,15 @@
   },
   "CC": {
     "threshold": 1e-6,
-    "ndiis": 5,
-    "writet": false,
-    "ccsd_maxiter": 200,
+    "debug": false,
+    "ccsd_maxiter": 50,
     "CCSD(T)": {
       "ccsdt_tilesize": 28
-    },
-    "debug": true,
-    "EOMCCSD": {
-      "eom_nroots": 4
     }
   },
   "TASK": {
-    "scf": true,
     "mp2": false,
     "cd_2e": false,
-    "ccsd": false,
-    "ccsd_t": false
+    "ccsd_t": true
   }  
 }

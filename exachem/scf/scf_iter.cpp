@@ -1011,7 +1011,10 @@ void scf_diis(ExecutionContext& ec, const TiledIndexSpace& tAO, Tensor<TensorTyp
   }
 
   while(info != 0) {
-    if(idim == 1) return;
+    if(idim == 1) {
+      Tensor<TensorType>::deallocate(dhi_trace);
+      return;
+    }
 
     N = idim + 1;
     std::vector<TensorType> AC(N * (N + 1) / 2);
@@ -1053,7 +1056,10 @@ void scf_diis(ExecutionContext& ec, const TiledIndexSpace& tAO, Tensor<TensorTyp
       }
 
       idim--;
-      if(idim == 1) return;
+      if(idim == 1) {
+        Tensor<TensorType>::deallocate(dhi_trace);
+        return;
+      }
       Matrix A_pl  = A.block(2, 2, idim, idim);
       Matrix A_new = Matrix::Zero(idim + 1, idim + 1);
 

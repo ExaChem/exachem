@@ -722,18 +722,18 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, SCFVars& scf_va
 
   const int64_t Northo_a = sys_data.nbf; // X_a.cols();
   // TODO: avoid eigen Fp
-  Matrix              X_a;
-  std::vector<double> eps_a;
+  Matrix X_a;
   if(rank == 0) {
     // alpha
     Matrix Fp = tamm_to_eigen_matrix(ttensors.F_alpha);
     X_a       = tamm_to_eigen_matrix(ttensors.X_alpha);
     C_alpha.resize(N, Northo_a);
+    std::vector<double> eps_a(Northo_a);
+
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans, N, Northo_a, N, 1.,
                Fp.data(), N, X_a.data(), Northo_a, 0., C_alpha.data(), N);
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, Northo_a, Northo_a, N,
                1., X_a.data(), Northo_a, C_alpha.data(), N, 0., Fp.data(), Northo_a);
-    eps_a.resize(Northo_a);
     lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, Northo_a, Fp.data(), Northo_a,
                   eps_a.data());
     blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, Northo_a, N, Northo_a,
@@ -747,12 +747,13 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, SCFVars& scf_va
       // beta
       Matrix Fp = tamm_to_eigen_matrix(ttensors.F_beta);
       C_beta.resize(N, Northo_b);
-      Matrix& X_b = X_a;
+      std::vector<double> eps_b(Northo_b);
+      Matrix&             X_b = X_a;
+
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans, N, Northo_b, N, 1.,
                  Fp.data(), N, X_b.data(), Northo_b, 0., C_beta.data(), N);
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, Northo_b, Northo_b,
                  N, 1., X_b.data(), Northo_b, C_beta.data(), N, 0., Fp.data(), Northo_b);
-      std::vector<double> eps_b(Northo_b);
       lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, Northo_b, Fp.data(), Northo_b,
                     eps_b.data());
       blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, Northo_b, N, Northo_b,
@@ -768,7 +769,7 @@ void scf_diagonalize(Scheduler& sch, const SystemData& sys_data, SCFVars& scf_va
   hl_gap -= scf_vars.lshift;
 
   if(!scf_vars.lshift_reset) {
-    sch.ec().pg().broadcast(&hl_gap, 1, 0);
+    sch.ec().pg().broadcast(&hl_gap, 0);
     if(hl_gap < 1e-2) {
       scf_vars.lshift_reset = true;
       scf_vars.lshift       = 0.5;

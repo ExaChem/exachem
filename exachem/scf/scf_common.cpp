@@ -446,8 +446,6 @@ void scf_restart_test(const ExecutionContext& ec, const SystemData& sys_data, bo
   const auto rank   = ec.pg().rank();
   const bool is_uhf = (sys_data.is_unrestricted);
 
-  int rstatus = 1;
-
   std::string movecsfile_alpha  = files_prefix + ".alpha.movecs";
   std::string densityfile_alpha = files_prefix + ".alpha.density";
   std::string movecsfile_beta   = files_prefix + ".beta.movecs";
@@ -458,12 +456,11 @@ void scf_restart_test(const ExecutionContext& ec, const SystemData& sys_data, bo
     status = fs::exists(movecsfile_alpha) && fs::exists(densityfile_alpha);
     if(is_uhf) status = status && fs::exists(movecsfile_beta) && fs::exists(densityfile_beta);
   }
-  rstatus = status;
   ec.pg().barrier();
-  ec.pg().broadcast(&rstatus, 0);
+  ec.pg().broadcast(&status, 0);
   std::string fnf = movecsfile_alpha + "; " + densityfile_alpha;
   if(is_uhf) fnf = fnf + "; " + movecsfile_beta + "; " + densityfile_beta;
-  if(rstatus == 0) tamm_terminate("Error reading one or all of the files: [" + fnf + "]");
+  if(!status) tamm_terminate("Error reading one or all of the files: [" + fnf + "]");
 }
 
 template<typename T>
@@ -909,6 +906,8 @@ Matrix compute_schwarz_ints(ExecutionContext& ec, const SCFVars& scf_vars,
   Tensor<TensorType> schwarz{scf_vars.tAO, scf_vars.tAO};
   Tensor<TensorType> schwarz_mat{tnsh, tnsh};
   Tensor<TensorType>::allocate(&ec, schwarz_mat);
+  Scheduler sch{ec};
+  sch(schwarz_mat() = 0).execute();
 
   auto compute_schwarz_matrix = [&](const IndexVector& blockid) {
     auto bi0 = blockid[0];
@@ -1229,13 +1228,27 @@ gauxc_util::setup_gauxc(ExecutionContext& ec, const SystemData& sys_data, const 
     GauXC::RadialQuad::MuraKnowles, grid_type);
   auto gauxc_molmeta = std::make_shared<GauXC::MolMeta>(gauxc_mol);
 
+  std::string lb_exec_space_str  = "HOST";
+  std::string int_exec_space_str = "HOST";
+
+#ifdef GAUXC_HAS_DEVICE
+  std::map<std::string, GauXC::ExecutionSpace> exec_space_map = {
+    {"HOST", GauXC::ExecutionSpace::Host}, {"DEVICE", GauXC::ExecutionSpace::Device}};
+
+  auto lb_exec_space  = exec_space_map.at(lb_exec_space_str);
+  auto int_exec_space = exec_space_map.at(int_exec_space_str);
+#else
+  auto lb_exec_space  = GauXC::ExecutionSpace::Host;
+  auto int_exec_space = GauXC::ExecutionSpace::Host;
+#endif
+
   // Set the load balancer
-  GauXC::LoadBalancerFactory lb_factory(GauXC::ExecutionSpace::Host, "Replicated");
+  GauXC::LoadBalancerFactory lb_factory(lb_exec_space, "Replicated");
   auto gauxc_lb = lb_factory.get_shared_instance(gauxc_rt, gauxc_mol, gauxc_molgrid, gauxc_basis);
 
   // Modify the weighting algorithm from the input [Becke, SSF, LKO]
   GauXC::MolecularWeightsSettings mw_settings = {GauXC::XCWeightAlg::LKO, false};
-  GauXC::MolecularWeightsFactory  mw_factory(GauXC::ExecutionSpace::Host, "Default", mw_settings);
+  GauXC::MolecularWeightsFactory  mw_factory(int_exec_space, "Default", mw_settings);
   auto                            mw = mw_factory.get_instance();
   mw.modify_weights(*gauxc_lb);
 
@@ -1273,8 +1286,8 @@ gauxc_util::setup_gauxc(ExecutionContext& ec, const SystemData& sys_data, const 
   GauXC::functional_type gauxc_func = GauXC::functional_type(kernels);
 
   // Initialize GauXC integrator
-  GauXC::XCIntegratorFactory<Matrix> integrator_factory(GauXC::ExecutionSpace::Host, "Replicated",
-                                                        "Default", "Default", "Default");
+  GauXC::XCIntegratorFactory<Matrix> integrator_factory(int_exec_space, "Replicated", "Default",
+                                                        "Default", "Default");
   auto                               gc2 = std::chrono::high_resolution_clock::now();
   auto gc_time = std::chrono::duration_cast<std::chrono::duration<double>>((gc2 - gc1)).count();
 

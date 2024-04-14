@@ -64,7 +64,7 @@ void init_diagonal(ExecutionContext& ec, LabeledTensor<TensorType> ltensor) {
   block_for(ec, ltensor, lambda);
 }
 
-void iteration_print(SystemData& sys_data, const ProcGroup& pg, int iter, double residual,
+void iteration_print(ChemEnv& chem_env, const ProcGroup& pg, int iter, double residual,
                      double energy, double time, string cmethod) {
   if(pg.rank() == 0) {
     std::cout << std::setw(4) << std::right << iter + 1 << "     ";
@@ -74,10 +74,10 @@ void iteration_print(SystemData& sys_data, const ProcGroup& pg, int iter, double
     std::cout << std::fixed << std::setprecision(2);
     std::cout << std::string(8, ' ') << time << std::endl;
 
-    sys_data.results["output"][cmethod]["iter"][std::to_string(iter + 1)] = {
+    chem_env.sys_data.results["output"][cmethod]["iter"][std::to_string(iter + 1)] = {
       {"residual", residual}, {"correlation", energy}};
-    sys_data.results["output"][cmethod]["iter"][std::to_string(iter + 1)]["performance"] = {
-      {"total_time", time}};
+    chem_env.sys_data.results["output"][cmethod]["iter"][std::to_string(iter + 1)]["performance"] =
+      {{"total_time", time}};
   }
 }
 
@@ -292,43 +292,6 @@ setupTensors_cs(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int n
   return std::make_tuple(p_evl_sorted, d_t1, d_t2, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s);
 }
 
-template<typename T>
-std::tuple<SystemData, double, libint2::BasisSet, std::vector<size_t>, Tensor<T>, Tensor<T>,
-           Tensor<T>, Tensor<T>, TiledIndexSpace, TiledIndexSpace, bool>
-hartree_fock_driver(ExecutionContext& ec, const string filename, ECOptions options_map) {
-  auto rank = ec.pg().rank();
-
-  double              hf_energy{0.0};
-  libint2::BasisSet   shells;
-  Tensor<T>           C_AO, C_beta_AO;
-  Tensor<T>           F_AO, F_beta_AO;
-  TiledIndexSpace     tAO;  // Fixed Tilesize AO
-  TiledIndexSpace     tAOt; // original AO TIS
-  std::vector<size_t> shell_tile_map;
-  bool                scf_conv;
-
-  SystemData sys_data{options_map, options_map.scf_options.scf_type};
-
-  auto hf_t1 = std::chrono::high_resolution_clock::now();
-
-  std::tie(sys_data, hf_energy, shells, shell_tile_map, C_AO, F_AO, C_beta_AO, F_beta_AO, tAO, tAOt,
-           scf_conv)          = hartree_fock(ec, filename, options_map);
-  sys_data.input_molecule     = ECParse::getfilename(filename);
-  sys_data.output_file_prefix = options_map.options.output_file_prefix;
-
-  auto hf_t2 = std::chrono::high_resolution_clock::now();
-
-  double hf_time =
-    std::chrono::duration_cast<std::chrono::duration<double>>((hf_t2 - hf_t1)).count();
-  if(rank == 0)
-    std::cout << std::endl
-              << "Time taken for Hartree-Fock: " << std::fixed << std::setprecision(2) << hf_time
-              << " secs" << std::endl;
-
-  return std::make_tuple(sys_data, hf_energy, shells, shell_tile_map, C_AO, F_AO, C_beta_AO,
-                         F_beta_AO, tAO, tAOt, scf_conv);
-}
-
 void ccsd_stats(ExecutionContext& ec, double hf_energy, double residual, double energy,
                 double thresh) {
   auto rank      = ec.pg().rank();
@@ -436,8 +399,9 @@ Tensor<T> setupV2(ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& CI
 }
 
 template<typename T>
-void cc_print(SystemData& sys_data, Tensor<T> d_t1, Tensor<T> d_t2, std::string files_prefix) {
-  CCSDOptions&      ccsd_options = sys_data.options_map.ccsd_options;
+void cc_print(ChemEnv& chem_env, Tensor<T> d_t1, Tensor<T> d_t2, std::string files_prefix) {
+  SystemData&       sys_data     = chem_env.sys_data;
+  CCSDOptions&      ccsd_options = chem_env.ioptions.ccsd_options;
   ExecutionContext& ec           = get_ec(d_t1());
 
   if(ccsd_options.tamplitudes.first) {
@@ -510,12 +474,13 @@ void cc_print(SystemData& sys_data, Tensor<T> d_t1, Tensor<T> d_t2, std::string 
 
 template<typename T>
 std::tuple<Tensor<T>, Tensor<T>, Tensor<T>, TAMM_SIZE, tamm::Tile, TiledIndexSpace>
-cd_svd_driver(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& AO,
+cd_svd_driver(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& AO,
               Tensor<T> C_AO, Tensor<T> F_AO, Tensor<T> C_beta_AO, Tensor<T> F_beta_AO,
               libint2::BasisSet& shells, std::vector<size_t>& shell_tile_map, bool readv2,
               std::string cholfile, bool is_dlpno, bool is_mso) {
-  CDOptions cd_options        = sys_data.options_map.cd_options;
-  auto      diagtol           = cd_options.diagtol; // tolerance for the max. diagonal
+  SystemData& sys_data        = chem_env.sys_data;
+  CDOptions   cd_options      = chem_env.ioptions.cd_options;
+  auto        diagtol         = cd_options.diagtol; // tolerance for the max. diagonal
   cd_options.max_cvecs_factor = 2 * std::abs(std::log10(diagtol));
   // TODO
   tamm::Tile max_cvecs = cd_options.max_cvecs_factor * sys_data.nbf;
@@ -535,23 +500,22 @@ cd_svd_driver(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO, T
 
   // std::tie(V2) =
   Tensor<T> cholVpr;
+  auto      itile_size = chem_env.ioptions.cd_options.itilesize;
 
-  auto itile_size = sys_data.options_map.cd_options.itilesize;
-
-  sys_data.freeze_atomic    = sys_data.options_map.ccsd_options.freeze_atomic;
-  sys_data.n_frozen_core    = get_nfcore(sys_data);
-  sys_data.n_frozen_virtual = sys_data.options_map.ccsd_options.freeze_virtual;
+  sys_data.freeze_atomic    = chem_env.ioptions.ccsd_options.freeze_atomic;
+  sys_data.n_frozen_core    = chem_env.get_nfcore();
+  sys_data.n_frozen_virtual = chem_env.ioptions.ccsd_options.freeze_virtual;
   bool do_freeze            = sys_data.n_frozen_core > 0 || sys_data.n_frozen_virtual > 0;
 
-  std::string out_fp = sys_data.output_file_prefix + "." + sys_data.options_map.ccsd_options.basis;
-  std::string files_dir = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type;
-  std::string lcaofile  = files_dir + "/" + out_fp + ".lcao";
+  std::string out_fp    = chem_env.workspace_dir;
+  std::string files_dir = out_fp + chem_env.ioptions.scf_options.scf_type;
+  std::string lcaofile  = files_dir + "/" + sys_data.output_file_prefix + ".lcao";
 
   if(!readv2) {
-    two_index_transform(sys_data, ec, C_AO, F_AO, C_beta_AO, F_beta_AO, d_f1, shells, lcao,
+    two_index_transform(chem_env, ec, C_AO, F_AO, C_beta_AO, F_beta_AO, d_f1, shells, lcao,
                         is_dlpno || !is_mso);
     if(!is_dlpno)
-      cholVpr = cd_svd(sys_data, ec, MO, AO, chol_count, max_cvecs, shells, lcao, is_mso);
+      cholVpr = cd_svd(chem_env, ec, MO, AO, chol_count, max_cvecs, shells, lcao, is_mso);
     write_to_disk<TensorType>(lcao, lcaofile);
   }
   else {
@@ -563,7 +527,7 @@ cd_svd_driver(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO, T
 
     if(rank == 0) cout << "Number of cholesky vectors to be read = " << chol_count << endl;
 
-    if(!is_dlpno) update_sysdata(sys_data, MO, is_mso);
+    if(!is_dlpno) update_sysdata(chem_env, MO, is_mso);
 
     IndexSpace      chol_is{range(0, chol_count)};
     TiledIndexSpace CI{chol_is, static_cast<tamm::Tile>(itile_size)};
@@ -601,7 +565,7 @@ cd_svd_driver(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO, T
     Tensor<T>::allocate(&ec, d_f1_new);
     if(rank == 0) {
       Matrix f1_eig     = tamm_to_eigen_matrix(d_f1);
-      Matrix f1_new_eig = reshape_mo_matrix(sys_data, f1_eig);
+      Matrix f1_new_eig = reshape_mo_matrix(chem_env, f1_eig);
       eigen_to_tamm_tensor(d_f1_new, f1_new_eig);
       f1_new_eig.resize(0, 0);
     }
@@ -609,9 +573,9 @@ cd_svd_driver(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO, T
     d_f1 = d_f1_new;
   }
 
-  if(!readv2 && sys_data.options_map.scf_options.mos_txt) {
+  if(!readv2 && chem_env.ioptions.scf_options.mos_txt) {
     Scheduler   sch{ec};
-    std::string hcorefile = files_dir + "/scf/" + out_fp + ".hcore";
+    std::string hcorefile = files_dir + "/scf/" + sys_data.output_file_prefix + ".hcore";
     Tensor<T>   hcore{AO, AO};
     Tensor<T>   hcore_mo{MO, MO};
     Tensor<T>::allocate(&ec, hcore, hcore_mo);
@@ -650,30 +614,36 @@ cd_svd_driver(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO, T
   }
 
   return std::make_tuple(cholVpr, d_f1, lcao, chol_count, max_cvecs, CI);
-}
+} // END of cd_svd_driver
 
-void cd_2e_driver(std::string filename, ECOptions options_map) {
+void cd_2e_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
 
-  ProcGroup        pg = ProcGroup::create_world_coll();
-  ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
-  auto             rank = ec.pg().rank();
+  auto rank = ec.pg().rank();
 
-  auto [sys_data, hf_energy, shells, shell_tile_map, C_AO, F_AO, C_beta_AO, F_beta_AO, AO_opt,
-        AO_tis, scf_conv] = hartree_fock_driver<T>(ec, filename, options_map);
+  scf(ec, chem_env);
 
-  CCSDOptions ccsd_options = sys_data.options_map.ccsd_options;
+  libint2::BasisSet   shells         = chem_env.shells;
+  Tensor<T>           C_AO           = chem_env.C_AO;
+  Tensor<T>           C_beta_AO      = chem_env.C_beta_AO;
+  Tensor<T>           F_AO           = chem_env.F_AO;
+  Tensor<T>           F_beta_AO      = chem_env.F_beta_AO;
+  TiledIndexSpace     AO_opt         = chem_env.AO_opt;
+  TiledIndexSpace     AO_tis         = chem_env.AO_tis;
+  std::vector<size_t> shell_tile_map = chem_env.shell_tile_map;
 
+  SystemData  sys_data     = chem_env.sys_data;
+  CCSDOptions ccsd_options = chem_env.ioptions.ccsd_options;
   if(rank == 0) ccsd_options.print();
 
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = setupMOIS(sys_data);
+  auto [MO, total_orbitals] = setupMOIS(chem_env);
 
-  std::string out_fp       = sys_data.output_file_prefix + "." + ccsd_options.basis;
-  std::string files_dir    = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type;
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + out_fp;
+  std::string out_fp       = chem_env.workspace_dir;
+  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
+  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
   std::string f1file       = files_prefix + ".f1_mo";
   std::string v2file       = files_prefix + ".cholv2";
   std::string cholfile     = files_prefix + ".cholcount";
@@ -682,7 +652,7 @@ void cd_2e_driver(std::string filename, ECOptions options_map) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(sys_data, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
+    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
                      shell_tile_map, cd_restart, cholfile);
   free_tensors(lcao);
 
@@ -710,7 +680,7 @@ using T = double;
 
 template void init_diagonal(ExecutionContext& ec, LabeledTensor<T> ltensor);
 
-template void cc_print<T>(SystemData& sys_data, Tensor<T> d_t1, Tensor<T> d_t2,
+template void cc_print<T>(ChemEnv& chem_env, Tensor<T> d_t1, Tensor<T> d_t2,
                           std::string files_prefix);
 
 template void update_r2<T>(ExecutionContext& ec, LabeledTensor<T> ltensor);
@@ -743,16 +713,15 @@ template std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>,
 setupTensors_cs<T>(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndiis,
                    bool ccsd_restart);
 
-template std::tuple<SystemData, double, libint2::BasisSet, std::vector<size_t>, Tensor<T>,
-                    Tensor<T>, Tensor<T>, Tensor<T>, TiledIndexSpace, TiledIndexSpace, bool>
-hartree_fock_driver<T>(ExecutionContext& ec, const string filename, ECOptions options_map);
+// template std::tuple<SystemData, double, libint2::BasisSet, std::vector<size_t>, Tensor<T>,
+//                     Tensor<T>, Tensor<T>, Tensor<T>, TiledIndexSpace, TiledIndexSpace, bool>
+// hartree_fock_driver<T>(ExecutionContext& ec, const string filename, ECOptions options_map);
 
 template std::tuple<Tensor<T>, Tensor<T>, Tensor<T>, TAMM_SIZE, tamm::Tile, TiledIndexSpace>
-cd_svd_driver<T>(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO,
-                 TiledIndexSpace& AO, Tensor<T> C_AO, Tensor<T> F_AO, Tensor<T> C_beta_AO,
-                 Tensor<T> F_beta_AO, libint2::BasisSet& shells,
-                 std::vector<size_t>& shell_tile_map, bool readv2, std::string cholfile,
-                 bool is_dlpno, bool is_mso);
+cd_svd_driver<T>(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& AO,
+                 Tensor<T> C_AO, Tensor<T> F_AO, Tensor<T> C_beta_AO, Tensor<T> F_beta_AO,
+                 libint2::BasisSet& shells, std::vector<size_t>& shell_tile_map, bool readv2,
+                 std::string cholfile, bool is_dlpno, bool is_mso);
 
 template V2Tensors<T> setupV2Tensors<T>(ExecutionContext& ec, Tensor<T> cholVpr, ExecutionHW ex_hw,
                                         std::vector<std::string> blocks);

@@ -28,7 +28,7 @@ void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
 
 template<typename T>
 std::tuple<double, double>
-cd_ccsd_os_driver(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
+cd_ccsd_os_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                   const TiledIndexSpace& CI, Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_f1,
                   Tensor<T>& d_r1, Tensor<T>& d_r2, std::vector<Tensor<T>>& d_r1s,
                   std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_t1s,

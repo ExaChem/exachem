@@ -13,7 +13,7 @@
 
 using namespace tamm;
 
-void cd_ccsd(std::string filename, ECOptions options_map);
+void cd_ccsd(ExecutionContext& ec, ChemEnv& chem_env);
 
 template<typename T>
 void ccsd_e_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI, Tensor<T>& de,
@@ -32,7 +32,7 @@ void ccsd_t2_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
 
 template<typename T>
 std::tuple<double, double>
-cd_ccsd_cs_driver(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
+cd_ccsd_cs_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                   const TiledIndexSpace& CI, Tensor<T>& t1_aa, Tensor<T>& t2_abab, Tensor<T>& d_f1,
                   Tensor<T>& r1_aa, Tensor<T>& r2_abab, std::vector<Tensor<T>>& d_r1s,
                   std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_t1s,

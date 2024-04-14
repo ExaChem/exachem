@@ -6,10 +6,10 @@
  * See LICENSE.txt for details
  */
 
-#include "molden.hpp"
-#include "misc.hpp"
-#include "txtutils.hpp"
-string read_option(string line) {
+#include "ec_molden.hpp"
+#include "txt_utils.hpp"
+
+std::string ECMolden::read_option(std::string line) {
   std::istringstream       oss(line);
   std::vector<std::string> option_string{std::istream_iterator<std::string>{oss},
                                          std::istream_iterator<std::string>{}};
@@ -18,7 +18,7 @@ string read_option(string line) {
   return option_string[1];
 }
 
-inline bool is_comment(const std::string line) {
+bool ECMolden::is_comment(const std::string line) {
   auto found = false;
   if(line.find("//") != std::string::npos) {
     // found = true;
@@ -29,12 +29,11 @@ inline bool is_comment(const std::string line) {
   return found;
 }
 
-bool is_in_line(const std::string str, const std::string line) {
+bool ECMolden::is_in_line(const std::string str, const std::string line) {
   auto        found = true;
   std::string str_u = str, str_l = str;
-  txtutils    caseChange;
-  caseChange.to_upper(str_u);
-  caseChange.to_lower(str_l);
+  txt_utils::to_upper(str_u);
+  txt_utils::to_lower(str_l);
 
   if(is_comment(line)) found = false;
   else {
@@ -52,8 +51,9 @@ bool is_in_line(const std::string str, const std::string line) {
 }
 
 template<typename T>
-void reorder_molden_orbitals(const bool is_spherical, std::vector<AtomInfo>& atominfo, Matrix& smat,
-                             Matrix& dmat, const bool reorder_cols, const bool reorder_rows) {
+void ECMolden::reorder_molden_orbitals(const bool is_spherical, std::vector<AtomInfo>& atominfo,
+                                       Matrix& smat, Matrix& dmat, const bool reorder_cols,
+                                       const bool reorder_rows) {
   auto dim1 = dmat.rows();
   auto dim2 = dmat.cols();
 
@@ -450,7 +450,7 @@ void reorder_molden_orbitals(const bool is_spherical, std::vector<AtomInfo>& ato
 }
 
 // TODO: is this needed? - currently does not make a difference
-libint2::BasisSet renormalize_libint_shells(const SystemData& sys_data, libint2::BasisSet& shells) {
+libint2::BasisSet ECMolden::renormalize_libint_shells(libint2::BasisSet& shells) {
   using libint2::math::df_Kminus1;
   using std::pow;
   // const auto                  sqrt_Pi_cubed = double{5.56832799683170784528481798212};
@@ -511,9 +511,12 @@ libint2::BasisSet renormalize_libint_shells(const SystemData& sys_data, libint2:
   return result;
 }
 
-void read_geom_molden(const SystemData& sys_data, std::vector<libint2::Atom>& atoms) {
+void ECMolden::read_geom_molden(ChemEnv& chem_env) {
+  SCFOptions&        scf_options = chem_env.ioptions.scf_options;
+  std::vector<Atom>& atoms       = chem_env.atoms;
+
   std::string line;
-  auto        is = std::ifstream(sys_data.options_map.scf_options.moldenfile);
+  auto        is = std::ifstream(scf_options.moldenfile);
 
   while(line.find("[Atoms]") == std::string::npos) std::getline(is, line);
 
@@ -530,7 +533,7 @@ void read_geom_molden(const SystemData& sys_data, std::vector<libint2::Atom>& at
 }
 
 // TODO: is this needed? - currently does not make a difference
-libint2::BasisSet read_basis_molden(const SystemData& sys_data, libint2::BasisSet& shells) {
+libint2::BasisSet ECMolden::read_basis_molden(const ChemEnv& chem_env) {
   // s_type = 0, p_type = 1, d_type = 2,
   // f_type = 3, g_type = 4
   /*For spherical
@@ -541,8 +544,11 @@ libint2::BasisSet read_basis_molden(const SystemData& sys_data, libint2::BasisSe
   s=1,p=3,d=6,f=10,g=15
   */
 
+  const libint2::BasisSet& shells      = chem_env.shells;
+  const SCFOptions&        scf_options = chem_env.ioptions.scf_options;
+
   std::string line;
-  auto        is = std::ifstream(sys_data.options_map.scf_options.moldenfile);
+  auto        is = std::ifstream(scf_options.moldenfile);
 
   while(line.find("GTO") == std::string::npos) { std::getline(is, line); } // end basis section
 
@@ -589,11 +595,15 @@ libint2::BasisSet read_basis_molden(const SystemData& sys_data, libint2::BasisSe
 }
 
 template<typename T>
-void read_molden(const SystemData& sys_data, libint2::BasisSet& shells,
-                 Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& C_alpha,
-                 Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& C_beta) {
-  auto        scf_options = sys_data.options_map.scf_options;
-  auto        is          = std::ifstream(scf_options.moldenfile);
+void ECMolden::read_molden(
+  ChemEnv& chem_env, Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& C_alpha,
+  Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& C_beta) {
+  SystemData&              sys_data    = chem_env.sys_data;
+  std::vector<Atom>&       atoms       = chem_env.atoms;
+  const libint2::BasisSet& shells      = chem_env.shells;
+  SCFOptions&              scf_options = chem_env.ioptions.scf_options;
+
+  auto        is = std::ifstream(scf_options.moldenfile);
   std::string line;
   size_t      n_occ_alpha = 0, n_occ_beta = 0, n_vir_alpha = 0, n_vir_beta = 0;
 
@@ -609,7 +619,7 @@ void read_molden(const SystemData& sys_data, libint2::BasisSet& shells,
   Matrix eigenvecs_beta(N, Northo);
   if(is_uhf) eigenvecs_beta.setZero();
 
-  auto         atoms  = sys_data.options_map.options.atoms;
+  // auto         atoms  = chem_env.atoms;
   const size_t natoms = atoms.size();
 
   auto                  a2s_map = shells.atom2shell(atoms);
@@ -700,8 +710,9 @@ void read_molden(const SystemData& sys_data, libint2::BasisSet& shells,
   //     n_vir_beta = N - n_occ_beta;
   // }
 
-  cout << "finished reading molden: n_occ_alpha, n_vir_alpha, n_occ_beta, n_vir_beta = "
-       << n_occ_alpha << "," << n_vir_alpha << "," << n_occ_beta << "," << n_vir_beta << endl;
+  std::cout << "finished reading molden: n_occ_alpha, n_vir_alpha, n_occ_beta, n_vir_beta = "
+            << n_occ_alpha << "," << n_vir_alpha << "," << n_occ_beta << "," << n_vir_beta
+            << std::endl;
 
   EXPECTS(n_occ_alpha == (size_t) sys_data.nelectrons_alpha);
   EXPECTS(n_occ_beta == (size_t) sys_data.nelectrons_beta);
@@ -709,12 +720,13 @@ void read_molden(const SystemData& sys_data, libint2::BasisSet& shells,
   EXPECTS(n_vir_beta == Northo - n_occ_beta);
 }
 
-template void reorder_molden_orbitals<double>(const bool             is_spherical,
-                                              std::vector<AtomInfo>& atominfo, Matrix& smat,
-                                              Matrix& dmat, const bool reorder_cols,
-                                              const bool reorder_rows);
+template void ECMolden::reorder_molden_orbitals<double>(const bool             is_spherical,
+                                                        std::vector<AtomInfo>& atominfo,
+                                                        Matrix& smat, Matrix& dmat,
+                                                        const bool reorder_cols,
+                                                        const bool reorder_rows);
 
-template void
-read_molden<double>(const SystemData& sys_data, libint2::BasisSet& shells,
-                    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& C_alpha,
-                    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& C_beta);
+template void ECMolden::read_molden<double>(
+  ChemEnv&                                                                chem_env,
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& C_alpha,
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& C_beta);

@@ -1,12 +1,15 @@
 
-#include "libint2_includes.hpp"
-#include "tamm/tamm.hpp"
-#include "txtutils.hpp"
+#pragma once
 #include <iostream>
 #include <vector>
+
+#include "atom_info.hpp"
+#include "libint2_includes.hpp"
+#include "tamm/tamm.hpp"
+#include "txt_utils.hpp"
 using namespace tamm;
 using libint2::Atom;
-class ECAtom {
+class ECAtom: public AtomInfo {
 public:
   Atom                atom;
   std::string         esymbol;

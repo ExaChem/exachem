@@ -437,7 +437,7 @@ void lambda_ccsd_y2(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexS
 
 template<typename T>
 std::tuple<double, double>
-lambda_ccsd_driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
+lambda_ccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                    const TiledIndexSpace& CI, Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_f1,
                    V2Tensors<T>& v2tensors, Tensor<T>& cv3d, Tensor<T>& d_r1, Tensor<T>& d_r2,
                    Tensor<T>& d_y1, Tensor<T>& d_y2, std::vector<Tensor<T>>& d_r1s,
@@ -446,11 +446,12 @@ lambda_ccsd_driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSp
   // TODO: LAMBDA DOES NOT HAVE THE SAME ITERATION CONVERGENCE
   //       PROTOCOL AND NEEDS TO BE UPDATED.
 
-  double zshiftl = 0.0;
-  int    maxiter = sys_data.options_map.ccsd_options.ccsd_maxiter;
-  int    ndiis   = sys_data.options_map.ccsd_options.ndiis;
-  double thresh  = sys_data.options_map.ccsd_options.threshold;
-  bool   profile = sys_data.options_map.ccsd_options.profile_ccsd;
+  double      zshiftl  = 0.0;
+  SystemData& sys_data = chem_env.sys_data;
+  int         maxiter  = chem_env.ioptions.ccsd_options.ccsd_maxiter;
+  int         ndiis    = chem_env.ioptions.ccsd_options.ndiis;
+  double      thresh   = chem_env.ioptions.ccsd_options.threshold;
+  bool        profile  = chem_env.ioptions.ccsd_options.profile_ccsd;
 
   const TAMM_SIZE n_occ_alpha = static_cast<TAMM_SIZE>(sys_data.n_occ_alpha);
   const TAMM_SIZE n_occ_beta  = static_cast<TAMM_SIZE>(sys_data.n_occ_beta);
@@ -523,7 +524,7 @@ lambda_ccsd_driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSp
 
 using T = double;
 template std::tuple<double, double>
-lambda_ccsd_driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
+lambda_ccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                    const TiledIndexSpace& CI, Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_f1,
                    V2Tensors<T>& v2tensors, Tensor<T>& cv3d, Tensor<T>& d_r1, Tensor<T>& d_r2,
                    Tensor<T>& d_y1, Tensor<T>& d_y2, std::vector<Tensor<T>>& d_r1s,

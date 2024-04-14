@@ -9,15 +9,18 @@
 #include "scf_iter.hpp"
 
 template<typename TensorType>
-std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
-                                                 ScalapackInfo& scalapack_info, const int& iter,
-                                                 const SystemData& sys_data, SCFVars& scf_vars,
-                                                 TAMMTensors& ttensors, EigenTensors& etensors
+std::tuple<TensorType, TensorType>
+SCFIter::scf_iter_body(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
+                       const int& iter, SCFVars& scf_vars, TAMMTensors& ttensors,
+                       EigenTensors& etensors
 #if defined(USE_GAUXC)
-                                                 ,
-                                                 GauXC::XCIntegrator<Matrix>& gauxc_integrator
+                       ,
+                       GauXC::XCIntegrator<Matrix>& gauxc_integrator
 #endif
 ) {
+
+  SystemData& sys_data    = chem_env.sys_data;
+  SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   const bool   is_uhf = sys_data.is_unrestricted;
   const bool   is_rhf = sys_data.is_restricted;
@@ -49,9 +52,9 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
   const TiledIndexSpace& tAO = scf_vars.tAO;
 
   auto rank          = ec.pg().rank();
-  auto debug         = sys_data.options_map.scf_options.debug;
+  auto debug         = scf_options.debug;
   auto [mu, nu, ku]  = tAO.labels<3>("all");
-  const int max_hist = sys_data.options_map.scf_options.diis_hist;
+  const int max_hist = scf_options.diis_hist;
 
   double ehf = 0.0;
 
@@ -86,7 +89,7 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
   if(is_ks) {
     const auto xcf_start = std::chrono::high_resolution_clock::now();
     gauxc_exc =
-      gauxc_util::compute_xcf<TensorType>(ec, sys_data, ttensors, etensors, gauxc_integrator);
+      igauxc_util::compute_xcf<TensorType>(ec, chem_env, ttensors, etensors, gauxc_integrator);
 
     const auto xcf_stop = std::chrono::high_resolution_clock::now();
     const auto xcf_time =
@@ -140,16 +143,17 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
     auto do_t1 = std::chrono::high_resolution_clock::now();
     if(is_rhf) {
       ++scf_vars.idiis;
-      scf_diis(ec, tAO, F_alpha, F_alpha, err_mat_alpha_tamm, err_mat_alpha_tamm, iter, max_hist,
-               scf_vars, sys_data, sys_data.n_lindep, ttensors.diis_hist, ttensors.diis_hist,
+      scf_diis(ec, chem_env, tAO, F_alpha, F_alpha, err_mat_alpha_tamm, err_mat_alpha_tamm, iter,
+               max_hist, scf_vars, sys_data.n_lindep, ttensors.diis_hist, ttensors.diis_hist,
                ttensors.fock_hist, ttensors.fock_hist);
     }
     if(is_uhf) {
       ++scf_vars.idiis;
-      scf_diis(ec, tAO, F_alpha, F_beta, err_mat_alpha_tamm, err_mat_beta_tamm, iter, max_hist,
-               scf_vars, sys_data, sys_data.n_lindep, ttensors.diis_hist, ttensors.diis_beta_hist,
+      scf_diis(ec, chem_env, tAO, F_alpha, F_beta, err_mat_alpha_tamm, err_mat_beta_tamm, iter,
+               max_hist, scf_vars, sys_data.n_lindep, ttensors.diis_hist, ttensors.diis_beta_hist,
                ttensors.fock_hist, ttensors.fock_beta_hist);
-      // scf_diis(ec, tAO, D_beta_tamm, F_beta, err_mat_beta_tamm, iter, max_hist, scf_vars,
+      // scf_diis(ec, chem_env, tAO, D_beta_tamm, F_beta, err_mat_beta_tamm, iter, max_hist,
+      // scf_vars,
       //         sys_data.n_lindep, ttensors.diis_beta_hist, ttensors.fock_beta_hist);
     }
     auto do_t2 = std::chrono::high_resolution_clock::now();
@@ -179,9 +183,10 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
     }
   }
 
-  auto do_t1 = std::chrono::high_resolution_clock::now();
-
-  scf_diagonalize<TensorType>(sch, sys_data, scf_vars, scalapack_info, ttensors, etensors);
+  auto     do_t1 = std::chrono::high_resolution_clock::now();
+  SCFGuess iscf_guess;
+  iscf_guess.scf_diagonalize<TensorType>(sch, chem_env, scf_vars, scalapack_info, ttensors,
+                                         etensors);
 
   auto do_t2   = std::chrono::high_resolution_clock::now();
   auto do_time = std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
@@ -189,7 +194,7 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
   if(rank == 0 && debug)
     std::cout << std::fixed << std::setprecision(2) << "diagonalize: " << do_time << "s, ";
 
-  compute_density<TensorType>(ec, sys_data, scf_vars, scalapack_info, ttensors, etensors);
+  compute_density<TensorType>(ec, chem_env, scf_vars, scalapack_info, ttensors, etensors);
 
   double rmsd = 0.0;
   // clang-format off
@@ -202,15 +207,12 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
 
   if(is_uhf) {
     // clang-format off
-    sch
-      (D_diff()  = D_beta_tamm())
-      (D_diff() -= D_last_beta_tamm())
-      .execute();
+    sch(D_diff() = D_beta_tamm())(D_diff() -= D_last_beta_tamm()).execute();
     // clang-format on
     rmsd += norm(D_diff) / (double) (1.0 * N);
   }
 
-  const auto   damp  = sys_data.options_map.scf_options.damp;
+  const auto   damp  = scf_options.damp;
   const double alpha = damp / 100.0;
   // if(rmsd < 1e-6) { scf_vars.switch_diis = true; } // rmsd check
 
@@ -236,17 +238,19 @@ std::tuple<TensorType, TensorType> scf_iter_body(ExecutionContext& ec,
 
 template<typename TensorType>
 std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-compute_2bf_taskinfo(ExecutionContext& ec, const SystemData& sys_data, const SCFVars& scf_vars,
-                     const libint2::BasisSet& obs, const bool do_schwarz_screen,
-                     const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
-                     const size_t& max_nprim4, TAMMTensors& ttensors, EigenTensors& etensors,
-                     const bool cs1s2) {
+SCFIter::compute_2bf_taskinfo(ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars,
+                              const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
+                              const Matrix& SchwarzK, const size_t& max_nprim4,
+                              TAMMTensors& ttensors, EigenTensors& etensors, const bool cs1s2) {
   Matrix&             D       = etensors.D_alpha;
   Matrix&             D_beta  = etensors.D_beta;
   Tensor<TensorType>& F_dummy = ttensors.F_dummy;
 
-  double fock_precision = std::min(sys_data.options_map.scf_options.tol_sch,
-                                   1e-2 * sys_data.options_map.scf_options.conve);
+  SystemData&              sys_data    = chem_env.sys_data;
+  SCFOptions&              scf_options = chem_env.ioptions.scf_options;
+  const libint2::BasisSet& obs         = chem_env.shells;
+
+  double fock_precision = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
   // auto       rank           = ec.pg().rank();
   const bool is_uhf = sys_data.is_unrestricted;
 
@@ -314,19 +318,23 @@ compute_2bf_taskinfo(ExecutionContext& ec, const SystemData& sys_data, const SCF
 }
 
 template<typename TensorType>
-void compute_2bf_ri(ExecutionContext& ec, ScalapackInfo& scalapack_info, const SystemData& sys_data,
-                    const SCFVars& scf_vars, const libint2::BasisSet& obs,
-                    const std::vector<size_t>& shell2bf, TAMMTensors& ttensors,
-                    EigenTensors& etensors, bool& is_3c_init, double xHF) {
+void SCFIter::compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
+                             const SCFVars& scf_vars, const std::vector<size_t>& shell2bf,
+                             TAMMTensors& ttensors, EigenTensors& etensors, bool& is_3c_init,
+                             double xHF) {
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
+
+  SystemData&              sys_data    = chem_env.sys_data;
+  SCFOptions&              scf_options = chem_env.ioptions.scf_options;
+  const libint2::BasisSet& obs         = chem_env.shells;
 
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;
 
   auto                       rank           = ec.pg().rank();
-  auto                       debug          = sys_data.options_map.scf_options.debug;
+  auto                       debug          = scf_options.debug;
   const std::vector<Tile>&   AO_tiles       = scf_vars.AO_tiles;
   const std::vector<size_t>& shell_tile_map = scf_vars.shell_tile_map;
 
@@ -655,13 +663,16 @@ void compute_2bf_ri(ExecutionContext& ec, ScalapackInfo& scalapack_info, const S
 }
 
 template<typename TensorType>
-void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const SystemData& sys_data,
-                 const SCFVars& scf_vars, const libint2::BasisSet& obs,
-                 const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
-                 const Matrix& SchwarzK, const size_t& max_nprim4, TAMMTensors& ttensors,
-                 EigenTensors& etensors, bool& is_3c_init, const bool do_density_fitting,
-                 double xHF) {
+void SCFIter::compute_2bf(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
+                          const SCFVars& scf_vars, const bool do_schwarz_screen,
+                          const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
+                          const size_t& max_nprim4, TAMMTensors& ttensors, EigenTensors& etensors,
+                          bool& is_3c_init, const bool do_density_fitting, double xHF) {
   using libint2::Operator;
+
+  SystemData&              sys_data    = chem_env.sys_data;
+  SCFOptions&              scf_options = chem_env.ioptions.scf_options;
+  const libint2::BasisSet& obs         = chem_env.shells;
 
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;
@@ -675,16 +686,15 @@ void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syst
   Tensor<TensorType>& F_alpha_tmp = ttensors.F_alpha_tmp;
   Tensor<TensorType>& F_beta_tmp  = ttensors.F_beta_tmp;
 
-  double fock_precision = std::min(sys_data.options_map.scf_options.tol_sch,
-                                   1e-2 * sys_data.options_map.scf_options.conve);
+  double fock_precision = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
   auto   rank           = ec.pg().rank();
   auto   N              = sys_data.nbf_orig;
-  auto   debug          = sys_data.options_map.scf_options.debug;
+  auto   debug          = scf_options.debug;
 
   auto   do_t1 = std::chrono::high_resolution_clock::now();
   Matrix D_shblk_norm;
 
-  double engine_precision = sys_data.options_map.scf_options.tol_int; // default: 1e-22
+  double engine_precision = scf_options.tol_int; // default: 1e-22
 
   // construct the 2-electron repulsion integrals engine pool
   using libint2::Engine;
@@ -863,8 +873,8 @@ void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syst
     // ec.pg().barrier();
   }
   else {
-    compute_2bf_ri<TensorType>(ec, scalapack_info, sys_data, scf_vars, obs, shell2bf, ttensors,
-                               etensors, is_3c_init, xHF);
+    compute_2bf_ri<TensorType>(ec, chem_env, scalapack_info, scf_vars, shell2bf, ttensors, etensors,
+                               is_3c_init, xHF);
   } // end density fitting
 
   Scheduler sch{ec};
@@ -894,18 +904,19 @@ void compute_2bf(ExecutionContext& ec, ScalapackInfo& scalapack_info, const Syst
 }
 
 template<typename TensorType>
-void scf_diis(ExecutionContext& ec, const TiledIndexSpace& tAO, Tensor<TensorType> F_alpha,
-              Tensor<TensorType> F_beta, Tensor<TensorType> err_mat_alpha,
-              Tensor<TensorType> err_mat_beta, int iter, int max_hist, const SCFVars& scf_vars,
-              const SystemData& sys_data, const int n_lindep,
-              std::vector<Tensor<TensorType>>& diis_hist_alpha,
-              std::vector<Tensor<TensorType>>& diis_hist_beta,
-              std::vector<Tensor<TensorType>>& fock_hist_alpha,
-              std::vector<Tensor<TensorType>>& fock_hist_beta) {
+void SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env, const TiledIndexSpace& tAO,
+                       Tensor<TensorType> F_alpha, Tensor<TensorType> F_beta,
+                       Tensor<TensorType> err_mat_alpha, Tensor<TensorType> err_mat_beta, int iter,
+                       int max_hist, const SCFVars& scf_vars, const int n_lindep,
+                       std::vector<Tensor<TensorType>>& diis_hist_alpha,
+                       std::vector<Tensor<TensorType>>& diis_hist_beta,
+                       std::vector<Tensor<TensorType>>& fock_hist_alpha,
+                       std::vector<Tensor<TensorType>>& fock_hist_beta) {
   using Vector = Eigen::Matrix<TensorType, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
   tamm::Scheduler sch{ec};
-  bool const      is_uhf = sys_data.is_unrestricted;
+  SystemData&     sys_data = chem_env.sys_data;
+  bool const      is_uhf   = sys_data.is_unrestricted;
 
   auto rank  = ec.pg().rank().value();
   auto ndiis = scf_vars.idiis;
@@ -1095,41 +1106,32 @@ void scf_diis(ExecutionContext& ec, const TiledIndexSpace& tAO, Tensor<TensorTyp
   sch.execute();
 }
 
-// template instantiation
-
-// template void scf_diis<double>(ExecutionContext& ec, const TiledIndexSpace& tAO, Tensor<double>
-// D,
-//           Tensor<double> F, Tensor<double> err_mat, int iter, int max_hist,
-//           const SCFVars& scf_vars, const int n_lindep, std::vector<Tensor<double>>& diis_hist,
-//           std::vector<Tensor<double>>& fock_hist);
-
 template std::tuple<double, double>
-scf_iter_body<double>(ExecutionContext& ec, ScalapackInfo& scalapack_info, const int& iter,
-                      const SystemData& sys_data, SCFVars& scf_vars, TAMMTensors& ttensors,
-                      EigenTensors& etensors
+SCFIter::scf_iter_body<double>(ExecutionContext& ec, ChemEnv& chem_env,
+                               ScalapackInfo& scalapack_info, const int& iter, SCFVars& scf_vars,
+                               TAMMTensors& ttensors, EigenTensors& etensors
 #if defined(USE_GAUXC)
-                      ,
-                      GauXC::XCIntegrator<Matrix>& gauxc_integrator
+                               ,
+                               GauXC::XCIntegrator<Matrix>& gauxc_integrator
 #endif
 );
 
 template std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-compute_2bf_taskinfo<double>(ExecutionContext& ec, const SystemData& sys_data,
-                             const SCFVars& scf_vars, const libint2::BasisSet& obs,
-                             const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
-                             const Matrix& SchwarzK, const size_t& max_nprim4,
-                             TAMMTensors& ttensors, EigenTensors& etensors, const bool cs1s2);
+SCFIter::compute_2bf_taskinfo<double>(ExecutionContext& ec, ChemEnv& chem_env,
+                                      const SCFVars& scf_vars, const bool do_schwarz_screen,
+                                      const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
+                                      const size_t& max_nprim4, TAMMTensors& ttensors,
+                                      EigenTensors& etensors, const bool cs1s2);
 
-template void compute_2bf<double>(ExecutionContext& ec, ScalapackInfo& scalapack_info,
-                                  const SystemData& sys_data, const SCFVars& scf_vars,
-                                  const libint2::BasisSet& obs, const bool do_schwarz_screen,
-                                  const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
-                                  const size_t& max_nprim4, TAMMTensors& ttensors,
-                                  EigenTensors& etensors, bool& is_3c_init,
-                                  const bool do_density_fitting, double xHF);
+template void SCFIter::compute_2bf<double>(
+  ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
+  const bool do_schwarz_screen, const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
+  const size_t& max_nprim4, TAMMTensors& ttensors, EigenTensors& etensors, bool& is_3c_init,
+  const bool do_density_fitting, double xHF);
 
-template void compute_2bf_ri<double>(ExecutionContext& ec, ScalapackInfo& scalapack_info,
-                                     const SystemData& sys_data, const SCFVars& scf_vars,
-                                     const libint2::BasisSet&   obs,
-                                     const std::vector<size_t>& shell2bf, TAMMTensors& ttensors,
-                                     EigenTensors& etensors, bool& is_3c_init, double xHF);
+template void SCFIter::compute_2bf_ri<double>(ExecutionContext& ec, ChemEnv& chem_env,
+                                              ScalapackInfo&             scalapack_info,
+                                              const SCFVars&             scf_vars,
+                                              const std::vector<size_t>& shell2bf,
+                                              TAMMTensors& ttensors, EigenTensors& etensors,
+                                              bool& is_3c_init, double xHF);

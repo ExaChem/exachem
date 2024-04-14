@@ -8,15 +8,18 @@
 
 #pragma once
 
+#include "scf/scf_outputs.hpp"
 #include "tamm/eigen_utils.hpp"
 using namespace tamm;
 
 template<typename TensorType>
-void print_mo_vectors_analysis(SystemData& sys_data, libint2::BasisSet& shells, Matrix& C_alpha_eig,
-                               Matrix& C_beta_eig, Matrix& F_MO_alpha, Matrix& F_MO_beta,
-                               bool is_rhf) {
-  auto       vec_analysis = sys_data.options_map.scf_options.mo_vectors_analysis;
-  const bool is_spherical = (sys_data.options_map.scf_options.gaussian_type == "spherical");
+void print_mo_vectors_analysis(ChemEnv& chem_env, Matrix& C_alpha_eig, Matrix& C_beta_eig,
+                               Matrix& F_MO_alpha, Matrix& F_MO_beta) {
+  SystemData& sys_data = chem_env.sys_data;
+  const bool  is_rhf   = sys_data.is_restricted;
+
+  auto       vec_analysis = chem_env.ioptions.scf_options.mo_vectors_analysis;
+  const bool is_spherical = (chem_env.ioptions.scf_options.gaussian_type == "spherical");
   if(vec_analysis.first) {
     std::vector<double> occup_alpha(sys_data.nbf, 0.0);
     for(int i = 0; i < sys_data.n_occ_alpha; i++) {
@@ -26,8 +29,9 @@ void print_mo_vectors_analysis(SystemData& sys_data, libint2::BasisSet& shells, 
     std::vector<double> occup_beta(sys_data.nbf, 0.0);
     for(int i = 0; i < sys_data.n_occ_beta; i++) occup_beta[i] = 1.0;
 
-    auto        atoms = sys_data.options_map.options.atoms;
-    BasisSetMap bsm   = construct_basisset_maps(atoms, shells, is_spherical);
+    auto               atoms  = chem_env.atoms;
+    libint2::BasisSet& shells = chem_env.shells;
+    BasisSetMap        bsm(atoms, shells, is_spherical);
 
     cout << std::fixed << std::setprecision(6);
     if(is_rhf)
@@ -83,11 +87,12 @@ void print_mo_vectors_analysis(SystemData& sys_data, libint2::BasisSet& shells, 
 }
 
 template<typename TensorType>
-void two_index_transform(SystemData sys_data, ExecutionContext& ec, Tensor<TensorType> C_alpha_AO,
+void two_index_transform(ChemEnv& chem_env, ExecutionContext& ec, Tensor<TensorType> C_alpha_AO,
                          Tensor<TensorType> F_alpha_AO, Tensor<TensorType> C_beta_AO,
                          Tensor<TensorType> F_beta_AO, Tensor<TensorType> F_MO,
                          libint2::BasisSet& shells, Tensor<TensorType> lcao, bool isdlpno = false) {
-  SCFOptions         scf_options = sys_data.options_map.scf_options;
+  SystemData&        sys_data    = chem_env.sys_data;
+  SCFOptions         scf_options = chem_env.ioptions.scf_options;
   const TAMM_GA_SIZE n_occ_alpha = sys_data.n_occ_alpha;
   const TAMM_GA_SIZE n_occ_beta  = sys_data.n_occ_beta;
   const TAMM_GA_SIZE n_vir_alpha = sys_data.n_vir_alpha;
@@ -110,10 +115,11 @@ void two_index_transform(SystemData sys_data, ExecutionContext& ec, Tensor<Tenso
   // const bool is_rohf = sys_data.is_restricted_os;
 
   Matrix CTiled(nao, N);
+  SCFIO  scf_output;
 
   std::string err_msg{};
 
-  const int pcore = sys_data.options_map.ccsd_options.pcore - 1; // 0-based indexing
+  const int pcore = chem_env.ioptions.ccsd_options.pcore - 1; // 0-based indexing
 
   if(rank == 0) {
     cout << std::endl << "-----------------------------------------------------" << endl;
@@ -155,8 +161,8 @@ void two_index_transform(SystemData sys_data, ExecutionContext& ec, Tensor<Tenso
       Matrix F_MO_beta  = F_MO_alpha;
       if(is_uhf) F_MO_beta = C_beta_eig.transpose() * (F_beta_AO_eig * C_beta_eig);
 
-      print_mo_vectors_analysis<TensorType>(sys_data, shells, C_alpha_eig, C_beta_eig, F_MO_alpha,
-                                            F_MO_beta, is_rhf);
+      print_mo_vectors_analysis<TensorType>(chem_env, C_alpha_eig, C_beta_eig, F_MO_alpha,
+                                            F_MO_beta);
 
       Matrix F;
       F.setZero(N, N);
@@ -182,19 +188,18 @@ void two_index_transform(SystemData sys_data, ExecutionContext& ec, Tensor<Tenso
       // clang-format on
 
       if(pcore >= 0) {
-        const auto out_fp =
-          sys_data.output_file_prefix + "." + sys_data.options_map.ccsd_options.basis;
-        const auto files_prefix = out_fp + "_files/restricted/" + out_fp;
-        const auto f1file       = files_prefix + ".td.f1_mo";
-        const auto lcaofile     = files_prefix + ".td.lcao";
+        std::string out_fp       = chem_env.workspace_dir;
+        const auto  files_prefix = out_fp + "restricted/" + sys_data.output_file_prefix;
+        const auto  f1file       = files_prefix + ".td.f1_mo";
+        const auto  lcaofile     = files_prefix + ".td.lcao";
         if(is_rhf) {
-          write_scf_mat<TensorType>(F, f1file);
-          write_scf_mat<TensorType>(CTiled, lcaofile);
+          scf_output.write_scf_mat<TensorType>(F, f1file);
+          scf_output.write_scf_mat<TensorType>(CTiled, lcaofile);
         }
         else if(is_uhf) {
           if(fs::exists(f1file) && fs::exists(lcaofile)) {
-            F      = read_scf_mat<TensorType>(f1file);
-            CTiled = read_scf_mat<TensorType>(lcaofile);
+            F      = scf_output.read_scf_mat<TensorType>(f1file);
+            CTiled = scf_output.read_scf_mat<TensorType>(lcaofile);
           }
           else { err_msg = "Files [" + f1file + ", " + lcaofile + "] do not exist "; }
 

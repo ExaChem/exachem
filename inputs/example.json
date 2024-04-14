@@ -16,7 +16,7 @@
     "common": {
       "maxiter": 50,
       "debug": false,
-      "output_file_prefix": "",
+      "file_prefix": "",
       "comments": {
         "comment1": "example comment"
       }  

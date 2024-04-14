@@ -7,33 +7,40 @@
  */
 
 #include "cc/ccsd/ccsd_util.hpp"
-
+#include "common/termcolor.hpp"
+#include "scf/scf_main.hpp"
 #include <filesystem>
 namespace fs = std::filesystem;
 
-void cd_mp2(std::string filename, ECOptions options_map) {
+void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
+  using namespace termcolor;
+  auto rank = ec.pg().rank();
 
-  ProcGroup        pg = ProcGroup::create_world_coll();
-  ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
-  auto             rank = ec.pg().rank();
+  scf(ec, chem_env);
+  SystemData sys_data = chem_env.sys_data;
 
-  auto [sys_data, hf_energy, shells, shell_tile_map, C_AO, F_AO, C_beta_AO, F_beta_AO, AO_opt,
-        AO_tis, scf_conv] = hartree_fock_driver<T>(ec, filename, options_map);
+  libint2::BasisSet   shells         = chem_env.shells;
+  Tensor<T>           C_AO           = chem_env.C_AO;
+  Tensor<T>           C_beta_AO      = chem_env.C_beta_AO;
+  Tensor<T>           F_AO           = chem_env.F_AO;
+  Tensor<T>           F_beta_AO      = chem_env.F_beta_AO;
+  TiledIndexSpace     AO_opt         = chem_env.AO_opt;
+  std::vector<size_t> shell_tile_map = chem_env.shell_tile_map;
 
-  CCSDOptions& ccsd_options = sys_data.options_map.ccsd_options;
+  CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
   if(rank == 0) ccsd_options.print();
 
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = setupMOIS(sys_data);
+  auto [MO, total_orbitals] = setupMOIS(chem_env);
 
   const bool is_rhf = sys_data.is_restricted;
 
-  std::string out_fp       = sys_data.output_file_prefix + "." + ccsd_options.basis;
-  std::string files_dir    = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type;
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + out_fp;
+  std::string out_fp       = chem_env.workspace_dir;
+  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
+  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
   std::string f1file       = files_prefix + ".f1_mo";
   std::string t1file       = files_prefix + ".t1amp";
   std::string t2file       = files_prefix + ".t2amp";
@@ -45,7 +52,7 @@ void cd_mp2(std::string filename, ECOptions options_map) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(sys_data, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
+    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
                      shell_tile_map, mp2_restart, cholfile);
   free_tensors(lcao);
 

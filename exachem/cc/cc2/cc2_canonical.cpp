@@ -183,27 +183,28 @@ void cc2_t2(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const Tens
 
 template<typename T>
 std::tuple<double, double>
-cc2_v2_driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_t1,
+cc2_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_t1,
               Tensor<T>& d_t2, Tensor<T>& d_f1, Tensor<T>& d_v2, Tensor<T>& d_r1, Tensor<T>& d_r2,
               std::vector<Tensor<T>>& d_r1s, std::vector<Tensor<T>>& d_r2s,
               std::vector<Tensor<T>>& d_t1s, std::vector<Tensor<T>>& d_t2s,
-              std::vector<T>& p_evl_sorted, bool ccsd_restart = false, std::string out_fp = "") {
-  int    maxiter     = sys_data.options_map.ccsd_options.ccsd_maxiter;
-  int    ndiis       = sys_data.options_map.ccsd_options.ndiis;
-  double thresh      = sys_data.options_map.ccsd_options.threshold;
-  bool   writet      = sys_data.options_map.ccsd_options.writet;
-  int    writet_iter = sys_data.options_map.ccsd_options.writet_iter;
-  double zshiftl     = sys_data.options_map.ccsd_options.lshift;
-  bool   profile     = sys_data.options_map.ccsd_options.profile_ccsd;
-  double residual    = 0.0;
-  double energy      = 0.0;
-  int    niter       = 0;
+              std::vector<T>& p_evl_sorted, bool ccsd_restart = false, std::string cc2_fp = "") {
+  SystemData& sys_data    = chem_env.sys_data;
+  int         maxiter     = chem_env.ioptions.ccsd_options.ccsd_maxiter;
+  int         ndiis       = chem_env.ioptions.ccsd_options.ndiis;
+  double      thresh      = chem_env.ioptions.ccsd_options.threshold;
+  bool        writet      = chem_env.ioptions.ccsd_options.writet;
+  int         writet_iter = chem_env.ioptions.ccsd_options.writet_iter;
+  double      zshiftl     = chem_env.ioptions.ccsd_options.lshift;
+  bool        profile     = chem_env.ioptions.ccsd_options.profile_ccsd;
+  double      residual    = 0.0;
+  double      energy      = 0.0;
+  int         niter       = 0;
 
   const TAMM_SIZE n_occ_alpha = static_cast<TAMM_SIZE>(sys_data.n_occ_alpha);
   const TAMM_SIZE n_occ_beta  = static_cast<TAMM_SIZE>(sys_data.n_occ_beta);
 
-  std::string t1file = out_fp + ".t1amp";
-  std::string t2file = out_fp + ".t2amp";
+  std::string t1file = cc2_fp + ".t1amp";
+  std::string t2file = cc2_fp + ".t2amp";
 
   std::cout.precision(15);
 
@@ -243,7 +244,7 @@ cc2_v2_driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& 
           std::chrono::duration_cast<std::chrono::duration<double>>((timer_end - timer_start))
             .count();
 
-        iteration_print(sys_data, ec.pg(), iter, residual, energy, iter_time);
+        iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
 
         if(writet && (((iter + 1) % writet_iter == 0) || (residual < thresh))) {
           write_to_disk(d_t1, t1file);
@@ -286,7 +287,7 @@ cc2_v2_driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& 
     sys_data.results["output"]["CCSD"]["final_energy"]["correlation"] = energy;
     sys_data.results["output"]["CCSD"]["final_energy"]["total"] = sys_data.scf_energy + energy;
 
-    sys_data.write_json_data("CCSD");
+    chem_env.write_json_data("CCSD");
   }
 
   return std::make_tuple(residual, energy);
@@ -294,28 +295,36 @@ cc2_v2_driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& 
 
 }; // namespace cc2_canonical
 
-void cc2_canonical_driver(std::string filename, ECOptions options_map) {
+void cc2_canonical_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
 
-  ProcGroup        pg = ProcGroup::create_world_coll();
-  ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
-  auto             rank = ec.pg().rank();
+  auto rank = ec.pg().rank();
 
-  auto [sys_data, hf_energy, shells, shell_tile_map, C_AO, F_AO, C_beta_AO, F_beta_AO, AO_opt,
-        AO_tis, scf_conv] = hartree_fock_driver<T>(ec, filename, options_map);
+  scf(ec, chem_env);
 
-  CCSDOptions& ccsd_options = sys_data.options_map.ccsd_options;
+  double              hf_energy      = chem_env.hf_energy;
+  libint2::BasisSet   shells         = chem_env.shells;
+  Tensor<T>           C_AO           = chem_env.C_AO;
+  Tensor<T>           C_beta_AO      = chem_env.C_beta_AO;
+  Tensor<T>           F_AO           = chem_env.F_AO;
+  Tensor<T>           F_beta_AO      = chem_env.F_beta_AO;
+  TiledIndexSpace     AO_opt         = chem_env.AO_opt;
+  std::vector<size_t> shell_tile_map = chem_env.shell_tile_map;
+  bool                scf_conv       = chem_env.no_scf;
+
+  SystemData&  sys_data     = chem_env.sys_data;
+  CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
   auto         debug        = ccsd_options.debug;
   if(rank == 0) ccsd_options.print();
 
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = setupMOIS(sys_data);
+  auto [MO, total_orbitals] = setupMOIS(chem_env);
 
-  std::string out_fp    = sys_data.output_file_prefix + "." + ccsd_options.basis;
-  std::string files_dir = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type + "/cc2";
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + out_fp;
+  std::string out_fp       = chem_env.workspace_dir;
+  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type + "/cc2";
+  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
   std::string f1file       = files_prefix + ".f1_mo";
   std::string t1file       = files_prefix + ".t1amp";
   std::string t2file       = files_prefix + ".t2amp";
@@ -328,7 +337,7 @@ void cc2_canonical_driver(std::string filename, ECOptions options_map) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(sys_data, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
+    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
                      shell_tile_map, ccsd_restart, cholfile);
   free_tensors(lcao);
 
@@ -386,7 +395,7 @@ void cc2_canonical_driver(std::string filename, ECOptions options_map) {
   if(!fs::exists(fullV2file)) {
     d_v2 = setupV2<T>(ec, MO, CI, cholVpr, chol_count, ec.exhw());
     if(ccsd_options.writet) {
-      write_to_disk(d_v2, fullV2file, true);
+      write_to_disk(d_v2, fullV2file);
       // Tensor<T>::deallocate(d_v2);
     }
   }
@@ -399,7 +408,7 @@ void cc2_canonical_driver(std::string filename, ECOptions options_map) {
   free_tensors(cholVpr);
 
   auto [residual, corr_energy] =
-    cc2_canonical::cc2_v2_driver<T>(sys_data, ec, MO, d_t1, d_t2, d_f1, d_v2, d_r1, d_r2, d_r1s,
+    cc2_canonical::cc2_v2_driver<T>(chem_env, ec, MO, d_t1, d_t2, d_f1, d_v2, d_r1, d_r2, d_r1s,
                                     d_r2s, d_t1s, d_t2s, p_evl_sorted, ccsd_restart, files_prefix);
 
   ccsd_stats(ec, hf_energy, residual, corr_energy, ccsd_options.threshold);
@@ -423,7 +432,7 @@ void cc2_canonical_driver(std::string filename, ECOptions options_map) {
               << "Time taken for spin-orbital CC2: " << std::fixed << std::setprecision(2)
               << cc2_time << " secs" << std::endl;
 
-  cc_print(sys_data, d_t1, d_t2, files_prefix);
+  cc_print(chem_env, d_t1, d_t2, files_prefix);
 
   if(!ccsd_restart) {
     free_tensors(d_r1, d_r2);

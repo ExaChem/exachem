@@ -13,20 +13,22 @@
 #include "cc/ccsd_t/ccsd_t_fused_driver.hpp"
 #include "exachem/cc/lambda/ccsd_lambda.hpp"
 #include "exachem/cc/eom/eomccsd_opt.hpp"
+
+#include "exachem/common/chemenv.hpp"
+#include "exachem/common/options/parse_options.hpp"
+#include "scf/scf_main.hpp"
 // clang-format on
 
 #define EC_COMPLEX
 
-void sinfo(std::string filename, ECOptions options_map);
-
 #if !defined(USE_UPCXX) and defined(EC_COMPLEX)
-void gfccsd_driver(std::string filename, ECOptions options_map);
-void rt_eom_cd_ccsd_driver(std::string filename, ECOptions options_map);
+void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env);
+void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env);
 #include "exachem/fci/fci.hpp"
 #endif
 
-void cd_cc2_driver(std::string filename, ECOptions options_map);
-void ducc_driver(std::string filename, ECOptions options_map);
+void cd_cc2_driver(ExecutionContext& ec, ChemEnv& chem_env);
+void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
 int main(int argc, char* argv[]) {
   tamm::initialize(argc, argv);
@@ -54,27 +56,31 @@ int main(int argc, char* argv[]) {
   ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
 
   for(auto ifile: inputfiles) {
-    std::string   filename = fs::canonical(ifile);
-    std::ifstream testinput(filename);
-    if(!testinput) tamm_terminate("Input file provided [" + filename + "] does not exist!");
+    std::string   input_file = fs::canonical(ifile);
+    std::ifstream testinput(input_file);
+    if(!testinput) tamm_terminate("Input file provided [" + input_file + "] does not exist!");
 
     auto current_time   = std::chrono::system_clock::now();
     auto current_time_t = std::chrono::system_clock::to_time_t(current_time);
     auto cur_local_time = localtime(&current_time_t);
 
     // read geometry from a json file
-    json jinput;
+    ChemEnv chem_env;
+    chem_env.input_file = input_file;
 
-    ECParse parse(filename);
-    jinput = parse.jinput;
-    // ECOptions options_map(parse.jinput, parse.ec_atoms, parse.atoms);
-    ECOptions options_map(parse);
+    // This call should update all input options and SystemData object
+    std::unique_ptr<ECOptionParser> iparse = std::make_unique<ECOptionParser>(chem_env);
 
-    // std::tie(options_map, jinput) = parse_input(is);
-    // ECOptions options_map;
-    // parseInput pInput(options_map, jinput, filename);
-    if(options_map.options.output_file_prefix.empty())
-      options_map.options.output_file_prefix = ECParse::getfilename(filename);
+    ECOptions& ioptions              = chem_env.ioptions;
+    chem_env.sys_data.input_molecule = ParserUtils::getfilename(input_file);
+
+    if(chem_env.ioptions.common_options.file_prefix.empty()) {
+      chem_env.ioptions.common_options.file_prefix = chem_env.sys_data.input_molecule;
+    }
+
+    chem_env.sys_data.output_file_prefix =
+      chem_env.ioptions.common_options.file_prefix + "." + chem_env.ioptions.common_options.basis;
+    chem_env.workspace_dir = chem_env.sys_data.output_file_prefix + "_files/";
 
     if(rank == 0) {
       std::cout << exachem_git_info() << std::endl;
@@ -84,22 +90,17 @@ int main(int argc, char* argv[]) {
     if(rank == 0) {
       cout << endl << "date: " << std::put_time(cur_local_time, "%c") << endl;
       cout << "program: " << fs::canonical(argv[0]) << endl;
-      cout << "input: " << filename << endl;
+      cout << "input: " << input_file << endl;
       cout << "nnodes: " << ec.nnodes() << ", ";
       cout << "nproc: " << ec.nnodes() * ec.ppn() << endl;
-      cout << "prefix: " << options_map.options.output_file_prefix << endl << endl;
+      cout << "prefix: " << chem_env.sys_data.output_file_prefix << endl << endl;
       ec.print_mem_info();
       cout << endl << endl;
       cout << "Input file provided" << endl << std::string(20, '-') << endl;
-      std::cout << jinput.dump(2) << std::endl;
+      std::cout << chem_env.jinput.dump(2) << std::endl;
     }
 
-    // if(rank == 0) {
-    //   std::ofstream res_file(ECParse::getfilename(filename)+".json");
-    //   res_file << std::setw(2) << jinput << std::endl;
-    // }
-
-    const auto              task = options_map.task_options;
+    const auto              task = ioptions.task_options;
     const std::vector<bool> tvec = {task.sinfo,
                                     task.scf,
                                     task.mp2,
@@ -131,20 +132,20 @@ int main(int argc, char* argv[]) {
     if(task.fci) tamm_terminate("Full CI integration not enabled!");
 #endif
 
-    if(task.sinfo) sinfo(filename, options_map);
-    else if(task.scf) scf(filename, options_map);
-    else if(task.mp2) cd_mp2(filename, options_map);
-    else if(task.cd_2e) cd_2e_driver(filename, options_map);
-    else if(task.ccsd) cd_ccsd(filename, options_map);
-    else if(task.ccsd_t) ccsd_t_driver(filename, options_map);
-    else if(task.cc2) cd_cc2_driver(filename, options_map);
-    else if(task.ccsd_lambda) ccsd_lambda_driver(filename, options_map);
-    else if(task.eom_ccsd) eom_ccsd_driver(filename, options_map);
-    else if(task.ducc) ducc_driver(filename, options_map);
+    if(task.sinfo) chem_env.sinfo();
+    else if(task.scf) scf(ec, chem_env);
+    else if(task.mp2) cd_mp2(ec, chem_env);
+    else if(task.cd_2e) cd_2e_driver(ec, chem_env);
+    else if(task.ccsd) cd_ccsd(ec, chem_env);
+    else if(task.ccsd_t) ccsd_t_driver(ec, chem_env);
+    else if(task.cc2) cd_cc2_driver(ec, chem_env);
+    else if(task.ccsd_lambda) ccsd_lambda_driver(ec, chem_env);
+    else if(task.eom_ccsd) eom_ccsd_driver(ec, chem_env);
+    else if(task.ducc) ducc_driver(ec, chem_env);
 #if !defined(USE_UPCXX) and defined(EC_COMPLEX)
-    else if(task.fci || task.fcidump) fci_driver(filename, options_map);
-    else if(task.gfccsd) gfccsd_driver(filename, options_map);
-    else if(task.rteom_ccsd) rt_eom_cd_ccsd_driver(filename, options_map);
+    else if(task.fci || task.fcidump) fci_driver(ec, chem_env);
+    else if(task.gfccsd) gfccsd_driver(ec, chem_env);
+    else if(task.rteom_ccsd) rt_eom_cd_ccsd_driver(ec, chem_env);
 #endif
 
     else

@@ -12,7 +12,7 @@
 
 using namespace tamm;
 
-void eom_ccsd_driver(std::string filename, ECOptions options_map);
+void eom_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
 template<typename T>
 struct EOM_X1Tensors {
@@ -152,6 +152,6 @@ void eomccsd_x2(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const 
                 V2Tensors<T>& v2tensors, EOM_X2Tensors<T>& x2tensors);
 
 template<typename T>
-void right_eomccsd_driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
+void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                           Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1, V2Tensors<T>& v2tensors,
                           std::vector<T> p_evl_sorted);

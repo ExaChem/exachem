@@ -15,8 +15,6 @@ using namespace tamm;
 
 namespace cc2_cs {
 
-// void cd_cc2_driver(std::string filename, ECOptions options_map);
-
 template<typename T>
 void cc2_e_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI, Tensor<T>& de,
               const Tensor<T>& t1_aa, const Tensor<T>& t2_abab, const Tensor<T>& t2_aaaa,
@@ -35,7 +33,7 @@ void cc2_t2_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace&
 
 template<typename T>
 std::tuple<double, double> cd_cc2_cs_driver(
-  SystemData& sys_data, ExecutionContext& ec, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
+  ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
   Tensor<T>& t1_aa, Tensor<T>& t2_abab, Tensor<T>& d_f1, Tensor<T>& r1_aa, Tensor<T>& r2_abab,
   std::vector<Tensor<T>>& d_r1s, std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_t1s,
   std::vector<Tensor<T>>& d_t2s, std::vector<T>& p_evl_sorted, Tensor<T>& cv3d, Tensor<T> dt1_full,

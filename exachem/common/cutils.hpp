@@ -8,7 +8,8 @@
 
 #pragma once
 
-#include "system_data.hpp"
+#include "common/system_data.hpp"
+#include "options/input_options.hpp"
 using namespace tamm;
 
 #if defined(USE_SCALAPACK)
@@ -62,7 +63,7 @@ struct ScalapackInfo {
 
 MPI_Comm get_scalapack_comm(tamm::ExecutionContext& ec, int sca_nranks);
 
-void setup_scalapack_info(SystemData& sys_data, ScalapackInfo& scalapack_info, MPI_Comm& scacomm);
+void setup_scalapack_info(ChemEnv& chem_env, ScalapackInfo& scalapack_info, MPI_Comm& scacomm);
 #endif
 
 // Contains node, ppn information used for creating a smaller process group from world group

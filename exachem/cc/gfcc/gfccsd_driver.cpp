@@ -99,7 +99,7 @@ std::string gfacc_str(Ts&&... args) {
   return res;
 }
 
-void write_results_to_json(ExecutionContext& ec, SystemData& sys_data, int level,
+void write_results_to_json(ExecutionContext& ec, ChemEnv& chem_env, int level,
                            std::vector<double>& ni_w, std::vector<double>& ni_A,
                            std::string gfcc_type) {
   auto lomega_npts = ni_w.size();
@@ -114,14 +114,14 @@ void write_results_to_json(ExecutionContext& ec, SystemData& sys_data, int level
 
   if(ec.pg().rank() == 0) {
     const std::string lvl_str = "level" + std::to_string(level);
-    sys_data.results["output"]["GFCCSD"][gfcc_type][lvl_str]["omega_npts"] = lomega_npts;
+    chem_env.sys_data.results["output"]["GFCCSD"][gfcc_type][lvl_str]["omega_npts"] = lomega_npts;
     for(size_t ni = 0; ni < lomega_npts; ni++) {
-      sys_data.results["output"]["GFCCSD"][gfcc_type][lvl_str][std::to_string(ni)]["omega"] =
-        ni_w[ni];
-      sys_data.results["output"]["GFCCSD"][gfcc_type][lvl_str][std::to_string(ni)]["A_a"] =
+      chem_env.sys_data
+        .results["output"]["GFCCSD"][gfcc_type][lvl_str][std::to_string(ni)]["omega"] = ni_w[ni];
+      chem_env.sys_data.results["output"]["GFCCSD"][gfcc_type][lvl_str][std::to_string(ni)]["A_a"] =
         ni_A[ni];
     }
-    sys_data.write_json_data("GFCCSD");
+    chem_env.write_json_data("GFCCSD");
   }
 }
 
@@ -2507,20 +2507,30 @@ void gfccsd_driver_ea_b(
 #endif // gfccsd_driver_ea_b
 
 ////////////////////main entry point///////////////////////////
-void gfccsd_driver(std::string filename, ECOptions options_map) {
+void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
 
-  ProcGroup        pg = ProcGroup::create_world_coll();
-  ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
-  auto             rank = ec.pg().rank();
+  auto rank = ec.pg().rank();
 
   ProcGroup        pg_l = ProcGroup::create_coll(MPI_COMM_SELF);
   ExecutionContext ec_l{pg_l, DistributionKind::nw, MemoryManagerKind::local};
 
   auto restart_time_start = std::chrono::high_resolution_clock::now();
 
-  auto [sys_data, hf_energy, shells, shell_tile_map, C_AO, F_AO, C_beta_AO, F_beta_AO, AO_opt,
-        AO_tis, scf_conv] = hartree_fock_driver<T>(ec, filename, options_map);
+  scf(ec, chem_env);
+
+  SystemData& sys_data = chem_env.sys_data;
+
+  double              hf_energy      = chem_env.hf_energy;
+  libint2::BasisSet   shells         = chem_env.shells;
+  Tensor<T>           C_AO           = chem_env.C_AO;
+  Tensor<T>           C_beta_AO      = chem_env.C_beta_AO;
+  Tensor<T>           F_AO           = chem_env.F_AO;
+  Tensor<T>           F_beta_AO      = chem_env.F_beta_AO;
+  TiledIndexSpace     AO_opt         = chem_env.AO_opt;
+  TiledIndexSpace     AO_tis         = chem_env.AO_tis;
+  std::vector<size_t> shell_tile_map = chem_env.shell_tile_map;
+  bool                scf_conv       = chem_env.no_scf;
 
   int nsranks = sys_data.nbf / 15;
   if(nsranks < 1) nsranks = 1;
@@ -2548,21 +2558,21 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
   Scheduler sub_sch{*sub_ec};
 
   // force writet on
-  sys_data.options_map.ccsd_options.writet       = true;
-  sys_data.options_map.ccsd_options.computeTData = true;
+  chem_env.ioptions.ccsd_options.writet       = true;
+  chem_env.ioptions.ccsd_options.computeTData = true;
 
-  CCSDOptions& ccsd_options = sys_data.options_map.ccsd_options;
+  CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
   auto         debug        = ccsd_options.debug;
   if(rank == 0) ccsd_options.print();
 
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = setupMOIS(sys_data);
+  auto [MO, total_orbitals] = setupMOIS(chem_env);
 
-  std::string out_fp       = sys_data.output_file_prefix + "." + ccsd_options.basis;
-  std::string files_dir    = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type;
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + out_fp;
+  std::string out_fp       = chem_env.workspace_dir;
+  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
+  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
   std::string f1file       = files_prefix + ".f1_mo";
   std::string t1file       = files_prefix + ".t1amp";
   std::string t2file       = files_prefix + ".t2amp";
@@ -2577,7 +2587,7 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(sys_data, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
+    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
                      shell_tile_map, ccsd_restart, cholfile);
   free_tensors(lcao);
   total_orbitals = sys_data.nmo;
@@ -2656,14 +2666,14 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
           std::cout << "Executing with " << nsranks << " ranks (" << nsranks / ppn << " nodes)"
                     << std::endl;
         std::tie(residual, corr_energy) = cd_ccsd_cs_driver<T>(
-          sys_data, *sub_ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
+          chem_env, *sub_ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
           p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
       }
       ec.pg().barrier();
     }
     else {
       std::tie(residual, corr_energy) = cd_ccsd_cs_driver<T>(
-        sys_data, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
+        chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
         p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
     }
   }
@@ -2675,14 +2685,14 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
           std::cout << "Executing with " << nsranks << " ranks (" << nsranks / ppn << " nodes)"
                     << std::endl;
         std::tie(residual, corr_energy) = cd_ccsd_os_driver<T>(
-          sys_data, *sub_ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
+          chem_env, *sub_ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
           p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
       }
       ec.pg().barrier();
     }
     else {
       std::tie(residual, corr_energy) = cd_ccsd_os_driver<T>(
-        sys_data, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
+        chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
         p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
     }
   }
@@ -2725,7 +2735,7 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
                 << ccsd_time << " secs" << std::endl;
   }
 
-  cc_print(sys_data, d_t1, d_t2, files_prefix);
+  cc_print(chem_env, d_t1, d_t2, files_prefix);
 
   if(!ccsd_restart) {
     free_tensors(d_r1, d_r2);
@@ -3576,7 +3586,7 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
         double time_gs_orth = 0.0;
         double time_gs_norm = 0.0;
 
-        double q_norm_threshold = sys_data.options_map.scf_options.tol_lindep;
+        double q_norm_threshold = chem_env.ioptions.scf_options.tol_lindep;
         if(rank == 0 && debug) { cout << "q_norm threshold: " << q_norm_threshold << endl; }
 
         auto gs_start_timer = std::chrono::high_resolution_clock::now();
@@ -4201,7 +4211,7 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
              << omega_extra << endl;
         cout << "Time to compute spectral function in level " << level
              << " (omega_npts_ip = " << omega_npts_ip << "): " << time << " secs" << endl;
-        write_results_to_json(ec, sys_data, level, ni_w, ni_A, "retarded_alpha");
+        write_results_to_json(ec, chem_env, level, ni_w, ni_A, "retarded_alpha");
       }
 
       auto               extrap_file = files_prefix + ".extrapolate.retarded.alpha.txt";
@@ -4296,7 +4306,7 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
         write_string_to_disk(ec, spfe.str(), extrap_file);
         if(rank == 0) {
           sys_data.results["output"]["GFCCSD"]["retarded_alpha"]["nlevels"] = level;
-          sys_data.write_json_data("GFCCSD");
+          chem_env.write_json_data("GFCCSD");
         }
         sch.deallocate(xsub_local_a, o_local_a, Cp_local_a, hsub_tamm_a, bsub_tamm_a, Cp_a)
           .execute();
@@ -4763,7 +4773,7 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
              << omega_extra << endl;
         cout << "Time to compute spectral function in level " << level
              << " (omega_npts_ip = " << omega_npts_ip << "): " << time << " secs" << endl;
-        write_results_to_json(ec, sys_data, level, ni_w, ni_A, "retarded_beta");
+        write_results_to_json(ec, chem_env, level, ni_w, ni_A, "retarded_beta");
       }
 
       auto               extrap_file = files_prefix + ".extrapolate.retarded.beta.txt";
@@ -4816,7 +4826,7 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
         write_string_to_disk(ec, spfe.str(), extrap_file);
         if(rank == 0) {
           sys_data.results["output"]["GFCCSD"]["retarded_beta"]["nlevels"] = level;
-          sys_data.write_json_data( "GFCCSD");
+          chem_env.write_json_data( "GFCCSD");
         }
 
         sch.deallocate(xsub_local_b, o_local_b, Cp_local_b, hsub_tamm_b, bsub_tamm_b, Cp_b)
@@ -5681,7 +5691,7 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
         cout << endl << "omegas processed in level " << level << " = " << omega_extra << endl;
         cout << "Time to compute spectral function in level " << level
              << " (omega_npts_ea = " << omega_npts_ea << "): " << time << " secs" << endl;
-        write_results_to_json(ec, sys_data, level, ni_w, ni_A, "advanced_alpha");
+        write_results_to_json(ec, chem_env, level, ni_w, ni_A, "advanced_alpha");
       }
 
       auto               extrap_file = files_prefix + ".extrapolate.advanced.alpha.txt";
@@ -5740,7 +5750,7 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
         write_string_to_disk(ec, spfe.str(), extrap_file);
         if(rank == 0) {
           sys_data.results["output"]["GFCCSD"]["advanced_alpha"]["nlevels"] = level;
-          sys_data.write_json_data( "GFCCSD");
+          chem_env.write_json_data( "GFCCSD");
         }
 
         sch_l.deallocate(Cp_local_a).execute();
@@ -6252,7 +6262,7 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
         cout << endl << "omegas processed in level " << level << " = " << omega_extra << endl;
         cout << "Time to compute spectral function in level " << level
              << " (omega_npts_ea = " << omega_npts_ea << "): " << time << " secs" << endl;
-        write_results_to_json(ec, sys_data, level, ni_w, ni_A, "advanced_beta");
+        write_results_to_json(ec, chem_env, level, ni_w, ni_A, "advanced_beta");
       }
 
       auto               extrap_file = files_prefix + ".extrapolate.advanced.beta.txt";
@@ -6304,7 +6314,7 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
         write_string_to_disk(ec, spfe.str(), extrap_file);
         if(rank == 0) {
           sys_data.results["output"]["GFCCSD"]["advanced_beta"]["nlevels"] = level;
-          sys_data.write_json_data( "GFCCSD");
+          chem_env.write_json_data( "GFCCSD");
         }
 
         sch.deallocate(ysub_local_b, o_local_b, Cp_local_b, hsub_tamm_b, bsub_tamm_b, Cp_b)
@@ -6411,7 +6421,7 @@ void gfccsd_driver(std::string filename, ECOptions options_map) {
   // GA_Summarize(0);
   ec.flush_and_sync();
   // MemoryManagerGA::destroy_coll(mgr);
-  pg.destroy_coll();
+  ec.pg().destroy_coll();
   ec_l.flush_and_sync();
   // MemoryManagerLocal::destroy_coll(mgr_l);
   pg_l.destroy_coll();

@@ -161,14 +161,15 @@ void fcidump::write_1el_ints(std::ofstream& file, SystemData& sys_data, Tensor<T
 }
 
 template<typename T>
-void fcidump::write_fcidump_file(SystemData& sys_data, Tensor<T> H_MO, Tensor<T> full_v2,
+void fcidump::write_fcidump_file(ChemEnv& chem_env, Tensor<T> H_MO, Tensor<T> full_v2,
                                  std::vector<int> orbsym, std::string filename) {
-  double nuc_rep = sys_data.results["output"]["SCF"]["nucl_rep_energy"];
-  bool   is_uhf  = sys_data.is_unrestricted;
-  int    norbs   = is_uhf ? sys_data.nbf_orig * 2 : sys_data.nbf_orig;
-  int    nelec   = sys_data.nelectrons;
-  int    spin    = 0; // sys_data.options_map.scf_options.multiplicity;
-  int    isym    = 1;
+  SystemData& sys_data = chem_env.sys_data;
+  double      nuc_rep  = sys_data.results["output"]["SCF"]["nucl_rep_energy"];
+  bool        is_uhf   = sys_data.is_unrestricted;
+  int         norbs    = is_uhf ? sys_data.nbf_orig * 2 : sys_data.nbf_orig;
+  int         nelec    = sys_data.nelectrons;
+  int         spin     = 0; // chem_env.ioptions.scf_options.multiplicity;
+  int         isym     = 1;
 
   ExecutionContext& ec = get_ec(full_v2());
 
@@ -200,6 +201,6 @@ template void fcidump::write_2el_ints<double>(std::ofstream& file, SystemData& s
 template void fcidump::write_1el_ints<double>(std::ofstream& file, SystemData& sys_data,
                                               Tensor<double> h, int norb, bool is_uhf);
 
-template void fcidump::write_fcidump_file<double>(SystemData& sys_data, Tensor<double> H_MO,
+template void fcidump::write_fcidump_file<double>(ChemEnv& chem_env, Tensor<double> H_MO,
                                                   Tensor<double> full_v2, std::vector<int> orbsym,
                                                   std::string filename);

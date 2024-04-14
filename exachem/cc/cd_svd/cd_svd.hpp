@@ -9,8 +9,9 @@
 
 #pragma once
 
+#include "common/ec_basis.hpp"
 #include "common/system_data.hpp"
-#include "scf/scf_main.hpp"
+#include "scf/scf_compute.hpp"
 #include "tamm/eigen_utils.hpp"
 
 #if defined(USE_UPCXX)
@@ -21,17 +22,17 @@ using namespace tamm;
 
 using TAMM_GA_SIZE = int64_t;
 
-std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(SystemData sys_data, bool triples = false);
+std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ChemEnv& chem_env, bool triples = false);
 
-std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(SystemData sys_data, bool triples = false,
+std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ChemEnv& chem_env, bool triples = false,
                                                  int nactv = 0);
 
-void update_sysdata(SystemData& sys_data, TiledIndexSpace& MO, bool is_mso = true);
+void update_sysdata(ChemEnv& chem_env, TiledIndexSpace& MO, bool is_mso = true);
 
 // reshape F/lcao after freezing
-Matrix reshape_mo_matrix(SystemData sys_data, Matrix& emat, bool is_lcao = false);
+Matrix reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat, bool is_lcao = false);
 
 template<typename TensorType>
-Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& tMO,
+Tensor<TensorType> cd_svd(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace& tMO,
                           TiledIndexSpace& tAO, TAMM_SIZE& chol_count, const TAMM_GA_SIZE max_cvecs,
                           libint2::BasisSet& shells, Tensor<TensorType>& lcao, bool is_mso = true);

@@ -252,15 +252,15 @@ void eomccsd_x2(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const 
 }
 
 template<typename T>
-void right_eomccsd_driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
+void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                           Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1, V2Tensors<T>& v2tensors,
                           std::vector<T> p_evl_sorted) {
-  // int total_orbitals = sys_data.nmo;
+  SystemData&     sys_data    = chem_env.sys_data;
   const TAMM_SIZE n_occ_alpha = static_cast<TAMM_SIZE>(sys_data.n_occ_alpha);
   const TAMM_SIZE n_occ_beta  = static_cast<TAMM_SIZE>(sys_data.n_occ_beta);
 
   // EOMCCSD Variables
-  CCSDOptions ccsd_options = sys_data.options_map.ccsd_options;
+  CCSDOptions ccsd_options = chem_env.ioptions.ccsd_options;
   int         nroots       = ccsd_options.eom_nroots;
   int         maxeomiter   = ccsd_options.maxiter;
   //    int eomsolver        = 1; //INDICATES WHICH SOLVER TO USE. (LATER IMPLEMENTATION)
@@ -713,7 +713,7 @@ void right_eomccsd_driver(SystemData sys_data, ExecutionContext& ec, const Tiled
         std::cout << std::fixed << std::setprecision(2) << iter_time << " secs" << std::endl;
         sys_data.results["output"]["EOMCCSD"]["iter"][std::to_string(iter + 1)]["performance"]
                         ["total_time"] = iter_time;
-        sys_data.write_json_data("EOMCCSD");
+        chem_env.write_json_data("EOMCCSD");
       }
 
       //################################################################################
@@ -772,7 +772,7 @@ void right_eomccsd_driver(SystemData sys_data, ExecutionContext& ec, const Tiled
 }
 
 using T = double;
-template void right_eomccsd_driver<T>(SystemData sys_data, ExecutionContext& ec,
+template void right_eomccsd_driver<T>(ChemEnv& chem_env, ExecutionContext& ec,
                                       const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
                                       Tensor<T>& f1, V2Tensors<T>& v2tensors,
                                       std::vector<T> p_evl_sorted);

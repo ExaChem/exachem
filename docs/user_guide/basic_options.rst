@@ -49,8 +49,8 @@ Some common options supported are as follows:
 
 :debug: A boolean used to turn on debugging mode. ``[default: false]``
 
-:output_file_prefix: A string indicating the prefix for the name of the output folder where the results of a run are stored.
-   The *default prefix* is the name of the input file without the *.json* extension.
+:file_prefix: A string indicating the prefix for the name of the workspace folder where the results of a run are stored.
+   It also forms the prefix for the files written to the workspace folder. The *default prefix* is the name of the input file without the *.json* extension.
 
 .. _Basis:
 

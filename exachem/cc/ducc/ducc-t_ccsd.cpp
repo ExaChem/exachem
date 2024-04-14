@@ -536,7 +536,7 @@ void ducc_tensors_io(ExecutionContext& ec, std::vector<Tensor<T>>& rwtensors,
 }
 
 template<typename T>
-void DUCC_T_CCSD_Driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
+void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                         Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1, V2Tensors<T>& v2tensors,
                         size_t nactv, ExecutionHW ex_hw = ExecutionHW::CPU) {
   Scheduler sch{ec};
@@ -559,9 +559,10 @@ void DUCC_T_CCSD_Driver(SystemData sys_data, ExecutionContext& ec, const TiledIn
 
   std::cout.precision(15);
 
-  std::string out_fp = sys_data.output_file_prefix + "." + sys_data.options_map.ccsd_options.basis;
-  std::string files_dir = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type + "/ducc";
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + out_fp;
+  SystemData& sys_data     = chem_env.sys_data;
+  std::string out_fp       = chem_env.workspace_dir;
+  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type + "/ducc";
+  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
   std::string ftij_file   = files_prefix + ".ftij";
   std::string ftia_file   = files_prefix + ".ftia";
@@ -572,7 +573,7 @@ void DUCC_T_CCSD_Driver(SystemData sys_data, ExecutionContext& ec, const TiledIn
   std::string vtijab_file = files_prefix + ".vtijab";
   std::string vtiabc_file = files_prefix + ".vtiabc";
   std::string vtabcd_file = files_prefix + ".vtabcd";
-  const bool  drestart    = sys_data.options_map.ccsd_options.writet;
+  const bool  drestart    = chem_env.ioptions.ccsd_options.writet;
 
   // Allocate the transformed arrays
   Tensor<T> ftij{{O, O}, {1, 1}};
@@ -883,11 +884,11 @@ void DUCC_T_CCSD_Driver(SystemData sys_data, ExecutionContext& ec, const TiledIn
   free_tensors(ftij, vtijkl);
   if(nactv > 0) { free_tensors(ftia, ftab, vtijka, vtaijb, vtijab, vtiabc, vtabcd); }
 
-  if(rank == 0) sys_data.write_json_data("DUCC");
+  if(rank == 0) chem_env.write_json_data("DUCC");
 }
 
 using T = double;
-template void DUCC_T_CCSD_Driver<T>(SystemData sys_data, ExecutionContext& ec,
+template void DUCC_T_CCSD_Driver<T>(ChemEnv& chem_env, ExecutionContext& ec,
                                     const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
                                     Tensor<T>& f1, V2Tensors<T>& v2tensors, size_t nactv,
                                     ExecutionHW ex_hw);

@@ -795,28 +795,29 @@ void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
 
 template<typename T>
 std::tuple<double, double>
-cd_ccsd_os_driver(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
+cd_ccsd_os_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                   const TiledIndexSpace& CI, Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_f1,
                   Tensor<T>& d_r1, Tensor<T>& d_r2, std::vector<Tensor<T>>& d_r1s,
                   std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_t1s,
                   std::vector<Tensor<T>>& d_t2s, std::vector<T>& p_evl_sorted, Tensor<T>& cv3d,
-                  bool ccsd_restart, std::string out_fp, bool computeTData) {
-  int    maxiter     = sys_data.options_map.ccsd_options.ccsd_maxiter;
-  int    ndiis       = sys_data.options_map.ccsd_options.ndiis;
-  double thresh      = sys_data.options_map.ccsd_options.threshold;
-  bool   writet      = sys_data.options_map.ccsd_options.writet;
-  int    writet_iter = sys_data.options_map.ccsd_options.writet_iter;
-  double zshiftl     = sys_data.options_map.ccsd_options.lshift;
-  bool   profile     = sys_data.options_map.ccsd_options.profile_ccsd;
-  double residual    = 0.0;
-  double energy      = 0.0;
-  int    niter       = 0;
+                  bool ccsd_restart, std::string ccsd_fp, bool computeTData) {
+  SystemData& sys_data    = chem_env.sys_data;
+  int         maxiter     = chem_env.ioptions.ccsd_options.ccsd_maxiter;
+  int         ndiis       = chem_env.ioptions.ccsd_options.ndiis;
+  double      thresh      = chem_env.ioptions.ccsd_options.threshold;
+  bool        writet      = chem_env.ioptions.ccsd_options.writet;
+  int         writet_iter = chem_env.ioptions.ccsd_options.writet_iter;
+  double      zshiftl     = chem_env.ioptions.ccsd_options.lshift;
+  bool        profile     = chem_env.ioptions.ccsd_options.profile_ccsd;
+  double      residual    = 0.0;
+  double      energy      = 0.0;
+  int         niter       = 0;
 
   const TAMM_SIZE n_occ_alpha = static_cast<TAMM_SIZE>(sys_data.n_occ_alpha);
   const TAMM_SIZE n_occ_beta  = static_cast<TAMM_SIZE>(sys_data.n_occ_beta);
 
-  std::string t1file = out_fp + ".t1amp";
-  std::string t2file = out_fp + ".t2amp";
+  std::string t1file = ccsd_fp + ".t1amp";
+  std::string t2file = ccsd_fp + ".t2amp";
 
   std::cout.precision(15);
 
@@ -931,7 +932,7 @@ cd_ccsd_os_driver(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSp
   CCSE_Tensors<T>::allocate_list(sch, _a02_os, _a03_os);
   sch.execute();
 
-  const int pcore = sys_data.options_map.ccsd_options.pcore - 1; // 0-based indexing
+  const int pcore = chem_env.ioptions.ccsd_options.pcore - 1; // 0-based indexing
   if(pcore >= 0) {
     const auto timer_start = std::chrono::high_resolution_clock::now();
 
@@ -1069,7 +1070,7 @@ cd_ccsd_os_driver(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSp
           std::chrono::duration_cast<std::chrono::duration<double>>((timer_end - timer_start))
             .count();
 
-        iteration_print(sys_data, ec.pg(), iter, residual, energy, iter_time);
+        iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
 
         if(writet && (((iter + 1) % writet_iter == 0) /*|| (residual < thresh)*/)) {
           write_to_disk(d_t1, t1file);
@@ -1090,9 +1091,9 @@ cd_ccsd_os_driver(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSp
           if(writet) {
             write_to_disk(d_t1, t1file);
             write_to_disk(d_t2, t2file);
-            if(computeTData && sys_data.options_map.ccsd_options.writev) {
-              fs::copy_file(t1file, out_fp + ".fullT1amp", fs::copy_options::update_existing);
-              fs::copy_file(t2file, out_fp + ".fullT2amp", fs::copy_options::update_existing);
+            if(computeTData && chem_env.ioptions.ccsd_options.writev) {
+              fs::copy_file(t1file, ccsd_fp + ".fullT1amp", fs::copy_options::update_existing);
+              fs::copy_file(t2file, ccsd_fp + ".fullT2amp", fs::copy_options::update_existing);
             }
           }
           break;
@@ -1115,7 +1116,7 @@ cd_ccsd_os_driver(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSp
     }
 
     if(profile && ec.print()) {
-      std::string   profile_csv = out_fp + "_profile.csv";
+      std::string   profile_csv = ccsd_fp + "_profile.csv";
       std::ofstream pds(profile_csv, std::ios::out);
       if(!pds) std::cerr << "Error opening file " << profile_csv << std::endl;
       std::string header = "ID;Level;OP;total_op_time_min;total_op_time_max;total_op_time_avg;";
@@ -1158,7 +1159,7 @@ cd_ccsd_os_driver(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSp
     sys_data.results["output"]["CCSD"]["final_energy"]["correlation"] = energy;
     sys_data.results["output"]["CCSD"]["final_energy"]["total"] = sys_data.scf_energy + energy;
 
-    sys_data.write_json_data("CCSD");
+    chem_env.write_json_data("CCSD");
   }
 
   CCSE_Tensors<T>::deallocate_list(sch, _a02_os, _a03_os);
@@ -1172,7 +1173,7 @@ cd_ccsd_os_driver(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSp
 
 using T = double;
 template std::tuple<double, double>
-cd_ccsd_os_driver<T>(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
+cd_ccsd_os_driver<T>(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                      const TiledIndexSpace& CI, Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_f1,
                      Tensor<T>& d_r1, Tensor<T>& d_r2, std::vector<Tensor<T>>& d_r1s,
                      std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_t1s,

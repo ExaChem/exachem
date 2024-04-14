@@ -33,8 +33,11 @@
 #include <tuple>
 #include <vector>
 
-#include "scf_iter.hpp"
-#include "scf_taskmap.hpp"
+#include "common/chemenv.hpp"
+#include "scf/scf_main.hpp"
+#include "scf/scf_taskmap.hpp"
+
+using libint2::BasisSet;
 
 #if defined(USE_GAUXC)
 #include <gauxc/molecular_weights.hpp>
@@ -47,9 +50,4 @@ namespace fs = std::filesystem;
 
 #define SCF_THROTTLE_RESOURCES 1
 
-std::tuple<SystemData, double, libint2::BasisSet, std::vector<size_t>, Tensor<TensorType>,
-           Tensor<TensorType>, Tensor<TensorType>, Tensor<TensorType>, TiledIndexSpace,
-           TiledIndexSpace, bool>
-hartree_fock(ExecutionContext& exc, const string filename, ECOptions options_map);
-
-void scf(std::string filename, ECOptions options_map);
+void scf(ExecutionContext& ec, ChemEnv& chem_env);

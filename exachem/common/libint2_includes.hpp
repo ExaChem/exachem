@@ -23,7 +23,7 @@
 #pragma push_macro("SYCL_DEVICE_ONLY")
 #pragma push_macro("__SYCL_DEVICE_ONLY__")
 #undef SYCL_DEVICE_ONLY
-#undef __SYCL_DEVICE_ONLY__
+// #undef __SYCL_DEVICE_ONLY__
 #undef EIGEN_USE_SYCL
 // #define EIGEN_DONT_VECTORIZE
 #define __SYCL__REDEFINE__
@@ -54,7 +54,7 @@
 /*SYCL restore*/
 #if defined(__SYCL__REDEFINE__)
 #pragma pop_macro("SYCL_DEVICE_ONLY")
-#pragma pop_macro("__SYCL_DEVICE_ONLY__")
+// #pragma pop_macro("__SYCL_DEVICE_ONLY__")
 #endif
 
 /*HIP restore*/

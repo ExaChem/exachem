@@ -16,7 +16,7 @@
 #endif
 #include "ccsd_t_common.hpp"
 
-void ccsd_t_driver(std::string filename, ECOptions options_map);
+void ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
 void finalizememmodule();
 
@@ -61,7 +61,7 @@ inline int checkCudaKernelCompatible(bool r0) {
 //
 template<typename T>
 std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
-  SystemData& sys_data, ExecutionContext& ec, std::vector<int>& k_spin, const TiledIndexSpace& MO,
+  ChemEnv& chem_env, ExecutionContext& ec, std::vector<int>& k_spin, const TiledIndexSpace& MO,
   Tensor<T>& d_t1, Tensor<T>& d_t2, V2Tensors<T>& d_v2, std::vector<T>& k_evl_sorted,
   T hf_ccsd_energy, bool is_restricted, LRUCache<Index, std::vector<T>>& cache_s1t,
   LRUCache<Index, std::vector<T>>& cache_s1v, LRUCache<Index, std::vector<T>>& cache_d1t,
@@ -206,7 +206,7 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   df_host_pinned_d2_v2 = static_cast<T*>(getHostMem(sizeof(T) * size_T_d2_v2));
 #endif
 
-  size_t max_num_blocks = sys_data.options_map.ccsd_options.ccsdt_tilesize;
+  size_t max_num_blocks = chem_env.ioptions.ccsd_options.ccsdt_tilesize;
   max_num_blocks        = std::ceil((max_num_blocks + 4 - 1) / 4.0);
 
   T* df_host_energies = static_cast<T*>(getHostMem(sizeof(T) * std::pow(max_num_blocks, 6) * 2));
@@ -472,13 +472,11 @@ freeHostMem(df_host_pinned_d2_v2);
 }
 
 template<typename T>
-void ccsd_t_fused_driver_calculator_ops(SystemData& sys_data, ExecutionContext& ec,
+void ccsd_t_fused_driver_calculator_ops(ChemEnv& chem_env, ExecutionContext& ec,
                                         std::vector<int>& k_spin, const TiledIndexSpace& MO,
                                         std::vector<T>& k_evl_sorted, double hf_ccsd_energy,
                                         bool is_restricted, long double& total_num_ops,
-                                        //
                                         bool seq_h3b = false) {
-  //
   auto rank = ec.pg().rank().value();
 
   Index noab = MO("occ").num_tiles();

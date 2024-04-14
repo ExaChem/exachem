@@ -9,10 +9,10 @@
 #pragma once
 
 #include "cc/ccsd/cd_ccsd_os_ann.hpp"
-
+#include "scf/scf_main.hpp"
 using namespace tamm;
 
-void ccsd_lambda_driver(std::string filename, ECOptions options_map);
+void ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
 void iteration_print_lambda(const ProcGroup& pg, int iter, double residual, double time);
 
@@ -247,7 +247,7 @@ void lambda_ccsd_y2(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexS
 
 template<typename T>
 std::tuple<double, double>
-lambda_ccsd_driver(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
+lambda_ccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                    const TiledIndexSpace& CI, Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_f1,
                    V2Tensors<T>& v2tensors, Tensor<T>& cv3d, Tensor<T>& d_r1, Tensor<T>& d_r2,
                    Tensor<T>& d_y1, Tensor<T>& d_y2, std::vector<Tensor<T>>& d_r1s,

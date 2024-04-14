@@ -459,7 +459,7 @@ void scale_complex_ip(Tensor<TensorType> tensor, double alpha_real, double alpha
   else tamm_terminate("[scale_complex_ip] TensorType not complex ...");
 }
 
-void td_iteration_print(SystemData& sys_data, int iter, std::complex<double> energy,
+void td_iteration_print(ChemEnv& chem_env, int iter, std::complex<double> energy,
                         std::complex<double> x1_1, std::complex<double> x1_2,
                         std::complex<double> x2_1, std::complex<double> x2_2,
                         std::complex<double> x2_3, double time) {
@@ -564,16 +564,17 @@ void complex_copy_swap(ExecutionContext& ec, Tensor<TensorType> src, Tensor<Tens
 }
 
 template<typename T>
-void rt_eom_cd_ccsd(SystemData& sys_data, ExecutionContext& ec, const TiledIndexSpace& MO,
+void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                     const TiledIndexSpace& CI, Tensor<T>& d_f1, std::vector<T>& p_evl_sorted,
-                    Tensor<T>& cv3d, bool cc_restart, std::string out_fp) {
-  // int    maxiter     = sys_data.options_map.ccsd_options.ccsd_maxiter;
-  // int    ndiis       = sys_data.options_map.ccsd_options.ndiis;
-  double thresh      = sys_data.options_map.ccsd_options.rt_threshold;
-  bool   writet      = sys_data.options_map.ccsd_options.writet;
-  int    writet_iter = sys_data.options_map.ccsd_options.writet_iter;
-  // double zshiftl     = sys_data.options_map.ccsd_options.lshift;
-  bool profile = sys_data.options_map.ccsd_options.profile_ccsd;
+                    Tensor<T>& cv3d, bool cc_restart, std::string rt_eom_fp) {
+  SystemData& sys_data = chem_env.sys_data;
+  // int    maxiter     = chem_env.ioptions.ccsd_options.ccsd_maxiter;
+  // int    ndiis       = chem_env.ioptions.ccsd_options.ndiis;
+  double thresh      = chem_env.ioptions.ccsd_options.rt_threshold;
+  bool   writet      = chem_env.ioptions.ccsd_options.writet;
+  int    writet_iter = chem_env.ioptions.ccsd_options.writet_iter;
+  // double zshiftl     = chem_env.ioptions.ccsd_options.lshift;
+  bool profile = chem_env.ioptions.ccsd_options.profile_ccsd;
   // T    residual = 0.0;
   // T    energy   = 0.0;
   // int    niter       = 0;
@@ -696,7 +697,7 @@ void rt_eom_cd_ccsd(SystemData& sys_data, ExecutionContext& ec, const TiledIndex
   CCSE_Tensors<T>::allocate_list(sch, _a02, _a03);
   sch.execute();
 
-  const int pcore = sys_data.options_map.ccsd_options.pcore - 1; // 0-based indexing
+  const int pcore = chem_env.ioptions.ccsd_options.pcore - 1; // 0-based indexing
   if(pcore >= 0) {
     const auto timer_start = std::chrono::high_resolution_clock::now();
 
@@ -771,10 +772,10 @@ void rt_eom_cd_ccsd(SystemData& sys_data, ExecutionContext& ec, const TiledIndex
 
   sch.execute(exhw);
 
-  const int    ntimesteps    = sys_data.options_map.ccsd_options.ntimesteps;
-  const int    rt_microiter  = sys_data.options_map.ccsd_options.rt_microiter;
-  const double rt_multiplier = sys_data.options_map.ccsd_options.rt_multiplier;
-  const double rt_step_size  = sys_data.options_map.ccsd_options.rt_step_size;
+  const int    ntimesteps    = chem_env.ioptions.ccsd_options.ntimesteps;
+  const int    rt_microiter  = chem_env.ioptions.ccsd_options.rt_microiter;
+  const double rt_multiplier = chem_env.ioptions.ccsd_options.rt_multiplier;
+  const double rt_step_size  = chem_env.ioptions.ccsd_options.rt_step_size;
   const double scale_factor  = rt_multiplier * rt_step_size;
 
   CCSE_Tensors<T>::initialize(sch, 0, t1_vo, t2_vvoo, t1_vo_aux, t2_vvoo_aux, t1_vo_old,
@@ -789,8 +790,8 @@ void rt_eom_cd_ccsd(SystemData& sys_data, ExecutionContext& ec, const TiledIndex
   }
 
   int         ts_start  = 0;
-  std::string dcdt_file = out_fp + ".dcdt";
-  std::string ts_file   = out_fp + ".restart_ts";
+  std::string dcdt_file = rt_eom_fp + ".dcdt";
+  std::string ts_file   = rt_eom_fp + ".restart_ts";
 
   if(cc_restart) {
     bool ts_file_exists = fs::exists(ts_file);
@@ -803,11 +804,11 @@ void rt_eom_cd_ccsd(SystemData& sys_data, ExecutionContext& ec, const TiledIndex
       // else tamm_terminate("[RT-EOM-CC] restart file " + ts_file + " is missing ");
 
       if(ts_start < ntimesteps) {
-        if(t1_vo.exist_on_disk(out_fp)) {
-          t1_vo.read_from_disk(out_fp);
-          t2_vvoo.read_from_disk(out_fp);
-          t1_vo_old.read_from_disk(out_fp);
-          t2_vvoo_old.read_from_disk(out_fp);
+        if(t1_vo.exist_on_disk(rt_eom_fp)) {
+          t1_vo.read_from_disk(rt_eom_fp);
+          t2_vvoo.read_from_disk(rt_eom_fp);
+          t1_vo_old.read_from_disk(rt_eom_fp);
+          t2_vvoo_old.read_from_disk(rt_eom_fp);
         }
         if(ec.print()) std::cout << "Restarting from Timestep " << ts_start + 1 << std::endl;
       }
@@ -927,7 +928,7 @@ void rt_eom_cd_ccsd(SystemData& sys_data, ExecutionContext& ec, const TiledIndex
         std::chrono::duration_cast<std::chrono::duration<double>>((mt_end - mt_start)).count();
 
       if(ec.print())
-        td_iteration_print(sys_data, li, get_scalar(d_e), x1_1, x1_2, x2_1, x2_2, x2_3, mi_time);
+        td_iteration_print(chem_env, li, get_scalar(d_e), x1_1, x1_2, x2_1, x2_2, x2_3, mi_time);
 
       // step 12
       if((x1_1.real() < thresh) && (x1_2.real() < thresh) && (x2_1.real() < thresh) &&
@@ -936,10 +937,10 @@ void rt_eom_cd_ccsd(SystemData& sys_data, ExecutionContext& ec, const TiledIndex
     } // microiter loop
 
     if(writet && ((titer + 1) % writet_iter == 0)) {
-      t1_vo.write_to_disk(out_fp);
-      t2_vvoo.write_to_disk(out_fp);
-      t1_vo_old.write_to_disk(out_fp);
-      t2_vvoo_old.write_to_disk(out_fp);
+      t1_vo.write_to_disk(rt_eom_fp);
+      t2_vvoo.write_to_disk(rt_eom_fp);
+      t1_vo_old.write_to_disk(rt_eom_fp);
+      t2_vvoo_old.write_to_disk(rt_eom_fp);
       if(ec.print()) {
         std::ofstream out(ts_file, std::ios::out);
         out << titer + 1 << std::endl;
@@ -950,10 +951,10 @@ void rt_eom_cd_ccsd(SystemData& sys_data, ExecutionContext& ec, const TiledIndex
   } // end timestep loop
 
   if(ec.print()) {
-    if(ts_start < ntimesteps) sys_data.write_json_data("RT-EOMCCSD");
+    if(ts_start < ntimesteps) chem_env.write_json_data("RT-EOMCCSD");
 
     if(profile) {
-      std::string   profile_csv = out_fp + "_profile.csv";
+      std::string   profile_csv = rt_eom_fp + "_profile.csv";
       std::ofstream pds(profile_csv, std::ios::out);
       if(!pds) std::cerr << "Error opening file " << profile_csv << std::endl;
       std::string header = "ID;Level;OP;total_op_time_min;total_op_time_max;total_op_time_avg;";
@@ -980,29 +981,36 @@ void rt_eom_cd_ccsd(SystemData& sys_data, ExecutionContext& ec, const TiledIndex
 
 }; // namespace rteomcc
 
-void rt_eom_cd_ccsd_driver(std::string filename, ECOptions options_map) {
+void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T             = double;
   using ComplexTensor = Tensor<rteomcc::CCEType>;
 
-  ProcGroup        pg = ProcGroup::create_world_coll();
-  ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
-  auto             rank = ec.pg().rank();
+  auto rank = ec.pg().rank();
 
-  auto [sys_data, hf_energy, shells, shell_tile_map, C_AO, F_AO, C_beta_AO, F_beta_AO, AO_opt,
-        AO_tis, scf_conv] = hartree_fock_driver<T>(ec, filename, options_map);
+  scf(ec, chem_env);
 
-  CCSDOptions& ccsd_options = sys_data.options_map.ccsd_options;
-  auto         debug        = ccsd_options.debug;
+  libint2::BasisSet   shells         = chem_env.shells;
+  Tensor<T>           C_AO           = chem_env.C_AO;
+  Tensor<T>           C_beta_AO      = chem_env.C_beta_AO;
+  Tensor<T>           F_AO           = chem_env.F_AO;
+  Tensor<T>           F_beta_AO      = chem_env.F_beta_AO;
+  TiledIndexSpace     AO_opt         = chem_env.AO_opt;
+  std::vector<size_t> shell_tile_map = chem_env.shell_tile_map;
+
+  SystemData&  sys_data     = chem_env.sys_data;
+  CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
+  // CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
+  auto debug = ccsd_options.debug;
   if(rank == 0) ccsd_options.print();
 
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = setupMOIS(sys_data);
+  auto [MO, total_orbitals] = setupMOIS(chem_env);
 
-  std::string out_fp       = sys_data.output_file_prefix + "." + ccsd_options.basis;
-  std::string files_dir    = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type;
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + out_fp;
+  std::string out_fp       = chem_env.workspace_dir;
+  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
+  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
   std::string f1file       = files_prefix + ".f1_mo";
   // std::string t1file = files_prefix+".t1amp";
   // std::string t2file = files_prefix+".t2amp";
@@ -1017,7 +1025,7 @@ void rt_eom_cd_ccsd_driver(std::string filename, ECOptions options_map) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(sys_data, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
+    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
                      shell_tile_map, cc_restart, cholfile);
   free_tensors(lcao);
 
@@ -1067,9 +1075,9 @@ void rt_eom_cd_ccsd_driver(std::string filename, ECOptions options_map) {
   cc_restart = cc_restart && ccsd_options.writet;
   files_dir += "/rteom/";
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
-  files_prefix = files_dir + out_fp;
+  files_prefix = files_dir + sys_data.output_file_prefix;
 
-  rteomcc::rt_eom_cd_ccsd<rteomcc::CCEType>(sys_data, ec, MO, CI, d_f1_c, p_evl_sorted, cholVpr_c,
+  rteomcc::rt_eom_cd_ccsd<rteomcc::CCEType>(chem_env, ec, MO, CI, d_f1_c, p_evl_sorted, cholVpr_c,
                                             cc_restart, files_prefix);
 
   auto   cc_t2 = std::chrono::high_resolution_clock::now();

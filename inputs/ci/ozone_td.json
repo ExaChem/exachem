@@ -11,7 +11,7 @@
     "basisset": "sto-3g"
   },
   "common": {
-    "output_file_prefix": "ozone"
+    "file_prefix": "ozone"
   },  
   "SCF": {
     "tilesize": 30,

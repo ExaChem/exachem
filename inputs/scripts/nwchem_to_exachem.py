@@ -369,7 +369,7 @@ if __name__ == '__main__':
     Common block
 
     Top-level directives
-    start file_prefix -> output_file_prefix
+    start file_prefix -> exachem_input_file_prefix
 
     Geometries
       geometry units <angstroms or an | au or atomic or bohr>
@@ -406,7 +406,7 @@ if __name__ == '__main__':
 
   #start directive
   if not nwchem_opt["start"]: nwchem_opt["start"] = file_prefix
-  exachem_opt["common"] = { "output_file_prefix": nwchem_opt["start"] }
+  exachem_opt["common"] = { "file_prefix": nwchem_opt["start"] }
 
   #BASIS
   #TODO: atom basis is not parsed 

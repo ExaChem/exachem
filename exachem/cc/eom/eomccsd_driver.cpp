@@ -8,28 +8,37 @@
 
 #include "eomccsd_opt.hpp"
 
-void eom_ccsd_driver(std::string filename, ECOptions options_map) {
+void eom_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
 
-  ProcGroup        pg = ProcGroup::create_world_coll();
-  ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
-  auto             rank = ec.pg().rank();
+  auto rank = ec.pg().rank();
+  scf(ec, chem_env);
 
-  auto [sys_data, hf_energy, shells, shell_tile_map, C_AO, F_AO, C_beta_AO, F_beta_AO, AO_opt,
-        AO_tis, scf_conv] = hartree_fock_driver<T>(ec, filename, options_map);
+  double              hf_energy      = chem_env.hf_energy;
+  libint2::BasisSet   shells         = chem_env.shells;
+  Tensor<T>           C_AO           = chem_env.C_AO;
+  Tensor<T>           C_beta_AO      = chem_env.C_beta_AO;
+  Tensor<T>           F_AO           = chem_env.F_AO;
+  Tensor<T>           F_beta_AO      = chem_env.F_beta_AO;
+  TiledIndexSpace     AO_opt         = chem_env.AO_opt;
+  TiledIndexSpace     AO_tis         = chem_env.AO_tis;
+  std::vector<size_t> shell_tile_map = chem_env.shell_tile_map;
+  bool                scf_conv       = chem_env.no_scf;
 
-  CCSDOptions& ccsd_options = sys_data.options_map.ccsd_options;
+  SystemData& sys_data = chem_env.sys_data;
+  // CCSDOptions ccsd_options = chem_env.ioptions.ccsd_options;
+  CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
   auto         debug        = ccsd_options.debug;
   if(rank == 0) ccsd_options.print();
 
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = setupMOIS(sys_data);
+  auto [MO, total_orbitals] = setupMOIS(chem_env);
 
-  std::string out_fp       = sys_data.output_file_prefix + "." + ccsd_options.basis;
-  std::string files_dir    = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type;
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + out_fp;
+  std::string out_fp       = chem_env.workspace_dir;
+  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
+  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
   std::string f1file       = files_prefix + ".f1_mo";
   std::string t1file       = files_prefix + ".t1amp";
   std::string t2file       = files_prefix + ".t2amp";
@@ -44,7 +53,7 @@ void eom_ccsd_driver(std::string filename, ECOptions options_map) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(sys_data, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
+    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
                      shell_tile_map, ccsd_restart, cholfile);
   free_tensors(lcao);
 
@@ -116,11 +125,11 @@ void eom_ccsd_driver(std::string filename, ECOptions options_map) {
 
   if(is_rhf)
     std::tie(residual, corr_energy) = cd_ccsd_cs_driver<T>(
-      sys_data, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s, p_evl_sorted,
+      chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s, p_evl_sorted,
       cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
   else
     std::tie(residual, corr_energy) =
-      cd_ccsd_os_driver<T>(sys_data, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s,
+      cd_ccsd_os_driver<T>(chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s,
                            d_t2s, p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
 
   if(computeTData && is_rhf) {
@@ -161,7 +170,7 @@ void eom_ccsd_driver(std::string filename, ECOptions options_map) {
                 << ccsd_time << " secs" << std::endl;
   }
 
-  cc_print(sys_data, d_t1, d_t2, files_prefix);
+  cc_print(chem_env, d_t1, d_t2, files_prefix);
 
   if(!ccsd_restart) {
     free_tensors(d_r1, d_r2);
@@ -188,7 +197,7 @@ void eom_ccsd_driver(std::string filename, ECOptions options_map) {
   cc_t1 = std::chrono::high_resolution_clock::now();
 
   if(eom_type == "right")
-    right_eomccsd_driver<T>(sys_data, ec, MO, d_t1, d_t2, d_f1, v2tensors, p_evl_sorted);
+    right_eomccsd_driver<T>(chem_env, ec, MO, d_t1, d_t2, d_f1, v2tensors, p_evl_sorted);
 
   cc_t2 = std::chrono::high_resolution_clock::now();
 

@@ -10,7 +10,6 @@
 #pragma once
 
 #include "common/system_data.hpp"
-#include "scf/scf_main.hpp"
 #include "tamm/eigen_utils.hpp"
 
 #if defined(USE_UPCXX)
@@ -68,22 +67,22 @@ int64_t ac_fetch_add(int ga_ac, int64_t index, int64_t amount) {
 }
 #endif
 
-std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(SystemData sys_data, bool triples = false) {
-  // TAMM_SIZE nao = sys_data.nbf;
-  TAMM_SIZE n_occ_alpha = sys_data.n_occ_alpha;
-  TAMM_SIZE n_vir_alpha = sys_data.n_vir_alpha;
+std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ChemEnv& chem_env, bool triples = false) {
+  SystemData& sys_data    = chem_env.sys_data;
+  TAMM_SIZE   n_occ_alpha = sys_data.n_occ_alpha;
+  TAMM_SIZE   n_vir_alpha = sys_data.n_vir_alpha;
 
-  Tile tce_tile = sys_data.options_map.ccsd_options.tilesize;
+  Tile tce_tile = chem_env.ioptions.ccsd_options.tilesize;
   if(!triples) {
     if((tce_tile < static_cast<Tile>(sys_data.nbf / 10) || tce_tile < 50) &&
-       !sys_data.options_map.ccsd_options.force_tilesize) {
+       !chem_env.ioptions.ccsd_options.force_tilesize) {
       tce_tile = static_cast<Tile>(sys_data.nbf / 10);
       if(tce_tile < 50) tce_tile = 50; // 50 is the default tilesize for CCSD.
       if(ProcGroup::world_rank() == 0)
         std::cout << std::endl << "Resetting CCSD tilesize to: " << tce_tile << std::endl;
     }
   }
-  else tce_tile = sys_data.options_map.ccsd_options.ccsdt_tilesize;
+  else tce_tile = chem_env.ioptions.ccsd_options.ccsdt_tilesize;
 
   const TAMM_SIZE total_orbitals = sys_data.nbf;
 
@@ -107,16 +106,17 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(SystemData sys_data, bool tr
   return std::make_tuple(MO, total_orbitals);
 }
 
-std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(SystemData sys_data, bool triples = false,
+std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ChemEnv& chem_env, bool triples = false,
                                                  int nactv = 0) {
-  TAMM_SIZE n_occ_alpha = sys_data.n_occ_alpha;
-  TAMM_SIZE n_occ_beta  = sys_data.n_occ_beta;
+  SystemData& sys_data    = chem_env.sys_data;
+  TAMM_SIZE   n_occ_alpha = sys_data.n_occ_alpha;
+  TAMM_SIZE   n_occ_beta  = sys_data.n_occ_beta;
 
-  Tile tce_tile      = sys_data.options_map.ccsd_options.tilesize;
-  bool balance_tiles = sys_data.options_map.ccsd_options.balance_tiles;
+  Tile tce_tile      = chem_env.ioptions.ccsd_options.tilesize;
+  bool balance_tiles = chem_env.ioptions.ccsd_options.balance_tiles;
   if(!triples) {
     if((tce_tile < static_cast<Tile>(sys_data.nbf / 10) || tce_tile < 50 || tce_tile > 100) &&
-       !sys_data.options_map.ccsd_options.force_tilesize) {
+       !chem_env.ioptions.ccsd_options.force_tilesize) {
       tce_tile = static_cast<Tile>(sys_data.nbf / 10);
       if(tce_tile < 50) tce_tile = 50;   // 50 is the default tilesize for CCSD.
       if(tce_tile > 100) tce_tile = 100; // 100 is the max tilesize for CCSD.
@@ -126,7 +126,7 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(SystemData sys_data, bool tripl
   }
   else {
     balance_tiles = false;
-    tce_tile      = sys_data.options_map.ccsd_options.ccsdt_tilesize;
+    tce_tile      = chem_env.ioptions.ccsd_options.ccsdt_tilesize;
   }
 
   TAMM_SIZE nmo         = sys_data.nmo;
@@ -238,9 +238,10 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(SystemData sys_data, bool tripl
   return std::make_tuple(MO, total_orbitals);
 }
 
-void update_sysdata(SystemData& sys_data, TiledIndexSpace& MO, bool is_mso = true) {
-  const bool do_freeze      = sys_data.n_frozen_core > 0 || sys_data.n_frozen_virtual > 0;
-  TAMM_SIZE  total_orbitals = sys_data.nmo;
+void update_sysdata(ChemEnv& chem_env, TiledIndexSpace& MO, bool is_mso = true) {
+  SystemData& sys_data       = chem_env.sys_data;
+  const bool  do_freeze      = sys_data.n_frozen_core > 0 || sys_data.n_frozen_virtual > 0;
+  TAMM_SIZE   total_orbitals = sys_data.nmo;
   if(do_freeze) {
     sys_data.nbf -= (sys_data.n_frozen_core + sys_data.n_frozen_virtual);
     sys_data.n_occ_alpha -= sys_data.n_frozen_core;
@@ -250,18 +251,19 @@ void update_sysdata(SystemData& sys_data, TiledIndexSpace& MO, bool is_mso = tru
       sys_data.n_vir_beta -= sys_data.n_frozen_virtual;
     }
     sys_data.update();
-    if(!is_mso) std::tie(MO, total_orbitals) = setup_mo_red(sys_data);
-    else std::tie(MO, total_orbitals) = setupMOIS(sys_data);
+    if(!is_mso) std::tie(MO, total_orbitals) = setup_mo_red(chem_env);
+    else std::tie(MO, total_orbitals) = setupMOIS(chem_env);
   }
 }
 
-Matrix reshape_mo_matrix(SystemData sys_data, Matrix& emat) {
-  const int noa   = sys_data.n_occ_alpha;
-  const int nob   = sys_data.n_occ_beta;
-  const int nva   = sys_data.n_vir_alpha;
-  const int nvb   = sys_data.n_vir_beta;
-  const int nocc  = sys_data.nocc;
-  const int N_eff = sys_data.nmo;
+Matrix reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat) {
+  SystemData& sys_data = chem_env.sys_data;
+  const int   noa      = sys_data.n_occ_alpha;
+  const int   nob      = sys_data.n_occ_beta;
+  const int   nva      = sys_data.n_vir_alpha;
+  const int   nvb      = sys_data.n_vir_beta;
+  const int   nocc     = sys_data.nocc;
+  const int   N_eff    = sys_data.nmo;
 
   const int n_frozen_core    = sys_data.n_frozen_core;
   const int n_frozen_virtual = sys_data.n_frozen_virtual;
@@ -297,7 +299,7 @@ Matrix reshape_mo_matrix(SystemData sys_data, Matrix& emat) {
 }
 
 template<typename TensorType>
-Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& tMO,
+Tensor<TensorType> cd_svd(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace& tMO,
                           TiledIndexSpace& tAO, TAMM_SIZE& chol_count, const TAMM_GA_SIZE max_cvecs,
                           libint2::BasisSet& shells, Tensor<TensorType>& lcao, bool is_mso = true) {
   using libint2::Atom;
@@ -305,8 +307,9 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
   using libint2::Operator;
   using libint2::Shell;
 
-  double           diagtol    = sys_data.options_map.cd_options.diagtol;
-  const tamm::Tile itile_size = sys_data.options_map.cd_options.itilesize;
+  SystemData&      sys_data   = chem_env.sys_data;
+  double           diagtol    = chem_env.ioptions.cd_options.diagtol;
+  const tamm::Tile itile_size = chem_env.ioptions.cd_options.itilesize;
   // const TAMM_GA_SIZE northo         = sys_data.nbf;
   const TAMM_GA_SIZE nao = sys_data.nbf_orig;
 
@@ -455,8 +458,8 @@ Tensor<TensorType> cd_svd(SystemData& sys_data, ExecutionContext& ec, TiledIndex
   NGA_Distribution64(g_r, iproc, lo_r, hi_r);
 #endif
 
-    auto shell2bf = map_shell_to_basis_function(shells);
-    auto bf2shell = map_basis_function_to_shell(shells);
+    auto shell2bf = BasisSetMap::map_shell_to_basis_function(shells);
+    auto bf2shell = BasisSetMap::map_basis_function_to_shell(shells);
 
     auto cd_t2 = std::chrono::high_resolution_clock::now();
     auto cd_time =
@@ -808,7 +811,7 @@ if(iproc == 0) {
             << " secs" << endl;
 }
 
-update_sysdata(sys_data, tMO, is_mso);
+update_sysdata(chem_env, tMO, is_mso);
 
 TAMM_GA_SIZE N_eff = tMO("all").max_num_indices();
 
@@ -974,7 +977,7 @@ for(decltype(count) kk = 0; kk < count; kk++) {
       Matrix emat = Eigen::Map<Matrix>(k_pq.data(), N, N);
       k_pq.clear();
 
-      Matrix cvec = reshape_mo_matrix(sys_data, emat);
+      Matrix cvec = reshape_mo_matrix(chem_env, emat);
 
       k_pq.resize(N_eff * N_eff);
       Eigen::Map<Matrix>(k_pq.data(), N_eff, N_eff) = cvec;

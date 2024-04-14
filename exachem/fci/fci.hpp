@@ -16,7 +16,7 @@
 using namespace tamm;
 
 template<typename T>
-std::string generate_fcidump(SystemData sys_data, ExecutionContext& ec, const TiledIndexSpace& MSO,
+std::string generate_fcidump(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MSO,
                              Tensor<T>& lcao, Tensor<T>& d_f1, Tensor<T>& full_v2,
                              ExecutionHW ex_hw = ExecutionHW::CPU) {
   // int nactv = sys_data.options_map.fci_options.nactive;
@@ -35,12 +35,13 @@ std::string generate_fcidump(SystemData sys_data, ExecutionContext& ec, const Ti
   Tensor<T> hcore_mo{{MSO, MSO}, {1, 1}};
   Tensor<T>::allocate(&ec, hcore, hcore_mo);
 
-  std::string out_fp = sys_data.output_file_prefix + "." + sys_data.options_map.ccsd_options.basis;
-  std::string files_dir = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type + "/fci";
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + out_fp;
+  SystemData& sys_data     = chem_env.sys_data;
+  std::string out_fp       = chem_env.workspace_dir;
+  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type + "/fci";
+  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
 
-  std::string hcorefile = files_dir + "/../scf/" + out_fp + ".hcore";
+  std::string hcorefile = files_dir + "/../scf/" + sys_data.output_file_prefix + ".hcore";
   read_from_disk(hcore, hcorefile);
 
   Tensor<T> tmp{MSO, AO};
@@ -57,33 +58,41 @@ std::string generate_fcidump(SystemData sys_data, ExecutionContext& ec, const Ti
 
   // write fcidump file
   std::string fcid_file = files_prefix + ".fcidump";
-  fcidump::write_fcidump_file(sys_data, hcore_mo, full_v2, symvec, fcid_file);
+  fcidump::write_fcidump_file(chem_env, hcore_mo, full_v2, symvec, fcid_file);
 
   free_tensors(hcore_mo);
   return files_prefix;
 }
 
-void fci_driver(std::string filename, ECOptions options_map) {
+void fci_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
 
-  ProcGroup        pg = ProcGroup::create_world_coll();
-  ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
-  auto             rank = ec.pg().rank();
+  auto rank = ec.pg().rank();
 
-  auto [sys_data, hf_energy, shells, shell_tile_map, C_AO, F_AO, C_beta_AO, F_beta_AO, AO_opt,
-        AO_tis, scf_conv] = hartree_fock_driver<T>(ec, filename, options_map);
+  scf(ec, chem_env);
 
-  CCSDOptions& ccsd_options = sys_data.options_map.ccsd_options;
+  // double              hf_energy      = chem_env.hf_energy;
+  libint2::BasisSet   shells         = chem_env.shells;
+  Tensor<T>           C_AO           = chem_env.C_AO;
+  Tensor<T>           C_beta_AO      = chem_env.C_beta_AO;
+  Tensor<T>           F_AO           = chem_env.F_AO;
+  Tensor<T>           F_beta_AO      = chem_env.F_beta_AO;
+  TiledIndexSpace     AO_opt         = chem_env.AO_opt;
+  TiledIndexSpace     AO_tis         = chem_env.AO_tis;
+  std::vector<size_t> shell_tile_map = chem_env.shell_tile_map;
+
+  SystemData   sys_data     = chem_env.sys_data;
+  CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
   if(rank == 0) ccsd_options.print();
 
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = setupMOIS(sys_data);
+  auto [MO, total_orbitals] = setupMOIS(chem_env);
 
-  std::string out_fp       = sys_data.output_file_prefix + "." + ccsd_options.basis;
-  std::string files_dir    = out_fp + "_files/" + sys_data.options_map.scf_options.scf_type;
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + out_fp;
+  std::string out_fp       = chem_env.workspace_dir;
+  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
+  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
   std::string f1file       = files_prefix + ".f1_mo";
   std::string v2file       = files_prefix + ".cholv2";
   std::string cholfile     = files_prefix + ".cholcount";
@@ -94,7 +103,7 @@ void fci_driver(std::string filename, ECOptions options_map) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(sys_data, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
+    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
                      shell_tile_map, ccsd_restart, cholfile);
 
   TiledIndexSpace N = MO("all");
@@ -135,7 +144,7 @@ void fci_driver(std::string filename, ECOptions options_map) {
 
   free_tensors(cholVpr);
 
-  files_prefix = generate_fcidump(sys_data, ec, MO, lcao, d_f1, full_v2, ex_hw);
+  files_prefix = generate_fcidump(chem_env, ec, MO, lcao, d_f1, full_v2, ex_hw);
   #if defined(USE_MACIS)
   if(options_map.task_options.fci)
     macis_driver(ec, sys_data, files_prefix);

@@ -8,9 +8,14 @@
 
 #pragma once
 
-#include "options/ec_options.hpp"
-// #include "txtutils.hpp"
+#include "common/txt_utils.hpp"
+#include "options/input_options.hpp"
+#include "tamm/eigen_utils.hpp"
+#include "tamm/tamm.hpp"
 #include <filesystem>
+#include <iostream>
+#include <nlohmann/json.hpp>
+
 namespace fs = std::filesystem;
 
 class SystemData {
@@ -20,7 +25,7 @@ public:
   int       n_vir_alpha{};
   int       n_occ_beta{};
   int       n_vir_beta{};
-  int       n_lindep;
+  int       n_lindep{};
   int       ndf{};
   int       nbf{};
   int       nbf_orig{};
@@ -57,15 +62,10 @@ public:
   double ccsd_corr_energy{};
 
   // json data
-  json results;
+  nlohmann::ordered_json results;
+  void                   print();
+  void                   update(bool spin_orbital = true);
 
-  void print();
-
-  void update(bool spin_orbital = true);
-
+  SystemData() = default;
   SystemData(ECOptions options_map_, const std::string scf_type_string);
-
-  void write_sinfo(libint2::BasisSet& shells);
-
-  void write_json_data(const std::string cmodule);
 };

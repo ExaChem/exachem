@@ -6,7 +6,10 @@
  * See LICENSE.txt for details
  */
 
+// clang-format off
+#include "chemenv.hpp"
 #include "cutils.hpp"
+// clang-format on
 
 #if defined(USE_SCALAPACK)
 
@@ -24,7 +27,9 @@ MPI_Comm get_scalapack_comm(tamm::ExecutionContext& ec, int sca_nranks) {
   return scacomm;
 }
 
-void setup_scalapack_info(SystemData& sys_data, ScalapackInfo& scalapack_info, MPI_Comm& scacomm) {
+void setup_scalapack_info(ChemEnv& chem_env, ScalapackInfo& scalapack_info, MPI_Comm& scacomm) {
+  SystemData& sys_data    = chem_env.sys_data;
+  SCFOptions& scf_options = chem_env.ioptions.scf_options;
 #if defined(USE_UPCXX)
   abort(); // Not supported with UPC++
 #endif
@@ -32,8 +37,8 @@ void setup_scalapack_info(SystemData& sys_data, ScalapackInfo& scalapack_info, M
   if(scacomm == MPI_COMM_NULL) return;
   auto blacs_setup_st = std::chrono::high_resolution_clock::now();
   // Sanity checks
-  scalapack_info.npr   = sys_data.options_map.scf_options.scalapack_np_row;
-  scalapack_info.npc   = sys_data.options_map.scf_options.scalapack_np_col;
+  scalapack_info.npr   = scf_options.scalapack_np_row;
+  scalapack_info.npc   = scf_options.scalapack_np_col;
   int scalapack_nranks = scalapack_info.npr * scalapack_info.npc;
 
   scalapack_info.pg = ProcGroup::create_coll(scacomm);
@@ -62,7 +67,7 @@ void setup_scalapack_info(SystemData& sys_data, ScalapackInfo& scalapack_info, M
   std::iota(scalapack_ranks.begin(), scalapack_ranks.end(), 0);
   scalapack_info.scalapack_nranks = scalapack_nranks;
 
-  int& mb_ = sys_data.options_map.scf_options.scalapack_nb;
+  int& mb_ = scf_options.scalapack_nb;
 
   if(scalapack_info.pg.rank() == 0) {
     std::cout << "scalapack_nranks = " << scalapack_nranks << std::endl;
@@ -73,8 +78,8 @@ void setup_scalapack_info(SystemData& sys_data, ScalapackInfo& scalapack_info, M
 
   const auto N = sys_data.nbf_orig;
   if(mb_ > N / scalapack_info.npr) {
-    mb_                                           = N / scalapack_info.npr;
-    sys_data.options_map.scf_options.scalapack_nb = mb_;
+    mb_                      = N / scalapack_info.npr;
+    scf_options.scalapack_nb = mb_;
     if(scalapack_info.pg.rank() == 0)
       std::cout << "WARNING: Resetting scalapack block size (scalapack_nb) to: " << mb_
                 << std::endl;
@@ -94,6 +99,7 @@ void setup_scalapack_info(SystemData& sys_data, ScalapackInfo& scalapack_info, M
   //   std::cout << std::fixed << std::setprecision(2) << std::endl
   //             << "Time for BLACS setup: " << blacs_time.count() << " secs" << std::endl;
 }
+
 #endif
 
 // Nbf, % of nodes, % of Nbf, nnodes from input file, (% of nodes, % of nbf) for scalapack

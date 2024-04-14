@@ -8,8 +8,8 @@
 
 #include "scf_taskmap.hpp"
 
-void readLoads(std::vector<NODE_T>& s1_all, std::vector<NODE_T>& s2_all,
-               std::vector<VAL_T> ntasks_all, Loads& L) {
+void Loads::readLoads(std::vector<NODE_T>& s1_all, std::vector<NODE_T>& s2_all,
+                      std::vector<VAL_T> ntasks_all) {
   EDGE_T nLoads = 0;
 
   NODE_T rank;
@@ -23,30 +23,31 @@ void readLoads(std::vector<NODE_T>& s1_all, std::vector<NODE_T>& s2_all,
     nTasks = ntasks_all[i];
     rank   = 0;
 
-    if(s1 > L.maxS1) L.maxS1 = s1;
-    if(s2 > L.maxS2) L.maxS2 = s2;
+    if(s1 > maxS1) maxS1 = s1;
+    if(s2 > maxS2) maxS2 = s2;
 
     if(nTasks > 0) {
-      L.loadList.push_back({nLoads, rank, s1, s2, nTasks});
+      loadList.push_back({nLoads, rank, s1, s2, nTasks});
       nLoads++;
     }
   }
-  L.nLoads = nLoads;
 }
 
-void simpleLoadBal(Loads& L, NODE_T nMachine) {
+void Loads::simpleLoadBal(NODE_T nMachine) {
   // sort Loads array w.r.t to ntasks
-  sort(L.loadList.begin(), L.loadList.end(), [](Load a, Load b) { return a.nTasks > b.nTasks; });
-
+  sort(loadList.begin(), loadList.end(), [](Load a, Load b) { return a.nTasks > b.nTasks; });
+  auto cmpbyFirst = [](const std::pair<VAL_T, NODE_T>& T1, const std::pair<VAL_T, NODE_T>& T2) {
+    return T1.first > T2.first;
+  };
   // create a pq with nMachine size.
   std::vector<std::pair<VAL_T, NODE_T>> pq;
   std::vector<VAL_T>                    cW(nMachine);
   std::vector<NODE_T>                   bV(nMachine);
   std::vector<NODE_T>                   cV(nMachine);
 
-  NODE_T b_prime = L.nLoads / nMachine;
+  NODE_T b_prime = nLoads / nMachine;
   // cout<<b_prime<<endl;
-  NODE_T remainder = L.nLoads % nMachine;
+  NODE_T remainder = nLoads % nMachine;
 
   for(NODE_T i = 0; i < nMachine; i++) { bV[i] = b_prime; }
   // settle the remainder
@@ -60,7 +61,7 @@ void simpleLoadBal(Loads& L, NODE_T nMachine) {
   std::make_heap(pq.begin(), pq.end(), cmpbyFirst);
 
   // scan over the loadList array in high to low and place it in the least load availalble queue.
-  for(EDGE_T i = 0; i < L.nLoads; i++) {
+  for(EDGE_T i = 0; i < nLoads; i++) {
     while(1) {
       auto   top = pq.front();
       NODE_T mId = top.second;
@@ -68,10 +69,10 @@ void simpleLoadBal(Loads& L, NODE_T nMachine) {
       pq.pop_back();
       // cout<<"Top machine, mId: "<<top.second<<" total load: "<<cW[mId]<<endl;
       if(cV[mId] < bV[mId]) {
-        L.loadList[i].rank = mId;
+        loadList[i].rank = mId;
         cV[mId]++;
-        top.first = top.first + L.loadList[i].nTasks;
-        cW[mId]   = cW[mId] + L.loadList[i].nTasks;
+        top.first = top.first + loadList[i].nTasks;
+        cW[mId]   = cW[mId] + loadList[i].nTasks;
         if(cV[mId] < bV[mId]) {
           pq.push_back(top);
           std::push_heap(pq.begin(), pq.end(), cmpbyFirst);
@@ -84,12 +85,12 @@ void simpleLoadBal(Loads& L, NODE_T nMachine) {
   }
 }
 
-void createTaskMap(Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& taskmap,
-                   Loads&                                                               L) {
-  for(auto i = 0; i < L.nLoads; i++) {
-    auto u        = L.loadList[i].s1;
-    auto v        = L.loadList[i].s2;
-    taskmap(u, v) = L.loadList[i].rank;
+void Loads::createTaskMap(
+  Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& taskmap) {
+  for(auto i = 0; i < nLoads; i++) {
+    auto u        = loadList[i].s1;
+    auto v        = loadList[i].s2;
+    taskmap(u, v) = loadList[i].rank;
     // taskmap(u,v) = i;
     // std::cout<<u<<" "<<v<<" "<<taskmap(u,v)<<" "<<L.loadList[i].nTasks<<std::endl;
   }

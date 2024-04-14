@@ -10,7 +10,7 @@
 
 #include "cc/ccse_tensors.hpp"
 #include "cc/diis.hpp"
-
+#include "scf/scf_main.hpp"
 // auto lambdar2 = [](const IndexVector& blockid, span<double> buf){
 //     if((blockid[0] > blockid[1]) || (blockid[2] > blockid[3])) {
 //         for(auto i = 0U; i < buf.size(); i++) buf[i] = 0;
@@ -142,23 +142,7 @@ void update_r2(ExecutionContext& ec, LabeledTensor<TensorType> ltensor);
 template<typename TensorType>
 void init_diagonal(ExecutionContext& ec, LabeledTensor<TensorType> ltensor);
 
-// inline std::string ccsd_test(int argc, char* argv[]) {
-//   if(argc < 2) {
-//     std::cout << "Please provide an input file!" << std::endl;
-//     exit(0);
-//   }
-
-//   auto          filename = std::string(argv[1]);
-//   std::ifstream testinput(filename);
-//   if(!testinput) {
-//     std::cout << "Input file provided [" << filename << "] does not exist!" << std::endl;
-//     exit(0);
-//   }
-
-//   return filename;
-// }
-
-void iteration_print(SystemData& sys_data, const ProcGroup& pg, int iter, double residual,
+void iteration_print(ChemEnv& chem_env, const ProcGroup& pg, int iter, double residual,
                      double energy, double time, string cmethod = "CCSD");
 
 /**
@@ -196,10 +180,10 @@ std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vect
 setupTensors_cs(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndiis,
                 bool ccsd_restart = false);
 
-template<typename T>
-std::tuple<SystemData, double, libint2::BasisSet, std::vector<size_t>, Tensor<T>, Tensor<T>,
-           Tensor<T>, Tensor<T>, TiledIndexSpace, TiledIndexSpace, bool>
-hartree_fock_driver(ExecutionContext& ec, const string filename, ECOptions options_map);
+// template<typename T>
+// std::tuple<SystemData, double, libint2::BasisSet, std::vector<size_t>, Tensor<T>, Tensor<T>,
+//            Tensor<T>, Tensor<T>, TiledIndexSpace, TiledIndexSpace, bool>
+// hartree_fock_driver(ExecutionContext& ec, const string filename, ECOptions options_map);
 
 void ccsd_stats(ExecutionContext& ec, double hf_energy, double residual, double energy,
                 double thresh);
@@ -215,15 +199,15 @@ Tensor<T> setupV2(ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& CI
                   bool anti_sym = true);
 
 template<typename T>
-void cc_print(SystemData& sys_data, Tensor<T> d_t1, Tensor<T> d_t2, std::string files_prefix);
+void cc_print(ChemEnv& chem_env, Tensor<T> d_t1, Tensor<T> d_t2, std::string files_prefix);
 
 template<typename T>
 std::tuple<Tensor<T>, Tensor<T>, Tensor<T>, TAMM_SIZE, tamm::Tile, TiledIndexSpace>
-cd_svd_driver(SystemData& sys_data, ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& AO,
+cd_svd_driver(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& AO,
               Tensor<T> C_AO, Tensor<T> F_AO, Tensor<T> C_beta_AO, Tensor<T> F_beta_AO,
               libint2::BasisSet& shells, std::vector<size_t>& shell_tile_map, bool readv2 = false,
               std::string cholfile = "", bool is_dlpno = false, bool is_mso = true);
 
-void cd_2e_driver(std::string filename, ECOptions options_map);
+void cd_2e_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
-void cd_mp2(std::string filename, ECOptions options_map);
+void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env);

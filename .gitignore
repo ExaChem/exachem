@@ -3,7 +3,7 @@
 
 #These are configuration files for VS code
 .vscode/
-
+.code-workspace
 #This is the documentation build directory
 
 #These are common build directory names

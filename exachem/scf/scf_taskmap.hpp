@@ -18,7 +18,8 @@ typedef int EDGE_T;
 typedef int VAL_T;
 
 // load data struct
-struct Load {
+class Load {
+public:
   NODE_T loadId;
   NODE_T rank;
   NODE_T s1;
@@ -45,16 +46,8 @@ public:
     nLoads = nloads;
     loadList.reserve(nLoads);
   }
+  void readLoads(std::vector<NODE_T>& s1_all, std::vector<NODE_T>& s2_all,
+                 std::vector<VAL_T> ntasks_all);
+  void simpleLoadBal(NODE_T nMachine);
+  void createTaskMap(Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& taskmap);
 };
-
-inline bool cmpbyFirst(const std::pair<VAL_T, NODE_T>& T1, const std::pair<VAL_T, NODE_T>& T2) {
-  return T1.first > T2.first;
-}
-
-void readLoads(std::vector<NODE_T>& s1_all, std::vector<NODE_T>& s2_all,
-               std::vector<VAL_T> ntasks_all, Loads& L);
-
-void simpleLoadBal(Loads& L, NODE_T nMachine);
-
-void createTaskMap(Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& taskmap,
-                   Loads&                                                               L);

@@ -2,8 +2,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "XL"
     OR CMAKE_CXX_COMPILER_ID STREQUAL "Cray"
     OR CMAKE_CXX_COMPILER_ID STREQUAL "MSVC"
     OR CMAKE_CXX_COMPILER_ID STREQUAL "Intel" 
-    OR CMAKE_CXX_COMPILER_ID STREQUAL "PGI"
-    OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    OR CMAKE_CXX_COMPILER_ID STREQUAL "PGI")
+    #OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
         message(FATAL_ERROR "TAMM cannot be currently built with ${CMAKE_CXX_COMPILER_ID} compilers.")
 endif()
 
@@ -49,8 +49,8 @@ endif()
 check_compiler_version(C Clang 9)
 check_compiler_version(CXX Clang 9)
 
-# check_compiler_version(C AppleClang 14)
-# check_compiler_version(CXX AppleClang 14)
+check_compiler_version(C AppleClang 15)
+check_compiler_version(CXX AppleClang 15)
 
 check_compiler_version(C GNU 9.1)
 check_compiler_version(CXX GNU 9.1)
@@ -82,30 +82,23 @@ endif()
 if(USE_CUDA)
     include(CheckLanguage)
     check_language(CUDA)
+
+    if(CMAKE_CUDA_ARCHITECTURES)
+        set(GPU_ARCH ${CMAKE_CUDA_ARCHITECTURES} CACHE STRING "CUDA ARCH" FORCE)
+    elseif(GPU_ARCH)
+        set(CMAKE_CUDA_ARCHITECTURES ${GPU_ARCH} CACHE STRING "GPU ARCH" FORCE)
+    else()
+        message(FATAL_ERROR "One of CMAKE_CUDA_ARCHITECTURES or GPU_ARCH options needs to be provided")
+    endif()
+
+    enable_language(CUDA)
     if(CMAKE_CUDA_COMPILER)
-        enable_language(CUDA)
-        if(GPU_ARCH)
             message(STATUS "CUDA Architecture provided: ${GPU_ARCH}")
-        else()
-            set(OUTPUTFILE ${CMAKE_CURRENT_BINARY_DIR}/cuda_arch_detect_script)
-            set(CUDAFILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cuda_arch_detect.cu)
-            execute_process(COMMAND nvcc ${CUDA_CUDART_LIBRARY} ${CUDAFILE} -o ${OUTPUTFILE})
-            execute_process(COMMAND ${OUTPUTFILE}
-                            RESULT_VARIABLE CUDA_RETURN_CODE
-                            OUTPUT_VARIABLE ARCH)
-            if(${CUDA_RETURN_CODE} EQUAL 0)
-                message(STATUS "CUDA Architecture detected: ${ARCH}")
-                set(GPU_ARCH ${ARCH})
-            else()
-                message(WARNING "Setting CUDA Architecture to: 50")
-                set(GPU_ARCH 50)
-            endif()
-        endif()
     else()
         message(FATAL_ERROR "CUDA Toolkit not found.")
     endif()
 
-    set(_CUDA_MIN "11.4")
+    set(_CUDA_MIN "11.7")
     if(CMAKE_CUDA_COMPILER_VERSION VERSION_LESS ${_CUDA_MIN})
         message(FATAL_ERROR "CUDA version provided \
         (${CMAKE_CUDA_COMPILER_VERSION}) \

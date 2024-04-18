@@ -158,7 +158,7 @@ void ParseCCSDOptions::update_common_options(ChemEnv& chem_env) {
 
 void ParseCCSDOptions::print(ChemEnv& chem_env) {
   std::cout << std::defaultfloat;
-  std::cout << std::endl << "CCSD COptions" << std::endl;
+  std::cout << std::endl << "CCSD Options" << std::endl;
   std::cout << "{" << std::endl;
 
   CCSDOptions& cc_options = chem_env.ioptions.ccsd_options;

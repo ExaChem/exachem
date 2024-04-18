@@ -17,7 +17,7 @@ void ParseSCFOptions::parse_check(json& jinput) {
     "damp","writem","nnodes","restart","noscf","moldenfile", "guess",
     "debug","scf_type","xc_type", "xc_grid_type", "n_lindep","restart_size","scalapack_nb","riscf",
     "scalapack_np_row","scalapack_np_col","ext_data_path","PRINT",
-    "qed_omegas","qed_lambdas","qed_volumes","qed_polvecs","comments"};
+    "qed_omegas","qed_lambdas","qed_volumes","qed_polvecs","direct_df","comments"};
   // clang-format on
 
   for(auto& el: jinput["SCF"].items()) {
@@ -61,6 +61,7 @@ void ParseSCFOptions::parse(ChemEnv& chem_env) {
   parse_option<std::vector<double>>(scf_options.qed_lambdas, jscf, "qed_lambdas");
   parse_option<std::vector<double>>(scf_options.qed_volumes, jscf, "qed_volumes");
   parse_option<std::vector<std::vector<double>>>(scf_options.qed_polvecs, jscf, "qed_polvecs");
+  parse_option<bool>(scf_options.direct_df, jscf, "direct_df");
 
   json jscf_guess          = jscf["guess"];
   json jguess_atom_options = jscf_guess["atom_options"];
@@ -103,7 +104,7 @@ void ParseSCFOptions::update_common_options(ChemEnv& chem_env) {
 
 void ParseSCFOptions::print(ChemEnv& chem_env) {
   std::cout << std::defaultfloat;
-  std::cout << std::endl << "SCF COptions" << std::endl;
+  std::cout << std::endl << "SCF Options" << std::endl;
   std::cout << "{" << std::endl;
 
   SCFOptions& scf_options = chem_env.ioptions.scf_options;

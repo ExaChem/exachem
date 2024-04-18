@@ -2,7 +2,7 @@
 
 void SCFOptions::print() {
   std::cout << std::defaultfloat;
-  std::cout << std::endl << "SCF COptions" << std::endl;
+  std::cout << std::endl << "SCF Options" << std::endl;
   std::cout << "{" << std::endl;
   std::cout << " charge       = " << charge << std::endl;
   std::cout << " multiplicity = " << multiplicity << std::endl;
@@ -86,7 +86,7 @@ void SCFOptions::print() {
 
 void CCSDOptions::print() {
   std::cout << std::defaultfloat;
-  std::cout << std::endl << "CCSD COptions" << std::endl;
+  std::cout << std::endl << "CCSD Options" << std::endl;
   std::cout << "{" << std::endl;
   std::cout << " cache_size           = " << cache_size << std::endl;
   std::cout << " ccsdt_tilesize       = " << ccsdt_tilesize << std::endl;
@@ -298,7 +298,7 @@ void FCIOptions::initialize() {
 
 void CDOptions::print() {
   std::cout << std::defaultfloat;
-  std::cout << std::endl << "CD COptions" << std::endl;
+  std::cout << std::endl << "CD Options" << std::endl;
   std::cout << "{" << std::endl;
   std::cout << std::boolalpha << " debug            = " << debug << std::endl;
   std::cout << std::boolalpha << " write_cv         = " << write_cv << std::endl;
@@ -311,7 +311,7 @@ void CDOptions::print() {
 
 void GWOptions::print() {
   std::cout << std::defaultfloat;
-  std::cout << std::endl << "GW COptions" << std::endl;
+  std::cout << std::endl << "GW Options" << std::endl;
   std::cout << "{" << std::endl;
   std::cout << " ngl       = " << ngl << std::endl;
   std::cout << " noqpa     = " << noqpa << std::endl;
@@ -334,7 +334,7 @@ void GWOptions::print() {
 void TaskOptions::print() {
   CommonOptions::print();
 
-  std::cout << std::endl << "Task COptions" << std::endl;
+  std::cout << std::endl << "Task Options" << std::endl;
   std::cout << "{" << std::endl;
   txt_utils::print_bool(" sinfo        ", sinfo);
   txt_utils::print_bool(" scf          ", scf);

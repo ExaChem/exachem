@@ -17,8 +17,8 @@ double SCFIO::tt_trace(ExecutionContext& ec, Tensor<TensorType>& T1, Tensor<Tens
 void SCFIO::print_energies(ExecutionContext& ec, const ChemEnv& chem_env, TAMMTensors& ttensors,
                            EigenTensors& etensors, SCFVars& scf_vars,
                            ScalapackInfo& scalapack_info) {
-  const SystemData& sys_data    = chem_env.sys_data;
-  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
+  const SystemData& sys_data = chem_env.sys_data;
+  // const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;

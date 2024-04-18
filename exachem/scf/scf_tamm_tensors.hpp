@@ -59,5 +59,6 @@ public:
 
   // DF
   Tensor<TensorType> xyK; // n,n,ndf
-  Tensor<TensorType> Zxy; // ndf,n,n
+  Tensor<TensorType> xyZ; // n,n,ndf
+  Tensor<TensorType> Vm1; // ndf,ndf
 };

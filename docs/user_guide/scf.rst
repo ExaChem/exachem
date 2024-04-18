@@ -38,6 +38,7 @@ The values listed below are the defaults where few options are automatically adj
    "scf_type": "restricted",
    "xc_type": [],
    "xc_grid_type": "UltraFine",
+   "direct_df": false,
    "debug": false,
     "guess": {
       "atom_options":{
@@ -108,6 +109,8 @@ The values listed below are the defaults where few options are automatically adj
    * :strong:`SuperFine`: 175 radial shells with 974 angular points per shell for first row elements and 250 radial shells with 974 Lebedev points per shell for the rest.
 
    All **xc_grid_type** options use a `Mura-Knowles` radial quadrature, a `Lebedev-Laikov` angular quadrature, a `Laqua-Kussmann-Ochsenfeld` partitioning scheme, and a `Robust` pruning method.
+
+:direct_df: ``[default=false]`` Requests the direct computation of the density-fitted Coulomb contribution. Works only for pure Kohn-Sham fnctionals (no exact exchange) and with a provided ``df_basisset`` (see :ref:`Basis set options <Basis>`).
 
 :debug: ``[default=false]`` enable verbose printing for debugging a calculation.
 

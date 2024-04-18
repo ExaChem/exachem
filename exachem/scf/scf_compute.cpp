@@ -198,7 +198,7 @@ void SCFCompute::compute_density(ExecutionContext& ec, ChemEnv& chem_env, const 
   sch.execute();
 
   // compute D in eigen for subsequent fock build
-  if(!scf_vars.do_dens_fit) {
+  if(!scf_vars.do_dens_fit || scf_vars.direct_df || chem_env.sys_data.is_ks) {
     tamm_to_eigen_tensor(ttensors.D_alpha, D_alpha);
     if(is_uhf) tamm_to_eigen_tensor(ttensors.D_beta, etensors.D_beta);
   }

@@ -29,7 +29,24 @@ private:
                       const SCFVars& scf_vars, const std::vector<size_t>& shell2bf,
                       TAMMTensors& ttensors, EigenTensors& etensors, bool& is_3c_init, double xHF);
 
+  template<typename TensorType>
+  void compute_3c_ints(ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars,
+                       Tensor<TensorType>& xyZ);
+
+  template<typename TensorType>
+  void compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_env, EigenTensors& etensors,
+                       const SCFVars& scf_vars, TAMMTensors& ttensors);
+
+  template<typename TensorType>
+  void compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars,
+                             const std::vector<size_t>& shell2bf, TAMMTensors& ttensors,
+                             EigenTensors& etensors, const Matrix& SchwarzK);
+
 public:
+  template<typename TensorType>
+  void init_ri(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
+               const SCFVars& scf_vars, EigenTensors& etensors, TAMMTensors& ttensors);
+
   template<typename TensorType>
   void compute_2bf(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
                    const SCFVars& scf_vars, const bool do_schwarz_screen,

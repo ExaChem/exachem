@@ -61,6 +61,7 @@ Spherical-harmonic (5 *d*, 7 *f*, 9 *g*, ...) angular functions are utilized by 
 
  "basis": {
    "basisset": "cc-pvdz",
+   "df_basisset": "cc-pvdz-ri",
    "basisfile": "/path/to/basis_file_with_ecps",
    "atom_basis": {
      "H": "cc-pvtz",
@@ -69,6 +70,8 @@ Spherical-harmonic (5 *d*, 7 *f*, 9 *g*, ...) angular functions are utilized by 
  }
 
 :basisset: String specifying the basis set name. Parsing of the basis set will be handled by *Libint*, which expects to find a ``<basisset>.g94`` file with Gaussian-style format and located at ``$LIBINT_DATA_PATH/basis`` or ``<libint2_install_prefix>/share/libint/<libint2_version>/basis`` (if ``LIBINT_DATA_PATH`` is not defined).
+
+:df_basisset: String specifying the density-fitting basis set name. Parsing of the basis set will be handled by *Libint*, which expects to find a ``<basisset>.g94`` file with Gaussian-style format and located at ``$LIBINT_DATA_PATH/basis`` or ``<libint2_install_prefix>/share/libint/<libint2_version>/basis`` (if ``LIBINT_DATA_PATH`` is not defined).
 
 :basisfile: Currently used for ECPs only. This is a basis file containing the ECP block. Only the ECP block of this file is parsed and everthing else is ignored. The specified file should follow the NWChem format from the basis set exchange website.
 

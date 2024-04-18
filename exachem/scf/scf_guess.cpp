@@ -817,7 +817,7 @@ void SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& chem_env, SCFVar
   size_t     N    = shells_tot.nbf();
 
   // D,G,D_b are only allocated on rank 0 for SAD when DF-HF is enabled
-  if(scf_vars.do_dens_fit && rank == 0) {
+  if((scf_vars.do_dens_fit && !scf_vars.direct_df) && rank == 0) {
     etensors.D_alpha = Matrix::Zero(N, N);
     etensors.G_alpha = Matrix::Zero(N, N);
     if(is_uhf) etensors.D_beta = Matrix::Zero(N, N);
@@ -1458,14 +1458,15 @@ void SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& chem_env, SCFVar
   }
   ec.pg().barrier();
 
-  if(scf_vars.do_dens_fit && rank == 0) {
+  if((scf_vars.do_dens_fit && !scf_vars.direct_df) && rank == 0) { etensors.G_alpha.resize(0, 0); }
+
+  if(scf_vars.do_dens_fit && !(scf_vars.direct_df || chem_env.sys_data.is_ks)) {
     etensors.D_alpha.resize(0, 0);
-    etensors.G_alpha.resize(0, 0);
     if(is_uhf) etensors.D_beta.resize(0, 0);
   }
 
   // needed only for 4c HF
-  if(rank != 0 && !scf_vars.do_dens_fit) {
+  if(rank != 0 && (!scf_vars.do_dens_fit || scf_vars.direct_df || chem_env.sys_data.is_ks)) {
     tamm_to_eigen_tensor(ttensors.D_alpha, etensors.D_alpha);
     if(is_uhf) { tamm_to_eigen_tensor(ttensors.D_beta, etensors.D_beta); }
   }

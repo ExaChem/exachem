@@ -3,7 +3,7 @@ import sys
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-au2ev = 27.2139
+au2ev = 27.21139
 
 filename =       sys.argv[1]
 savename =       sys.argv[2]

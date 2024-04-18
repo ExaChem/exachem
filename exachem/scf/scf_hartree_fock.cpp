@@ -172,20 +172,6 @@ void SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
     else scf_vars.dfbs.set_pure(false); // use cartesian gaussians
 
     if(rank == 0) cout << "density-fitting basis set rank = " << scf_vars.dfbs.nbf() << endl;
-// compute DFBS non-negligible shell-pair list
-#if 0
-      {
-        //TODO: Doesn't work to screen - revisit
-        std::tie(scf_vars.dfbs_shellpair_list, scf_vars.dfbs_shellpair_data) = scf_compute.compute_shellpairs(scf_vars.dfbs);
-        size_t nsp = 0;
-        for (auto& sp : scf_vars.dfbs_shellpair_list) {
-          nsp += sp.second.size();
-        }
-        if(rank==0) std::cout << "# of {all,non-negligible} DFBS shell-pairs = {"
-                  << scf_vars.dfbs.size() * (scf_vars.dfbs.size() + 1) / 2 << "," << nsp << "}"
-                  << endl;
-      }
-#endif
 
     chem_env.sys_data.ndf = scf_vars.dfbs.nbf();
     scf_vars.dfAO         = IndexSpace{range(0, chem_env.sys_data.ndf)};
@@ -256,6 +242,15 @@ void SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
 #else
   const double      xHF = 1.;
 #endif
+
+    scf_vars.direct_df = do_density_fitting && chem_env.ioptions.scf_options.direct_df;
+    if(scf_vars.direct_df && xHF != 0.0) {
+      if(rank == 0) {
+        cout << "Direct DF cannot be used for xHF != 0.0" << endl;
+        cout << "Falling back to in-core DF" << endl;
+      }
+      scf_vars.direct_df = false;
+    }
 
     // SETUP LibECPint
     std::vector<libecpint::ECP>           ecps;
@@ -384,7 +379,7 @@ void SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
     }
 #endif
 
-    if(!do_density_fitting) {
+    if(!do_density_fitting || scf_vars.direct_df || chem_env.sys_data.is_ks) {
       // needed for 4c HF only
       etensors.D_alpha = Matrix::Zero(N, N);
       etensors.G_alpha = Matrix::Zero(N, N);
@@ -399,7 +394,7 @@ void SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
     std::string schwarz_matfile = files_prefix + ".schwarz";
     Matrix      SchwarzK;
 
-    if(!do_density_fitting) {
+    if(!do_density_fitting || scf_vars.direct_df) {
       if(N >= chem_env.ioptions.scf_options.restart_size && fs::exists(schwarz_matfile)) {
         if(rank == 0) cout << "Read Schwarz matrix from disk ... " << endl;
 
@@ -468,9 +463,12 @@ void SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
       std::tie(scf_vars.d_mu, scf_vars.d_nu, scf_vars.d_ku)    = scf_vars.tdfAO.labels<3>("all");
       std::tie(scf_vars.d_mup, scf_vars.d_nup, scf_vars.d_kup) = scf_vars.tdfAOt.labels<3>("all");
 
-      ttensors.Zxy = Tensor<TensorType>{scf_vars.tdfAO, tAO, tAO}; // ndf,n,n
-      ttensors.xyK = Tensor<TensorType>{tAO, tAO, scf_vars.tdfAO}; // n,n,ndf
-      Tensor<TensorType>::allocate(&ec, ttensors.xyK);
+      ttensors.xyZ = Tensor<TensorType>{tAO, tAO, scf_vars.tdfAO};       // n,n,ndf
+      ttensors.xyK = Tensor<TensorType>{tAO, tAO, scf_vars.tdfAO};       // n,n,ndf
+      ttensors.Vm1 = Tensor<TensorType>{scf_vars.tdfAO, scf_vars.tdfAO}; // ndf, ndf
+      if(!scf_vars.direct_df) Tensor<TensorType>::allocate(&ec, ttensors.xyK);
+
+      scf_iter.init_ri<TensorType>(ec, chem_env, scalapack_info, scf_vars, etensors, ttensors);
     }
     const auto do_schwarz_screen = SchwarzK.cols() != 0 && SchwarzK.rows() != 0;
     // engine precision controls primitive truncation, assume worst-case scenario
@@ -482,7 +480,7 @@ void SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
     if(chem_env.ioptions.scf_options.restart || chem_env.ioptions.scf_options.noscf) {
       // This was originally scf_restart.restart()
       scf_restart(ec, chem_env, scalapack_info, ttensors, etensors, files_prefix);
-      if(!do_density_fitting) {
+      if(!do_density_fitting || scf_vars.direct_df || chem_env.sys_data.is_ks) {
         tamm_to_eigen_tensor(ttensors.D_alpha, etensors.D_alpha);
         if(chem_env.sys_data.is_unrestricted) {
           tamm_to_eigen_tensor(ttensors.D_beta, etensors.D_beta);
@@ -548,7 +546,15 @@ void SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
 
       scf_iter.compute_2bf<TensorType>(ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen,
                                        shell2bf, SchwarzK, max_nprim4, ttensors, etensors,
-                                       is_3c_init, do_density_fitting, 1.0);
+                                       is_3c_init, do_density_fitting, xHF);
+
+#if defined(USE_GAUXC)
+      TensorType gauxc_exc = 0.;
+      if(chem_env.sys_data.is_ks) {
+        gauxc_exc =
+          igauxc_util::compute_xcf<TensorType>(ec, chem_env, ttensors, etensors, gauxc_integrator);
+      }
+#endif
 
       scf_guess.scf_diagonalize<TensorType>(sch, chem_env, scf_vars, scalapack_info, ttensors,
                                             etensors);
@@ -864,7 +870,10 @@ void SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
     if(chem_env.sys_data.is_unrestricted) sch(Fb_global(mu, nu) = ttensors.F_beta(mu, nu));
     sch.execute();
 
-    if(do_density_fitting) Tensor<TensorType>::deallocate(ttensors.xyK);
+    if(do_density_fitting) {
+      if(scf_vars.direct_df) { Tensor<TensorType>::deallocate(ttensors.Vm1); }
+      else { Tensor<TensorType>::deallocate(ttensors.xyK); }
+    }
 
     scf_output.rw_mat_disk<TensorType>(ttensors.H1, files_prefix + ".hcore",
                                        chem_env.ioptions.scf_options.debug);

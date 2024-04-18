@@ -32,7 +32,7 @@ void ParseCDOptions::parse(ChemEnv& chem_env) {
 
 void ParseCDOptions::print(ChemEnv& chem_env) {
   std::cout << std::defaultfloat;
-  std::cout << std::endl << "CD COptions New" << std::endl;
+  std::cout << std::endl << "CD Options" << std::endl;
   std::cout << "{" << std::endl;
   std::cout << std::boolalpha << " debug            = " << chem_env.ioptions.cd_options.debug
             << std::endl;

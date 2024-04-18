@@ -61,6 +61,7 @@
         "scalapack_np_col": 0,
         "n_lindep": 0,
         "moldenfile": "",
+	"direct_df": false,
         "guess": {
           "atom_options":{
             "O": [0,1],

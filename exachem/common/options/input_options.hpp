@@ -39,6 +39,7 @@ public:
   bool     noscf{false};   // only recompute energy from movecs
   bool     sad{true};
   bool     force_tilesize{false};
+  bool     direct_df{false};
   int restart_size{2000}; // read/write orthogonalizer, schwarz, etc matrices when N>=restart_size
   int scalapack_nb{256};
   int riscf{0}; // 0 for JK, 1 for J, 2 for K

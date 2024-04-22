@@ -15,6 +15,8 @@
 
 using namespace tamm;
 
+namespace exachem::fci {
+
 template<typename T>
 std::string generate_fcidump(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MSO,
                              Tensor<T>& lcao, Tensor<T>& d_f1, Tensor<T>& full_v2,
@@ -69,7 +71,7 @@ void fci_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   auto rank = ec.pg().rank();
 
-  scf(ec, chem_env);
+  scf::scf_driver(ec, chem_env);
 
   // double              hf_energy      = chem_env.hf_energy;
   libint2::BasisSet   shells         = chem_env.shells;
@@ -88,7 +90,7 @@ void fci_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = setupMOIS(chem_env);
+  auto [MO, total_orbitals] = cd_svd::setupMOIS(chem_env);
 
   std::string out_fp       = chem_env.workspace_dir;
   std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
@@ -103,8 +105,8 @@ void fci_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
-                     shell_tile_map, ccsd_restart, cholfile);
+    cd_svd::cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
+                             shell_tile_map, ccsd_restart, cholfile);
 
   TiledIndexSpace N = MO("all");
 
@@ -155,3 +157,4 @@ void fci_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   ec.flush_and_sync();
   // delete ec;
 }
+}//end of namespace

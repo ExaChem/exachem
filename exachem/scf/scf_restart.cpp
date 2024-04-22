@@ -2,8 +2,8 @@
 #include "scf/scf_matrix.hpp"
 
 // Originally scf_restart_test
-void SCFRestart::operator()(const ExecutionContext& ec, ChemEnv& chem_env,
-                            std::string files_prefix) {
+void exachem::scf::SCFRestart::operator()(const ExecutionContext& ec, ChemEnv& chem_env,
+                                          std::string files_prefix) {
   bool restart = chem_env.ioptions.scf_options.restart || chem_env.ioptions.scf_options.noscf;
 
   if(!restart) return;
@@ -27,9 +27,9 @@ void SCFRestart::operator()(const ExecutionContext& ec, ChemEnv& chem_env,
   if(!status) tamm_terminate("Error reading one or all of the files: [" + fnf + "]");
 }
 
-void SCFRestart::operator()(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-                            TAMMTensors& ttensors, EigenTensors& etensors,
-                            std::string files_prefix) {
+void exachem::scf::SCFRestart::operator()(ExecutionContext& ec, ChemEnv& chem_env,
+                                          ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
+                                          EigenTensors& etensors, std::string files_prefix) {
   const auto N      = chem_env.sys_data.nbf_orig;
   const auto Northo = N - chem_env.sys_data.n_lindep;
   EXPECTS(Northo == chem_env.sys_data.nbf);

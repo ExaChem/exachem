@@ -8,9 +8,11 @@
 #include "scf/scf_tamm_tensors.hpp"
 using namespace tamm;
 
+namespace exachem::scf {
 class SCFRestart: public SCFIO {
 public:
   void operator()(const ExecutionContext& ec, ChemEnv& chem_env, std::string files_prefix);
   void operator()(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
                   TAMMTensors& ttensors, EigenTensors& etensors, std::string files_prefix);
 };
+} // namespace exachem::scf

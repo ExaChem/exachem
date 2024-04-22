@@ -13,6 +13,8 @@
 
 using namespace tamm;
 
+namespace exachem::cc::ccsd {
+
 void cd_ccsd(ExecutionContext& ec, ChemEnv& chem_env);
 
 template<typename T>
@@ -39,3 +41,5 @@ cd_ccsd_cs_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace
                   std::vector<Tensor<T>>& d_t2s, std::vector<T>& p_evl_sorted, Tensor<T>& cv3d,
                   Tensor<T> dt1_full, Tensor<T> dt2_full, bool ccsd_restart = false,
                   std::string out_fp = "", bool computeTData = false);
+
+} // namespace exachem::cc::ccsd

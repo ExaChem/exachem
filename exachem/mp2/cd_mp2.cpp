@@ -12,12 +12,15 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
+namespace exachem::mp2 {
+
 void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
   using namespace termcolor;
+
   auto rank = ec.pg().rank();
 
-  scf(ec, chem_env);
+  scf::scf_driver(ec, chem_env);
   SystemData sys_data = chem_env.sys_data;
 
   libint2::BasisSet   shells         = chem_env.shells;
@@ -34,7 +37,7 @@ void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env) {
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = setupMOIS(chem_env);
+  auto [MO, total_orbitals] = cd_svd::setupMOIS(chem_env);
 
   const bool is_rhf = sys_data.is_restricted;
 
@@ -52,8 +55,8 @@ void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
-                     shell_tile_map, mp2_restart, cholfile);
+    cd_svd::cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
+                             shell_tile_map, mp2_restart, cholfile);
   free_tensors(lcao);
 
   if(mp2_restart) {
@@ -226,3 +229,4 @@ void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env) {
   ec.flush_and_sync();
   // delete ec;
 }
+} // namespace exachem::mp2

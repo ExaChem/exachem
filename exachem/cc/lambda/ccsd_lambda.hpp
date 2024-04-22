@@ -12,6 +12,8 @@
 #include "scf/scf_main.hpp"
 using namespace tamm;
 
+namespace exachem::cc::ccsd_lambda {
+
 void ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
 void iteration_print_lambda(const ProcGroup& pg, int iter, double residual, double time);
@@ -253,3 +255,4 @@ lambda_ccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpac
                    Tensor<T>& d_y1, Tensor<T>& d_y2, std::vector<Tensor<T>>& d_r1s,
                    std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_y1s,
                    std::vector<Tensor<T>>& d_y2s, std::vector<T>& p_evl_sorted);
+} // namespace exachem::cc::ccsd_lambda

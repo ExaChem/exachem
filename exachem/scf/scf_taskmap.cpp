@@ -8,8 +8,8 @@
 
 #include "scf_taskmap.hpp"
 
-void Loads::readLoads(std::vector<NODE_T>& s1_all, std::vector<NODE_T>& s2_all,
-                      std::vector<VAL_T> ntasks_all) {
+void exachem::scf::Loads::readLoads(std::vector<NODE_T>& s1_all, std::vector<NODE_T>& s2_all,
+                                    std::vector<VAL_T> ntasks_all) {
   EDGE_T nLoads = 0;
 
   NODE_T rank;
@@ -33,7 +33,7 @@ void Loads::readLoads(std::vector<NODE_T>& s1_all, std::vector<NODE_T>& s2_all,
   }
 }
 
-void Loads::simpleLoadBal(NODE_T nMachine) {
+void exachem::scf::Loads::simpleLoadBal(NODE_T nMachine) {
   // sort Loads array w.r.t to ntasks
   sort(loadList.begin(), loadList.end(), [](Load a, Load b) { return a.nTasks > b.nTasks; });
   auto cmpbyFirst = [](const std::pair<VAL_T, NODE_T>& T1, const std::pair<VAL_T, NODE_T>& T2) {
@@ -85,7 +85,7 @@ void Loads::simpleLoadBal(NODE_T nMachine) {
   }
 }
 
-void Loads::createTaskMap(
+void exachem::scf::Loads::createTaskMap(
   Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& taskmap) {
   for(auto i = 0; i < nLoads; i++) {
     auto u        = loadList[i].s1;

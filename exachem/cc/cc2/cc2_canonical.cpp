@@ -10,7 +10,7 @@
 #include "cc/ccsd/ccsd_util.hpp"
 
 using namespace tamm;
-
+using namespace exachem::scf;
 namespace cc2_canonical {
 
 template<typename T>
@@ -320,7 +320,7 @@ void cc2_canonical_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = setupMOIS(chem_env);
+  auto [MO, total_orbitals] = cd_svd::setupMOIS(chem_env);
 
   std::string out_fp       = chem_env.workspace_dir;
   std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type + "/cc2";
@@ -337,8 +337,8 @@ void cc2_canonical_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
-                     shell_tile_map, ccsd_restart, cholfile);
+    exachem::cd_svd::cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO,
+                                      shells, shell_tile_map, ccsd_restart, cholfile);
   free_tensors(lcao);
 
   if(ccsd_options.writev) ccsd_options.writet = true;

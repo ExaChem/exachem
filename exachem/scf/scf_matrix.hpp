@@ -4,7 +4,7 @@
 #include <string>
 
 using TensorType = double;
-
+namespace exachem::scf {
 class SCFMatrix {
 public:
   template<typename T>
@@ -12,3 +12,4 @@ public:
   template<typename T>
   void write_scf_mat(Matrix& C, std::string matfile);
 };
+} // namespace exachem::scf

@@ -21,7 +21,7 @@
 using namespace tamm;
 
 using TAMM_GA_SIZE = int64_t;
-
+namespace exachem::cd_svd {
 std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ChemEnv& chem_env, bool triples = false);
 
 std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ChemEnv& chem_env, bool triples = false,
@@ -36,3 +36,4 @@ template<typename TensorType>
 Tensor<TensorType> cd_svd(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace& tMO,
                           TiledIndexSpace& tAO, TAMM_SIZE& chol_count, const TAMM_GA_SIZE max_cvecs,
                           libint2::BasisSet& shells, Tensor<TensorType>& lcao, bool is_mso = true);
+} // namespace exachem::cd_svd

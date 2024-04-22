@@ -64,6 +64,8 @@ T vec_sum(const std::vector<T>& x) {
   return std::accumulate(x.begin(), x.end(), T(0));
 }
 
+namespace exachem::fci {
+
 void macis_driver(ExecutionContext& ec, SystemData& sys_data, const std::string files_prefix) {
   using hrt_t = std::chrono::high_resolution_clock;
   using dur_t = std::chrono::duration<double, std::milli>;
@@ -350,3 +352,4 @@ void macis_driver(ExecutionContext& ec, SystemData& sys_data, const std::string 
   if(fci_out_fname.size())
     macis::write_fcidump(fci_out_fname, norb, T.data(), norb, V.data(), norb, E_core);
 }
+} // namespace exachem::fci

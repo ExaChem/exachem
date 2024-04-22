@@ -8,7 +8,7 @@
  */
 
 #include "cd_svd.hpp"
-
+using namespace exachem::scf;
 bool cd_debug = false;
 #define CD_USE_PGAS_API
 
@@ -19,7 +19,8 @@ auto cd_tensor_zero(Tensor<T>& tens) {
 #endif
 }
 
-std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ChemEnv& chem_env, bool triples) {
+std::tuple<TiledIndexSpace, TAMM_SIZE> exachem::cd_svd::setup_mo_red(ChemEnv& chem_env,
+                                                                     bool     triples) {
   SystemData& sys_data    = chem_env.sys_data;
   TAMM_SIZE   n_occ_alpha = sys_data.n_occ_alpha;
   TAMM_SIZE   n_vir_alpha = sys_data.n_vir_alpha;
@@ -58,7 +59,8 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ChemEnv& chem_env, bool trip
   return std::make_tuple(MO, total_orbitals);
 }
 
-std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ChemEnv& chem_env, bool triples, int nactv) {
+std::tuple<TiledIndexSpace, TAMM_SIZE> exachem::cd_svd::setupMOIS(ChemEnv& chem_env, bool triples,
+                                                                  int nactv) {
   SystemData& sys_data    = chem_env.sys_data;
   TAMM_SIZE   n_occ_alpha = sys_data.n_occ_alpha;
   TAMM_SIZE   n_occ_beta  = sys_data.n_occ_beta;
@@ -191,7 +193,7 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ChemEnv& chem_env, bool triples
   return std::make_tuple(MO, total_orbitals);
 }
 
-void update_sysdata(ChemEnv& chem_env, TiledIndexSpace& MO, bool is_mso) {
+void exachem::cd_svd::update_sysdata(ChemEnv& chem_env, TiledIndexSpace& MO, bool is_mso) {
   SystemData& sys_data       = chem_env.sys_data;
   const bool  do_freeze      = sys_data.n_frozen_core > 0 || sys_data.n_frozen_virtual > 0;
   TAMM_SIZE   total_orbitals = sys_data.nmo;
@@ -205,12 +207,12 @@ void update_sysdata(ChemEnv& chem_env, TiledIndexSpace& MO, bool is_mso) {
     }
     sys_data.update();
     if(!is_mso) std::tie(MO, total_orbitals) = setup_mo_red(chem_env);
-    else std::tie(MO, total_orbitals) = setupMOIS(chem_env);
+    else std::tie(MO, total_orbitals) = cd_svd::setupMOIS(chem_env);
   }
 }
 
 // reshape F/lcao after freezing
-Matrix reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat, bool is_lcao) {
+Matrix exachem::cd_svd::reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat, bool is_lcao) {
   SystemData& sys_data = chem_env.sys_data;
   const int   noa      = sys_data.n_occ_alpha;
   const int   nob      = sys_data.n_occ_beta;
@@ -265,9 +267,10 @@ Matrix reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat, bool is_lcao) {
 }
 
 template<typename TensorType>
-Tensor<TensorType> cd_svd(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace& tMO,
-                          TiledIndexSpace& tAO, TAMM_SIZE& chol_count, const TAMM_GA_SIZE max_cvecs,
-                          libint2::BasisSet& shells, Tensor<TensorType>& lcao, bool is_mso) {
+Tensor<TensorType>
+exachem::cd_svd::cd_svd(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace& tMO,
+                        TiledIndexSpace& tAO, TAMM_SIZE& chol_count, const TAMM_GA_SIZE max_cvecs,
+                        libint2::BasisSet& shells, Tensor<TensorType>& lcao, bool is_mso) {
   using libint2::Atom;
   using libint2::Engine;
   using libint2::Operator;
@@ -952,7 +955,8 @@ Tensor<TensorType> cd_svd(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpa
   return CholVpr_tamm;
 }
 
-template Tensor<double> cd_svd(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace& tMO,
-                               TiledIndexSpace& tAO, TAMM_SIZE& chol_count,
-                               const TAMM_GA_SIZE max_cvecs, libint2::BasisSet& shells,
-                               Tensor<double>& lcao, bool is_mso);
+template Tensor<double> exachem::cd_svd::cd_svd(ChemEnv& chem_env, ExecutionContext& ec,
+                                                TiledIndexSpace& tMO, TiledIndexSpace& tAO,
+                                                TAMM_SIZE& chol_count, const TAMM_GA_SIZE max_cvecs,
+                                                libint2::BasisSet& shells, Tensor<double>& lcao,
+                                                bool is_mso);

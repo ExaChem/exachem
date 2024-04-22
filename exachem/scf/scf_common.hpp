@@ -25,6 +25,8 @@ using std::string;
 
 using TensorType = double;
 
+namespace exachem::scf {
+
 // DENSITY FITTING
 class DFFockEngine {
 public:
@@ -82,3 +84,4 @@ template<typename TensorType>
 std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
 gather_task_vectors(ExecutionContext& ec, std::vector<int>& s1vec, std::vector<int>& s2vec,
                     std::vector<int>& ntask_vec);
+} // namespace exachem::scf

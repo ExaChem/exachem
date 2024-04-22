@@ -12,8 +12,9 @@
 
 using namespace tamm;
 
+namespace exachem::cc::eom {
 void eom_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env);
-
+}
 template<typename T>
 struct EOM_X1Tensors {
   Tensor<T> i_1;

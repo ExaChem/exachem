@@ -9,6 +9,8 @@
 #include "scf/scf_tamm_tensors.hpp"
 #include "scf/scf_vars.hpp"
 
+namespace exachem::scf {
+
 class SCFIO: public SCFMatrix {
 private:
   template<typename TensorType>
@@ -24,3 +26,4 @@ public:
   void print_energies(ExecutionContext& ec, const ChemEnv& chem_env, TAMMTensors& ttensors,
                       EigenTensors& etensors, SCFVars& scf_vars, ScalapackInfo& scalapack_info);
 };
+} // namespace exachem::scf

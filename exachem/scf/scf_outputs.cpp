@@ -3,7 +3,8 @@
 #include "scf_matrix.hpp"
 
 template<typename TensorType>
-double SCFIO::tt_trace(ExecutionContext& ec, Tensor<TensorType>& T1, Tensor<TensorType>& T2) {
+double exachem::scf::SCFIO::tt_trace(ExecutionContext& ec, Tensor<TensorType>& T1,
+                                     Tensor<TensorType>& T2) {
   Tensor<TensorType> tensor{T1.tiled_index_spaces()}; //{tAO, tAO};
   Tensor<TensorType>::allocate(&ec, tensor);
   const TiledIndexSpace tis_ao = T1.tiled_index_spaces()[0];
@@ -14,11 +15,10 @@ double SCFIO::tt_trace(ExecutionContext& ec, Tensor<TensorType>& T1, Tensor<Tens
   return trace;
 }
 
-void SCFIO::print_energies(ExecutionContext& ec, const ChemEnv& chem_env, TAMMTensors& ttensors,
-                           EigenTensors& etensors, SCFVars& scf_vars,
-                           ScalapackInfo& scalapack_info) {
+void exachem::scf::SCFIO::print_energies(ExecutionContext& ec, const ChemEnv& chem_env,
+                                         TAMMTensors& ttensors, EigenTensors& etensors,
+                                         SCFVars& scf_vars, ScalapackInfo& scalapack_info) {
   const SystemData& sys_data = chem_env.sys_data;
-  // const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;
@@ -62,7 +62,7 @@ void SCFIO::print_energies(ExecutionContext& ec, const ChemEnv& chem_env, TAMMTe
   }
 }
 
-void SCFIO::print_mulliken(ChemEnv& chem_env, Matrix& D, Matrix& D_beta, Matrix& S) {
+void exachem::scf::SCFIO::print_mulliken(ChemEnv& chem_env, Matrix& D, Matrix& D_beta, Matrix& S) {
   std::vector<Atom>&   atoms    = chem_env.atoms;
   std::vector<ECAtom>& ec_atoms = chem_env.ec_atoms;
   libint2::BasisSet&   shells   = chem_env.shells;
@@ -145,7 +145,8 @@ void SCFIO::print_mulliken(ChemEnv& chem_env, Matrix& D, Matrix& D_beta, Matrix&
 }
 
 template<typename T>
-void SCFIO::rw_mat_disk(Tensor<T> tensor, std::string tfilename, bool profile, bool read) {
+void exachem::scf::SCFIO::rw_mat_disk(Tensor<T> tensor, std::string tfilename, bool profile,
+                                      bool read) {
 #if !defined(USE_UPCXX)
   if(read) read_from_disk<T>(tensor, tfilename, true, {}, profile);
   else write_to_disk<T>(tensor, tfilename, true, profile);
@@ -165,9 +166,9 @@ void SCFIO::rw_mat_disk(Tensor<T> tensor, std::string tfilename, bool profile, b
 #endif
 }
 
-void SCFIO::rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-                       TAMMTensors& ttensors, EigenTensors& etensors, std::string files_prefix,
-                       bool read) {
+void exachem::scf::SCFIO::rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env,
+                                     ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
+                                     EigenTensors& etensors, std::string files_prefix, bool read) {
   const auto rank   = ec.pg().rank();
   const bool is_uhf = chem_env.sys_data.is_unrestricted;
   auto       debug  = chem_env.ioptions.scf_options.debug;
@@ -229,7 +230,7 @@ void SCFIO::rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env, ScalapackI
 #endif
 }
 
-template void SCFIO::rw_mat_disk<double>(Tensor<double> tensor, std::string tfilename, bool profile,
-                                         bool read);
-template double SCFIO::tt_trace<double>(ExecutionContext& ec, Tensor<TensorType>& T1,
-                                        Tensor<TensorType>& T2);
+template void exachem::scf::SCFIO::rw_mat_disk<double>(Tensor<double> tensor, std::string tfilename,
+                                                       bool profile, bool read);
+template double exachem::scf::SCFIO::tt_trace<double>(ExecutionContext& ec, Tensor<TensorType>& T1,
+                                                      Tensor<TensorType>& T2);

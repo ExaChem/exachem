@@ -1,7 +1,7 @@
 #pragma once
 
 #include "tamm/eigen_utils.hpp"
-
+namespace exachem::scf {
 class EigenTensors {
 public:
   Matrix C_alpha, C_beta, C_occ; // allocated only on rank 0 when scalapack is not used
@@ -12,3 +12,4 @@ public:
   Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
     taskmap; // on all ranks for 4c HF only
 };
+} // namespace exachem::scf

@@ -10,7 +10,7 @@
 
 #include <filesystem>
 namespace fs = std::filesystem;
-
+using namespace exachem::scf;
 template<typename T>
 void eomccsd_x1(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const Tensor<T>& t1,
                 const Tensor<T>& t2, const Tensor<T>& x1, const Tensor<T>& x2, const Tensor<T>& f1,

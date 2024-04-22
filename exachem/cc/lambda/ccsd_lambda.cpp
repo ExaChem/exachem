@@ -8,7 +8,8 @@
 
 #include "ccsd_lambda.hpp"
 
-void iteration_print_lambda(const ProcGroup& pg, int iter, double residual, double time) {
+void exachem::cc::ccsd_lambda::iteration_print_lambda(const ProcGroup& pg, int iter,
+                                                      double residual, double time) {
   if(pg.rank() == 0) {
     std::cout << std::setw(4) << std::right << iter + 1 << "     ";
     std::cout << std::setprecision(13) << std::setw(16) << std::left << residual << "  ";
@@ -20,7 +21,8 @@ void iteration_print_lambda(const ProcGroup& pg, int iter, double residual, doub
 template<typename T>
 std::tuple<Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vector<Tensor<T>>,
            std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>>
-setupLambdaTensors(ExecutionContext& ec, TiledIndexSpace& MO, size_t ndiis) {
+exachem::cc::ccsd_lambda::setupLambdaTensors(ExecutionContext& ec, TiledIndexSpace& MO,
+                                             size_t ndiis) {
   TiledIndexSpace O = MO("occ");
   TiledIndexSpace V = MO("virt");
 
@@ -64,10 +66,12 @@ setupLambdaTensors(ExecutionContext& ec, TiledIndexSpace& MO, size_t ndiis) {
 }
 
 template<typename T>
-void lambda_ccsd_y1(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
-                    Tensor<T>& i0, const Tensor<T>& t1, const Tensor<T>& t2, const Tensor<T>& y1,
-                    const Tensor<T>& y2, const Tensor<T>& f1, V2Tensors<T>& v2tensors,
-                    Tensor<T>& cv3d, Y1Tensors<T>& y1tensors) {
+void exachem::cc::ccsd_lambda::lambda_ccsd_y1(Scheduler& sch, const TiledIndexSpace& MO,
+                                              const TiledIndexSpace& CI, Tensor<T>& i0,
+                                              const Tensor<T>& t1, const Tensor<T>& t2,
+                                              const Tensor<T>& y1, const Tensor<T>& y2,
+                                              const Tensor<T>& f1, V2Tensors<T>& v2tensors,
+                                              Tensor<T>& cv3d, Y1Tensors<T>& y1tensors) {
   // const TiledIndexSpace& O = MO("occ");
   // const TiledIndexSpace& V = MO("virt");
   auto [cind] = CI.labels<1>("all");
@@ -269,10 +273,12 @@ void lambda_ccsd_y1(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexS
 }
 
 template<typename T>
-void lambda_ccsd_y2(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
-                    Tensor<T>& i0, const Tensor<T>& t1, Tensor<T>& t2, const Tensor<T>& y1,
-                    Tensor<T>& y2, const Tensor<T>& f1, V2Tensors<T>& v2tensors, Tensor<T>& cv3d,
-                    Y2Tensors<T>& y2tensors) {
+void exachem::cc::ccsd_lambda::lambda_ccsd_y2(Scheduler& sch, const TiledIndexSpace& MO,
+                                              const TiledIndexSpace& CI, Tensor<T>& i0,
+                                              const Tensor<T>& t1, Tensor<T>& t2,
+                                              const Tensor<T>& y1, Tensor<T>& y2,
+                                              const Tensor<T>& f1, V2Tensors<T>& v2tensors,
+                                              Tensor<T>& cv3d, Y2Tensors<T>& y2tensors) {
   // const TiledIndexSpace& O = MO("occ");
   // const TiledIndexSpace& V = MO("virt");
   auto [cind] = CI.labels<1>("all");
@@ -436,13 +442,12 @@ void lambda_ccsd_y2(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexS
 }
 
 template<typename T>
-std::tuple<double, double>
-lambda_ccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
-                   const TiledIndexSpace& CI, Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_f1,
-                   V2Tensors<T>& v2tensors, Tensor<T>& cv3d, Tensor<T>& d_r1, Tensor<T>& d_r2,
-                   Tensor<T>& d_y1, Tensor<T>& d_y2, std::vector<Tensor<T>>& d_r1s,
-                   std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_y1s,
-                   std::vector<Tensor<T>>& d_y2s, std::vector<T>& p_evl_sorted) {
+std::tuple<double, double> exachem::cc::ccsd_lambda::lambda_ccsd_driver(
+  ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
+  Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_f1, V2Tensors<T>& v2tensors, Tensor<T>& cv3d,
+  Tensor<T>& d_r1, Tensor<T>& d_r2, Tensor<T>& d_y1, Tensor<T>& d_y2, std::vector<Tensor<T>>& d_r1s,
+  std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_y1s, std::vector<Tensor<T>>& d_y2s,
+  std::vector<T>& p_evl_sorted) {
   // TODO: LAMBDA DOES NOT HAVE THE SAME ITERATION CONVERGENCE
   //       PROTOCOL AND NEEDS TO BE UPDATED.
 
@@ -520,17 +525,17 @@ lambda_ccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpac
   Tensor<T>::deallocate(d_e, d_r1_residual, d_r2_residual);
 
   return std::make_tuple(residual, energy);
-}
+} // End of lambda_ccsd_driver
 
 using T = double;
-template std::tuple<double, double>
-lambda_ccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
-                   const TiledIndexSpace& CI, Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_f1,
-                   V2Tensors<T>& v2tensors, Tensor<T>& cv3d, Tensor<T>& d_r1, Tensor<T>& d_r2,
-                   Tensor<T>& d_y1, Tensor<T>& d_y2, std::vector<Tensor<T>>& d_r1s,
-                   std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_y1s,
-                   std::vector<Tensor<T>>& d_y2s, std::vector<T>& p_evl_sorted);
+template std::tuple<double, double> exachem::cc::ccsd_lambda::lambda_ccsd_driver(
+  ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
+  Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_f1, V2Tensors<T>& v2tensors, Tensor<T>& cv3d,
+  Tensor<T>& d_r1, Tensor<T>& d_r2, Tensor<T>& d_y1, Tensor<T>& d_y2, std::vector<Tensor<T>>& d_r1s,
+  std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_y1s, std::vector<Tensor<T>>& d_y2s,
+  std::vector<T>& p_evl_sorted);
 
 template std::tuple<Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vector<Tensor<T>>,
                     std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>>
-setupLambdaTensors(ExecutionContext& ec, TiledIndexSpace& MO, size_t ndiis);
+exachem::cc::ccsd_lambda::setupLambdaTensors(ExecutionContext& ec, TiledIndexSpace& MO,
+                                             size_t ndiis);

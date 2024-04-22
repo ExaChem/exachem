@@ -9,7 +9,7 @@
 #include "scf/scf_common.hpp"
 
 template<typename T>
-std::vector<size_t> sort_indexes(std::vector<T>& v) {
+std::vector<size_t> exachem::scf::sort_indexes(std::vector<T>& v) {
   std::vector<size_t> idx(v.size());
   iota(idx.begin(), idx.end(), 0);
   sort(idx.begin(), idx.end(), [&v](size_t x, size_t y) { return v[x] < v[y]; });
@@ -29,10 +29,11 @@ std::vector<size_t> sort_indexes(std::vector<T>& v) {
 // cols are transformed basis ("orthogonal" AO)
 //
 // A is conditioned to max_condition_number
-std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, ChemEnv& chem_env,
-                                              SCFVars& scf_vars, ScalapackInfo& scalapack_info,
-                                              TAMMTensors& ttensors, bool symmetric,
-                                              double threshold) {
+std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec, ChemEnv& chem_env,
+                                                            SCFVars&       scf_vars,
+                                                            ScalapackInfo& scalapack_info,
+                                                            exachem::scf::TAMMTensors& ttensors,
+                                                            bool symmetric, double threshold) {
   using T = TensorType;
 
   SystemData& sys_data    = chem_env.sys_data;
@@ -347,9 +348,9 @@ std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, ChemEnv& che
 // }
 
 std::tuple<Matrix, size_t, double, double>
-gensqrtinv_atscf(ExecutionContext& ec, ChemEnv& chem_env, SCFVars& scf_vars,
-                 ScalapackInfo& scalapack_info, Tensor<double> S1, TiledIndexSpace& tao_atom,
-                 bool symmetric, double threshold) {
+exachem::scf::gensqrtinv_atscf(ExecutionContext& ec, ChemEnv& chem_env, SCFVars& scf_vars,
+                               ScalapackInfo& scalapack_info, Tensor<double> S1,
+                               TiledIndexSpace& tao_atom, bool symmetric, double threshold) {
   using T = double;
 
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
@@ -445,8 +446,8 @@ gensqrtinv_atscf(ExecutionContext& ec, ChemEnv& chem_env, SCFVars& scf_vars,
 
 template<typename TensorType>
 std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-gather_task_vectors(ExecutionContext& ec, std::vector<int>& s1vec, std::vector<int>& s2vec,
-                    std::vector<int>& ntask_vec) {
+exachem::scf::gather_task_vectors(ExecutionContext& ec, std::vector<int>& s1vec,
+                                  std::vector<int>& s2vec, std::vector<int>& ntask_vec) {
   const int rank   = ec.pg().rank().value();
   const int nranks = ec.pg().size().value();
 
@@ -585,7 +586,7 @@ gather_task_vectors(ExecutionContext& ec, std::vector<int>& s1vec, std::vector<i
 }
 
 template std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-gather_task_vectors<double>(ExecutionContext& ec, std::vector<int>& s1vec, std::vector<int>& s2vec,
-                            std::vector<int>& ntask_vec);
+exachem::scf::gather_task_vectors<double>(ExecutionContext& ec, std::vector<int>& s1vec,
+                                          std::vector<int>& s2vec, std::vector<int>& ntask_vec);
 
-template std::vector<size_t> sort_indexes<double>(std::vector<double>& v);
+template std::vector<size_t> exachem::scf::sort_indexes<double>(std::vector<double>& v);

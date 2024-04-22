@@ -16,12 +16,12 @@ template<typename T>
 void compute_rdm(std::vector<int>&, std::string, Scheduler&, TiledIndexSpace&, Tensor<T>, Tensor<T>,
                  Tensor<T>, Tensor<T>);
 
-void ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env) {
+void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
   using namespace termcolor;
   auto rank = ec.pg().rank();
 
-  scf(ec, chem_env);
+  scf::scf_driver(ec, chem_env);
 
   double              hf_energy      = chem_env.hf_energy;
   libint2::BasisSet   shells         = chem_env.shells;
@@ -43,7 +43,7 @@ void ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = setupMOIS(chem_env);
+  auto [MO, total_orbitals] = cd_svd::setupMOIS(chem_env);
 
   const bool is_rhf = sys_data.is_restricted;
 
@@ -64,8 +64,8 @@ void ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
-                     shell_tile_map, ccsd_restart, cholfile);
+    cd_svd::cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
+                             shell_tile_map, ccsd_restart, cholfile);
 
   // if(ccsd_options.writev) ccsd_options.writet = true;
 
@@ -136,7 +136,7 @@ void ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   double residual = 0, corr_energy = 0;
 
   if(is_rhf)
-    std::tie(residual, corr_energy) = cd_ccsd_cs_driver<T>(
+    std::tie(residual, corr_energy) = ccsd::cd_ccsd_cs_driver<T>(
       chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s, p_evl_sorted,
       cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
   else
@@ -247,14 +247,14 @@ void ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   .execute();
   // clang-format on
 
-  SCFVars    spvars;
-  SCFCompute scf_compute;
+  scf::SCFVars    spvars;
+  scf::SCFCompute scf_compute;
   scf_compute.compute_shellpair_list(ec, shells, spvars);
   std::tie(spvars.shell_tile_map, spvars.AO_tiles, spvars.AO_opttiles) =
     scf_compute.compute_AO_tiles(ec, chem_env, shells);
 
-  auto     atoms = chem_env.atoms;
-  SCFGuess scf_guess;
+  auto          atoms = chem_env.atoms;
+  scf::SCFGuess scf_guess;
   scf_guess.compute_dipole_ints(ec, spvars, DipX_ao, DipY_ao, DipZ_ao, atoms, shells,
                                 libint2::Operator::emultipole1);
 
@@ -274,7 +274,7 @@ void ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   std::string densityfile_alpha =
     files_dir + "/scf/" + sys_data.output_file_prefix + ".alpha.density";
-  SCFIO scf_output;
+  scf::SCFIO scf_output;
   scf_output.rw_mat_disk<T>(dens, densityfile_alpha, debug, true); // read density
 
   // compute electronic dipole moments

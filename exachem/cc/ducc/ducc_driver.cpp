@@ -11,6 +11,7 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
+namespace exachem::cc::ducc {
 template<typename T>
 void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                         Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1, V2Tensors<T>& v2tensors,
@@ -21,7 +22,7 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   auto rank = ec.pg().rank();
 
-  scf(ec, chem_env);
+  scf::scf_driver(ec, chem_env);
 
   double              hf_energy      = chem_env.hf_energy;
   libint2::BasisSet   shells         = chem_env.shells;
@@ -49,7 +50,7 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   // TODO: Implement check for UHF
   if(nactv > sys_data.n_vir_alpha && is_rhf) tamm_terminate("[DUCC ERROR]: nactive > n_vir_alpha");
 
-  auto [MO, total_orbitals] = setupMOIS(chem_env, false, nactv);
+  auto [MO, total_orbitals] = cd_svd::setupMOIS(chem_env, false, nactv);
 
   std::string out_fp       = chem_env.workspace_dir;
   std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
@@ -66,8 +67,8 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
-                     shell_tile_map, ccsd_restart, cholfile);
+    exachem::cd_svd::cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO,
+                                      shells, shell_tile_map, ccsd_restart, cholfile);
   free_tensors(lcao);
 
   // if(ccsd_options.writev) ccsd_options.writet = true;
@@ -139,7 +140,7 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   double residual = 0, corr_energy = 0;
 
   if(is_rhf)
-    std::tie(residual, corr_energy) = cd_ccsd_cs_driver<T>(
+    std::tie(residual, corr_energy) = exachem::cc::ccsd::cd_ccsd_cs_driver<T>(
       chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s, p_evl_sorted,
       cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
   else
@@ -211,3 +212,4 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   ec.flush_and_sync();
   // delete ec;
 }
+} // namespace exachem::cc::ducc

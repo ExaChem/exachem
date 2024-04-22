@@ -13,6 +13,8 @@
 #include <iostream>
 #include <vector>
 
+namespace exachem::scf {
+
 typedef int NODE_T;
 typedef int EDGE_T;
 typedef int VAL_T;
@@ -51,3 +53,4 @@ public:
   void simpleLoadBal(NODE_T nMachine);
   void createTaskMap(Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& taskmap);
 };
+} // namespace exachem::scf

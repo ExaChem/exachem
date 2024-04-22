@@ -4,6 +4,8 @@
 using namespace tamm;
 using TensorType = double;
 
+namespace exachem::scf {
+
 class TAMMTensors {
 public:
   std::vector<Tensor<TensorType>> ehf_tamm_hist;
@@ -62,3 +64,4 @@ public:
   Tensor<TensorType> xyZ; // n,n,ndf
   Tensor<TensorType> Vm1; // ndf,ndf
 };
+} // namespace exachem::scf

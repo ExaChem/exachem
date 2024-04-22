@@ -21,9 +21,11 @@ CCSE_Tensors<CCEType> _a01, _a02, _a03, _a04, _a05, _a06, _a001, _a004, _a006, _
 Tensor<CCEType> i0_temp, t2_aaaa_temp; // CS only
 
 template<typename T>
-void ccsd_e_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI, Tensor<T>& de,
-               const Tensor<T>& t1_aa, const Tensor<T>& t2_abab, const Tensor<T>& t2_aaaa,
-               std::vector<CCSE_Tensors<T>>& f1_se, std::vector<CCSE_Tensors<T>>& chol3d_se) {
+void exachem::cc::ccsd::ccsd_e_cs(Scheduler& sch, const TiledIndexSpace& MO,
+                                  const TiledIndexSpace& CI, Tensor<T>& de, const Tensor<T>& t1_aa,
+                                  const Tensor<T>& t2_abab, const Tensor<T>& t2_aaaa,
+                                  std::vector<CCSE_Tensors<T>>& f1_se,
+                                  std::vector<CCSE_Tensors<T>>& chol3d_se) {
   auto [cind] = CI.labels<1>("all");
 
   auto [p1_va, p2_va] = v_alpha.labels<2>("all");
@@ -66,9 +68,11 @@ void ccsd_e_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace&
 }
 
 template<typename T>
-void ccsd_t1_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
-                Tensor<T>& i0_aa, const Tensor<T>& t1_aa, const Tensor<T>& t2_abab,
-                std::vector<CCSE_Tensors<T>>& f1_se, std::vector<CCSE_Tensors<T>>& chol3d_se) {
+void exachem::cc::ccsd::ccsd_t1_cs(Scheduler& sch, const TiledIndexSpace& MO,
+                                   const TiledIndexSpace& CI, Tensor<T>& i0_aa,
+                                   const Tensor<T>& t1_aa, const Tensor<T>& t2_abab,
+                                   std::vector<CCSE_Tensors<T>>& f1_se,
+                                   std::vector<CCSE_Tensors<T>>& chol3d_se) {
   auto [cind] = CI.labels<1>("all");
   auto [p2]   = MO.labels<1>("virt");
   auto [h1]   = MO.labels<1>("occ");
@@ -139,9 +143,11 @@ void ccsd_t1_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
 }
 
 template<typename T>
-void ccsd_t2_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
-                Tensor<T>& i0_abab, const Tensor<T>& t1_aa, Tensor<T>& t2_abab, Tensor<T>& t2_aaaa,
-                std::vector<CCSE_Tensors<T>>& f1_se, std::vector<CCSE_Tensors<T>>& chol3d_se) {
+void exachem::cc::ccsd::ccsd_t2_cs(Scheduler& sch, const TiledIndexSpace& MO,
+                                   const TiledIndexSpace& CI, Tensor<T>& i0_abab,
+                                   const Tensor<T>& t1_aa, Tensor<T>& t2_abab, Tensor<T>& t2_aaaa,
+                                   std::vector<CCSE_Tensors<T>>& f1_se,
+                                   std::vector<CCSE_Tensors<T>>& chol3d_se) {
   auto [cind]   = CI.labels<1>("all");
   auto [p3, p4] = MO.labels<2>("virt");
   auto [h1, h2] = MO.labels<2>("occ");
@@ -549,7 +555,7 @@ void ccsd_t2_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
 }
 
 template<typename T>
-std::tuple<double, double> cd_ccsd_cs_driver(
+std::tuple<double, double> exachem::cc::ccsd::cd_ccsd_cs_driver(
   ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
   Tensor<T>& t1_aa, Tensor<T>& t2_abab, Tensor<T>& d_f1, Tensor<T>& r1_aa, Tensor<T>& r2_abab,
   std::vector<Tensor<T>>& d_r1s, std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_t1s,
@@ -795,7 +801,7 @@ std::tuple<double, double> cd_ccsd_cs_driver(
 
   } // no restart
   else {
-    ccsd_e_cs(sch, MO, CI, d_e, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
+    exachem::cc::ccsd::ccsd_e_cs(sch, MO, CI, d_e, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
 
     sch.execute(exhw, profile);
 
@@ -870,7 +876,7 @@ std::tuple<double, double> cd_ccsd_cs_driver(
 }
 
 using T = double;
-template std::tuple<double, double> cd_ccsd_cs_driver<T>(
+template std::tuple<double, double> exachem::cc::ccsd::cd_ccsd_cs_driver<T>(
   ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
   Tensor<T>& t1_aa, Tensor<T>& t2_abab, Tensor<T>& d_f1, Tensor<T>& r1_aa, Tensor<T>& r2_abab,
   std::vector<Tensor<T>>& d_r1s, std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_t1s,

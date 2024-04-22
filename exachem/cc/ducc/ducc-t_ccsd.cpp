@@ -534,7 +534,7 @@ void ducc_tensors_io(ExecutionContext& ec, std::vector<Tensor<T>>& rwtensors,
     write_to_disk_group(ec, rwtensors, tfiles);
   }
 }
-
+namespace exachem::cc::ducc {
 template<typename T>
 void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                         Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1, V2Tensors<T>& v2tensors,
@@ -892,3 +892,4 @@ template void DUCC_T_CCSD_Driver<T>(ChemEnv& chem_env, ExecutionContext& ec,
                                     const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
                                     Tensor<T>& f1, V2Tensors<T>& v2tensors, size_t nactv,
                                     ExecutionHW ex_hw);
+} // namespace exachem::cc::ducc

@@ -12,6 +12,8 @@
 #include "tamm/eigen_utils.hpp"
 using namespace tamm;
 
+namespace exachem::cd_svd {
+
 template<typename TensorType>
 void print_mo_vectors_analysis(ChemEnv& chem_env, Matrix& C_alpha_eig, Matrix& C_beta_eig,
                                Matrix& F_MO_alpha, Matrix& F_MO_beta) {
@@ -114,8 +116,8 @@ void two_index_transform(ChemEnv& chem_env, ExecutionContext& ec, Tensor<TensorT
   const bool is_rhf = sys_data.is_restricted;
   // const bool is_rohf = sys_data.is_restricted_os;
 
-  Matrix CTiled(nao, N);
-  SCFIO  scf_output;
+  Matrix     CTiled(nao, N);
+  scf::SCFIO scf_output;
 
   std::string err_msg{};
 
@@ -264,3 +266,4 @@ void two_index_transform(ChemEnv& chem_env, ExecutionContext& ec, Tensor<TensorT
   if(pcore >= 0 && is_rhf)
     tamm_terminate("[RHF] pcore>=0 selected, fock and movecs written to disk");
 }
+} // namespace exachem::cd_svd

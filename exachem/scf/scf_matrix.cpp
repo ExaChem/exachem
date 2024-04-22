@@ -1,7 +1,7 @@
 #include "scf_matrix.hpp"
 
 template<typename T>
-Matrix SCFMatrix::read_scf_mat(std::string matfile) {
+Matrix exachem::scf::SCFMatrix::read_scf_mat(std::string matfile) {
   std::string mname = fs::path(matfile).extension();
   mname.erase(0, 1); // remove "."
 
@@ -26,7 +26,7 @@ Matrix SCFMatrix::read_scf_mat(std::string matfile) {
 }
 
 template<typename T>
-void SCFMatrix::write_scf_mat(Matrix& C, std::string matfile) {
+void exachem::scf::SCFMatrix::write_scf_mat(Matrix& C, std::string matfile) {
   std::string mname = fs::path(matfile).extension();
   mname.erase(0, 1); // remove "."
 
@@ -61,5 +61,5 @@ void SCFMatrix::write_scf_mat(Matrix& C, std::string matfile) {
   H5Fclose(file_id);
 }
 
-template Matrix SCFMatrix::read_scf_mat<double>(std::string matfile);
-template void   SCFMatrix::write_scf_mat<double>(Matrix& C, std::string matfile);
+template Matrix exachem::scf::SCFMatrix::read_scf_mat<double>(std::string matfile);
+template void   exachem::scf::SCFMatrix::write_scf_mat<double>(Matrix& C, std::string matfile);

@@ -16,8 +16,10 @@
 #endif
 #include "ccsd_t_common.hpp"
 
-void ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env);
+namespace exachem::cc::ccsd_t {
 
+void ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env);
+}
 void finalizememmodule();
 
 /**

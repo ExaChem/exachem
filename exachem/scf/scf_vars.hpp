@@ -9,6 +9,8 @@ using shellpair_list_t = std::unordered_map<size_t, std::vector<size_t>>;
 using shellpair_data_t =
   std::vector<std::vector<std::shared_ptr<libint2::ShellPair>>>; // in same order as
 
+namespace exachem::scf {
+
 class SCFVars {
 public:
   // diis
@@ -69,3 +71,4 @@ public:
   shellpair_data_t obs_shellpair_data_atom;   // shellpair data for OBS for specfied atom
   shellpair_data_t minbs_shellpair_data_atom; // shellpair data for minBS for specfied atom
 };
+} // namespace exachem::scf

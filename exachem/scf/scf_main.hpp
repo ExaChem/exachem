@@ -50,4 +50,7 @@ namespace fs = std::filesystem;
 
 #define SCF_THROTTLE_RESOURCES 1
 
+namespace exachem::scf {
 void scf(ExecutionContext& ec, ChemEnv& chem_env);
+void scf_driver(ExecutionContext& ec, ChemEnv& chem_env);
+} // namespace exachem::scf

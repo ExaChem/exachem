@@ -62,7 +62,7 @@ std::vector<double> gf_analyze_omega;
 //                d_t2_aaaa, d_t2_bbbb, d_t2_abab,
 //                v2ijab_aaaa, v2ijab_abab, v2ijab_bbbb,
 //                cholOO_a, cholOO_b, cholOV_a, cholOV_b, cholVV_a, cholVV_b;
-
+namespace exachem::cc::gfcc {
 Tensor<double> t2v2_o, lt12_o_a, lt12_o_b, ix1_1_1_a, ix1_1_1_b, ix2_1_aaaa, ix2_1_abab, ix2_1_bbbb,
   ix2_1_baba, ix2_2_a, ix2_2_b, ix2_3_a, ix2_3_b, ix2_4_aaaa, ix2_4_abab, ix2_4_bbbb, ix2_5_aaaa,
   ix2_5_abba, ix2_5_abab, ix2_5_bbbb, ix2_5_baab, ix2_5_baba, ix2_6_2_a, ix2_6_2_b, ix2_6_3_aaaa,
@@ -2517,7 +2517,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   auto restart_time_start = std::chrono::high_resolution_clock::now();
 
-  scf(ec, chem_env);
+  scf::scf_driver(ec, chem_env);
 
   SystemData& sys_data = chem_env.sys_data;
 
@@ -2568,7 +2568,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = setupMOIS(chem_env);
+  auto [MO, total_orbitals] = cd_svd::setupMOIS(chem_env);
 
   std::string out_fp       = chem_env.workspace_dir;
   std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
@@ -2587,8 +2587,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
-                     shell_tile_map, ccsd_restart, cholfile);
+    exachem::cd_svd::cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO,
+                                      shells, shell_tile_map, ccsd_restart, cholfile);
   free_tensors(lcao);
   total_orbitals = sys_data.nmo;
 
@@ -2665,14 +2665,14 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         if(rank == 0)
           std::cout << "Executing with " << nsranks << " ranks (" << nsranks / ppn << " nodes)"
                     << std::endl;
-        std::tie(residual, corr_energy) = cd_ccsd_cs_driver<T>(
+        std::tie(residual, corr_energy) = exachem::cc::ccsd::cd_ccsd_cs_driver<T>(
           chem_env, *sub_ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
           p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
       }
       ec.pg().barrier();
     }
     else {
-      std::tie(residual, corr_energy) = cd_ccsd_cs_driver<T>(
+      std::tie(residual, corr_energy) = exachem::cc::ccsd::cd_ccsd_cs_driver<T>(
         chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
         p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
     }
@@ -6432,3 +6432,4 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   }
   // delete ec;
 }
+} // namespace exachem::cc::gfcc

@@ -9,13 +9,12 @@
 #include "scf_iter.hpp"
 
 template<typename TensorType>
-std::tuple<TensorType, TensorType>
-SCFIter::scf_iter_body(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-                       const int& iter, SCFVars& scf_vars, TAMMTensors& ttensors,
-                       EigenTensors& etensors
+std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
+  ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const int& iter,
+  SCFVars& scf_vars, TAMMTensors& ttensors, EigenTensors& etensors
 #if defined(USE_GAUXC)
-                       ,
-                       GauXC::XCIntegrator<Matrix>& gauxc_integrator
+  ,
+  GauXC::XCIntegrator<Matrix>& gauxc_integrator
 #endif
 ) {
 
@@ -89,7 +88,7 @@ SCFIter::scf_iter_body(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& s
   if(is_ks) {
     const auto xcf_start = std::chrono::high_resolution_clock::now();
     gauxc_exc =
-      igauxc_util::compute_xcf<TensorType>(ec, chem_env, ttensors, etensors, gauxc_integrator);
+      scf::gauxc::compute_xcf<TensorType>(ec, chem_env, ttensors, etensors, gauxc_integrator);
 
     const auto xcf_stop = std::chrono::high_resolution_clock::now();
     const auto xcf_time =
@@ -184,9 +183,9 @@ SCFIter::scf_iter_body(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& s
   }
 
   auto     do_t1 = std::chrono::high_resolution_clock::now();
-  SCFGuess iscf_guess;
-  iscf_guess.scf_diagonalize<TensorType>(sch, chem_env, scf_vars, scalapack_info, ttensors,
-                                         etensors);
+  SCFGuess scf_guess;
+  scf_guess.scf_diagonalize<TensorType>(sch, chem_env, scf_vars, scalapack_info, ttensors,
+                                        etensors);
 
   auto do_t2   = std::chrono::high_resolution_clock::now();
   auto do_time = std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
@@ -238,10 +237,12 @@ SCFIter::scf_iter_body(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& s
 
 template<typename TensorType>
 std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-SCFIter::compute_2bf_taskinfo(ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars,
-                              const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
-                              const Matrix& SchwarzK, const size_t& max_nprim4,
-                              TAMMTensors& ttensors, EigenTensors& etensors, const bool cs1s2) {
+exachem::scf::SCFIter::compute_2bf_taskinfo(ExecutionContext& ec, ChemEnv& chem_env,
+                                            const SCFVars& scf_vars, const bool do_schwarz_screen,
+                                            const std::vector<size_t>& shell2bf,
+                                            const Matrix& SchwarzK, const size_t& max_nprim4,
+                                            TAMMTensors& ttensors, EigenTensors& etensors,
+                                            const bool cs1s2) {
   Matrix&             D       = etensors.D_alpha;
   Matrix&             D_beta  = etensors.D_beta;
   Tensor<TensorType>& F_dummy = ttensors.F_dummy;
@@ -318,8 +319,8 @@ SCFIter::compute_2bf_taskinfo(ExecutionContext& ec, ChemEnv& chem_env, const SCF
 }
 
 template<typename TensorType>
-void SCFIter::compute_3c_ints(ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars,
-                              Tensor<TensorType>& xyZ) {
+void exachem::scf::SCFIter::compute_3c_ints(ExecutionContext& ec, ChemEnv& chem_env,
+                                            const SCFVars& scf_vars, Tensor<TensorType>& xyZ) {
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
@@ -422,8 +423,9 @@ void SCFIter::compute_3c_ints(ExecutionContext& ec, ChemEnv& chem_env, const SCF
 }
 
 template<typename TensorType>
-void SCFIter::compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_env, EigenTensors& etensors,
-                              const SCFVars& scf_vars, TAMMTensors& ttensors) {
+void exachem::scf::SCFIter::compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_env,
+                                            EigenTensors& etensors, const SCFVars& scf_vars,
+                                            TAMMTensors& ttensors) {
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
@@ -525,8 +527,9 @@ void SCFIter::compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_env, EigenTens
 }
 
 template<typename TensorType>
-void SCFIter::init_ri(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-                      const SCFVars& scf_vars, EigenTensors& etensors, TAMMTensors& ttensors) {
+void exachem::scf::SCFIter::init_ri(ExecutionContext& ec, ChemEnv& chem_env,
+                                    ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
+                                    EigenTensors& etensors, TAMMTensors& ttensors) {
   SystemData& sys_data    = chem_env.sys_data;
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -640,10 +643,11 @@ void SCFIter::init_ri(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& sc
 }
 
 template<typename TensorType>
-void SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv& chem_env,
-                                    const SCFVars& scf_vars, const std::vector<size_t>& shell2bf,
-                                    TAMMTensors& ttensors, EigenTensors& etensors,
-                                    const Matrix& SchwarzK) {
+void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv& chem_env,
+                                                  const SCFVars&             scf_vars,
+                                                  const std::vector<size_t>& shell2bf,
+                                                  TAMMTensors& ttensors, EigenTensors& etensors,
+                                                  const Matrix& SchwarzK) {
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
@@ -837,10 +841,11 @@ void SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv& chem_env,
 };
 
 template<typename TensorType>
-void SCFIter::compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-                             const SCFVars& scf_vars, const std::vector<size_t>& shell2bf,
-                             TAMMTensors& ttensors, EigenTensors& etensors, bool& is_3c_init,
-                             double xHF) {
+void exachem::scf::SCFIter::compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_env,
+                                           ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
+                                           const std::vector<size_t>& shell2bf,
+                                           TAMMTensors& ttensors, EigenTensors& etensors,
+                                           bool& is_3c_init, double xHF) {
   SystemData& sys_data    = chem_env.sys_data;
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -925,11 +930,13 @@ void SCFIter::compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_env, ScalapackI
 }
 
 template<typename TensorType>
-void SCFIter::compute_2bf(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-                          const SCFVars& scf_vars, const bool do_schwarz_screen,
-                          const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
-                          const size_t& max_nprim4, TAMMTensors& ttensors, EigenTensors& etensors,
-                          bool& is_3c_init, const bool do_density_fitting, double xHF) {
+void exachem::scf::SCFIter::compute_2bf(ExecutionContext& ec, ChemEnv& chem_env,
+                                        ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
+                                        const bool                 do_schwarz_screen,
+                                        const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
+                                        const size_t& max_nprim4, TAMMTensors& ttensors,
+                                        EigenTensors& etensors, bool& is_3c_init,
+                                        const bool do_density_fitting, double xHF) {
   using libint2::Operator;
 
   SystemData&              sys_data    = chem_env.sys_data;
@@ -1261,14 +1268,15 @@ void SCFIter::compute_2bf(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo
 }
 
 template<typename TensorType>
-void SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env, const TiledIndexSpace& tAO,
-                       Tensor<TensorType> F_alpha, Tensor<TensorType> F_beta,
-                       Tensor<TensorType> err_mat_alpha, Tensor<TensorType> err_mat_beta, int iter,
-                       int max_hist, const SCFVars& scf_vars, const int n_lindep,
-                       std::vector<Tensor<TensorType>>& diis_hist_alpha,
-                       std::vector<Tensor<TensorType>>& diis_hist_beta,
-                       std::vector<Tensor<TensorType>>& fock_hist_alpha,
-                       std::vector<Tensor<TensorType>>& fock_hist_beta) {
+void exachem::scf::SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env,
+                                     const TiledIndexSpace& tAO, Tensor<TensorType> F_alpha,
+                                     Tensor<TensorType> F_beta, Tensor<TensorType> err_mat_alpha,
+                                     Tensor<TensorType> err_mat_beta, int iter, int max_hist,
+                                     const SCFVars& scf_vars, const int n_lindep,
+                                     std::vector<Tensor<TensorType>>& diis_hist_alpha,
+                                     std::vector<Tensor<TensorType>>& diis_hist_beta,
+                                     std::vector<Tensor<TensorType>>& fock_hist_alpha,
+                                     std::vector<Tensor<TensorType>>& fock_hist_beta) {
   using Vector = Eigen::Matrix<TensorType, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
   tamm::Scheduler sch{ec};
@@ -1463,49 +1471,49 @@ void SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env, const TiledIndex
   sch.execute();
 }
 
-template std::tuple<double, double>
-SCFIter::scf_iter_body<double>(ExecutionContext& ec, ChemEnv& chem_env,
-                               ScalapackInfo& scalapack_info, const int& iter, SCFVars& scf_vars,
-                               TAMMTensors& ttensors, EigenTensors& etensors
+template std::tuple<double, double> exachem::scf::SCFIter::scf_iter_body<double>(
+  ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const int& iter,
+  SCFVars& scf_vars, TAMMTensors& ttensors, EigenTensors& etensors
 #if defined(USE_GAUXC)
-                               ,
-                               GauXC::XCIntegrator<Matrix>& gauxc_integrator
+  ,
+  GauXC::XCIntegrator<Matrix>& gauxc_integrator
 #endif
 );
 
 template std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-SCFIter::compute_2bf_taskinfo<double>(ExecutionContext& ec, ChemEnv& chem_env,
-                                      const SCFVars& scf_vars, const bool do_schwarz_screen,
-                                      const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
-                                      const size_t& max_nprim4, TAMMTensors& ttensors,
-                                      EigenTensors& etensors, const bool cs1s2);
+exachem::scf::SCFIter::compute_2bf_taskinfo<double>(
+  ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars, const bool do_schwarz_screen,
+  const std::vector<size_t>& shell2bf, const Matrix& SchwarzK, const size_t& max_nprim4,
+  TAMMTensors& ttensors, EigenTensors& etensors, const bool cs1s2);
 
-template void SCFIter::compute_2bf<double>(
+template void exachem::scf::SCFIter::compute_2bf<double>(
   ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
   const bool do_schwarz_screen, const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
   const size_t& max_nprim4, TAMMTensors& ttensors, EigenTensors& etensors, bool& is_3c_init,
   const bool do_density_fitting, double xHF);
 
-template void SCFIter::compute_2bf_ri<double>(ExecutionContext& ec, ChemEnv& chem_env,
-                                              ScalapackInfo&             scalapack_info,
-                                              const SCFVars&             scf_vars,
-                                              const std::vector<size_t>& shell2bf,
-                                              TAMMTensors& ttensors, EigenTensors& etensors,
-                                              bool& is_3c_init, double xHF);
+template void exachem::scf::SCFIter::compute_2bf_ri<double>(
+  ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
+  const std::vector<size_t>& shell2bf, TAMMTensors& ttensors, EigenTensors& etensors,
+  bool& is_3c_init, double xHF);
 
-template void SCFIter::init_ri<double>(ExecutionContext& ec, ChemEnv& chem_env,
-                                       ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
-                                       EigenTensors& etensors, TAMMTensors& ttensors);
+template void exachem::scf::SCFIter::init_ri<double>(ExecutionContext& ec, ChemEnv& chem_env,
+                                                     ScalapackInfo& scalapack_info,
+                                                     const SCFVars& scf_vars,
+                                                     EigenTensors& etensors, TAMMTensors& ttensors);
 
-template void SCFIter::compute_2c_ints<double>(ExecutionContext& ec, ChemEnv& chem_env,
-                                               EigenTensors& etensors, const SCFVars& scf_vars,
-                                               TAMMTensors& ttensors);
+template void exachem::scf::SCFIter::compute_2c_ints<double>(ExecutionContext& ec,
+                                                             ChemEnv&          chem_env,
+                                                             EigenTensors&     etensors,
+                                                             const SCFVars&    scf_vars,
+                                                             TAMMTensors&      ttensors);
 
-template void SCFIter::compute_3c_ints<double>(ExecutionContext& ec, ChemEnv& chem_env,
-                                               const SCFVars& scf_vars, Tensor<TensorType>& xyZ);
+template void exachem::scf::SCFIter::compute_3c_ints<double>(ExecutionContext&   ec,
+                                                             ChemEnv&            chem_env,
+                                                             const SCFVars&      scf_vars,
+                                                             Tensor<TensorType>& xyZ);
 
-template void SCFIter::compute_2bf_ri_direct<double>(ExecutionContext& ec, ChemEnv& chem_env,
-                                                     const SCFVars&             scf_vars,
-                                                     const std::vector<size_t>& shell2bf,
-                                                     TAMMTensors& ttensors, EigenTensors& etensors,
-                                                     const Matrix& SchwarzK);
+template void exachem::scf::SCFIter::compute_2bf_ri_direct<double>(
+  ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars,
+  const std::vector<size_t>& shell2bf, TAMMTensors& ttensors, EigenTensors& etensors,
+  const Matrix& SchwarzK);

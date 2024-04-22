@@ -12,6 +12,7 @@
 #include "scf/scf_gauxc.hpp"
 #include "scf/scf_guess.hpp"
 
+namespace exachem::scf {
 class SCFIter: public SCFCompute {
 private:
   template<typename TensorType>
@@ -71,3 +72,4 @@ public:
 #endif
   );
 };
+} // namespace exachem::scf

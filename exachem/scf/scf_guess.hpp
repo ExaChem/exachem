@@ -11,7 +11,9 @@
 #include "scf/scf_common.hpp"
 #include "scf/scf_compute.hpp"
 
-namespace iscf_guess {
+namespace exachem::scf {
+
+namespace scf_guess {
 
 /// computes orbital occupation numbers for a subshell of size \c size created
 /// by smearing
@@ -32,7 +34,7 @@ void subshell_occvec(Real& occvec, size_t size, size_t& ne);
 template<typename Real = double>
 const std::vector<Real> compute_ao_occupation_vector(size_t Z);
 
-} // namespace iscf_guess
+} // namespace scf_guess
 
 class SCFGuess {
 private:
@@ -79,3 +81,4 @@ public:
   void t2e_hf_helper(const ExecutionContext& ec, tamm::Tensor<T>& ttensor, Matrix& etensor,
                      const std::string& ustr = "");
 };
+} // namespace exachem::scf

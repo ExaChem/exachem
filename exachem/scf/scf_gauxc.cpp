@@ -3,7 +3,8 @@
 #if defined(USE_GAUXC)
 
 std::tuple<std::shared_ptr<GauXC::XCIntegrator<Matrix>>, double>
-igauxc_util::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env, const SCFVars& scf_vars) {
+exachem::scf::gauxc::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
+                                 const SCFVars& scf_vars) {
   size_t            batch_size  = 512;
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
@@ -107,7 +108,7 @@ igauxc_util::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env, const SC
   return std::make_tuple(integrator_factory.get_shared_instance(gauxc_func, gauxc_lb), xHF);
 };
 
-GauXC::Molecule igauxc_util::make_gauxc_molecule(const std::vector<libint2::Atom>& atoms) {
+GauXC::Molecule exachem::scf::gauxc::make_gauxc_molecule(const std::vector<libint2::Atom>& atoms) {
   GauXC::Molecule mol;
   mol.resize(atoms.size());
   std::transform(atoms.begin(), atoms.end(), mol.begin(), [](const libint2::Atom& atom) {
@@ -117,7 +118,7 @@ GauXC::Molecule igauxc_util::make_gauxc_molecule(const std::vector<libint2::Atom
   return mol;
 }
 
-GauXC::BasisSet<double> igauxc_util::make_gauxc_basis(const libint2::BasisSet& basis) {
+GauXC::BasisSet<double> exachem::scf::gauxc::make_gauxc_basis(const libint2::BasisSet& basis) {
   using shell_t = GauXC::Shell<double>;
   using prim_t  = typename shell_t::prim_array;
   using cart_t  = typename shell_t::cart_array;
@@ -140,9 +141,10 @@ GauXC::BasisSet<double> igauxc_util::make_gauxc_basis(const libint2::BasisSet& b
 }
 
 template<typename TensorType>
-TensorType igauxc_util::compute_xcf(ExecutionContext& ec, ChemEnv& chem_env, TAMMTensors& ttensors,
-                                    EigenTensors&                etensors,
-                                    GauXC::XCIntegrator<Matrix>& xc_integrator) {
+TensorType exachem::scf::gauxc::compute_xcf(ExecutionContext& ec, ChemEnv& chem_env,
+                                            exachem::scf::TAMMTensors&   ttensors,
+                                            exachem::scf::EigenTensors&  etensors,
+                                            GauXC::XCIntegrator<Matrix>& xc_integrator) {
   SystemData& sys_data = chem_env.sys_data;
 
   const bool is_uhf = sys_data.is_unrestricted;
@@ -170,8 +172,8 @@ TensorType igauxc_util::compute_xcf(ExecutionContext& ec, ChemEnv& chem_env, TAM
   return EXC;
 }
 
-template double igauxc_util::compute_xcf<double>(ExecutionContext& ec, ChemEnv& chem_env,
-                                                 TAMMTensors& ttensors, EigenTensors& etensors,
-                                                 GauXC::XCIntegrator<Matrix>& xc_integrator);
+template double exachem::scf::gauxc::compute_xcf<double>(
+  ExecutionContext& ec, ChemEnv& chem_env, exachem::scf::TAMMTensors& ttensors,
+  exachem::scf::EigenTensors& etensors, GauXC::XCIntegrator<Matrix>& xc_integrator);
 
 #endif

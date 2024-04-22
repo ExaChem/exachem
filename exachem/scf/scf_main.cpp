@@ -5,6 +5,10 @@
 #include "scf/scf_outputs.hpp"
 #include <string_view>
 
+namespace exachem::scf {
+
+void scf_driver(ExecutionContext& ec, ChemEnv& chem_env) { scf(ec, chem_env); }
+
 void scf(ExecutionContext& ec, ChemEnv& chem_env) {
   auto rank = ec.pg().rank();
 
@@ -26,3 +30,4 @@ void scf(ExecutionContext& ec, ChemEnv& chem_env) {
               << "Total Time taken for Hartree-Fock: " << std::fixed << std::setprecision(2)
               << hf_time << " secs" << std::endl;
 }
+} // namespace exachem::scf

@@ -3,9 +3,11 @@
 #include "common/options/parser_utils.hpp"
 #include <functional>
 
-void SCFHartreeFock::initialize(ExecutionContext& exc, ChemEnv& chem_env) { scf_hf(exc, chem_env); }
+void exachem::scf::SCFHartreeFock::initialize(ExecutionContext& exc, ChemEnv& chem_env) {
+  scf_hf(exc, chem_env);
+}
 
-void SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
+void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
   SCFCompute scf_compute;
   SCFIter    scf_iter;
   SCFGuess   scf_guess;
@@ -233,7 +235,7 @@ void SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
     double                                       xHF;
     std::shared_ptr<GauXC::XCIntegrator<Matrix>> gauxc_integrator_ptr;
     if(chem_env.sys_data.is_ks)
-      std::tie(gauxc_integrator_ptr, xHF) = igauxc_util::setup_gauxc(ec, chem_env, scf_vars);
+      std::tie(gauxc_integrator_ptr, xHF) = scf::gauxc::setup_gauxc(ec, chem_env, scf_vars);
     else xHF = 1.0;
     auto gauxc_integrator = chem_env.sys_data.is_ks
                               ? GauXC::XCIntegrator<Matrix>(std::move(*gauxc_integrator_ptr))
@@ -515,55 +517,7 @@ void SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
 
       scf_guess.compute_sad_guess<TensorType>(ec, chem_env, scf_vars, scalapack_info, etensors,
                                               ttensors);
-      if(!do_density_fitting && scf_vars.do_load_bal) {
-        // Collect task info
-        std::tie(s1vec, s2vec, ntask_vec) = scf_iter.compute_2bf_taskinfo<TensorType>(
-          ec, chem_env, scf_vars, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4, ttensors,
-          etensors, do_density_fitting);
 
-        auto [s1_all, s2_all, ntasks_all] =
-          gather_task_vectors<TensorType>(ec, s1vec, s2vec, ntask_vec);
-
-        int tmdim = 0;
-        if(rank == 0) {
-          Loads dummyLoads;
-          /***generate load balanced task map***/
-          dummyLoads.readLoads(s1_all, s2_all, ntasks_all);
-          dummyLoads.simpleLoadBal(ec.pg().size().value());
-          tmdim = std::max(dummyLoads.maxS1, dummyLoads.maxS2);
-          etensors.taskmap.resize(tmdim + 1, tmdim + 1);
-          // value in this array is the rank that executes task i,j
-          // -1 indicates a task i,j that can be skipped
-          etensors.taskmap.setConstant(-1);
-          // cout<<"creating task map"<<endl;
-          dummyLoads.createTaskMap(etensors.taskmap);
-          // cout<<"task map creation completed"<<endl;
-        }
-        ec.pg().broadcast(&tmdim, 0);
-        if(rank != 0) etensors.taskmap.resize(tmdim + 1, tmdim + 1);
-        ec.pg().broadcast(etensors.taskmap.data(), etensors.taskmap.size(), 0);
-      }
-
-      scf_iter.compute_2bf<TensorType>(ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen,
-                                       shell2bf, SchwarzK, max_nprim4, ttensors, etensors,
-                                       is_3c_init, do_density_fitting, xHF);
-
-#if defined(USE_GAUXC)
-      TensorType gauxc_exc = 0.;
-      if(chem_env.sys_data.is_ks) {
-        gauxc_exc =
-          igauxc_util::compute_xcf<TensorType>(ec, chem_env, ttensors, etensors, gauxc_integrator);
-      }
-#endif
-
-      scf_guess.scf_diagonalize<TensorType>(sch, chem_env, scf_vars, scalapack_info, ttensors,
-                                            etensors);
-
-      scf_compute.compute_density<TensorType>(ec, chem_env, scf_vars, scalapack_info, ttensors,
-                                              etensors);
-
-      if(!do_density_fitting && scf_vars.do_load_bal) etensors.taskmap.resize(0, 0);
-      scf_output.rw_md_disk(ec, chem_env, scalapack_info, ttensors, etensors, files_prefix);
       ec.pg().barrier();
     }
 
@@ -633,46 +587,86 @@ void SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
       ec.pg().broadcast(etensors.taskmap.data(), etensors.taskmap.size(), 0);
     }
 
-    if(chem_env.ioptions.scf_options.restart || chem_env.ioptions.scf_options.noscf ||
-       ec_basis.molden_exists) {
-      sch(ttensors.F_alpha_tmp() = 0).execute();
+    if(chem_env.ioptions.scf_options.noscf) {
+      SystemData& sys_data = chem_env.sys_data;
 
-      if(chem_env.sys_data.is_unrestricted) { sch(ttensors.F_beta_tmp() = 0).execute(); }
-      // F1 = H1 + F_alpha_tmp
+      // clang-format off
+      sch (ttensors.F_alpha_tmp() = 0)
+          (ttensors.D_last_alpha(mu,nu) = ttensors.D_alpha(mu,nu))
+          .execute();
+      // clang-format on
+
+      if(chem_env.sys_data.is_unrestricted) {
+        // clang-format off
+        sch (ttensors.F_beta_tmp() = 0)
+            (ttensors.D_last_beta(mu,nu) = ttensors.D_beta(mu,nu))
+            .execute();
+        // clang-format on
+      }
+
+      // F_alpha = H1 + F_alpha_tmp
       scf_iter.compute_2bf<TensorType>(ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen,
                                        shell2bf, SchwarzK, max_nprim4, ttensors, etensors,
                                        is_3c_init, do_density_fitting, xHF);
 
-      TensorType gauxc_exc = 0.;
+      if(sys_data.is_restricted) {
+        // clang-format off
+        sch
+          (ttensors.ehf_tmp(mu,nu)  = ttensors.H1(mu,nu))
+          (ttensors.ehf_tmp(mu,nu) += ttensors.F_alpha(mu,nu))
+          (ttensors.ehf_tamm()      = 0.5 * ttensors.D_alpha() * ttensors.ehf_tmp())
+          .execute();
+        // clang-format on
+      }
+
+      if(sys_data.is_unrestricted) {
+        // clang-format off
+        sch
+          (ttensors.ehf_tmp(mu,nu)  = ttensors.H1(mu,nu))
+          (ttensors.ehf_tmp(mu,nu) += ttensors.F_alpha(mu,nu))
+          (ttensors.ehf_tamm()      = 0.5 * ttensors.D_alpha() * ttensors.ehf_tmp())
+          (ttensors.ehf_tmp(mu,nu)  = ttensors.H1(mu,nu))
+          (ttensors.ehf_tmp(mu,nu) += ttensors.F_beta(mu,nu))
+          (ttensors.ehf_tamm()     += 0.5 * ttensors.D_beta()  * ttensors.ehf_tmp())
+          .execute();
+        // clang-format on
+      }
+
+      ehf = get_scalar(ttensors.ehf_tamm);
+
 #if defined(USE_GAUXC)
-      if(chem_env.sys_data.is_ks) {
+      const bool is_ks     = sys_data.is_ks;
+      double     gauxc_exc = 0;
+      if(is_ks) {
+        const auto xcf_start = std::chrono::high_resolution_clock::now();
         gauxc_exc =
-          igauxc_util::compute_xcf<TensorType>(ec, chem_env, ttensors, etensors, gauxc_integrator);
+          scf::gauxc::compute_xcf<TensorType>(ec, chem_env, ttensors, etensors, gauxc_integrator);
+
+        const auto xcf_stop = std::chrono::high_resolution_clock::now();
+        const auto xcf_time =
+          std::chrono::duration_cast<std::chrono::duration<double>>((xcf_stop - xcf_start)).count();
+        auto debug = chem_env.ioptions.scf_options.debug;
+        if(rank == 0 && debug) std::cout << "xcf:" << xcf_time << "s, ";
+      }
+
+      ehf += gauxc_exc;
+      scf_vars.exc = gauxc_exc;
+
+      if(is_ks) {
+        sch(ttensors.F_alpha() += ttensors.VXC_alpha());
+        if(sys_data.is_unrestricted) {
+          // clang-format off
+          sch
+            (ttensors.F_alpha() += ttensors.VXC_beta())
+            (ttensors.F_beta()  += ttensors.VXC_alpha())
+            (ttensors.F_beta()  += -1.0 * ttensors.VXC_beta());
+          // clang-format on
+        }
+        sch.execute();
       }
 #endif
 
-      // ehf = D * (H1+F1);
-      if(chem_env.sys_data.is_restricted) {
-        // clang-format off
-        sch (ttensors.ehf_tmp(mu,nu)  = 2.0 * ttensors.H1(mu,nu))
-            (ttensors.ehf_tmp(mu,nu) += 1.0 * ttensors.F_alpha_tmp(mu,nu))
-            (ttensors.ehf_tamm()      = 1.0 * ttensors.D_alpha() * ttensors.ehf_tmp())
-            .execute();
-        // clang-format on
-      }
-      if(chem_env.sys_data.is_unrestricted) {
-        // clang-format off
-        sch (ttensors.ehf_tmp(mu,nu)  = 2.0 * ttensors.H1(mu,nu))
-            (ttensors.ehf_tmp(mu,nu) += 1.0 * ttensors.F_alpha_tmp(mu,nu))
-            (ttensors.ehf_tamm()      = 1.0 * ttensors.D_alpha() * ttensors.ehf_tmp())
-            (ttensors.ehf_tmp(mu,nu)  = 2.0 * ttensors.H1(mu,nu))
-            (ttensors.ehf_tmp(mu,nu) += 1.0 * ttensors.F_beta_tmp(mu,nu))
-            (ttensors.ehf_tamm()     += 1.0 * ttensors.D_beta() * ttensors.ehf_tmp())
-            .execute();
-        // clang-format on
-      }
-
-      ehf = 0.5 * get_scalar(ttensors.ehf_tamm) + enuc + gauxc_exc;
+      ehf += enuc;
       if(rank == 0)
         std::cout << std::setprecision(18) << "Total HF energy after restart: " << ehf << std::endl;
     }

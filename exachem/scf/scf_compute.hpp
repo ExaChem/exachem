@@ -12,6 +12,9 @@ using shellpair_data_t =
                                                                  // shellpair_list_t
 
 #pragma once
+
+namespace exachem::scf {
+
 class SCFCompute {
 public:
   Matrix compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A);
@@ -50,3 +53,4 @@ public:
                               typename libint2::operator_traits<Kernel>::oper_params_type params =
                                 libint2::operator_traits<Kernel>::default_params());
 };
+} // namespace exachem::scf

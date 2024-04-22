@@ -9,8 +9,7 @@
 #include "cc/ccsd/ccsd_util.hpp"
 
 using namespace tamm;
-
-namespace rteomcc {
+namespace exachem::rteom_cc::ccsd {
 
 bool debug = false;
 
@@ -819,7 +818,7 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
     if(ec.print()) std::cout << std::right << "Timestep " << titer + 1 << std::endl;
 
     // step 1
-    rteomcc::ccsd_e_os(sch, MO, CI, d_e, t1_vo, t2_vvoo, f1_se, chol3d_se);
+    rteom_cc::ccsd::ccsd_e_os(sch, MO, CI, d_e, t1_vo, t2_vvoo, f1_se, chol3d_se);
     sch.execute(exhw, profile);
 
     if(ec.print()) {
@@ -849,9 +848,9 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
     sch.execute();
 
     // step 3
-    rteomcc::ccsd_t1_os(sch, MO, CI, r1_vo_old, t1_vo_old, t2_vvoo_old, f1_se, chol3d_se);
-    rteomcc::ccsd_t2_os(sch, MO, CI, r2_vvoo_old, t1_vo_old, t2_vvoo_old, f1_se, chol3d_se,
-                        i0_t2_tmp);
+    rteom_cc::ccsd::ccsd_t1_os(sch, MO, CI, r1_vo_old, t1_vo_old, t2_vvoo_old, f1_se, chol3d_se);
+    rteom_cc::ccsd::ccsd_t2_os(sch, MO, CI, r2_vvoo_old, t1_vo_old, t2_vvoo_old, f1_se, chol3d_se,
+                               i0_t2_tmp);
     sch.execute(exhw, profile);
 
     // if(ec.print() && debug) std::cout << "Step 3 debug r1,r2 old norm ..." << std::endl;
@@ -869,8 +868,8 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
 
       // r1=r2=0
       // step 5
-      rteomcc::ccsd_t1_os(sch, MO, CI, r1_vo, t1_vo, t2_vvoo, f1_se, chol3d_se);
-      rteomcc::ccsd_t2_os(sch, MO, CI, r2_vvoo, t1_vo, t2_vvoo, f1_se, chol3d_se, i0_t2_tmp);
+      rteom_cc::ccsd::ccsd_t1_os(sch, MO, CI, r1_vo, t1_vo, t2_vvoo, f1_se, chol3d_se);
+      rteom_cc::ccsd::ccsd_t2_os(sch, MO, CI, r2_vvoo, t1_vo, t2_vvoo, f1_se, chol3d_se, i0_t2_tmp);
       sch.execute(exhw, profile);
 
       // step 6 (r += r_old)
@@ -896,7 +895,7 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
       complex_copy_swap(ec, r2_vvoo("bbbb"), t2_vvoo_aux("bbbb"));
 
       // step 9
-      rteomcc::ccsd_e_os(sch, MO, CI, d_e, t1_vo_aux, t2_vvoo_aux, f1_se, chol3d_se);
+      rteom_cc::ccsd::ccsd_e_os(sch, MO, CI, d_e, t1_vo_aux, t2_vvoo_aux, f1_se, chol3d_se);
       sch.execute(exhw, profile);
 
       // step 10
@@ -979,15 +978,13 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
   sch.deallocate(d_e, _a01V).execute();
 }
 
-}; // namespace rteomcc
-
 void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T             = double;
-  using ComplexTensor = Tensor<rteomcc::CCEType>;
+  using ComplexTensor = Tensor<rteom_cc::ccsd::CCEType>;
 
   auto rank = ec.pg().rank();
 
-  scf(ec, chem_env);
+  scf::scf_driver(ec, chem_env);
 
   libint2::BasisSet   shells         = chem_env.shells;
   Tensor<T>           C_AO           = chem_env.C_AO;
@@ -1006,7 +1003,7 @@ void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = setupMOIS(chem_env);
+  auto [MO, total_orbitals] = cd_svd::setupMOIS(chem_env);
 
   std::string out_fp       = chem_env.workspace_dir;
   std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
@@ -1025,8 +1022,8 @@ void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
-                     shell_tile_map, cc_restart, cholfile);
+    exachem::cd_svd::cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO,
+                                      shells, shell_tile_map, cc_restart, cholfile);
   free_tensors(lcao);
 
   TiledIndexSpace N = MO("all");
@@ -1061,7 +1058,7 @@ void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     .deallocate(d_f1, cholVpr)
     .execute();
 
-  std::vector<rteomcc::CCEType> p_evl_sorted = tamm::diagonal(d_f1_c);
+  std::vector<rteom_cc::ccsd::CCEType> p_evl_sorted = tamm::diagonal(d_f1_c);
 
   if(rank == 0 && debug) {
     print_vector(p_evl_sorted, files_prefix + ".eigen_values.txt");
@@ -1077,8 +1074,8 @@ void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
   files_prefix = files_dir + sys_data.output_file_prefix;
 
-  rteomcc::rt_eom_cd_ccsd<rteomcc::CCEType>(chem_env, ec, MO, CI, d_f1_c, p_evl_sorted, cholVpr_c,
-                                            cc_restart, files_prefix);
+  rteom_cc::ccsd::rt_eom_cd_ccsd<rteom_cc::ccsd::CCEType>(
+    chem_env, ec, MO, CI, d_f1_c, p_evl_sorted, cholVpr_c, cc_restart, files_prefix);
 
   auto   cc_t2 = std::chrono::high_resolution_clock::now();
   double ccsd_time =
@@ -1093,3 +1090,4 @@ void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   ec.flush_and_sync();
   // delete ec;
 }
+} // namespace exachem::rteom_cc::ccsd

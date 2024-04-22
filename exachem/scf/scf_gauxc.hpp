@@ -13,7 +13,7 @@
 #include "scf/scf_tamm_tensors.hpp"
 #include "scf/scf_vars.hpp"
 
-namespace igauxc_util {
+namespace exachem::scf::gauxc {
 
 std::tuple<std::shared_ptr<GauXC::XCIntegrator<Matrix>>, double>
 setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env, const SCFVars& scf_vars);
@@ -23,8 +23,9 @@ GauXC::Molecule make_gauxc_molecule(const std::vector<libint2::Atom>& atoms);
 GauXC::BasisSet<double> make_gauxc_basis(const libint2::BasisSet& basis);
 
 template<typename TensorType>
-TensorType compute_xcf(ExecutionContext& ec, ChemEnv& chem_env, TAMMTensors& ttensors,
-                       EigenTensors& etensors, GauXC::XCIntegrator<Matrix>& xc_integrator);
+TensorType compute_xcf(ExecutionContext& ec, ChemEnv& chem_env, exachem::scf::TAMMTensors& ttensors,
+                       exachem::scf::EigenTensors&  etensors,
+                       GauXC::XCIntegrator<Matrix>& xc_integrator);
 
-} // namespace igauxc_util
+} // namespace exachem::scf::gauxc
 #endif

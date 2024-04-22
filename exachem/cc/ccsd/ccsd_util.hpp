@@ -201,13 +201,18 @@ Tensor<T> setupV2(ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& CI
 template<typename T>
 void cc_print(ChemEnv& chem_env, Tensor<T> d_t1, Tensor<T> d_t2, std::string files_prefix);
 
+namespace exachem::cd_svd {
+
 template<typename T>
 std::tuple<Tensor<T>, Tensor<T>, Tensor<T>, TAMM_SIZE, tamm::Tile, TiledIndexSpace>
 cd_svd_driver(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& AO,
               Tensor<T> C_AO, Tensor<T> F_AO, Tensor<T> C_beta_AO, Tensor<T> F_beta_AO,
               libint2::BasisSet& shells, std::vector<size_t>& shell_tile_map, bool readv2 = false,
               std::string cholfile = "", bool is_dlpno = false, bool is_mso = true);
-
+}
+namespace exachem::cd {
 void cd_2e_driver(ExecutionContext& ec, ChemEnv& chem_env);
-
+}
+namespace exachem::mp2 {
 void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env);
+}

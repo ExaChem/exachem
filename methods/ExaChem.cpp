@@ -6,29 +6,44 @@
  * See LICENSE.txt for details
  */
 
-// clang-format off
-#include <tamm/tamm_git.hpp>
 #include <exachem/exachem_git.hpp>
+#include <tamm/tamm_git.hpp>
+
+#define EC_CC
+#define EC_COMPLEX
+
+// clang-format off
+#if defined(EC_CC)
 #include "cc/ccsd/cd_ccsd_os_ann.hpp"
 #include "cc/ccsd_t/ccsd_t_fused_driver.hpp"
 #include "exachem/cc/lambda/ccsd_lambda.hpp"
 #include "exachem/cc/eom/eomccsd_opt.hpp"
+#endif
 
 #include "exachem/common/chemenv.hpp"
 #include "exachem/common/options/parse_options.hpp"
 #include "scf/scf_main.hpp"
 // clang-format on
+using namespace exachem;
 
-#define EC_COMPLEX
-
-#if !defined(USE_UPCXX) and defined(EC_COMPLEX)
+#if !defined(USE_UPCXX) and defined(EC_COMPLEX) and defined(EC_CC)
+namespace exachem::cc::gfcc {
 void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env);
+}
+namespace exachem::rteom_cc::ccsd {
 void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env);
+}
 #include "exachem/fci/fci.hpp"
 #endif
 
+#if defined(EC_CC)
+namespace exachem::cc2 {
 void cd_cc2_driver(ExecutionContext& ec, ChemEnv& chem_env);
+}
+namespace exachem::cc::ducc {
 void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env);
+}
+#endif
 
 int main(int argc, char* argv[]) {
   tamm::initialize(argc, argv);
@@ -133,19 +148,22 @@ int main(int argc, char* argv[]) {
 #endif
 
     if(task.sinfo) chem_env.sinfo();
-    else if(task.scf) scf(ec, chem_env);
-    else if(task.mp2) cd_mp2(ec, chem_env);
-    else if(task.cd_2e) cd_2e_driver(ec, chem_env);
-    else if(task.ccsd) cd_ccsd(ec, chem_env);
-    else if(task.ccsd_t) ccsd_t_driver(ec, chem_env);
-    else if(task.cc2) cd_cc2_driver(ec, chem_env);
-    else if(task.ccsd_lambda) ccsd_lambda_driver(ec, chem_env);
-    else if(task.eom_ccsd) eom_ccsd_driver(ec, chem_env);
-    else if(task.ducc) ducc_driver(ec, chem_env);
+    else if(task.scf) scf::scf_driver(ec, chem_env);
+#if defined(EC_CC)
+    else if(task.mp2) mp2::cd_mp2(ec, chem_env);
+    else if(task.cd_2e) cd::cd_2e_driver(ec, chem_env);
+    else if(task.ccsd) cc::ccsd::cd_ccsd(ec, chem_env);
+    else if(task.ccsd_t) cc::ccsd_t::ccsd_t_driver(ec, chem_env);
+    else if(task.cc2) cc2::cd_cc2_driver(ec, chem_env);
+    else if(task.ccsd_lambda) cc::ccsd_lambda::ccsd_lambda_driver(ec, chem_env);
+    else if(task.eom_ccsd) cc::eom::eom_ccsd_driver(ec, chem_env);
+    else if(task.ducc) cc::ducc::ducc_driver(ec, chem_env);
 #if !defined(USE_UPCXX) and defined(EC_COMPLEX)
-    else if(task.fci || task.fcidump) fci_driver(ec, chem_env);
-    else if(task.gfccsd) gfccsd_driver(ec, chem_env);
-    else if(task.rteom_ccsd) rt_eom_cd_ccsd_driver(ec, chem_env);
+    else if(task.fci || task.fcidump) fci::fci_driver(ec, chem_env);
+    else if(task.gfccsd) cc::gfcc::gfccsd_driver(ec, chem_env);
+    else if(task.rteom_ccsd) rteom_cc::ccsd::rt_eom_cd_ccsd_driver(ec, chem_env);
+#endif
+
 #endif
 
     else

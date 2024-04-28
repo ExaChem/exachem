@@ -15,7 +15,7 @@ void ParseSCFOptions::parse_check(json& jinput) {
   const std::vector<std::string> valid_scf{"charge", "multiplicity", "lshift", "tol_int", "tol_sch",
     "tol_lindep", "conve", "convd", "diis_hist","force_tilesize","tilesize","df_tilesize",
     "damp","writem","nnodes","restart","noscf","moldenfile", "guess",
-    "debug","scf_type","xc_type", "xc_grid_type", "n_lindep","restart_size","scalapack_nb","riscf",
+    "debug","scf_type","xc_type", "xc_grid_type", "n_lindep","restart_size","scalapack_nb",
     "scalapack_np_row","scalapack_np_col","ext_data_path","PRINT",
     "qed_omegas","qed_lambdas","qed_volumes","qed_polvecs","direct_df","comments"};
   // clang-format on
@@ -71,6 +71,12 @@ void ParseSCFOptions::parse(ChemEnv& chem_env) {
     scf_options.guess_atom_options[element_symbol] = atom_opt;
   }
 
+  json jscf_analysis = jscf["PRINT"];
+  parse_option<bool>(scf_options.mos_txt, jscf_analysis, "mos_txt");
+  parse_option<bool>(scf_options.mulliken_analysis, jscf_analysis, "mulliken");
+  parse_option<std::pair<bool, double>>(scf_options.mo_vectors_analysis, jscf_analysis,
+                                        "mo_vectors");
+
   if(scf_options.nnodes < 1 || scf_options.nnodes > 100) {
     tamm_terminate("INPUT FILE ERROR: SCF option nnodes should be a number between 1 and 100");
   }
@@ -100,94 +106,4 @@ void ParseSCFOptions::update_common_options(ChemEnv& chem_env) {
   scf_options.geom_units    = common_options.geom_units;
   scf_options.file_prefix   = common_options.file_prefix;
   scf_options.ext_data_path = common_options.ext_data_path;
-}
-
-void ParseSCFOptions::print(ChemEnv& chem_env) {
-  std::cout << std::defaultfloat;
-  std::cout << std::endl << "SCF Options" << std::endl;
-  std::cout << "{" << std::endl;
-
-  SCFOptions& scf_options = chem_env.ioptions.scf_options;
-  std::cout << " charge       = " << scf_options.charge << std::endl;
-  std::cout << " multiplicity = " << scf_options.multiplicity << std::endl;
-  std::cout << " level shift  = " << scf_options.lshift << std::endl;
-  std::cout << " tol_int      = " << scf_options.tol_int << std::endl;
-  std::cout << " tol_sch      = " << scf_options.tol_sch << std::endl;
-  std::cout << " tol_lindep   = " << scf_options.tol_lindep << std::endl;
-  std::cout << " conve        = " << scf_options.conve << std::endl;
-  std::cout << " convd        = " << scf_options.convd << std::endl;
-  std::cout << " diis_hist    = " << scf_options.diis_hist << std::endl;
-  std::cout << " AO_tilesize  = " << scf_options.AO_tilesize << std::endl;
-  std::cout << " writem       = " << scf_options.writem << std::endl;
-  std::cout << " damp         = " << scf_options.damp << std::endl;
-  if(!scf_options.moldenfile.empty()) {
-    std::cout << " moldenfile   = " << scf_options.moldenfile << std::endl;
-    // std::cout << " n_lindep = " << n_lindep <<  std::endl;
-  }
-
-  std::cout << " scf_type     = " << scf_options.scf_type << std::endl;
-
-  // QED
-  if(!scf_options.qed_omegas.empty()) {
-    std::cout << " qed_omegas  = [";
-    for(auto x: scf_options.qed_omegas) { std::cout << x << ","; }
-    std::cout << "\b]" << std::endl;
-  }
-
-  if(!scf_options.qed_lambdas.empty()) {
-    std::cout << " qed_lambdas  = [";
-    for(auto x: scf_options.qed_lambdas) { std::cout << x << ","; }
-    std::cout << "\b]" << std::endl;
-  }
-
-  if(!scf_options.qed_volumes.empty()) {
-    std::cout << " qed_volumes  = [";
-    for(auto x: scf_options.qed_volumes) { std::cout << x << ","; }
-    std::cout << "\b]" << std::endl;
-  }
-
-  if(!scf_options.qed_polvecs.empty()) {
-    std::cout << " qed_polvecs  = [";
-    for(auto x: scf_options.qed_polvecs) {
-      std::cout << "[";
-      for(auto y: x) { std::cout << y << ","; }
-      std::cout << "\b],";
-    }
-    std::cout << "\b]" << std::endl;
-  }
-
-  if(!scf_options.xc_type.empty()) {
-    std::cout << " xc_type      = [ ";
-    for(auto xcfunc: scf_options.xc_type) { std::cout << " \"" << xcfunc << "\","; }
-    std::cout << "\b ]" << std::endl;
-    std::cout << " xc_grid_type = " << scf_options.xc_grid_type << std::endl;
-  }
-
-  if(scf_options.scalapack_np_row > 0 && scf_options.scalapack_np_col > 0) {
-    std::cout << " scalapack_np_row = " << scf_options.scalapack_np_row << std::endl;
-    std::cout << " scalapack_np_col = " << scf_options.scalapack_np_col << std::endl;
-    if(scf_options.scalapack_nb > 1)
-      std::cout << " scalapack_nb = " << scf_options.scalapack_nb << std::endl;
-  }
-  std::cout << " restart_size = " << scf_options.restart_size << std::endl;
-  txt_utils::print_bool(" restart     ", scf_options.restart);
-  txt_utils::print_bool(" debug       ", scf_options.debug);
-  if(scf_options.restart) txt_utils::print_bool(" noscf       ", scf_options.noscf);
-  // txt_utils::print_bool(" sad         ", scf_options.sad);
-  if(scf_options.mulliken_analysis || scf_options.mos_txt ||
-     scf_options.mo_vectors_analysis.first) {
-    std::cout << " PRINT {" << std::endl;
-    if(scf_options.mos_txt)
-      std::cout << std::boolalpha << "  mos_txt             = " << scf_options.mos_txt << std::endl;
-    if(scf_options.mulliken_analysis)
-      std::cout << std::boolalpha << "  mulliken_analysis   = " << scf_options.mulliken_analysis
-                << std::endl;
-    if(scf_options.mo_vectors_analysis.first) {
-      std::cout << "  mo_vectors_analysis = [" << std::boolalpha
-                << scf_options.mo_vectors_analysis.first;
-      std::cout << "," << scf_options.mo_vectors_analysis.second << "]" << std::endl;
-    }
-    std::cout << " }" << std::endl;
-  }
-  std::cout << "}" << std::endl;
 }

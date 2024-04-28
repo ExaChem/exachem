@@ -301,9 +301,11 @@ void CDOptions::print() {
   std::cout << std::endl << "CD Options" << std::endl;
   std::cout << "{" << std::endl;
   std::cout << std::boolalpha << " debug            = " << debug << std::endl;
-  std::cout << std::boolalpha << " write_cv         = " << write_cv << std::endl;
+  std::cout << std::boolalpha << " skip_cd          = [" << skip_cd.first << "," << skip_cd.second
+            << "]" << std::endl;
+  std::cout << std::boolalpha << " write_cv         = [" << write_cv.first << "," << write_cv.second
+            << "]" << std::endl;
   std::cout << " diagtol          = " << diagtol << std::endl;
-  std::cout << " write_vcount     = " << write_vcount << std::endl;
   std::cout << " itilesize        = " << itilesize << std::endl;
   std::cout << " max_cvecs_factor = " << max_cvecs_factor << std::endl;
   std::cout << "}" << std::endl;

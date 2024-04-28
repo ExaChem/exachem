@@ -276,12 +276,11 @@ exachem::cd_svd::cd_svd(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace
   using libint2::Operator;
   using libint2::Shell;
 
-  SystemData&      sys_data     = chem_env.sys_data;
-  const auto       cd_options   = chem_env.ioptions.cd_options;
-  const bool       write_cv     = cd_options.write_cv;
-  const double     diagtol      = cd_options.diagtol;
-  const int        write_vcount = cd_options.write_vcount;
-  const tamm::Tile itile_size   = cd_options.itilesize;
+  SystemData&      sys_data   = chem_env.sys_data;
+  const auto       cd_options = chem_env.ioptions.cd_options;
+  const auto       write_cv   = cd_options.write_cv;
+  const double     diagtol    = cd_options.diagtol;
+  const tamm::Tile itile_size = cd_options.itilesize;
   // const TAMM_GA_SIZE northo      = sys_data.nbf;
   const TAMM_GA_SIZE nao = sys_data.nbf_orig;
 
@@ -405,7 +404,7 @@ exachem::cd_svd::cd_svd(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace
   Engine      engine(Operator::coulomb, max_nprim(shells), max_l(shells), 0);
   const auto& buf = engine.results();
 
-  bool cd_restart = write_cv && fs::exists(diag_ao_file) && fs::exists(chol_ao_file) &&
+  bool cd_restart = write_cv.first && fs::exists(diag_ao_file) && fs::exists(chol_ao_file) &&
                     fs::exists(cv_count_file);
 
   auto compute_diagonals = [&](const IndexVector& blockid) {
@@ -830,7 +829,7 @@ exachem::cd_svd::cd_svd(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace
 
 #if !defined(USE_UPCXX)
     // Restart
-    if(write_cv && count % write_vcount == 0 && nbf > 1000) { write_chol_vectors(); }
+    if(write_cv.first && count % write_cv.second == 0 && nbf > 1000) { write_chol_vectors(); }
 #endif
 
   } // while
@@ -838,7 +837,7 @@ exachem::cd_svd::cd_svd(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace
   if(rank == 0) std::cout << endl << "- Total number of cholesky vectors = " << count << std::endl;
 
 #if !defined(USE_UPCXX)
-  if(write_cv && nbf > 1000) write_chol_vectors();
+  if(write_cv.first && nbf > 1000) write_chol_vectors();
 #endif
 
   Tensor<TensorType>::deallocate(g_d_tamm, g_r_tamm);

@@ -956,10 +956,7 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
       std::string   profile_csv = rt_eom_fp + "_profile.csv";
       std::ofstream pds(profile_csv, std::ios::out);
       if(!pds) std::cerr << "Error opening file " << profile_csv << std::endl;
-      std::string header = "ID;Level;OP;total_op_time_min;total_op_time_max;total_op_time_avg;";
-      header += "get_time_min;get_time_max;get_time_avg;gemm_time_min;";
-      header += "gemm_time_max;gemm_time_avg;acc_time_min;acc_time_max;acc_time_avg";
-      pds << header << std::endl;
+      pds << ec.get_profile_header() << std::endl;
       pds << ec.get_profile_data().str() << std::endl;
       pds.close();
     }

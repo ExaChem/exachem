@@ -44,27 +44,3 @@ void ParseGWOptions::update_common_options(ChemEnv& chem_env) {
   gw_options.file_prefix   = common_options.file_prefix;
   gw_options.ext_data_path = common_options.ext_data_path;
 }
-
-void ParseGWOptions::print(ChemEnv& chem_env) {
-  std::cout << std::defaultfloat;
-  std::cout << std::endl << "GW Options" << std::endl;
-  GWOptions& gw_options = chem_env.ioptions.gw_options;
-
-  std::cout << "{" << std::endl;
-  std::cout << " ngl       = " << gw_options.ngl << std::endl;
-  std::cout << " noqpa     = " << gw_options.noqpa << std::endl;
-  std::cout << " noqpb     = " << gw_options.noqpb << std::endl;
-  std::cout << " nvqpa     = " << gw_options.nvqpa << std::endl;
-  std::cout << " nvqp/b     = " << gw_options.nvqpb << std::endl;
-  std::cout << " ieta      = " << gw_options.ieta << std::endl;
-  std::cout << " maxnewton = " << gw_options.maxnewton << std::endl;
-  std::cout << " maxev     = " << gw_options.maxev << std::endl;
-  std::cout << " method    = " << gw_options.method << std::endl;
-  std::cout << " cdbasis   = " << gw_options.cdbasis << std::endl;
-  txt_utils::print_bool(" evgw     ", gw_options.evgw);
-  txt_utils::print_bool(" evgw0    ", gw_options.evgw0);
-  txt_utils::print_bool(" core     ", gw_options.core);
-  txt_utils::print_bool(" minres   ", gw_options.minres);
-  txt_utils::print_bool(" debug    ", gw_options.debug);
-  std::cout << "}" << std::endl;
-}

@@ -512,7 +512,9 @@ exachem::cd_svd::cd_svd_driver(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
   std::string files_dir = out_fp + chem_env.ioptions.scf_options.scf_type;
   std::string lcaofile  = files_dir + "/" + sys_data.output_file_prefix + ".lcao";
 
-  if(!readv2) {
+  auto skip_cd = cd_options.skip_cd;
+
+  if(!readv2 && !skip_cd.first) {
     two_index_transform(chem_env, ec, C_AO, F_AO, C_beta_AO, F_beta_AO, d_f1, shells, lcao,
                         is_dlpno || !is_mso);
     if(!is_dlpno)
@@ -520,13 +522,24 @@ exachem::cd_svd::cd_svd_driver(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
     write_to_disk<TensorType>(lcao, lcaofile);
   }
   else {
-    std::ifstream in(cholfile, std::ios::in);
-    int           rstatus = 0;
-    if(in.is_open()) rstatus = 1;
-    if(rstatus == 1) in >> chol_count;
-    else tamm_terminate("Error reading " + cholfile);
+    if(!skip_cd.first) {
+      std::ifstream in(cholfile, std::ios::in);
+      int           rstatus = 0;
+      if(in.is_open()) rstatus = 1;
+      if(rstatus == 1) in >> chol_count;
+      else tamm_terminate("Error reading " + cholfile);
 
-    if(rank == 0) cout << "Number of cholesky vectors to be read = " << chol_count << endl;
+      if(rank == 0)
+        cout << "Number of cholesky vectors to be read from disk = " << chol_count << endl;
+    }
+    else {
+      chol_count = skip_cd.second;
+      if(rank == 0)
+        cout << endl
+             << "Skipping Cholesky Decomposition... using user provided cholesky vector count of "
+             << chol_count << endl
+             << endl;
+    }
 
     if(!is_dlpno) update_sysdata(chem_env, MO, is_mso);
 
@@ -537,17 +550,18 @@ exachem::cd_svd::cd_svd_driver(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
     cholVpr = {{N, N, CI}, {SpinPosition::upper, SpinPosition::lower, SpinPosition::ignore}};
     if(!is_dlpno) Tensor<TensorType>::allocate(&ec, cholVpr);
     // Scheduler{ec}(cholVpr()=0).execute();
-    read_from_disk(lcao, lcaofile);
+    if(!skip_cd.first) read_from_disk(lcao, lcaofile);
   }
 
   auto   hf_t2 = std::chrono::high_resolution_clock::now();
   double cd_svd_time =
     std::chrono::duration_cast<std::chrono::duration<double>>((hf_t2 - hf_t1)).count();
 
-  if(rank == 0)
+  if(rank == 0 && !skip_cd.first)
     std::cout << std::endl
               << "Total Time taken for Cholesky Decomposition: " << std::fixed
-              << std::setprecision(2) << cd_svd_time << " secs" << std::endl;
+              << std::setprecision(2) << cd_svd_time << " secs" << std::endl
+              << std::endl;
 
   Tensor<T>::deallocate(C_AO, F_AO);
   if(sys_data.is_unrestricted) Tensor<T>::deallocate(C_beta_AO, F_beta_AO);

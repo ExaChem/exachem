@@ -275,7 +275,9 @@ void exachem::cc::ccsd::ccsd_t2_cs(Scheduler& sch, const TiledIndexSpace& MO,
   auto btensor = rhs2_.tensor();
   // for(auto itval=loop_nest.begin(); itval!=loop_nest.end(); ++itval) {}
 
-  auto compute_v4_term = [=](const IndexVector& cblkid, span<T> cbuf) {
+  auto& oprof = tamm::OpProfiler::instance();
+
+  auto compute_v4_term = [=, &oprof](const IndexVector& cblkid, span<T> cbuf) {
     auto& memHostPool = tamm::RMMMemoryManager::getInstance().getHostMemoryPool();
 
     // compute blockids from the loop indices. itval is the loop index
@@ -404,18 +406,21 @@ void exachem::cc::ccsd::ccsd_t2_cs(Scheduler& sch, const TiledIndexSpace& MO,
             static_cast<TensorElType2*>(memDevicePool.allocate(asize * sizeof(TensorElType2)));
           bbuf_dev =
             static_cast<TensorElType3*>(memDevicePool.allocate(bsize * sizeof(TensorElType3)));
-
+          TimerGuard tg_copy{&oprof.multOpCopyTime};
           gpuMemcpyAsync<TensorElType2>(abuf_dev, abuf, asize, gpuMemcpyHostToDevice, thandle);
           gpuMemcpyAsync<TensorElType3>(bbuf_dev, bbuf, bsize, gpuMemcpyHostToDevice, thandle);
         }
 #endif
-
-        kernels::block_multiply<T, TensorElType1, TensorElType2, TensorElType3>(
+        {
+          TimerGuard tg_dgemm{&oprof.multOpDgemmTime};
+          kernels::block_multiply<T, TensorElType1, TensorElType2, TensorElType3>(
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-          abuf_dev, bbuf_dev,
+            abuf_dev, bbuf_dev,
 #endif
-          thandle, 1.0, abuf, adims_sz, rhs1_int_labels_, bbuf, bdims_sz, rhs2_int_labels_, cscale,
-          cbuf.data(), cdims_sz, lhs_int_labels_, hw, false, cbuf_dev_ptr, cbuf_tmp_dev_ptr);
+            thandle, 1.0, abuf, adims_sz, rhs1_int_labels_, bbuf, bdims_sz, rhs2_int_labels_,
+            cscale, cbuf.data(), cdims_sz, lhs_int_labels_, hw, false, cbuf_dev_ptr,
+            cbuf_tmp_dev_ptr);
+        }
 
 #if(defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP))
         if(hw == ExecutionHW::GPU) {
@@ -437,8 +442,11 @@ void exachem::cc::ccsd::ccsd_t2_cs(Scheduler& sch, const TiledIndexSpace& MO,
         TensorElType1* cbuf_tmp{nullptr};
         cbuf_tmp = static_cast<TensorElType1*>(memHostPool.allocate(csize * sizeof(TensorElType1)));
         std::memset(cbuf_tmp, 0, csize * sizeof(TensorElType1));
-        gpuMemcpyAsync<TensorElType1>(cbuf_tmp, cbuf_dev_ptr, csize, gpuMemcpyDeviceToHost,
-                                      thandle);
+        {
+          TimerGuard tg_copy{&oprof.multOpCopyTime};
+          gpuMemcpyAsync<TensorElType1>(cbuf_tmp, cbuf_dev_ptr, csize, gpuMemcpyDeviceToHost,
+                                        thandle);
+        }
         // cbuf+=cbuf_tmp
         gpuStreamSynchronize(thandle);
         blas::axpy(csize, TensorElType1{1}, cbuf_tmp, 1, cbuf.data(), 1);
@@ -786,10 +794,7 @@ std::tuple<double, double> exachem::cc::ccsd::cd_ccsd_cs_driver(
       std::string   profile_csv = ccsd_fp + "_profile.csv";
       std::ofstream pds(profile_csv, std::ios::out);
       if(!pds) std::cerr << "Error opening file " << profile_csv << std::endl;
-      std::string header = "ID;Level;OP;total_op_time_min;total_op_time_max;total_op_time_avg;";
-      header += "get_time_min;get_time_max;get_time_avg;gemm_time_min;";
-      header += "gemm_time_max;gemm_time_avg;acc_time_min;acc_time_max;acc_time_avg";
-      pds << header << std::endl;
+      pds << ec.get_profile_header() << std::endl;
       pds << ec.get_profile_data().str() << std::endl;
       pds.close();
     }

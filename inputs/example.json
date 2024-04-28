@@ -48,7 +48,6 @@
         "damp": 100,
         "nnodes": 1,
         "writem": 10,
-        "riscf": "JK",
         "restart": false,
         "noscf": false,
         "scf_type": "restricted",
@@ -83,8 +82,8 @@
         "debug": false,
         "diagtol": 1e-5,
         "itilesize": 1000,
-        "write_cv": false,
-        "write_vcount": 5000
+        "skip_cd": [false,100],
+        "write_cv": [false,5000]
     },
 
     "GW": {

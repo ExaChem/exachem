@@ -85,8 +85,8 @@ void ChemEnv::write_json_data(const std::string cmodule) {
     // CD options
     results["input"]["CD"]["diagtol"]          = cd.diagtol;
     results["input"]["CD"]["itilesize"]        = cd.itilesize;
+    results["input"]["CD"]["skip_cd"]          = cd.skip_cd;
     results["input"]["CD"]["write_cv"]         = cd.write_cv;
-    results["input"]["CD"]["write_vcount"]     = cd.write_vcount;
     results["input"]["CD"]["max_cvecs_factor"] = cd.max_cvecs_factor;
   }
 

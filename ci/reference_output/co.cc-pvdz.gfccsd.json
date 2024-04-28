@@ -466,8 +466,7 @@
     "CD": {
       "diagtol": 1e-08,
       "itilesize": 1000,
-      "write_cv": false,
-      "write_vcount": 5000,
+      "write_cv": [false, 5000],
       "max_cvecs_factor": 12
     },
     "CCSD": {

@@ -85,12 +85,12 @@ void ECOptionParser::initialize(ChemEnv& chem_env) {
 }
 
 void ECOptionParser::parse_all_options(ChemEnv& chem_env) {
-  ParseCOptions    parse_common_options(chem_env);
-  ParseSCFOptions  parse_scf_options(chem_env);
-  ParseCDOptions   parse_cd_options(chem_env);
-  ParseGWOptions   parse_gw_options(chem_env);
-  ParseCCSDOptions parse_ccsd_options(chem_env);
-  ParseFCIOptions  parse_fci_options(chem_env);
-  ParseTaskOptions parse_task_options(chem_env);
-  IniSystemData    ini_sys_data(chem_env);
+  ParseCommonOptions parse_common_options(chem_env);
+  ParseSCFOptions    parse_scf_options(chem_env);
+  ParseCDOptions     parse_cd_options(chem_env);
+  ParseGWOptions     parse_gw_options(chem_env);
+  ParseCCSDOptions   parse_ccsd_options(chem_env);
+  ParseFCIOptions    parse_fci_options(chem_env);
+  ParseTaskOptions   parse_task_options(chem_env);
+  IniSystemData      ini_sys_data(chem_env);
 }

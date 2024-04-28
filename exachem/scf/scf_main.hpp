@@ -34,7 +34,6 @@
 #include <vector>
 
 #include "common/chemenv.hpp"
-#include "scf/scf_main.hpp"
 #include "scf/scf_taskmap.hpp"
 
 using libint2::BasisSet;

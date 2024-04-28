@@ -248,8 +248,10 @@ void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
   // "_a022( abab )(p3_va,p4_vb,p2_va,p1_vb)     =  1.0   * _a021_os( aa )(p3_va,p2_va,cind) *
   // _a021_os( bb )(p4_vb,p1_vb,cind)")
 
-  int  a22_flag        = 0;
-  auto compute_v4_term = [=, &a22_flag](const IndexVector& cblkid, span<T> cbuf) {
+  int   a22_flag = 0;
+  auto& oprof    = tamm::OpProfiler::instance();
+
+  auto compute_v4_term = [=, &a22_flag, &oprof](const IndexVector& cblkid, span<T> cbuf) {
     Tensor<T>        a22_tmp;
     LabeledTensor<T>*lhsp_{nullptr}, *rhs1p_{nullptr}, *rhs2p_{nullptr};
 
@@ -520,13 +522,16 @@ void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
         abptr->abuf_ = abuf;
         abptr->bbuf_ = bbuf;
 
-        kernels::block_multiply<T, TensorElType1, TensorElType2, TensorElType3>(
+        {
+          TimerGuard tg_dgemm{&oprof.multOpDgemmTime};
+          kernels::block_multiply<T, TensorElType1, TensorElType2, TensorElType3>(
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-          abptr->ta_, abptr->tb_,
+            abptr->ta_, abptr->tb_,
 #endif
-          thandle, 1.0, abptr->abuf_, adims_sz, rhs1_int_labels_, abptr->bbuf_, bdims_sz,
-          rhs2_int_labels_, cscale, cbuf.data(), cdims_sz, lhs_int_labels_, hw, false, cbuf_dev_ptr,
-          cbuf_tmp_dev_ptr);
+            thandle, 1.0, abptr->abuf_, adims_sz, rhs1_int_labels_, abptr->bbuf_, bdims_sz,
+            rhs2_int_labels_, cscale, cbuf.data(), cdims_sz, lhs_int_labels_, hw, false,
+            cbuf_dev_ptr, cbuf_tmp_dev_ptr);
+        }
 
 #if(defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP))
         if(hw == ExecutionHW::GPU) {
@@ -548,8 +553,11 @@ void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
         TensorElType1* cbuf_tmp{nullptr};
         cbuf_tmp = static_cast<TensorElType1*>(memHostPool.allocate(csize * sizeof(TensorElType1)));
         std::memset(cbuf_tmp, 0, csize * sizeof(TensorElType1));
-        gpuMemcpyAsync<TensorElType1>(cbuf_tmp, cbuf_dev_ptr, csize, gpuMemcpyDeviceToHost,
-                                      thandle);
+        {
+          TimerGuard tg_copy{&oprof.multOpCopyTime};
+          gpuMemcpyAsync<TensorElType1>(cbuf_tmp, cbuf_dev_ptr, csize, gpuMemcpyDeviceToHost,
+                                        thandle);
+        }
         // cbuf+=cbuf_tmp
         gpuStreamSynchronize(thandle);
         blas::axpy(csize, TensorElType1{1}, cbuf_tmp, 1, cbuf.data(), 1);
@@ -1119,10 +1127,7 @@ cd_ccsd_os_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace
       std::string   profile_csv = ccsd_fp + "_profile.csv";
       std::ofstream pds(profile_csv, std::ios::out);
       if(!pds) std::cerr << "Error opening file " << profile_csv << std::endl;
-      std::string header = "ID;Level;OP;total_op_time_min;total_op_time_max;total_op_time_avg;";
-      header += "get_time_min;get_time_max;get_time_avg;gemm_time_min;";
-      header += "gemm_time_max;gemm_time_avg;acc_time_min;acc_time_max;acc_time_avg";
-      pds << header << std::endl;
+      pds << ec.get_profile_header() << std::endl;
       pds << ec.get_profile_data().str() << std::endl;
       pds.close();
     }

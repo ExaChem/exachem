@@ -60,31 +60,3 @@ void ParseTaskOptions::update_common_options(ChemEnv& chem_env) {
   task_options.file_prefix   = common_options.file_prefix;
   task_options.ext_data_path = common_options.ext_data_path;
 }
-
-void ParseTaskOptions::print(ChemEnv& chem_env) {
-  std::cout << std::endl << "Task Options" << std::endl;
-  std::cout << "{" << std::endl;
-
-  TaskOptions& task_options = chem_env.ioptions.task_options;
-  txt_utils::print_bool(" sinfo        ", task_options.sinfo);
-  txt_utils::print_bool(" scf          ", task_options.scf);
-  txt_utils::print_bool(" mp2          ", task_options.mp2);
-  txt_utils::print_bool(" gw           ", task_options.gw);
-  txt_utils::print_bool(" cc2          ", task_options.cc2);
-  txt_utils::print_bool(" fci          ", task_options.fci);
-  txt_utils::print_bool(" fcidump      ", task_options.fcidump);
-  txt_utils::print_bool(" cd_2e        ", task_options.cd_2e);
-  txt_utils::print_bool(" ducc         ", task_options.ducc);
-  txt_utils::print_bool(" ccsd         ", task_options.ccsd);
-  txt_utils::print_bool(" ccsd_sf      ", task_options.ccsd_sf);
-  txt_utils::print_bool(" ccsd_lambda  ", task_options.ccsd_lambda);
-  txt_utils::print_bool(" eom_ccsd     ", task_options.eom_ccsd);
-  txt_utils::print_bool(" rteom_cc2    ", task_options.rteom_cc2);
-  txt_utils::print_bool(" rteom_ccsd   ", task_options.rteom_ccsd);
-  txt_utils::print_bool(" gfccsd       ", task_options.gfccsd);
-  std::cout << " dlpno_ccsd:  " << task_options.dlpno_ccsd.first << ", "
-            << task_options.dlpno_ccsd.second << "\n";
-  std::cout << " dlpno_ccsd_t " << task_options.dlpno_ccsd_t.first << ", "
-            << task_options.dlpno_ccsd_t.second << "\n";
-  std::cout << "}" << std::endl;
-}

@@ -108,15 +108,15 @@
         "writem": {
           "type": "number"
         },
-        "riscf": {
-          "type": "string"
-        },
         "restart": {
           "type": "boolean"
         },
         "noscf": {
           "type": "boolean"
         },
+        "direct_df": {
+          "type": "boolean"
+        },        
         "guess": {
           "type": "array",
           "sad": {
@@ -211,11 +211,17 @@
         "diagtol": {
           "type": "number"
         },
-        "write_vcount": {
-          "type": "number"
+        "skip_cd": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "write_cv": {
-          "type": "boolean"
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "itilesize": {
           "type": "number"

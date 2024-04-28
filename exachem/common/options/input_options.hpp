@@ -42,11 +42,9 @@ public:
   bool     direct_df{false};
   int restart_size{2000}; // read/write orthogonalizer, schwarz, etc matrices when N>=restart_size
   int scalapack_nb{256};
-  int riscf{0}; // 0 for JK, 1 for J, 2 for K
   int nnodes{1};
   int scalapack_np_row{0};
   int scalapack_np_col{0};
-  std::string riscf_str{"JK"};
   std::string moldenfile{""};
   int         n_lindep{0};
   int         writem{1};
@@ -170,11 +168,13 @@ public:
   double diagtol{1e-5};
   int    itilesize{1000};
   int    max_cvecs_factor{12};
+
+  // skip cholesky and use the value specified as the cholesky vector count.
+  std::pair<bool, int> skip_cd{false, 100};
+  // enabled only if set to true and nbf > 1000
   // write to disk after every count number of vectors are computed.
-  // enabled only if write_cv=true and nbf>1000
-  bool write_cv{false};
-  int  write_vcount{5000};
-  void print();
+  std::pair<bool, int> write_cv{false, 5000};
+  void                 print();
 };
 
 class FCIOptions: public CommonOptions {

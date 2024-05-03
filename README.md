@@ -18,7 +18,7 @@
 
 ## Build 
 
-Build instructions are available [here](docs/install.md)
+Build instructions are available [here](https://exachem.readthedocs.io/en/latest/install.html)
 
 ## ExaChem Citation
 #### Please cite the following reference when publishing results obtained with ExaChem. 

@@ -33,6 +33,4 @@ Options used in the Cholesky decomposition of atomic-orbital based two-electron 
 
 The following options are applicable only for calculations involving :math:`\geq` 1000 basis functions. They are used for restarting the cholesky decomposition procedure.
 
-:write_cv: ``[default=[false,5000]]`` When enabled, it performs parallel IO to write the tensor containing the AO cholesky vectors to disk. Enabling this option implies restart.
-The integer represents a count, indicating that the Cholesky vectors should be written to disk after every *count* vectors are computed.
-
+:write_cv: ``[default=[false,5000]]`` When enabled, it performs parallel IO to write the tensor containing the AO cholesky vectors to disk. Enabling this option implies restart. The integer represents a count, indicating that the Cholesky vectors should be written to disk after every *count* vectors are computed.

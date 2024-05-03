@@ -6,6 +6,7 @@ ExaChem Documentation
    :caption: Contents:
 
    introduction
+   install
    user_guide/user
    developer_guide/developer
 

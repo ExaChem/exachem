@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         os: 
-          - [self-hosted, ubuntu18]
+          - [self-hosted, ubuntu22]
           - [self-hosted, macos]
         backend:
           - ga
@@ -36,7 +36,7 @@ jobs:
         use_scalapack:
           - no-scalapack         
         include:
-          - os: [self-hosted, ubuntu18]
+          - os: [self-hosted, ubuntu22]
             mpi_impl: openmpi
             cxx: clang++
             cc: clang
@@ -44,7 +44,7 @@ jobs:
             backend: ga
             use_cuda: no-cuda
             use_scalapack: no-scalapack
-          - os: [self-hosted, ubuntu18]
+          - os: [self-hosted, ubuntu22]
             mpi_impl: openmpi
             cxx: g++
             cc: gcc
@@ -52,7 +52,7 @@ jobs:
             backend: ga
             use_cuda: cuda
             use_scalapack: no-scalapack
-          - os: [self-hosted, ubuntu18]
+          - os: [self-hosted, ubuntu22]
             mpi_impl: openmpi
             cxx: g++
             cc: gcc
@@ -60,7 +60,7 @@ jobs:
             backend: upcxx
             use_cuda: cuda
             use_scalapack: no-scalapack      
-          - os: [self-hosted, ubuntu18]
+          - os: [self-hosted, ubuntu22]
             mpi_impl: openmpi
             cxx: g++
             cc: gcc
@@ -110,7 +110,7 @@ jobs:
       shell: bash
 
     - name: Set cache path linux
-      if: ${{ matrix.os[1] == 'ubuntu18' }}
+      if: ${{ matrix.os[1] == 'ubuntu22' }}
       id: set-cache-path-linux
       run: |
         echo "exachem_cache_path=/hpc/software/CI/cache/exachem_cache" >> $GITHUB_ENV
@@ -139,7 +139,7 @@ jobs:
         echo "USE_SCALAPACK=ON" >> $GITHUB_ENV
 
     - name: load llvm
-      if: ${{ matrix.cc == 'clang' && matrix.cxx == 'clang++' && matrix.os[1] == 'ubuntu18' }}
+      if: ${{ matrix.cc == 'clang' && matrix.cxx == 'clang++' && matrix.os[1] == 'ubuntu22' }}
       shell: bash
       run: |
         module load llvm/11.1.0
@@ -220,7 +220,7 @@ jobs:
         # TAMM build
         git clone https://github.com/NWChemEx/TAMM $GITHUB_WORKSPACE/TAMM
         cd $GITHUB_WORKSPACE/TAMM
-        cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DLINALG_VENDOR=${{ env.LA_VENDOR }} -DGPU_ARCH=70 -DMODULES="CC" -DUSE_CUDA=${{ env.USE_CUDA }} -DUSE_SCALAPACK=${{ env.USE_SCALAPACK }}
+        cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DLINALG_VENDOR=${{ env.LA_VENDOR }} -DGPU_ARCH=70 -DMODULES="CC" -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DUSE_SCALAPACK=${{ env.USE_SCALAPACK }}
         cd build
         make -j${{ env.EC_NPROC }}
         make install
@@ -250,7 +250,7 @@ jobs:
         # TAMM build
         git clone https://github.com/NWChemEx/TAMM $GITHUB_WORKSPACE/TAMM
         cd $GITHUB_WORKSPACE/TAMM
-        UPCXX_CODEMODE=O3 CXX=upcxx cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DGPU_ARCH=70 -DMODULES="CC" -DUSE_UPCXX=ON -DMPIRUN_EXECUTABLE=${{ env.CI_MPIEXEC }}
+        UPCXX_CODEMODE=O3 CXX=upcxx cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DGPU_ARCH=70 -DMODULES="CC" -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DUSE_UPCXX=ON -DMPIRUN_EXECUTABLE=${{ env.CI_MPIEXEC }}
         cd build
         UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make -j${{ env.EC_NPROC }}
         UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make install

@@ -9,10 +9,12 @@
 #include "scf/scf_common.hpp"
 
 template<typename T>
-std::vector<size_t> exachem::scf::sort_indexes(std::vector<T>& v) {
+std::vector<size_t> exachem::scf::sort_indexes(std::vector<T>& v, bool reverse) {
   std::vector<size_t> idx(v.size());
   iota(idx.begin(), idx.end(), 0);
   sort(idx.begin(), idx.end(), [&v](size_t x, size_t y) { return v[x] < v[y]; });
+
+  if(reverse) std::reverse(idx.begin(), idx.end());
 
   return idx;
 }
@@ -589,4 +591,5 @@ template std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
 exachem::scf::gather_task_vectors<double>(ExecutionContext& ec, std::vector<int>& s1vec,
                                           std::vector<int>& s2vec, std::vector<int>& ntask_vec);
 
-template std::vector<size_t> exachem::scf::sort_indexes<double>(std::vector<double>& v);
+template std::vector<size_t> exachem::scf::sort_indexes<double>(std::vector<double>& v,
+                                                                bool                 reverse);

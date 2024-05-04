@@ -105,6 +105,8 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> exachem::cd_svd::setupMOIS(ChemEnv& chem_
       {"virt", {range(nocc, total_orbitals)}},
       {"virt_alpha", {range(nocc, nocc + n_vir_alpha)}},
       {"virt_beta", {range(nocc + n_vir_alpha, total_orbitals)}},
+      {"all_alpha", {range(0, n_occ_alpha), range(nocc, nocc + n_vir_alpha)}},
+      {"all_beta", {range(n_occ_alpha, nocc), range(nocc + n_vir_alpha, total_orbitals)}},
       {"virt_alpha_int", {range(nocc, nocc + nactv)}},
       {"virt_beta_int", {range(nocc + n_vir_alpha, nocc + nactv + n_vir_alpha)}},
       {"virt_int",

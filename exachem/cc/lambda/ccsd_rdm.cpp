@@ -11,12 +11,12 @@
 using namespace tamm;
 
 template<typename T>
-void compute_rdm(std::vector<int>& cc_rdm, std::string files_prefix, Scheduler& sch,
-                 TiledIndexSpace& MO, Tensor<T> d_t1, Tensor<T> d_t2, Tensor<T> d_y1,
-                 Tensor<T> d_y2) {
-  auto [mo1, mo2, mo3, mo4]            = MO.labels<4>("all");
-  auto [h1, h2, h3, h4, i, j, k, l, m] = MO.labels<9>("occ");
-  auto [p1, p2, p3, p4, a, b, c, d, e] = MO.labels<9>("virt");
+Tensor<T> compute_1rdm(std::vector<int>& cc_rdm, std::string files_prefix, Scheduler& sch,
+                       TiledIndexSpace& MO, Tensor<T> d_t1, Tensor<T> d_t2, Tensor<T> d_y1,
+                       Tensor<T> d_y2) {
+  auto [mo1, mo2]      = MO.labels<2>("all");
+  auto [i, j, k, l, m] = MO.labels<5>("occ");
+  auto [a, b, c, d, e] = MO.labels<5>("virt");
 
   auto ex_hw = sch.ec().exhw();
   auto rank  = sch.ec().pg().rank();
@@ -55,6 +55,17 @@ void compute_rdm(std::vector<int>& cc_rdm, std::string files_prefix, Scheduler& 
   // clang-format on
 
   sch.deallocate(hh_1, pp_1).execute();
+  if(!cc_rdm.empty()) {
+    ExecutionContext ec_dense{sch.ec().pg(), DistributionKind::dense, MemoryManagerKind::ga};
+    if(cc_rdm[0] == 1) {
+      if(rank == 0)
+        std::cout << "Printing 1-RDM to file: " << files_prefix << ".1_RDM.txt" << std::endl;
+      Tensor<T> gamma1_dense = to_dense_tensor(ec_dense, gamma1);
+      print_dense_tensor(gamma1_dense, files_prefix + ".1_RDM");
+      Tensor<T>::deallocate(gamma1_dense);
+    }
+  }
+
   //--------------------------------------------------------------------------------------------------
   // cross checking of 1-RDM, by computing 1st order response property in terms of density matrices
   //----------------------------------------------------------------------------------------------------
@@ -67,7 +78,21 @@ void compute_rdm(std::vector<int>& cc_rdm, std::string files_prefix, Scheduler& 
   // std::cout << std::fixed << std::setprecision(8) << dmy_new << std::endl;
   // }
 
-  // 2-RDM
+  return gamma1;
+}
+
+// 2-RDM
+template<typename T>
+Tensor<T> compute_2rdm(std::vector<int>& cc_rdm, std::string files_prefix, Scheduler& sch,
+                       TiledIndexSpace& MO, Tensor<T> d_t1, Tensor<T> d_t2, Tensor<T> d_y1,
+                       Tensor<T> d_y2) {
+  auto [mo1, mo2, mo3, mo4] = MO.labels<4>("all");
+  auto [i, j, k, l, m]      = MO.labels<5>("occ");
+  auto [a, b, c, d, e]      = MO.labels<5>("virt");
+
+  auto ex_hw = sch.ec().exhw();
+  auto rank  = sch.ec().pg().rank();
+
   Tensor<T> gamma2{{mo1, mo2, mo3, mo4}, {2, 2}};
   Tensor<T> pphh{{a, b, i, j}, {2, 2}};
   Tensor<T> hhhp{{i, j, k, a}, {2, 2}};
@@ -301,14 +326,7 @@ void compute_rdm(std::vector<int>& cc_rdm, std::string files_prefix, Scheduler& 
 
   if(!cc_rdm.empty()) {
     ExecutionContext ec_dense{sch.ec().pg(), DistributionKind::dense, MemoryManagerKind::ga};
-    if(cc_rdm[0] == 1) {
-      if(rank == 0)
-        std::cout << "Printing 1-RDM to file: " << files_prefix << ".1_RDM.txt" << std::endl;
-      Tensor<T> gamma1_dense = to_dense_tensor(ec_dense, gamma1);
-      print_dense_tensor(gamma1_dense, files_prefix + ".1_RDM");
-      Tensor<T>::deallocate(gamma1_dense);
-    }
-    auto rdm_val = (cc_rdm.size() == 2) ? cc_rdm[1] : cc_rdm[0];
+    auto             rdm_val = (cc_rdm.size() == 2) ? cc_rdm[1] : cc_rdm[0];
     if(rdm_val == 2) {
       if(rank == 0)
         std::cout << "Printing 2-RDM to file: " << files_prefix << ".2_RDM.txt" << std::endl;
@@ -318,11 +336,16 @@ void compute_rdm(std::vector<int>& cc_rdm, std::string files_prefix, Scheduler& 
     }
   }
 
-  sch.deallocate(gamma1, pphh, hhhp, pp, hh, ph, hpph, phhp, hhhh, hhpp, pppp, pphp, phpp, hhph)
-    .execute();
+  sch.deallocate(pphh, hhhp, pp, hh, ph, hpph, phhp, hhhh, hhpp, pppp, pphp, phpp, hhph).execute();
+
+  return gamma2;
 }
 
 using T = double;
-template void compute_rdm<T>(std::vector<int>& cc_rdm, std::string files_prefix, Scheduler& sch,
-                             TiledIndexSpace& MO, Tensor<T> d_t1, Tensor<T> d_t2, Tensor<T> d_y1,
-                             Tensor<T> d_y2);
+template Tensor<T> compute_1rdm<T>(std::vector<int>& cc_rdm, std::string files_prefix,
+                                   Scheduler& sch, TiledIndexSpace& MO, Tensor<T> d_t1,
+                                   Tensor<T> d_t2, Tensor<T> d_y1, Tensor<T> d_y2);
+
+template Tensor<T> compute_2rdm<T>(std::vector<int>& cc_rdm, std::string files_prefix,
+                                   Scheduler& sch, TiledIndexSpace& MO, Tensor<T> d_t1,
+                                   Tensor<T> d_t2, Tensor<T> d_y1, Tensor<T> d_y2);

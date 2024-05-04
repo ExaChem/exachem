@@ -77,7 +77,7 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
 
    * :strong:`ccsd_diagnostics`: Print CCSD T1, D1, D2 diagnostics.
    * :strong:`tamplitudes`: Write T1,T2 amplitude tensor values above a certain threshold to text files.
-   * :strong:`rdm`: Write 1- and 2-RDM (reduced density matrix) tensors to disk as plain text files. specifying 1 and/or 2 to write the desired RDM tensor. This option only applies when CCSD Lambda is run.
+   * :strong:`rdm`: Write 1- and 2-RDM (reduced density matrix) tensors to disk as plain text files. Specifying 1 and/or 2 to write the desired RDM tensor. Specifying 1 also computes the CCSD natural orbitals and writes them to the SCF files directory. This option only applies when CCSD Lambda is run.
 
 .. note::
 

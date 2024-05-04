@@ -55,7 +55,7 @@ inline int max_l(const libint2::BasisSet& shells) {
 }
 
 template<typename T>
-std::vector<size_t> sort_indexes(std::vector<T>& v);
+std::vector<size_t> sort_indexes(std::vector<T>& v, bool reverse = false);
 
 // returns {X,X^{-1},rank,A_condition_number,result_A_condition_number}, where
 // X is the generalized square-root-inverse such that X.transpose() * A * X = I

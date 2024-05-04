@@ -13,8 +13,17 @@
 namespace fs = std::filesystem;
 
 template<typename T>
-void compute_rdm(std::vector<int>&, std::string, Scheduler&, TiledIndexSpace&, Tensor<T>, Tensor<T>,
-                 Tensor<T>, Tensor<T>);
+void ccsd_natural_orbitals(ChemEnv& chem_env, std::vector<int>&, std::string, std::string,
+                           Scheduler&, ExecutionContext&, TiledIndexSpace&, TiledIndexSpace&,
+                           Tensor<T>&, ExecutionHW);
+
+template<typename T>
+Tensor<T> compute_1rdm(std::vector<int>&, std::string, Scheduler&, TiledIndexSpace&, Tensor<T>,
+                       Tensor<T>, Tensor<T>, Tensor<T>);
+
+template<typename T>
+Tensor<T> compute_2rdm(std::vector<int>&, std::string, Scheduler&, TiledIndexSpace&, Tensor<T>,
+                       Tensor<T>, Tensor<T>, Tensor<T>);
 
 void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
@@ -225,7 +234,8 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
               << std::endl;
 
   v2tensors.deallocate();
-  free_tensors(d_f1, l_r1, l_r2, cholVpr);
+  free_tensors(d_f1, cholVpr);
+  free_tensors(l_r1, l_r2);
   free_vec_tensors(l_r1s, l_r2s, d_y1s, d_y2s);
 
   cc_t1 = std::chrono::high_resolution_clock::now();
@@ -398,7 +408,20 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
     chem_env.write_json_data("CCSD_Lambda");
   }
 
-  compute_rdm(ccsd_options.cc_rdm, files_prefix, sch, MO, d_t1, d_t2, d_y1, d_y2);
+  if(!ccsd_options.cc_rdm.empty()) {
+    if(ccsd_options.cc_rdm[0] == 1) {
+      Tensor<T> gamma1;
+      gamma1 = compute_1rdm<T>(ccsd_options.cc_rdm, files_prefix, sch, MO, d_t1, d_t2, d_y1, d_y2);
+      ccsd_natural_orbitals(chem_env, ccsd_options.cc_rdm, files_prefix, files_dir, sch, ec, MO,
+                            AO_opt, gamma1, ex_hw);
+    }
+    auto rdm_val = (ccsd_options.cc_rdm.size() == 2) ? ccsd_options.cc_rdm[1]
+                                                     : ccsd_options.cc_rdm[0];
+    if(rdm_val == 2) {
+      Tensor<T> gamma2;
+      gamma2 = compute_2rdm<T>(ccsd_options.cc_rdm, files_prefix, sch, MO, d_t1, d_t2, d_y1, d_y2);
+    }
+  }
 
   sch
     .deallocate(d_t1, d_t2, d_y1, d_y2, tmp1, tmp2, tmp3, tmp4, tmp5, dipole_mx, dipole_my,

@@ -45,8 +45,7 @@ public:
                             EigenTensors& etensors);
 
   template<typename TensorType>
-  void compute_hamiltonian(ExecutionContext& ec, const SCFVars& scf_vars,
-                           std::vector<libint2::Atom>& atoms, libint2::BasisSet& shells,
+  void compute_hamiltonian(ExecutionContext& ec, const SCFVars& scf_vars, ChemEnv& chem_env,
                            TAMMTensors& ttensors, EigenTensors& etensors);
 
   template<typename TensorType>

@@ -28,6 +28,8 @@ void ParseCCSDOptions::parse_check(json& jinput) {
 void ParseCCSDOptions::parse(ChemEnv& chem_env) {
   json         jcc        = chem_env.jinput["CC"];
   CCSDOptions& cc_options = chem_env.ioptions.ccsd_options;
+  update_common_options(chem_env);
+
   parse_option<int>(cc_options.ndiis, jcc, "ndiis");
   parse_option<int>(cc_options.nactive, jcc, "nactive");
   parse_option<int>(cc_options.ccsd_maxiter, jcc, "ccsd_maxiter");
@@ -133,12 +135,11 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
   parse_option<std::vector<size_t>>(cc_options.gf_orbitals     , jgfcc, "gf_orbitals");
   parse_option<std::vector<double>>(cc_options.gf_analyze_omega, jgfcc, "gf_analyze_omega");
   // clang-format on
+
   if(cc_options.gf_p_oi_range != 0) {
     if(cc_options.gf_p_oi_range != 1 && cc_options.gf_p_oi_range != 2)
       tamm_terminate("gf_p_oi_range can only be one of 1 or 2");
   }
-
-  update_common_options(chem_env);
 }
 
 void ParseCCSDOptions::update_common_options(ChemEnv& chem_env) {

@@ -36,6 +36,7 @@ public:
   tamm::Tensor<TensorType> F_beta_AO;
   TiledIndexSpace          AO_opt;
   TiledIndexSpace          AO_tis;
+  TiledIndexSpace          AO_ortho;
   bool                     no_scf;
 
   std::string workspace_dir{};
@@ -45,7 +46,8 @@ public:
   void update(double hf_energy, libint2::BasisSet shells, std::vector<size_t> shell_tile_map,
               tamm::Tensor<TensorType> C_AO, tamm::Tensor<TensorType> F_AO,
               tamm::Tensor<TensorType> C_beta_AO, tamm::Tensor<TensorType> F_beta_AO,
-              TiledIndexSpace AO_opt, TiledIndexSpace AO_tis, bool no_scf) {
+              TiledIndexSpace AO_opt, TiledIndexSpace AO_tis, TiledIndexSpace AO_ortho,
+              bool no_scf) {
     this->hf_energy      = hf_energy;
     this->shells         = shells;
     this->shell_tile_map = shell_tile_map;
@@ -55,6 +57,7 @@ public:
     this->F_beta_AO      = F_beta_AO;
     this->AO_opt         = AO_opt;
     this->AO_tis         = AO_tis;
+    this->AO_ortho       = AO_ortho;
     this->no_scf         = no_scf;
   }
 };

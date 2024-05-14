@@ -20,14 +20,15 @@ void ParseFCIOptions::parse_check(json& jinput) {
       if(std::find(valid_fci.begin(), valid_fci.end(), el.key()) == valid_fci.end())
         tamm_terminate("INPUT FILE ERROR: Invalid FCI option [" + el.key() + "] in the input file");
     }
-// clang-format on    
-}//END of parse_check
+  // clang-format on    
+}
 
 void ParseFCIOptions::parse(ChemEnv& chem_env){
   json jfci = chem_env.jinput["FCI"];
   FCIOptions& fci_options = chem_env.ioptions.fci_options;
+  update_common_options(chem_env);
 
-// clang-format off
+  // clang-format off
   parse_option<int>(fci_options.nalpha,       jfci, "nalpha");
   parse_option<int>(fci_options.nbeta,        jfci, "nbeta");
   parse_option<int>(fci_options.nactive,      jfci, "nactive");
@@ -60,23 +61,20 @@ void ParseFCIOptions::parse(ChemEnv& chem_env){
   parse_option<bool>(fci_options.print_diis,        jprint, "diis");
   parse_option<bool>(fci_options.print_asci_search, jprint, "asci_search");
   parse_option<std::pair<bool, double>>(fci_options.print_state_char, jprint, "state_char");
-  update_common_options(chem_env);
+  // clang-format on
+}
 
-} 
-
-
-void ParseFCIOptions::update_common_options(ChemEnv& chem_env){
-  FCIOptions& fci_options = chem_env.ioptions.fci_options;
+void ParseFCIOptions::update_common_options(ChemEnv& chem_env) {
+  FCIOptions&    fci_options    = chem_env.ioptions.fci_options;
   CommonOptions& common_options = chem_env.ioptions.common_options;
 
-  fci_options.debug = common_options.debug;
-  fci_options.maxiter = common_options.maxiter;
-  fci_options.basis = common_options.basis;
-  fci_options.dfbasis = common_options.dfbasis;
-  fci_options.basisfile = common_options.basisfile;
+  fci_options.debug         = common_options.debug;
+  fci_options.maxiter       = common_options.maxiter;
+  fci_options.basis         = common_options.basis;
+  fci_options.dfbasis       = common_options.dfbasis;
+  fci_options.basisfile     = common_options.basisfile;
   fci_options.gaussian_type = common_options.gaussian_type;
-  fci_options.geom_units = common_options.geom_units;
-  fci_options.file_prefix = common_options.file_prefix;
+  fci_options.geom_units    = common_options.geom_units;
+  fci_options.file_prefix   = common_options.file_prefix;
   fci_options.ext_data_path = common_options.ext_data_path;
-
-} 
+}

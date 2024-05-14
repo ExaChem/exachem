@@ -20,6 +20,7 @@ void ParseTaskOptions::parse_check(json& jinput) {
 void ParseTaskOptions::parse(ChemEnv& chem_env) {
   json         jtask        = chem_env.jinput["TASK"];
   TaskOptions& task_options = chem_env.ioptions.task_options;
+  update_common_options(chem_env);
 
   // clang-format off
   parse_option<bool>(task_options.sinfo, jtask, "sinfo");
@@ -43,7 +44,6 @@ void ParseTaskOptions::parse(ChemEnv& chem_env) {
   parse_option<std::pair<bool, std::string>>(task_options.dlpno_ccsd, jtask, "dlpno_ccsd");
   parse_option<std::pair<bool, std::string>>(task_options.dlpno_ccsd_t, jtask, "dlpno_ccsd_t");
   // clang-format on
-  update_common_options(chem_env);
 }
 
 void ParseTaskOptions::update_common_options(ChemEnv& chem_env) {

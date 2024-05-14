@@ -317,8 +317,7 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
     /*** =========================== ***/
     /*** compute 1-e integrals       ***/
     /*** =========================== ***/
-    scf_compute.compute_hamiltonian<TensorType>(ec, scf_vars, chem_env.atoms, chem_env.shells,
-                                                ttensors, etensors);
+    scf_compute.compute_hamiltonian<TensorType>(ec, scf_vars, chem_env, ttensors, etensors);
 
     if(chem_env.sys_data.has_ecp) {
       Tensor<TensorType> ECP{tAO, tAO};
@@ -1023,6 +1022,6 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   exc.pg().barrier();
 
   chem_env.update(ehf, chem_env.shells, scf_vars.shell_tile_map, C_alpha_tamm, Fa_global,
-                  C_beta_tamm, Fb_global, scf_vars.tAO, scf_vars.tAOt,
+                  C_beta_tamm, Fb_global, scf_vars.tAO, scf_vars.tAOt, tAO_ortho,
                   chem_env.ioptions.scf_options.noscf);
 } // END of scf_hf(ExecutionContext& exc, ChemEnv& chem_env)

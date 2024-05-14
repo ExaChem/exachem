@@ -106,8 +106,9 @@ int main(int argc, char* argv[]) {
       cout << endl << "date: " << std::put_time(cur_local_time, "%c") << endl;
       cout << "program: " << fs::canonical(argv[0]) << endl;
       cout << "input: " << input_file << endl;
-      cout << "nnodes: " << ec.nnodes() << ", ";
-      cout << "nproc: " << ec.nnodes() * ec.ppn() << endl;
+      std::cout << "nnodes: " << ec.nnodes() << ", ";
+      std::cout << "nproc: " << ec.nnodes() * ec.ppn() << ", ";
+      std::cout << "ngpus: " << ec.nnodes() * ec.gpn() << std::endl;
       cout << "prefix: " << chem_env.sys_data.output_file_prefix << endl << endl;
       ec.print_mem_info();
       cout << endl << endl;

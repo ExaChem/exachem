@@ -6,6 +6,7 @@ void ParseGWOptions::parse(ChemEnv& chem_env) {
   // clang-format off
   json jgw = chem_env.jinput["GW"];
   GWOptions& gw_options = chem_env.ioptions.gw_options;
+  update_common_options(chem_env);
 
   parse_option<bool>  (gw_options.debug,     jgw, "debug");
   parse_option<int>   (gw_options.ngl,       jgw, "ngl");
@@ -27,7 +28,6 @@ void ParseGWOptions::parse(ChemEnv& chem_env) {
   std::vector<std::string> gwlist{"cdgw", "sdgw", "CDGW", "SDGW"};
   if(std::find(std::begin(gwlist), std::end(gwlist), string(gw_options.method)) == std::end(gwlist))
     tamm_terminate("INPUT FILE ERROR: GW method can only be one of [sdgw,cdgw]");
-  update_common_options(chem_env);
 }
 
 void ParseGWOptions::update_common_options(ChemEnv& chem_env) {

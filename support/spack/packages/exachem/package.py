@@ -25,6 +25,15 @@ class Exachem(CMakePackage,CudaPackage):
     # Still need to update libint recipe for 2.9.x
     #depends_on('libint@2.9:')
     conflicts("+cuda", when="cuda_arch=none")
+    variant(
+        "cuda_arch",
+        description="CUDA architecture",
+        values=("none",) + CudaPackage.cuda_arch_values,
+        default="none",
+        multi=False,
+        sticky=True,
+        when="+cuda",
+    )
 
     def cmake_args(self):
         args = [
@@ -36,7 +45,8 @@ class Exachem(CMakePackage,CudaPackage):
             '-DLINALG_PREFIX=%s' % join_path(self.spec['intel-oneapi-mkl'].prefix, 'mkl', 'latest'),
         ]
         if '+cuda' in self.spec:
+            cuda_arch = self.spec.variants["cuda_arch"].value
             args.append( "-DTAMM_ENABLE_CUDA=ON" )
-            args.append("-DGPU_ARCH=" + self.spec.variants["cuda_arch"].value)
+            args.append("-DGPU_ARCH=" + cuda_arch)
 
         return args

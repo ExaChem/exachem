@@ -315,12 +315,14 @@ void exachem::scf::SCFCompute::compute_orthogonalizer(ExecutionContext& ec, Chem
 
 template<typename TensorType>
 void exachem::scf::SCFCompute::compute_hamiltonian(ExecutionContext& ec, const SCFVars& scf_vars,
-                                                   std::vector<libint2::Atom>& atoms,
-                                                   libint2::BasisSet& shells, TAMMTensors& ttensors,
+                                                   ChemEnv& chem_env, TAMMTensors& ttensors,
                                                    EigenTensors& etensors) {
   using libint2::Operator;
   // const size_t N = shells.nbf();
   auto rank = ec.pg().rank();
+
+  std::vector<libint2::Atom>& atoms  = chem_env.atoms;
+  libint2::BasisSet&          shells = chem_env.shells;
 
   ttensors.H1 = {scf_vars.tAO, scf_vars.tAO};
   ttensors.S1 = {scf_vars.tAO, scf_vars.tAO};
@@ -615,9 +617,11 @@ template void exachem::scf::SCFCompute::compute_sdens_to_cdens<double>(
 template void exachem::scf::SCFCompute::compute_cpot_to_spot<double>(
   const libint2::BasisSet& shells, Matrix& Spherical, Matrix& Cartesian, EigenTensors& etensors);
 
-template void exachem::scf::SCFCompute::compute_hamiltonian<double>(
-  ExecutionContext& ec, const SCFVars& scf_vars, std::vector<libint2::Atom>& atoms,
-  libint2::BasisSet& shells, TAMMTensors& ttensors, EigenTensors& etensors);
+template void exachem::scf::SCFCompute::compute_hamiltonian<double>(ExecutionContext& ec,
+                                                                    const SCFVars&    scf_vars,
+                                                                    ChemEnv&          chem_env,
+                                                                    TAMMTensors&      ttensors,
+                                                                    EigenTensors&     etensors);
 
 template void exachem::scf::SCFCompute::compute_density<double>(
   ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars, ScalapackInfo& scalapack_info,

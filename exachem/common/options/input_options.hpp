@@ -40,17 +40,32 @@ public:
   bool     sad{true};
   bool     force_tilesize{false};
   bool     direct_df{false};
+  bool     snK{false};
   int restart_size{2000}; // read/write orthogonalizer, schwarz, etc matrices when N>=restart_size
   int scalapack_nb{256};
   int nnodes{1};
   int scalapack_np_row{0};
   int scalapack_np_col{0};
-  std::string moldenfile{""};
-  int         n_lindep{0};
-  int         writem{1};
-  int         damp{100}; // density mixing parameter
-  std::string scf_type{"restricted"};
-  std::string xc_grid_type{"UltraFine"};
+  std::string         moldenfile{""};
+  int                 n_lindep{0};
+  int                 writem{1};
+  int                 damp{100}; // density mixing parameter
+  std::string         scf_type{"restricted"};
+  std::string         xc_grid_type{"UltraFine"};
+  std::string         xc_pruning_scheme{"Robust"};
+  std::string         xc_rad_quad{"MK"};
+  std::string         xc_weight_scheme{"SSF"};
+  std::string         xc_exec_space{"Host"};
+  std::string         xc_lb_kernel{"Default"};
+  std::string         xc_mw_kernel{"Default"};
+  std::string         xc_int_kernel{"Default"};
+  std::string         xc_red_kernel{"Default"};
+  std::string         xc_lwd_kernel{"Default"};
+  std::pair<int, int> xc_radang_size{0, 0};
+  int                 xc_batch_size{2048};
+  double              xc_basis_tol{1e-8};
+  double              xc_snK_etol{1e-10};
+  double              xc_snK_ktol{1e-10};
 
   std::map<std::string, std::tuple<int, int>> guess_atom_options;
 

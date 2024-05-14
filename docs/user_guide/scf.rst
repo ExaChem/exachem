@@ -33,13 +33,30 @@ The values listed below are the defaults where few options are automatically adj
    "damp": 100,
    "nnodes": 1,
    "writem": 1,
+   "debug": false,
    "restart": false,
    "noscf": false,
    "scf_type": "restricted",
-   "xc_type": [],
-   "xc_grid_type": "UltraFine",
-   "direct_df": false,
-   "debug": false,
+   "direct_df": false,    
+   "DFT": {
+      "snK": false,
+      "xc_type": [],
+      "xc_grid_type": "UltraFine",
+      "xc_pruning_scheme": "Robust",
+      "xc_rad_quad": "MK",
+      "xc_weight_scheme": "SSF",
+      "xc_exec_space": "Host",
+      "xc_basis_tol": 1e-10,
+      "xc_batch_size": 512,
+      "xc_snK_etol": 1e-10,
+      "xc_snK_ktol": 1e-10,
+      "xc_lb_kernel": "Default",
+      "xc_mw_kernel": "Default",
+      "xc_int_kernel": "Default",
+      "xc_red_kernel": "Default",
+      "xc_lwd_kernel": "Default",
+      "xc_radang_size": [0, 0]
+   },
     "guess": {
       "atom_options":{
         "Fe1": [1,2],
@@ -93,26 +110,90 @@ The values listed below are the defaults where few options are automatically adj
 
 :noscf: ``[default=false]`` Computes only the SCF energy upon restart.
 
+:debug: ``[default=false]`` enable verbose printing for debugging a calculation.
+
 :scf_type: ``[default=restricted]``  The following values are supported
 
    * :strong:`restricted`: for closed-shell restricted Hartree-Fock (RHF) calculation
    * :strong:`unrestricted`: for spin-unrestricted Hartree-Fock (UHF) calculation
 
+:direct_df: ``[default=false]`` Requests the direct computation of the density-fitted Coulomb contribution. Works only for pure Kohn-Sham fnctionals (no exact exchange) and with a provided ``df_basisset`` (see :ref:`Basis set options <Basis>`).
+
+:snK: ``[default=false]`` Computes the exact exchange contribution using the seminumerical approach implemented in `GauXC`.
+
 :xc_type: ``[default=[]]`` A list of strings specifying the exchange and correlation functionals for DFT calculations using `GauXC <https://github.com/wavefunction91/GauXC>`_.
    The list of available functionals using the `builtin` backend can be found at the `ExchCXX <https://github.com/wavefunction91/ExchCXX>`_ repository.
-   The `Libxc` backend is restricted to the list of LDA and GGA functionals without range separation available at `Libxc <https://tddft.org/programs/libxc/functionals/libxc-6.2.2/>`_.
+   The `Libxc` backend is restricted to the list of functionals **without** range separation available at `Libxc <https://tddft.org/programs/libxc/functionals/libxc-6.2.2/>`_.
 
 :xc_grid_type: ``[default=UltraFine]`` Specifies the quality of the numerical integration grid. The following values are supported
 
    * :strong:`Fine`: 75 radial shells with 302 angular points per shell.
    * :strong:`UltraFine`: 99 radial shells with 590 angular points per shell.
    * :strong:`SuperFine`: 175 radial shells with 974 angular points per shell for first row elements and 250 radial shells with 974 Lebedev points per shell for the rest.
+   * :strong:`GM3`
+   * :strong:`GM5`
 
-   All **xc_grid_type** options use a `Mura-Knowles` radial quadrature, a `Lebedev-Laikov` angular quadrature, a `Laqua-Kussmann-Ochsenfeld` partitioning scheme, and a `Robust` pruning method.
+:xc_pruning_scheme: ``[default=Robust]`` Specifies the `GauXC` pruning scheme. The following values are supported
 
-:direct_df: ``[default=false]`` Requests the direct computation of the density-fitted Coulomb contribution. Works only for pure Kohn-Sham fnctionals (no exact exchange) and with a provided ``df_basisset`` (see :ref:`Basis set options <Basis>`).
+   * :strong:`Treutler`
+   * :strong:`Robust`
+   * :strong:`Unpruned`
 
-:debug: ``[default=false]`` enable verbose printing for debugging a calculation.
+:xc_rad_quad: ``[default=MK]`` Specifies the `GauXC` radial quadrature. The following values are supported
+
+   * :strong:`MK` Mura-Knowles radial quadrature.
+   * :strong:`TA` Treutler-Ahlrichs radial quadrature.
+   * :strong:`MHL` Murray-Handy-Laming radial quadrature.
+
+:xc_weight_scheme: ``[default=SSF]`` Specifies the `GauXC` partitioning scheme. The following values are supported
+
+   * :strong:`SSF` Stratman-Scuseria-Frisch partitioning scheme.
+   * :strong:`Becke` Becke partitioning scheme.
+   * :strong:`LKO` Laqua-Kussmann-Ochsenfeld partitioning scheme.
+
+:xc_exec_space: ``[default=Host]`` Specifies the `GauXC` execution space for the load balancer *and* integrator. The following values are supported
+
+   * :strong:`Host` Use the CPU execution space.
+   * :strong:`Device` Use the GPU execution space. Only meaningful when GPU support was enabled during compilation. By default, `TAMM` reserves up to 80% of the GPU memory and only 10% is made available to `GauXC`. The `TAMM_GPU_POOL` environment variable can be used to modify the percentage of GPU memory reserved for `TAMM` and `GauXC` (`90-TAMM_GPU_POOL`).
+
+:xc_basis_tol: ``[default=1e-8]`` Specifies the `GauXC` basis tolerance.
+
+:xc_batch_size: ``[default=2048]`` Specifies the `GauXC` batch size.
+
+:xc_snK_etol: ``[default=1e-10]`` Specifies the `GauXC` snK energy tolerance. If `conve < xc_snK_etol`, the `xc_snK_etol` tolerance will be automatically set to the `conve` value.
+   
+:xc_snK_ktol: ``[default=1e-10]`` Specifies the `GauXC` K matrix tolerance. If `conve * 1e-2 < xc_snK_ktol`, the `xc_snK_ktol` tolerance will be automatically set to `conve * 1e-2`.
+
+:xc_int_kernel: ``[default=Default]`` Specifies the `GauXC` Integrator Kernel.
+
+   * :strong:`Default` Uses `Replicated` or `Incore` for `Host` and `Device` execution spaces, respectively.
+   * :strong:`Replicated` Only available for the `Host` execution space.
+   * :strong:`Incore` Only available for the `Device` execution space.
+   * :strong:`ShellBatched` Only available for the `Device` execution space.
+
+:xc_lwd_kernel: ``[default=Default]`` Specifies the `GauXC` Local Work Driver Kernel.
+
+   * :strong:`Default` Uses the `Reference` or `Scheme1` kernels for `Host` and `Device` execution spaces, respectively.
+   * :strong:`Reference` Only available for the `Host` execution space.
+   * :strong:`Scheme1` Only available for the `Device` execution space.
+   * :strong:`Scheme1-Cutlass` Only available for the `Device` execution space. `GauXC` must be compiled setting `GAUXC_ENABLE_CUTLASS=ON`.
+
+:xc_red_kernel: ``[default=Default]`` Specifies the `GauXC` Reduction Kernel.
+
+   * :strong:`Default` Uses the `BasicMPI` reduction kernel.
+   * :strong:`BasicMPI`
+   * :strong:`NCCL` Only available for the `Device` execution space. `GauXC` must be compiled setting `GAUXC_ENABLE_NCCL=ON`.
+
+:xc_lb_kernel: ``[default=Default]`` Specifies the `GauXC` Load Balancer Kernel.
+
+   * :strong:`Default` Uses the `Replicated` reduction kernel.
+   * :strong:`Replicated` Alias for `Replicated-Petite` in the `Host` execution space.
+   * :strong:`Replicated-Petite` Only available for the `Host` execution space.
+   * :strong:`Replicated-Fillin` Only available for the `Host` execution space.
+
+:xc_mw_kernel: ``[default=Default]`` Specifies the `GauXC` Molecular Weights Kernel.
+
+   * :strong:`Default`
 
 :nnodes: On a distributed machine, the number of processors for an SCF run is chosen by default depending on the problem size (i.e. number of basis functions **Nbf**).
    If a larger number of processors than required are used, the SCF module automatically chooses a smaller subset of processors for the calculation. 

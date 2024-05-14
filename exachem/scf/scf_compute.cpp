@@ -14,6 +14,211 @@ void exachem::scf::SCFCompute::compute_shellpair_list(const ExecutionContext&  e
               << shells.size() * (shells.size() + 1) / 2 << "," << nsp << "}" << endl;
 }
 
+void exachem::scf::SCFCompute::compute_trafo(const libint2::BasisSet& shells,
+                                             EigenTensors&            etensors) {
+  std::vector<Matrix>& CtoS = etensors.trafo_ctos;
+  std::vector<Matrix>& StoC = etensors.trafo_stoc;
+  int                  lmax = shells.max_l();
+
+  static constexpr std::array<int64_t, 21> fac = {{1LL,
+                                                   1LL,
+                                                   2LL,
+                                                   6LL,
+                                                   24LL,
+                                                   120LL,
+                                                   720LL,
+                                                   5040LL,
+                                                   40320LL,
+                                                   362880LL,
+                                                   3628800LL,
+                                                   39916800LL,
+                                                   479001600LL,
+                                                   6227020800LL,
+                                                   87178291200LL,
+                                                   1307674368000LL,
+                                                   20922789888000LL,
+                                                   355687428096000LL,
+                                                   6402373705728000LL,
+                                                   121645100408832000LL,
+                                                   2432902008176640000LL}};
+
+  auto binomial = [](int i, int j) -> int {
+    return (j < 0 || j > i) ? 0 : fac[i] / (fac[j] * fac[i - j]);
+  };
+
+  for(int l = 0; l <= lmax; l++) {
+    int    c_size = (l + 1) * (l + 2) / 2;
+    int    s_size = 2 * l + 1;
+    Matrix trafo  = Matrix::Zero(s_size, c_size);
+    double norm2  = 1.0 / std::sqrt(((double) fac[2 * l]) / (pow(2.0, 2 * l) * fac[l]));
+
+    for(int lx = l, ic = 0; lx >= 0; lx--) {
+      for(int ly = l - lx; ly >= 0; ly--, ic++) {
+        int    lz     = l - lx - ly;
+        double norm1  = 1.0 / std::sqrt(((double) fac[2 * lx] * fac[2 * ly] * fac[2 * lz]) /
+                                        (pow(2.0, 2 * l) * fac[lx] * fac[ly] * fac[lz]));
+        double factor = norm1 / norm2;
+
+        for(int m = -l, is = 0; m <= l; m++, is++) {
+          int ma = abs(m);
+          int j  = lx + ly - ma;
+          if(j < 0 || j % 2 == 1) continue;
+          j = j / 2;
+          double s1{0.0};
+
+          for(int i = 0; i <= (l - ma) / 2; i++) {
+            double s2{0.0};
+            for(int k = 0; k <= j; k++) {
+              double s{0.0};
+              int    expo;
+              if((m < 0 && abs(ma - lx) % 2 == 1) || (m > 0 && abs(ma - lx) % 2 == 0)) {
+                expo = (ma - lx + 2 * k) / 2;
+                s    = pow(-1.0, expo) * std::sqrt(2.0);
+              }
+              else if(m == 0 && lx % 2 == 0) {
+                expo = k - lx / 2;
+                s    = pow(-1.0, expo);
+              }
+              else { s = 0.0; }
+              s2 += binomial(j, k) * binomial(ma, lx - 2 * k) * s;
+            }
+            s1 += binomial(l, i) * binomial(i, j) * fac[2 * l - 2 * i] * pow(-1.0, i) * s2 /
+                  fac[l - ma - 2 * i];
+          }
+          trafo(is, ic) =
+            factor * s1 / (fac[l] * pow(2.0, l)) *
+            std::sqrt(((double) fac[2 * lx] * fac[2 * ly] * fac[2 * lz] * fac[l] * fac[l - ma]) /
+                      (fac[lx] * fac[ly] * fac[lz] * fac[2 * l] * fac[l + ma]));
+        }
+      }
+    }
+    CtoS.push_back(trafo);
+  }
+
+  // Compute backtransformation
+  for(int l = 0; l <= lmax; l++) {
+    int    c_size = (l + 1) * (l + 2) / 2;
+    int    s_size = 2 * l + 1;
+    Matrix trafo  = Matrix::Zero(s_size, c_size);
+    double norm2  = 1.0 / std::sqrt(fac[2 * l] / (pow(2.0, 2 * l) * fac[l]));
+
+    for(int lx1 = l, ic1 = 0; lx1 >= 0; lx1--) {
+      for(int ly1 = l - lx1; ly1 >= 0; ly1--, ic1++) {
+        int    lz1    = l - lx1 - ly1;
+        double s1     = std::sqrt(((double) fac[lx1] * fac[ly1] * fac[lz1]) /
+                                  (fac[2 * lx1] * fac[2 * ly1] * fac[2 * lz1]));
+        double norm11 = s1 * pow(2, l);
+        for(int lx2 = l, ic2 = 0; lx2 >= 0; lx2--) {
+          for(int ly2 = l - lx2; ly2 >= 0; ly2--, ic2++) {
+            int lz2 = l - lx2 - ly2;
+            int lx  = lx1 + lx2;
+            int ly  = ly1 + ly2;
+            int lz  = lz1 + lz2;
+            if(lx % 2 == 1 || ly % 2 == 1 || lz % 2 == 1) continue;
+            double s2     = std::sqrt(((double) fac[lx2] * fac[ly2] * fac[lz2]) /
+                                      (fac[2 * lx2] * fac[2 * ly2] * fac[2 * lz2]));
+            double norm12 = s2 * pow(2, l);
+            double s      = fac[lx] * fac[ly] * fac[lz] * s1 * s2 /
+                       (fac[lx / 2] * fac[ly / 2] * fac[lz / 2]) * norm2 / norm11 * norm2 / norm12;
+            for(int is = 0; is <= 2 * l; is++) trafo(is, ic1) += s * CtoS[l](is, ic2);
+          }
+        }
+      }
+    }
+    StoC.push_back(trafo);
+  }
+}
+
+template<typename TensorType>
+void exachem::scf::SCFCompute::compute_sdens_to_cdens(const libint2::BasisSet& shells,
+                                                      Matrix& Spherical, Matrix& Cartesian,
+                                                      EigenTensors& etensors) {
+  std::vector<Matrix>& CtoS     = etensors.trafo_ctos;
+  auto                 shell2bf = shells.shell2bf();
+  int                  nsh      = shells.size();
+  int                  Nspher{0};
+  int                  Ncart{0};
+  for(auto& shell: shells) {
+    int l = shell.contr[0].l;
+    Nspher += 2 * l + 1;
+    Ncart += ((l + 1) * (l + 2)) / 2;
+  }
+
+  Cartesian         = Matrix::Zero(Ncart, Ncart);
+  int bf1_cartesian = 0;
+  for(int sh1 = 0; sh1 < nsh; sh1++) {
+    int l1            = shells[sh1].contr[0].l;
+    int bf1_spherical = shell2bf[sh1];
+    int n1_spherical  = shells[sh1].size();
+    int n1_cartesian  = ((l1 + 1) * (l1 + 2)) / 2;
+    int bf2_cartesian = 0;
+    for(int sh2 = 0; sh2 < nsh; sh2++) {
+      int l2            = shells[sh2].contr[0].l;
+      int bf2_spherical = shell2bf[sh2];
+      int n2_spherical  = shells[sh2].size();
+      int n2_cartesian  = ((l2 + 1) * (l2 + 2)) / 2;
+      for(int is1 = 0; is1 < n1_spherical; is1++) {
+        for(int is2 = 0; is2 < n2_spherical; is2++) {
+          for(int ic1 = 0; ic1 < n1_cartesian; ic1++) {
+            for(int ic2 = 0; ic2 < n2_cartesian; ic2++) {
+              Cartesian(bf1_cartesian + ic1, bf2_cartesian + ic2) +=
+                CtoS[l1](is1, ic1) * Spherical(bf1_spherical + is1, bf2_spherical + is2) *
+                CtoS[l2](is2, ic2);
+            }
+          }
+        }
+      }
+      bf2_cartesian += n2_cartesian;
+    }
+    bf1_cartesian += n1_cartesian;
+  }
+}
+
+template<typename TensorType>
+void exachem::scf::SCFCompute::compute_cpot_to_spot(const libint2::BasisSet& shells,
+                                                    Matrix& Spherical, Matrix& Cartesian,
+                                                    EigenTensors& etensors) {
+  std::vector<Matrix>& CtoS     = etensors.trafo_ctos;
+  auto                 shell2bf = shells.shell2bf();
+  int                  nsh      = shells.size();
+  int                  Nspher{0};
+  int                  Ncart{0};
+  for(auto& shell: shells) {
+    int l = shell.contr[0].l;
+    Nspher += 2 * l + 1;
+    Ncart += ((l + 1) * (l + 2)) / 2;
+  }
+
+  Spherical         = Matrix::Zero(Nspher, Nspher);
+  int bf1_cartesian = 0;
+  for(int sh1 = 0; sh1 < nsh; sh1++) {
+    int l1            = shells[sh1].contr[0].l;
+    int bf1_spherical = shell2bf[sh1];
+    int n1_spherical  = shells[sh1].size();
+    int n1_cartesian  = ((l1 + 1) * (l1 + 2)) / 2;
+    int bf2_cartesian = 0;
+    for(int sh2 = 0; sh2 < nsh; sh2++) {
+      int l2            = shells[sh2].contr[0].l;
+      int bf2_spherical = shell2bf[sh2];
+      int n2_spherical  = shells[sh2].size();
+      int n2_cartesian  = ((l2 + 1) * (l2 + 2)) / 2;
+      for(int is1 = 0; is1 < n1_spherical; is1++) {
+        for(int is2 = 0; is2 < n2_spherical; is2++) {
+          for(int ic1 = 0; ic1 < n1_cartesian; ic1++) {
+            for(int ic2 = 0; ic2 < n2_cartesian; ic2++) {
+              Spherical(bf1_spherical + is1, bf2_spherical + is2) +=
+                CtoS[l1](is1, ic1) * Cartesian(bf1_cartesian + ic1, bf2_cartesian + ic2) *
+                CtoS[l2](is2, ic2);
+            }
+          }
+        }
+      }
+      bf2_cartesian += n2_cartesian;
+    }
+    bf1_cartesian += n1_cartesian;
+  }
+}
+
 std::tuple<int, double> exachem::scf::SCFCompute::compute_NRE(const ExecutionContext&     ec,
                                                               std::vector<libint2::Atom>& atoms) {
   // count the number of electrons
@@ -203,7 +408,8 @@ void exachem::scf::SCFCompute::compute_density(ExecutionContext& ec, ChemEnv& ch
   sch.execute();
 
   // compute D in eigen for subsequent fock build
-  if(!scf_vars.do_dens_fit || scf_vars.direct_df || chem_env.sys_data.is_ks) {
+  if(!scf_vars.do_dens_fit || scf_vars.direct_df || chem_env.sys_data.is_ks ||
+     chem_env.sys_data.do_snK) {
     tamm_to_eigen_tensor(ttensors.D_alpha, D_alpha);
     if(is_uhf) tamm_to_eigen_tensor(ttensors.D_beta, etensors.D_beta);
   }
@@ -402,6 +608,12 @@ template Matrix exachem::scf::SCFCompute::compute_schwarz_ints<libint2::Operator
   ExecutionContext& ec, const SCFVars& scf_vars, const libint2::BasisSet& bs1,
   const libint2::BasisSet& bs2, bool use_2norm,
   typename libint2::operator_traits<libint2::Operator::coulomb>::oper_params_type params);
+
+template void exachem::scf::SCFCompute::compute_sdens_to_cdens<double>(
+  const libint2::BasisSet& shells, Matrix& Spherical, Matrix& Cartesian, EigenTensors& etensors);
+
+template void exachem::scf::SCFCompute::compute_cpot_to_spot<double>(
+  const libint2::BasisSet& shells, Matrix& Spherical, Matrix& Cartesian, EigenTensors& etensors);
 
 template void exachem::scf::SCFCompute::compute_hamiltonian<double>(
   ExecutionContext& ec, const SCFVars& scf_vars, std::vector<libint2::Atom>& atoms,

@@ -8,6 +8,7 @@ void IniSystemData::initialize(ChemEnv& chem_env) {
   chem_env.sys_data.is_ks            = false;
   chem_env.sys_data.is_qed           = false;
   chem_env.sys_data.do_qed           = false;
+  chem_env.sys_data.do_snK           = false;
   chem_env.sys_data.freeze_atomic    = false;
 
   SCFOptions& scf_options           = chem_env.ioptions.scf_options;
@@ -27,6 +28,8 @@ void IniSystemData::initialize(ChemEnv& chem_env) {
   }
   else tamm_terminate("ERROR: unrecognized scf_type [" + scf_options.scf_type + "] provided");
   if(!scf_options.xc_type.empty()) { chem_env.sys_data.is_ks = true; }
+
+  if(scf_options.snK) { chem_env.sys_data.do_snK = true; }
 
   if(!scf_options.qed_volumes.empty()) {
     for(auto x: scf_options.qed_volumes) { scf_options.qed_lambdas.push_back(sqrt(1.0 / x)); }

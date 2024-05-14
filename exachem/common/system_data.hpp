@@ -48,6 +48,7 @@ public:
   bool      is_ks{};
   bool      is_qed{};
   bool      do_qed{};
+  bool      do_snK{};
   bool      has_ecp{};
   // bool       is_cas{};???
 

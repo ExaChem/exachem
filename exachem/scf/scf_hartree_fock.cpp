@@ -88,12 +88,30 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   // SCFVars scf_vars; // init vars
   scf_vars.lshift = chem_env.ioptions.scf_options.lshift;
 
-  if(rank == 0) {
-    const double fock_precision =
-      std::min(chem_env.ioptions.scf_options.tol_sch, 1e-2 * chem_env.ioptions.scf_options.conve);
-    if(fock_precision < chem_env.ioptions.scf_options.tol_sch)
-      cout << "Resetting tol_sch to " << fock_precision << endl;
+  const double fock_precision =
+    std::min(chem_env.ioptions.scf_options.tol_sch, 1e-2 * chem_env.ioptions.scf_options.conve);
+  if(fock_precision < chem_env.ioptions.scf_options.tol_sch) {
+    chem_env.ioptions.scf_options.tol_sch = fock_precision;
+    if(rank == 0) cout << "Resetting tol_sch to " << fock_precision << endl;
   }
+#if defined(USE_GAUXC)
+  if(chem_env.ioptions.scf_options.snK) {
+    if(chem_env.ioptions.scf_options.xc_snK_etol > chem_env.ioptions.scf_options.conve) {
+      chem_env.ioptions.scf_options.xc_snK_etol = chem_env.ioptions.scf_options.conve;
+      if(rank == 0)
+        cout << "Resetting xc_snK_etol to " << chem_env.ioptions.scf_options.conve << endl;
+    }
+    if(chem_env.ioptions.scf_options.xc_snK_ktol > fock_precision) {
+      chem_env.ioptions.scf_options.xc_snK_ktol = fock_precision;
+      if(rank == 0) cout << "Resetting xc_snK_ktol to " << fock_precision << endl;
+    }
+  }
+  if(chem_env.ioptions.scf_options.xc_basis_tol > chem_env.ioptions.scf_options.conve) {
+    chem_env.ioptions.scf_options.xc_basis_tol = fock_precision;
+    if(rank == 0)
+      cout << "Resetting xc_basis_tol to " << chem_env.ioptions.scf_options.conve << endl;
+  }
+#endif
 
   // Compute Nuclear repulsion energy.
   auto [nelectrons, enuc] = scf_compute.compute_NRE(exc, chem_env.atoms);
@@ -234,21 +252,25 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 #if defined(USE_GAUXC)
     double                                       xHF;
     std::shared_ptr<GauXC::XCIntegrator<Matrix>> gauxc_integrator_ptr;
-    if(chem_env.sys_data.is_ks)
+    if(chem_env.sys_data.is_ks || chem_env.sys_data.do_snK)
       std::tie(gauxc_integrator_ptr, xHF) = scf::gauxc::setup_gauxc(ec, chem_env, scf_vars);
     else xHF = 1.0;
-    auto gauxc_integrator = chem_env.sys_data.is_ks
+    auto gauxc_integrator = (chem_env.sys_data.is_ks || chem_env.sys_data.do_snK)
                               ? GauXC::XCIntegrator<Matrix>(std::move(*gauxc_integrator_ptr))
                               : GauXC::XCIntegrator<Matrix>();
+    scf_vars.xHF          = xHF;
     if(rank == 0) cout << "HF exch = " << xHF << endl;
 #else
   const double      xHF = 1.;
 #endif
 
+    // Compute SPH<->CART transformation
+    scf_compute.compute_trafo(chem_env.shells, etensors);
+
     scf_vars.direct_df = do_density_fitting && chem_env.ioptions.scf_options.direct_df;
-    if(scf_vars.direct_df && xHF != 0.0) {
+    if(scf_vars.direct_df && xHF != 0.0 && !chem_env.sys_data.do_snK) {
       if(rank == 0) {
-        cout << "Direct DF cannot be used for xHF != 0.0" << endl;
+        cout << "Direct DF cannot be used without snK and xHF != 0.0" << endl;
         cout << "Falling back to in-core DF" << endl;
       }
       scf_vars.direct_df = false;
@@ -381,8 +403,9 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
     }
 #endif
 
-    if(!do_density_fitting || scf_vars.direct_df || chem_env.sys_data.is_ks) {
-      // needed for 4c HF only
+    if(!do_density_fitting || scf_vars.direct_df || chem_env.sys_data.is_ks ||
+       chem_env.sys_data.do_snK) {
+      // needed for 4c HF, direct_df, KS, or snK
       etensors.D_alpha = Matrix::Zero(N, N);
       etensors.G_alpha = Matrix::Zero(N, N);
       if(chem_env.sys_data.is_unrestricted) {
@@ -482,7 +505,8 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
     if(chem_env.ioptions.scf_options.restart || chem_env.ioptions.scf_options.noscf) {
       // This was originally scf_restart.restart()
       scf_restart(ec, chem_env, scalapack_info, ttensors, etensors, files_prefix);
-      if(!do_density_fitting || scf_vars.direct_df || chem_env.sys_data.is_ks) {
+      if(!do_density_fitting || scf_vars.direct_df || chem_env.sys_data.is_ks ||
+         chem_env.sys_data.do_snK) {
         tamm_to_eigen_tensor(ttensors.D_alpha, etensors.D_alpha);
         if(chem_env.sys_data.is_unrestricted) {
           tamm_to_eigen_tensor(ttensors.D_beta, etensors.D_beta);
@@ -609,6 +633,21 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
                                        shell2bf, SchwarzK, max_nprim4, ttensors, etensors,
                                        is_3c_init, do_density_fitting, xHF);
 
+#if defined(USE_GAUXC)
+      // Add snK contribution
+      if(chem_env.sys_data.do_snK) {
+        const auto snK_start = std::chrono::high_resolution_clock::now();
+        scf::gauxc::compute_exx<TensorType>(ec, chem_env, scf_vars, ttensors, etensors,
+                                            gauxc_integrator);
+        const auto snK_stop = std::chrono::high_resolution_clock::now();
+        const auto snK_time =
+          std::chrono::duration_cast<std::chrono::duration<double>>((snK_stop - snK_start)).count();
+        auto debug = chem_env.ioptions.scf_options.debug;
+        if(rank == 0 && debug)
+          std::cout << std::fixed << std::setprecision(2) << "snK: " << snK_time << "s, ";
+      }
+#endif
+
       if(sys_data.is_restricted) {
         // clang-format off
         sch
@@ -646,7 +685,8 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
         const auto xcf_time =
           std::chrono::duration_cast<std::chrono::duration<double>>((xcf_stop - xcf_start)).count();
         auto debug = chem_env.ioptions.scf_options.debug;
-        if(rank == 0 && debug) std::cout << "xcf:" << xcf_time << "s, ";
+        if(rank == 0 && debug)
+          std::cout << std::fixed << std::setprecision(2) << "xcf: " << xcf_time << "s, ";
       }
 
       ehf += gauxc_exc;
@@ -773,7 +813,7 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 
       // if(rank==0) cout << "D at the end of iteration: " << endl << std::setprecision(6) <<
       // etensors.D_alpha << endl;
-      if(chem_env.ioptions.scf_options.writem % iter == 0 ||
+      if(iter % chem_env.ioptions.scf_options.writem == 0 ||
          chem_env.ioptions.scf_options.writem == 1) {
         scf_output.rw_md_disk(ec, chem_env, scalapack_info, ttensors, etensors, files_prefix);
       }

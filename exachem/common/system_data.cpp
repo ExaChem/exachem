@@ -6,6 +6,7 @@ void SystemData::print() {
   if(is_unrestricted) std::cout << "Open-Shell SCF" << std::endl;
   if(is_restricted_os) std::cout << "Restricted Open-Shell SCF" << std::endl;
   if(is_ks) std::cout << "KS-DFT Enabled" << std::endl;
+  if(do_snK) std::cout << "snK Enabled" << std::endl;
   if(is_qed && do_qed && is_ks) { std::cout << "QED-KS Enabled" << std::endl; }
   else if(is_qed && is_ks) { std::cout << "QEDFT Enabled" << std::endl; }
   else if(is_qed) { std::cout << "QED-HF Enabled" << std::endl; }
@@ -55,6 +56,7 @@ SystemData::SystemData(ECOptions options_map_, const std::string scf_type_string
   is_ks            = false;
   is_qed           = false;
   do_qed           = false;
+  do_snK           = false;
   freeze_atomic    = false;
   if(scf_type_string == "restricted") {
     focc          = 1;
@@ -70,6 +72,8 @@ SystemData::SystemData(ECOptions options_map_, const std::string scf_type_string
   }
   else tamm_terminate("ERROR: unrecognized scf_type [" + scf_type_string + "] provided");
   if(!options_map_.scf_options.xc_type.empty()) { is_ks = true; }
+
+  if(options_map_.scf_options.snK) { do_snK = true; }
 
   if(!options_map_.scf_options.qed_volumes.empty()) {
     for(auto x: options_map_.scf_options.qed_volumes) {

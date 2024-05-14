@@ -23,6 +23,7 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
 
   const bool   is_uhf = sys_data.is_unrestricted;
   const bool   is_rhf = sys_data.is_restricted;
+  const bool   do_snK = sys_data.do_snK;
   const double lshift = scf_vars.lshift;
 
   Tensor<TensorType>& H1       = ttensors.H1;
@@ -56,6 +57,19 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
   const int max_hist = scf_options.diis_hist;
 
   double ehf = 0.0;
+
+#if defined(USE_GAUXC)
+  if(do_snK) {
+    const auto snK_start = std::chrono::high_resolution_clock::now();
+    scf::gauxc::compute_exx<TensorType>(ec, chem_env, scf_vars, ttensors, etensors,
+                                        gauxc_integrator);
+    const auto snK_stop = std::chrono::high_resolution_clock::now();
+    const auto snK_time =
+      std::chrono::duration_cast<std::chrono::duration<double>>((snK_stop - snK_start)).count();
+    if(rank == 0 && debug)
+      std::cout << std::fixed << std::setprecision(2) << "snK: " << snK_time << "s, ";
+  }
+#endif
 
   if(is_rhf) {
     // clang-format off
@@ -93,7 +107,8 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
     const auto xcf_stop = std::chrono::high_resolution_clock::now();
     const auto xcf_time =
       std::chrono::duration_cast<std::chrono::duration<double>>((xcf_stop - xcf_start)).count();
-    if(rank == 0 && debug) std::cout << "xcf:" << xcf_time << "s, ";
+    if(rank == 0 && debug)
+      std::cout << std::fixed << std::setprecision(2) << "xcf: " << xcf_time << "s, ";
   }
 
   ehf += gauxc_exc;
@@ -660,8 +675,9 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
 
   const libint2::BasisSet& obs = chem_env.shells;
 
-  const bool is_uhf       = sys_data.is_unrestricted;
-  const bool is_spherical = (scf_options.gaussian_type == "spherical");
+  const bool debug  = scf_options.debug;
+  const bool is_uhf = sys_data.is_unrestricted;
+  // const bool is_spherical = (scf_options.gaussian_type == "spherical");
 
   auto rank = ec.pg().rank();
 
@@ -676,7 +692,9 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
   double fock_precision   = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
 
   const auto& unitshell = libint2::Shell::unit();
-  auto engine = libint2::Engine(libint2::Operator::coulomb, dfbs.max_nprim(), dfbs.max_l(), 0);
+  auto        engine    = libint2::Engine(libint2::Operator::coulomb,
+                                          std::max(dfbs.max_nprim(), obs.max_nprim()),
+                                          std::max(obs.max_l(), dfbs.max_l()), 0);
   engine.set(libint2::BraKet::xs_xx);
   engine.set_precision(engine_precision);
   const auto& buf = engine.results();
@@ -686,8 +704,8 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
   Matrix& G      = etensors.G_alpha;
   auto&   dfNorm = etensors.dfNorm;
 
-  auto   shblk = is_spherical ? 2 * obs.max_l() + 1 : ((obs.max_l() + 1) * (obs.max_l() + 2)) / 2;
-  Matrix Dblk(shblk, shblk);
+  // auto   shblk = is_spherical ? 2 * obs.max_l() + 1 : ((obs.max_l() + 1) * (obs.max_l() + 2)) /
+  // 2; Matrix Dblk(shblk, shblk);
 
   Matrix              Jtmp    = Matrix::Zero(1, ndf);
   Tensor<TensorType>& F_dummy = ttensors.F_dummy;
@@ -695,6 +713,8 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
   IndexSpace          dummy{range(1)};
   TiledIndexSpace     tdummy{dummy};
   Tensor<TensorType>  Jtmp_tamm{tdummy, scf_vars.tdfAO}, Xtmp_tamm{tdummy, scf_vars.tdfAO};
+
+  const auto buildJ_start = std::chrono::high_resolution_clock::now();
 
   sch.allocate(Jtmp_tamm, Xtmp_tamm).execute();
   sch(Jtmp_tamm() = 0.0).execute();
@@ -733,8 +753,8 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
 
     if(Norm12 * dfNorm.maxCoeff() < fock_precision) return;
 
-    Dblk.block(0, 0, n1, n2) = Jfactor * D.block(bf1_first, bf2_first, n1, n2);
-    if(is_uhf) Dblk.block(0, 0, n1, n2) += Jfactor * D_beta.block(bf1_first, bf2_first, n1, n2);
+    Matrix Dblk = D.block(bf1_first, bf2_first, n1, n2);
+    if(is_uhf) Dblk.block(0, 0, n1, n2) += D_beta.block(bf1_first, bf2_first, n1, n2);
 
     auto sp_iter = spdata.at(0).begin();
     for(decltype(s1) s3 = 0; s3 < dfbs.size(); ++s3) {
@@ -745,17 +765,16 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
 
       if(Norm12 * dfNorm(s3) < fock_precision) continue;
 
+      engine.prescale_by(Jfactor);
       engine.compute2<Operator::coulomb, BraKet::xs_xx, 0>(dfbs[s3], unitshell, obs[s1], obs[s2],
                                                            sp, sp12);
       const auto* buf_312 = buf[0];
       if(buf_312 == nullptr) continue;
 
-      for(decltype(n1) f3 = 0, f312 = 0; f3 != n3; ++f3) {
-        const auto bf3 = f3 + bf3_first;
+      for(decltype(n1) bf3 = bf3_first, f312 = 0; bf3 != bf3_first + n3; ++bf3)
         for(decltype(n1) f1 = 0; f1 != n1; ++f1)
           for(decltype(n2) f2 = 0; f2 != n2; ++f2, ++f312)
             Jtmp(0, bf3) += buf_312[f312] * Dblk(f1, f2);
-      }
     }
   };
   block_for(ec, F_dummy(), comp_J_lambda);
@@ -763,6 +782,13 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
   eigen_to_tamm_tensor_acc(Jtmp_tamm, Jtmp);
   ec.pg().barrier();
 
+  // const auto buildJ_stop = std::chrono::high_resolution_clock::now();
+  // const auto buildJ_time =
+  //   std::chrono::duration_cast<std::chrono::duration<double>>((buildJ_stop -
+  //   buildJ_start)).count();
+  // if(rank == 0 && debug) std::cout << "buildJ: " << buildJ_time << "s, ";
+
+  // const auto buildX_start = std::chrono::high_resolution_clock::now();
   sch(Xtmp_tamm("i", "j") = Jtmp_tamm("i", "k") * Vm1("k", "j"))(
     Jtmp_tamm("i", "j") = Xtmp_tamm("i", "k") * Vm1("j", "k"))
     .deallocate(Xtmp_tamm)
@@ -771,17 +797,24 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
   Jtmp.setZero();
   tamm_to_eigen_tensor(Jtmp_tamm, Jtmp);
   ec.pg().barrier();
-
   Tensor<TensorType>::deallocate(Jtmp_tamm);
+  // const auto buildX_stop = std::chrono::high_resolution_clock::now();
+  // const auto buildX_time =
+  //   std::chrono::duration_cast<std::chrono::duration<double>>((buildX_stop -
+  //   buildX_start)).count();
+  // if(rank == 0 && debug) std::cout << "buildX: " << buildX_time << "s, ";
 
-  Eigen::VectorXd Jvec(Eigen::Map<Eigen::VectorXd>(Jtmp.data(), Jtmp.cols()));
-
+  // const auto                            buildF_start = std::chrono::high_resolution_clock::now();
+  Eigen::VectorXd                       Jvec(Eigen::Map<Eigen::VectorXd>(Jtmp.data(), Jtmp.cols()));
   Eigen::Vector<double, Eigen::Dynamic> Jnorm;
   Jnorm.resize(dfbs.size());
   for(size_t s3 = 0; s3 < dfbs.size(); ++s3) {
     Jnorm(s3) =
       Jvec.segment(shell2bf_df[s3], dfbs[s3].size()).lpNorm<Eigen::Infinity>() * dfNorm(s3);
   }
+
+  // Scale JVEC to account for permutational symmetry
+  Jvec *= 2.0;
 
   auto comp_df_lambda = [&](IndexVector blockid) {
     auto s1        = blockid[0];
@@ -801,11 +834,10 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
     const auto* sp12 = sp12_iter->get();
 
     const auto Norm12  = SchwarzK(s1, s2);
-    const auto Jfactor = (s1 == s2) ? 1.0 : 2.0;
-
+    const auto Jfactor = (s1 == s2) ? 0.5 : 1.0;
     if(Norm12 * Jnorm.maxCoeff() < fock_precision) return;
 
-    auto Xvec = Jfactor * Jvec;
+    Matrix J12 = Matrix::Zero(n1, n2);
 
     auto sp_iter = spdata.at(0).begin();
     for(decltype(s1) s3 = 0; s3 < dfbs.size(); ++s3) {
@@ -815,22 +847,17 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
       ++sp_iter;
       if(Norm12 * Jnorm(s3) < fock_precision) continue;
 
+      engine.prescale_by(Jfactor);
       engine.compute2<Operator::coulomb, BraKet::xs_xx, 0>(dfbs[s3], unitshell, obs[s1], obs[s2],
                                                            sp, sp12);
       const auto* buf_312 = buf[0];
       if(buf_312 == nullptr) continue;
 
-      for(decltype(n1) f3 = 0, f312 = 0; f3 != n3; ++f3) {
-        const auto bf3 = f3 + bf3_first;
-        for(decltype(n1) f1 = 0; f1 != n1; ++f1) {
-          const auto bf1 = f1 + bf1_first;
-          for(decltype(n2) f2 = 0; f2 != n2; ++f2, ++f312) {
-            const auto bf2 = f2 + bf2_first;
-            G(bf1, bf2) += buf_312[f312] * Xvec(bf3);
-          }
-        }
-      }
+      for(decltype(n1) bf3 = bf3_first, f312 = 0; bf3 != bf3_first + n3; ++bf3)
+        for(decltype(n1) f1 = 0; f1 != n1; ++f1)
+          for(decltype(n2) f2 = 0; f2 != n2; ++f2, ++f312) J12(f1, f2) += buf_312[f312] * Jvec(bf3);
     }
+    G.block(bf1_first, bf2_first, n1, n2) = J12;
   };
   block_for(ec, F_dummy(), comp_df_lambda);
 
@@ -838,6 +865,17 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
   ec.pg().barrier();
 
   if(is_uhf) sch(ttensors.F_beta_tmp() = ttensors.F_alpha_tmp()).execute();
+
+  const auto buildF_stop = std::chrono::high_resolution_clock::now();
+  // const auto buildF_time =
+  //   std::chrono::duration_cast<std::chrono::duration<double>>((buildF_stop -
+  //   buildF_start)).count();
+  // if(rank == 0 && debug) std::cout << "buildF: " << buildF_time << "s, ";
+
+  const auto total_time =
+    std::chrono::duration_cast<std::chrono::duration<double>>((buildF_stop - buildJ_start)).count();
+  if(rank == 0 && debug)
+    std::cout << std::fixed << std::setprecision(2) << "DF-J: " << total_time << "s, ";
 };
 
 template<typename TensorType>
@@ -851,6 +889,7 @@ void exachem::scf::SCFIter::compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_e
 
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;
+  const bool do_snK = sys_data.do_snK;
 
   auto rank  = ec.pg().rank();
   auto debug = scf_options.debug;
@@ -898,7 +937,7 @@ void exachem::scf::SCFIter::compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_e
   if(rank == 0 && debug)
     std::cout << " J: " << std::fixed << std::setprecision(2) << igtime << "s, ";
 
-  if(xHF > 0.0) {
+  if(xHF > 0.0 && !do_snK) {
     ig1 = std::chrono::high_resolution_clock::now();
 
     TensorType factor = is_rhf ? 0.5 : 1.0;
@@ -946,7 +985,8 @@ void exachem::scf::SCFIter::compute_2bf(ExecutionContext& ec, ChemEnv& chem_env,
 
   const bool is_uhf       = sys_data.is_unrestricted;
   const bool is_rhf       = sys_data.is_restricted;
-  const bool doK          = xHF != 0.0;
+  const bool do_snK       = sys_data.do_snK;
+  const bool doK          = xHF != 0.0 && !do_snK;
   const bool is_spherical = (scf_options.gaussian_type == "spherical");
 
   Matrix& G      = etensors.G_alpha;
@@ -1051,7 +1091,7 @@ void exachem::scf::SCFIter::compute_2bf(ExecutionContext& ec, ChemEnv& chem_env,
         if(do_schwarz_screen && Dnorm1234 * SchwarzK(s1, s2) * SchwarzK(s3, s4) < fock_precision)
           continue;
 
-        if(xHF == 0.0) {
+        if(!doK) {
           if(do_schwarz_screen && Dnorm12 * SchwarzK(s1, s2) * SchwarzK(s3, s4) < fock_precision &&
              Dnorm34 * SchwarzK(s1, s2) * SchwarzK(s3, s4) < fock_precision)
             continue;

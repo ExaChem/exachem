@@ -80,6 +80,8 @@ void ChemEnv::write_json_data(const std::string cmodule) {
   results["input"]["SCF"]["polvecs"]        = scf.qed_polvecs;
   results["input"]["SCF"]["omegas"]         = scf.qed_omegas;
   results["input"]["SCF"]["volumes"]        = scf.qed_volumes;
+  results["input"]["SCF"]["xc_type"]        = scf.xc_type;
+  results["input"]["SCF"]["snK"]            = scf.snK;
 
   if(cmodule == "CD" || cmodule == "CCSD") {
     // CD options

@@ -18,11 +18,13 @@ public:
   bool                     switch_diis  = false;
   double                   exc          = 0.0;
   double                   eqed         = 0.0;
+  bool                     do_snK       = false;
   bool                     do_dens_fit  = false;
   bool                     direct_df    = false;
   bool                     do_load_bal  = false;
   bool                     lshift_reset = false;
   double                   lshift       = 0;
+  double                   xHF          = 1.0;
   libecpint::ECPIntegrator ecp_factory;
 
   // AO spaces

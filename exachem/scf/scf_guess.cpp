@@ -1462,13 +1462,15 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
 
   if((scf_vars.do_dens_fit && !scf_vars.direct_df) && rank == 0) { etensors.G_alpha.resize(0, 0); }
 
-  if(scf_vars.do_dens_fit && !(scf_vars.direct_df || chem_env.sys_data.is_ks)) {
+  if(scf_vars.do_dens_fit &&
+     !(scf_vars.direct_df || chem_env.sys_data.is_ks || chem_env.sys_data.do_snK)) {
     etensors.D_alpha.resize(0, 0);
     if(is_uhf) etensors.D_beta.resize(0, 0);
   }
 
   // needed only for 4c HF
-  if(rank != 0 && (!scf_vars.do_dens_fit || scf_vars.direct_df || chem_env.sys_data.is_ks)) {
+  if(rank != 0 && (!scf_vars.do_dens_fit || scf_vars.direct_df || chem_env.sys_data.is_ks ||
+                   chem_env.sys_data.do_snK)) {
     tamm_to_eigen_tensor(ttensors.D_alpha, etensors.D_alpha);
     if(is_uhf) { tamm_to_eigen_tensor(ttensors.D_beta, etensors.D_beta); }
   }

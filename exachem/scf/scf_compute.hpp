@@ -20,6 +20,7 @@ public:
   Matrix compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A);
   void   compute_shellpair_list(const ExecutionContext& ec, const libint2::BasisSet& shells,
                                 SCFVars& scf_vars);
+  void   compute_trafo(const libint2::BasisSet& shells, EigenTensors& etensors);
   std::tuple<int, double> compute_NRE(const ExecutionContext&     ec,
                                       std::vector<libint2::Atom>& atoms);
   std::tuple<shellpair_list_t, shellpair_data_t>
@@ -34,6 +35,14 @@ public:
 
   void recompute_tilesize(tamm::Tile& tile_size, const int N, const bool force_ts,
                           const bool rank0);
+
+  template<typename TensorType>
+  void compute_sdens_to_cdens(const libint2::BasisSet& shells, Matrix& Spherical, Matrix& Cartesian,
+                              EigenTensors& etensors);
+
+  template<typename TensorType>
+  void compute_cpot_to_spot(const libint2::BasisSet& shells, Matrix& Spherical, Matrix& Cartesian,
+                            EigenTensors& etensors);
 
   template<typename TensorType>
   void compute_hamiltonian(ExecutionContext& ec, const SCFVars& scf_vars,

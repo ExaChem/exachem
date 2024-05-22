@@ -572,6 +572,8 @@ exachem::cd_svd::cd_svd_driver(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
   sys_data.num_chol_vectors                              = chol_count;
   sys_data.results["output"]["CD"]["n_cholesky_vectors"] = chol_count;
 
+  sys_data.results["output"]["CD"]["diagtol"] = chem_env.ioptions.cd_options.diagtol;
+
   if(rank == 0) sys_data.print();
 
   if(do_freeze) {

@@ -809,6 +809,8 @@ cd_ccsd_os_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace
                   std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_t1s,
                   std::vector<Tensor<T>>& d_t2s, std::vector<T>& p_evl_sorted, Tensor<T>& cv3d,
                   bool ccsd_restart, std::string ccsd_fp, bool computeTData) {
+  auto cc_t1 = std::chrono::high_resolution_clock::now();
+
   SystemData& sys_data    = chem_env.sys_data;
   int         maxiter     = chem_env.ioptions.ccsd_options.ccsd_maxiter;
   int         ndiis       = chem_env.ioptions.ccsd_options.ndiis;
@@ -1159,10 +1161,15 @@ cd_ccsd_os_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace
 
   sys_data.ccsd_corr_energy = energy;
 
+  auto   cc_t2 = std::chrono::high_resolution_clock::now();
+  double ccsd_time =
+    std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
+
   if(ec.pg().rank() == 0) {
     sys_data.results["output"]["CCSD"]["n_iterations"]                = niter + 1;
     sys_data.results["output"]["CCSD"]["final_energy"]["correlation"] = energy;
-    sys_data.results["output"]["CCSD"]["final_energy"]["total"] = sys_data.scf_energy + energy;
+    sys_data.results["output"]["CCSD"]["final_energy"]["total"]     = sys_data.scf_energy + energy;
+    sys_data.results["output"]["CCSD"]["performance"]["total_time"] = ccsd_time;
 
     chem_env.write_json_data("CCSD");
   }

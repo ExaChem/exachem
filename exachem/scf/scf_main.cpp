@@ -16,8 +16,6 @@ void scf(ExecutionContext& ec, ChemEnv& chem_env) {
 
   SCFHartreeFock SCFHF(ec, chem_env);
 
-  if(rank == 0 && chem_env.ioptions.task_options.scf) chem_env.write_json_data("SCF");
-
   auto hf_t2 = std::chrono::high_resolution_clock::now();
 
   double hf_time =
@@ -25,9 +23,12 @@ void scf(ExecutionContext& ec, ChemEnv& chem_env) {
 
   ec.flush_and_sync();
 
-  if(rank == 0)
+  if(rank == 0) {
+    chem_env.sys_data.results["output"]["SCF"]["performance"] = {{"total_time", hf_time}};
+    if(chem_env.ioptions.task_options.scf) chem_env.write_json_data("SCF");
     std::cout << std::endl
               << "Total Time taken for Hartree-Fock: " << std::fixed << std::setprecision(2)
               << hf_time << " secs" << std::endl;
+  }
 }
 } // namespace exachem::scf

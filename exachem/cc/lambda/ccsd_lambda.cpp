@@ -8,13 +8,18 @@
 
 #include "ccsd_lambda.hpp"
 
-void exachem::cc::ccsd_lambda::iteration_print_lambda(const ProcGroup& pg, int iter,
-                                                      double residual, double time) {
+void exachem::cc::ccsd_lambda::iteration_print_lambda(ChemEnv& chem_env, const ProcGroup& pg,
+                                                      int iter, double residual, double time) {
   if(pg.rank() == 0) {
     std::cout << std::setw(4) << std::right << iter + 1 << "     ";
     std::cout << std::setprecision(13) << std::setw(16) << std::left << residual << "  ";
     std::cout << std::fixed << std::setprecision(2);
     std::cout << std::string(5, ' ') << time << std::endl;
+
+    chem_env.sys_data.results["output"]["CCSD_Lambda"]["iter"][std::to_string(iter + 1)] = {
+      {"residual", residual}};
+    chem_env.sys_data.results["output"]["CCSD_Lambda"]["iter"][std::to_string(iter + 1)]
+                             ["performance"] = {{"total_time", time}};
   }
 }
 
@@ -502,7 +507,7 @@ std::tuple<double, double> exachem::cc::ccsd_lambda::lambda_ccsd_driver(
         std::chrono::duration_cast<std::chrono::duration<double>>((timer_end - timer_start))
           .count();
 
-      iteration_print_lambda(ec.pg(), iter, residual, iter_time);
+      iteration_print_lambda(chem_env, ec.pg(), iter, residual, iter_time);
 
       if(residual < thresh) { break; }
     }

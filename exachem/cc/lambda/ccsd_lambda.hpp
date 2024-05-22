@@ -16,7 +16,8 @@ namespace exachem::cc::ccsd_lambda {
 
 void ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
-void iteration_print_lambda(const ProcGroup& pg, int iter, double residual, double time);
+void iteration_print_lambda(ChemEnv& chem_env, const ProcGroup& pg, int iter, double residual,
+                            double time);
 
 template<typename T>
 std::tuple<Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vector<Tensor<T>>,

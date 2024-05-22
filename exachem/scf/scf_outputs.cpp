@@ -15,7 +15,7 @@ double exachem::scf::SCFIO::tt_trace(ExecutionContext& ec, Tensor<TensorType>& T
   return trace;
 }
 
-void exachem::scf::SCFIO::print_energies(ExecutionContext& ec, const ChemEnv& chem_env,
+void exachem::scf::SCFIO::print_energies(ExecutionContext& ec, ChemEnv& chem_env,
                                          TAMMTensors& ttensors, EigenTensors& etensors,
                                          SCFVars& scf_vars, ScalapackInfo& scalapack_info) {
   const SystemData& sys_data = chem_env.sys_data;
@@ -59,6 +59,11 @@ void exachem::scf::SCFIO::print_energies(ExecutionContext& ec, const ChemEnv& ch
     std::cout << "1e energy N-e     = " << NE_1e << endl;
     std::cout << "1e energy         = " << energy_1e << endl;
     std::cout << "2e energy         = " << energy_2e << std::endl;
+
+    chem_env.sys_data.results["output"]["SCF"]["NE_1e"]      = NE_1e;
+    chem_env.sys_data.results["output"]["SCF"]["kinetic_1e"] = kinetic_1e;
+    chem_env.sys_data.results["output"]["SCF"]["energy_1e"]  = energy_1e;
+    chem_env.sys_data.results["output"]["SCF"]["energy_2e"]  = energy_2e;
   }
 }
 

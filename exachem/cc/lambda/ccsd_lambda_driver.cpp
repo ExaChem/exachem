@@ -209,11 +209,11 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
   }
 
   //    free_tensors(cholVpr);
+  cc_t1 = std::chrono::high_resolution_clock::now();
 
   auto [l_r1, l_r2, d_y1, d_y2, l_r1s, l_r2s, d_y1s, d_y2s] =
     setupLambdaTensors<T>(ec, MO, ccsd_options.ndiis);
 
-  cc_t1 = std::chrono::high_resolution_clock::now();
   std::tie(residual, corr_energy) =
     lambda_ccsd_driver<T>(chem_env, ec, MO, CI, d_t1, d_t2, d_f1, v2tensors, cholVpr, l_r1, l_r2,
                           d_y1, d_y2, l_r1s, l_r2s, d_y1s, d_y2s, p_evl_sorted);
@@ -226,12 +226,15 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
     }
   }
 
-  ccsd_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
-  if(rank == 0)
+  auto ccsd_lambda_time =
+    std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
+  if(rank == 0) {
     std::cout << std::endl
-              << "Time taken for CCSD Lambda: " << std::fixed << std::setprecision(2) << ccsd_time
-              << " secs" << std::endl
+              << "Time taken for CCSD Lambda: " << std::fixed << std::setprecision(2)
+              << ccsd_lambda_time << " secs" << std::endl
               << std::endl;
+    sys_data.results["output"]["CCSD_Lambda"]["performance"]["total_time"] = ccsd_lambda_time;
+  }
 
   v2tensors.deallocate();
   free_tensors(d_f1, cholVpr);
@@ -392,19 +395,20 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
 
   print_dm("CCSD");
 
-  cc_t2     = std::chrono::high_resolution_clock::now();
-  ccsd_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
+  cc_t2 = std::chrono::high_resolution_clock::now();
+  auto dip_ttime =
+    std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
   if(rank == 0)
     std::cout << std::fixed << std::setprecision(3) << std::endl
               << "Time taken to compute dipole moments: " << std::fixed << std::setprecision(2)
-              << ccsd_time << " secs" << std::endl;
+              << dip_ttime << " secs" << std::endl;
 
   if(rank == 0) {
-    sys_data.results["output"]["CCSD_Lambda"]["dipole"]["X"]               = dmx;
-    sys_data.results["output"]["CCSD_Lambda"]["dipole"]["Y"]               = dmy;
-    sys_data.results["output"]["CCSD_Lambda"]["dipole"]["Z"]               = dmz;
-    sys_data.results["output"]["CCSD_Lambda"]["dipole"]["Total"]           = total_dip_val;
-    sys_data.results["output"]["CCSD_Lambda"]["performance"]["total_time"] = ccsd_time;
+    sys_data.results["output"]["CCSD_Lambda"]["dipole"]["X"]     = dmx;
+    sys_data.results["output"]["CCSD_Lambda"]["dipole"]["Y"]     = dmy;
+    sys_data.results["output"]["CCSD_Lambda"]["dipole"]["Z"]     = dmz;
+    sys_data.results["output"]["CCSD_Lambda"]["dipole"]["Total"] = total_dip_val;
+    sys_data.results["output"]["CCSD_Lambda"]["dipole"]["performance"]["total_time"] = dip_ttime;
     chem_env.write_json_data("CCSD_Lambda");
   }
 

@@ -155,7 +155,7 @@
         "CCSD(T)": {
           "cache_size": 8,
           "skip_ccsd": false,
-          "ccsdt_tilesize": 32
+          "ccsdt_tilesize": 40
         },
 
         "EOMCCSD": {

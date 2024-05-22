@@ -103,17 +103,42 @@ int main(int argc, char* argv[]) {
     }
 
     if(rank == 0) {
-      cout << endl << "date: " << std::put_time(cur_local_time, "%c") << endl;
+      std::ostringstream cur_date;
+      cur_date << std::put_time(cur_local_time, "%c");
+      cout << endl << "date: " << cur_date.str() << endl;
       cout << "program: " << fs::canonical(argv[0]) << endl;
       cout << "input: " << input_file << endl;
       std::cout << "nnodes: " << ec.nnodes() << ", ";
-      std::cout << "nproc: " << ec.nnodes() * ec.ppn() << ", ";
-      std::cout << "ngpus: " << ec.nnodes() * ec.gpn() << std::endl;
+      std::cout << "nproc_per_node: " << ec.ppn() << ", ";
+      std::cout << "nproc_total: " << ec.nnodes() * ec.ppn() << ", ";
+      std::cout << "ngpus_per_node: " << ec.gpn() << ", ";
+      std::cout << "ngpus_total: " << ec.nnodes() * ec.gpn() << std::endl;
       cout << "prefix: " << chem_env.sys_data.output_file_prefix << endl << endl;
       ec.print_mem_info();
       cout << endl << endl;
       cout << "Input file provided" << endl << std::string(20, '-') << endl;
       std::cout << chem_env.jinput.dump(2) << std::endl;
+      chem_env.sys_data.results["output"]["machine_info"]["date"]           = cur_date.str();
+      chem_env.sys_data.results["output"]["machine_info"]["nnodes"]         = ec.nnodes();
+      chem_env.sys_data.results["output"]["machine_info"]["nproc_per_node"] = ec.ppn();
+      chem_env.sys_data.results["output"]["machine_info"]["nproc_total"] = ec.nnodes() * ec.ppn();
+      auto meminfo                                                       = ec.mem_info();
+      chem_env.sys_data.results["output"]["machine_info"]["cpu"]["name"] = meminfo.cpu_name;
+      chem_env.sys_data.results["output"]["machine_info"]["cpu"]["cpu_memory_per_node_gib"] =
+        meminfo.cpu_mem_per_node;
+      chem_env.sys_data.results["output"]["machine_info"]["cpu"]["total_cpu_memory_gib"] =
+        meminfo.total_cpu_mem;
+      if(ec.has_gpu()) {
+        chem_env.sys_data.results["output"]["machine_info"]["ngpus_per_node"] = ec.gpn();
+        chem_env.sys_data.results["output"]["machine_info"]["ngpus_total"] = ec.nnodes() * ec.gpn();
+        chem_env.sys_data.results["output"]["machine_info"]["gpu"]["name"] = meminfo.gpu_name;
+        chem_env.sys_data.results["output"]["machine_info"]["gpu"]["memory_per_gpu_gib"] =
+          meminfo.gpu_mem_per_device;
+        chem_env.sys_data.results["output"]["machine_info"]["gpu"]["gpu_memory_per_node_gib"] =
+          meminfo.gpu_mem_per_node;
+        chem_env.sys_data.results["output"]["machine_info"]["gpu"]["total_gpu_memory_gib"] =
+          meminfo.total_gpu_mem;
+      }
     }
 
     const auto              task = ioptions.task_options;

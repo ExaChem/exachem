@@ -59,6 +59,7 @@ def parse_nwchem_input(input_file):
 
     for line in f:
       line=line.strip()
+      if not line: continue
       oline=line
       line=line.lower()
       
@@ -169,7 +170,7 @@ def parse_nwchem_input(input_file):
         #TODO
         elif tname=="dft" in line: nw_task["scf"] = True
         elif tname=="mp2" in line: nw_task["mp2"] = True
-        elif tname=="tce": 
+        elif tname=="tce" or "ccsd" in tname: 
           nw_task["scf"] = False
           nwchem_opt["task_tce"] = True
         else: unsupported.append("unsupported task line specified: %s" %(line))
@@ -212,7 +213,7 @@ def parse_nwchem_input(input_file):
           if "except" in line:
             atom_except_list = get_next_word(line,"except",True)
         else: 
-          atom_symbol = get_first_word(line)
+          atom_symbol = get_first_word(oline)
           atom_basis[atom_symbol] = get_next_word(line,"library")
         continue
 
@@ -308,7 +309,7 @@ def parse_nwchem_input(input_file):
         continue        
 
       #TCE options
-      if line.startswith("tce"):
+      if line.startswith("tce") or line.startswith("ccsd"):
         tce_block=True
         continue
 

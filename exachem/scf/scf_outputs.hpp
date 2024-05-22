@@ -23,7 +23,7 @@ public:
   template<typename T>
   void rw_mat_disk(Tensor<T> tensor, std::string tfilename, bool profile, bool read = false);
   void print_mulliken(ChemEnv& chem_env, Matrix& D, Matrix& D_beta, Matrix& S);
-  void print_energies(ExecutionContext& ec, const ChemEnv& chem_env, TAMMTensors& ttensors,
+  void print_energies(ExecutionContext& ec, ChemEnv& chem_env, TAMMTensors& ttensors,
                       EigenTensors& etensors, SCFVars& scf_vars, ScalapackInfo& scalapack_info);
 };
 } // namespace exachem::scf

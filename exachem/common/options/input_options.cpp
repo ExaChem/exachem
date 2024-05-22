@@ -249,7 +249,7 @@ void CCSDOptions::initialize() {
 
   cache_size     = 8;
   skip_ccsd      = false;
-  ccsdt_tilesize = 32;
+  ccsdt_tilesize = 40;
 
   eom_nroots    = 1;
   eom_threshold = 1e-6;

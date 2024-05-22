@@ -24,7 +24,7 @@ jobs:
           - ga
           - upcxx
         mpi_impl:
-          - openmpi
+          - mpich
         cxx:
           - g++
         cc:
@@ -37,7 +37,7 @@ jobs:
           - no-scalapack         
         include:
           - os: [self-hosted, ubuntu22]
-            mpi_impl: openmpi
+            mpi_impl: mpich
             cxx: clang++
             cc: clang
             fc: gfortran
@@ -45,7 +45,7 @@ jobs:
             use_cuda: no-cuda
             use_scalapack: no-scalapack
           - os: [self-hosted, ubuntu22]
-            mpi_impl: openmpi
+            mpi_impl: mpich
             cxx: g++
             cc: gcc
             fc: gfortran
@@ -53,7 +53,7 @@ jobs:
             use_cuda: cuda
             use_scalapack: no-scalapack
           - os: [self-hosted, ubuntu22]
-            mpi_impl: openmpi
+            mpi_impl: mpich
             cxx: g++
             cc: gcc
             fc: gfortran
@@ -61,7 +61,7 @@ jobs:
             use_cuda: cuda
             use_scalapack: no-scalapack      
           - os: [self-hosted, ubuntu22]
-            mpi_impl: openmpi
+            mpi_impl: mpich
             cxx: g++
             cc: gcc
             fc: gfortran
@@ -69,7 +69,7 @@ jobs:
             use_cuda: no-cuda
             use_scalapack: scalapack
           - os: [self-hosted, macos]
-            mpi_impl: openmpi
+            mpi_impl: mpich
             cxx: g++
             cc: gcc
             fc: gfortran
@@ -78,7 +78,7 @@ jobs:
             use_scalapack: no-scalapack
         exclude:
           - os: [self-hosted, macos]
-            mpi_impl: openmpi
+            mpi_impl: mpich
             cxx: g++
             cc: gcc
             fc: gfortran
@@ -94,7 +94,7 @@ jobs:
       FC: ${{ matrix.fc }}
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Check SIMD
       id: get-simd
       run: |
@@ -157,7 +157,7 @@ jobs:
     - name: Cache install steps (backend = ga)
       if: ${{ matrix.backend == 'ga' }}
       id: exachem-cache-install
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ${{ env.exachem_cache_path }}
@@ -166,7 +166,7 @@ jobs:
     - name: Cache install steps (backend = upcxx)
       if: ${{ matrix.backend == 'upcxx' }}
       id: exachem-upcxx-cache-install
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ${{ env.exachem_cache_path }}
@@ -194,9 +194,9 @@ jobs:
       run: |
         mkdir -p $GITHUB_WORKSPACE/../external_deps
         cd $GITHUB_WORKSPACE/../external_deps
-        wget https://bitbucket.org/berkeleylab/upcxx/downloads/upcxx-2023.3.0.tar.gz
-        tar xf upcxx-2023.3.0.tar.gz
-        cd upcxx-2023.3.0
+        wget https://bitbucket.org/berkeleylab/upcxx/downloads/upcxx-2023.9.0.tar.gz
+        tar xf upcxx-2023.9.0.tar.gz
+        cd upcxx-2023.9.0
         ./configure --prefix=${{ env.INSTALL_PATH }} --with-cxx=mpicxx --with-cc=mpicc --with-default-network=smp
         make -j${{ env.EC_NPROC }} all
         make install
@@ -241,7 +241,7 @@ jobs:
       id: build_exachem_upcxx
       run: |
         export PATH=$PATH:$GITHUB_WORKSPACE/install/bin
-        export CPATH=$CPATH:/usr/lib/x86_64-linux-gnu/openmpi/include
+        export CPATH=$CPATH:/hpc/software/spack/opt/spack/linux-ubuntu22.04-broadwell/gcc-11.4.0/mpich-4.2.1-6pwa6w25afu5mgacsiywlczdklq37ktl/include
         echo "UPCXX_SHARED_HEAP_SIZE=MAX" >> $GITHUB_ENV
         echo "CI_MPIEXEC=upcxx-run" >> $GITHUB_ENV
         echo "CI_NRANKS=2" >> $GITHUB_ENV
@@ -276,7 +276,7 @@ jobs:
     #     cd $GITHUB_WORKSPACE
     #     gcovr --root . --exclude build --exclude tests --xml ./coverage.xml
     #     ls -al .
-    # - uses: codecov/codecov-action@v3
+    # - uses: codecov/codecov-action@v4
     #   with:
     #     token: ${{ secrets.CODECOV_TOKEN }}
     #     file: ./coverage.xml

@@ -99,12 +99,12 @@ The (T) implementation and additional optimizations on various GPU architectures
  "CCSD(T)": {
     "cache_size": 8,
     "skip_ccsd": false,
-    "ccsdt_tilesize": 32
+    "ccsdt_tilesize": 40
  }
 
 :cache_size: ``[default=8]`` Each process (MPI rank) caches the specified number of blocks of the T2 and 2e integral tensors. This increases the overall memory consumption, but reduces the communication time for large calculations. The value should be set to 0 if minimal memory overhead is desired.
 
-:ccsdt_tilesize: ``[default=32]`` tilesize for the MSO dimension of the T1,T2 amplitude and 2e integral tensors. The tensors are re-tiled post CCSD just before the (T) calculation begins.
+:ccsdt_tilesize: ``[default=40]`` tilesize for the MSO dimension of the T1,T2 amplitude and 2e integral tensors. The tensors are re-tiled post CCSD just before the (T) calculation begins.
 
 :skip_ccsd: ``[default=false]`` Mostly used for performance benchmarking for the (T) calculation. When enabled, the cholesky decomposition and CCSD iterations are skipped.
 

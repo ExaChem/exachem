@@ -10,13 +10,11 @@ option(EC_COMPLEX "enable complex codes" ON)
 
 #TODO: cleanup
 include_directories(${EXACHEM_SRC_DIR})
-include_directories(${EXACHEM_SRC_DIR}/util/external)
 
 include(${EXACHEM_SRC_DIR}/scf/scf.cmake)
-include(${EXACHEM_SRC_DIR}/common/common.cmake)
 
 include(${EXACHEM_SRC_DIR}/mp2/mp2.cmake)
-include(${EXACHEM_SRC_DIR}/cc/cc.cmake)
+include(${EXACHEM_SRC_DIR}/cc/cd.cmake)
 include(${EXACHEM_SRC_DIR}/cc/cc2/cc2.cmake)
 include(${EXACHEM_SRC_DIR}/cc/eom/eom.cmake)
 include(${EXACHEM_SRC_DIR}/cc/ccsd/ccsd.cmake)
@@ -32,6 +30,6 @@ endif()
 set(CoupledCluster_SRCS ${CC_SRCS} ${CC2_SRCS} ${CCSD_SRCS} ${CCSD_T_SRCS} 
 ${CC_LAMBDA_SRCS} ${CC_EOM_SRCS} ${GFCC_SRCS} ${RTEOM_SRCS} ${DUCC_SRCS})
 
-set(EXACHEM_SRCS ${SCF_SRCS} ${COMMON_SRCS} ${MP2_SRCS} ${CoupledCluster_SRCS} ${EC_PRIVATE_SRCS})
+set(EXACHEM_SRCS ${SCF_SRCS} ${MP2_SRCS} ${CD_SRCS} ${CoupledCluster_SRCS} ${EC_PRIVATE_SRCS})
 
 add_mpi_gpu_unit_test(ExaChem "${EXACHEM_SRCS}" 2 "${CMAKE_SOURCE_DIR}/../inputs/h2o.json")

@@ -27,9 +27,10 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 
   chem_env.shells = ec_basis.shells;
 
-  const int N                = chem_env.shells.nbf();
-  chem_env.sys_data.nbf      = N;
-  chem_env.sys_data.nbf_orig = N;
+  const int N                                               = chem_env.shells.nbf();
+  chem_env.sys_data.nbf                                     = N;
+  chem_env.sys_data.nbf_orig                                = N;
+  chem_env.sys_data.results["output"]["system_info"]["nbf"] = chem_env.sys_data.nbf;
 
   std::string out_fp       = chem_env.workspace_dir;
   std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type + "/scf";
@@ -142,6 +143,12 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
               << "Nuclear repulsion energy  = " << std::setprecision(15) << enuc << std::endl
               << std::endl;
 
+    chem_env.sys_data.results["output"]["system_info"]["nshells"]          = chem_env.shells.size();
+    chem_env.sys_data.results["output"]["system_info"]["nelectrons_total"] = nelectrons;
+    chem_env.sys_data.results["output"]["system_info"]["nelectrons_alpha"] =
+      chem_env.sys_data.nelectrons_alpha;
+    chem_env.sys_data.results["output"]["system_info"]["nelectrons_beta"] =
+      chem_env.sys_data.nelectrons_beta;
     chem_env.write_sinfo();
   }
 
@@ -203,6 +210,7 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 
     scf_vars.tdfAO  = TiledIndexSpace{scf_vars.dfAO, scf_vars.dfAO_opttiles};
     scf_vars.tdfAOt = TiledIndexSpace{scf_vars.dfAO, scf_vars.dfAO_tiles};
+    chem_env.sys_data.results["output"]["system_info"]["ndf"] = chem_env.sys_data.ndf;
   }
   std::unique_ptr<DFFockEngine> dffockengine(
     do_density_fitting ? new DFFockEngine(chem_env.shells, scf_vars.dfbs) : nullptr);
@@ -264,13 +272,15 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   const double      xHF = 1.;
 #endif
 
+    chem_env.sys_data.results["output"]["SCF"]["xHF"] = xHF;
+
     // Compute SPH<->CART transformation
     scf_compute.compute_trafo(chem_env.shells, etensors);
 
     scf_vars.direct_df = do_density_fitting && chem_env.ioptions.scf_options.direct_df;
     if(scf_vars.direct_df && xHF != 0.0 && !chem_env.sys_data.do_snK) {
       if(rank == 0) {
-        cout << "Direct DF cannot be used without snK and xHF != 0.0" << endl;
+        cout << "[Warning] Direct DF cannot be used without snK and xHF != 0.0" << endl;
         cout << "Falling back to in-core DF" << endl;
       }
       scf_vars.direct_df = false;
@@ -985,6 +995,8 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   exc.pg().broadcast(&chem_env.sys_data.n_vir_alpha, 0);
   exc.pg().broadcast(&chem_env.sys_data.n_occ_beta, 0);
   exc.pg().broadcast(&chem_env.sys_data.n_vir_beta, 0);
+
+  chem_env.sys_data.results["output"]["system_info"]["nbf_orig"] = chem_env.sys_data.nbf_orig;
 
   chem_env.sys_data.update();
   if(rank == 0 && chem_env.ioptions.scf_options.debug) chem_env.sys_data.print();

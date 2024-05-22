@@ -11,6 +11,10 @@
 #include "scf/scf_common.hpp"
 #include "scf/scf_compute.hpp"
 
+#if defined(TAMM_USE_ELPA)
+#include <elpa/elpa.h>
+#endif
+
 namespace exachem::scf {
 
 namespace scf_guess {

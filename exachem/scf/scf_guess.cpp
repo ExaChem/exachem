@@ -610,7 +610,6 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
   double    hl_gap           = 0;
 
 #if defined(USE_SCALAPACK)
-
   if(scalapack_info.comm != MPI_COMM_NULL) {
     blacspp::Grid*                  blacs_grid       = scalapack_info.blacs_grid.get();
     scalapackpp::BlockCyclicDist2D* blockcyclic_dist = scalapack_info.blockcyclic_dist.get();
@@ -645,6 +644,7 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
       // Compute TMP = F * X -> F * X**T (b/c row-major)
       // scalapackpp::pgemm( scalapackpp::Op::NoTrans, scalapackpp::Op::Trans,
       // 1., Fa_sca, Xa_sca, 0., TMP1_sca );
+
       scalapackpp::pgemm(scalapackpp::Op::NoTrans, scalapackpp::Op::Trans, TMP1_sca.m(),
                          TMP1_sca.n(), desc_Fa[3], 1., Fa_tamm_lptr, 1, 1, desc_Fa, Xa_tamm_lptr, 1,
                          1, desc_Xa, 0., TMP1_sca.data(), 1, 1, TMP1_sca.desc());
@@ -652,6 +652,7 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
       // Compute Fp = X**T * TMP -> X * TMP (b/c row-major)
       // scalapackpp::pgemm( scalapackpp::Op::NoTrans, scalapackpp::Op::NoTrans,
       // 1., Xa_sca, TMP1_sca, 0., Fp_sca );
+
       scalapackpp::pgemm(scalapackpp::Op::NoTrans, scalapackpp::Op::NoTrans, Fp_sca.m(), Fp_sca.n(),
                          desc_Xa[3], 1., Xa_tamm_lptr, 1, 1, desc_Xa, TMP1_sca.data(), 1, 1,
                          TMP1_sca.desc(), 0., Fp_sca.data(), 1, 1, Fp_sca.desc());
@@ -659,9 +660,59 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
       std::vector<TensorType> eps_a(Northo);
       // scalapackpp::hereigd( scalapackpp::Job::Vec, scalapackpp::Uplo::Lower,
       //                       Fp_sca, eps_a.data(), Ca_sca );
+
+#if defined(TAMM_USE_ELPA)
+      elpa_t handle;
+      int    error;
+
+      // Initialize ELPA
+      if(elpa_init(20221109) != ELPA_OK) tamm_terminate("ELPA API not supported");
+
+      // Get and ELPA handle
+      handle = elpa_allocate(&error);
+      if(error != ELPA_OK) tamm_terminate("Could not create ELPA handle");
+
+      auto [na_rows, na_cols] = (*blockcyclic_dist).get_local_dims(Northo, Northo);
+
+      // Set parameters
+      elpa_set(handle, "na", Northo, &error);
+      elpa_set(handle, "nev", Northo, &error);
+      elpa_set(handle, "local_nrows", (int) na_rows, &error);
+      elpa_set(handle, "local_ncols", (int) na_cols, &error);
+      elpa_set(handle, "nblk", (int) mb, &error);
+      elpa_set(handle, "mpi_comm_parent", MPI_Comm_c2f(scalapack_info.comm), &error);
+      elpa_set(handle, "process_row", (int) grid.ipr(), &error);
+      elpa_set(handle, "process_col", (int) grid.ipc(), &error);
+#if defined(USE_CUDA)
+      elpa_set(handle, "nvidia-gpu", (int) 1, &error);
+      // elpa_set(handle, "use_gpu_id", 1, &error);
+#endif
+      error = elpa_setup(handle);
+      if(error != ELPA_OK) tamm_terminate(" ERROR: Could not setup ELPA");
+
+      elpa_set(handle, "solver", ELPA_SOLVER_2STAGE, &error);
+
+#if defined(USE_CUDA)
+      elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_NVIDIA_GPU, &error);
+#else
+      elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_AVX2_BLOCK2, &error);
+#endif
+
+      // elpa_set(handle, "debug", 1, &error);
+      // if (rank == 0 ) std::cout << " Calling ELPA " << std::endl;
+      elpa_eigenvectors(handle, Fp_sca.data(), eps_a.data(), Ca_sca.data(), &error);
+      if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA Eigendecompoistion failed");
+
+      // Clean-up
+      elpa_deallocate(handle, &error);
+      elpa_uninit(&error);
+      if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA deallocation failed");
+
+#else
       /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, Fp_sca.m(),
                                    Fp_sca.data(), 1, 1, Fp_sca.desc(), eps_a.data(), Ca_sca.data(),
                                    1, 1, Ca_sca.desc());
+#endif
 
       // Backtransform TMP = X * Ca -> TMP**T = Ca**T * X
       // scalapackpp::pgemm( scalapackpp::Op::Trans, scalapackpp::Op::NoTrans,
@@ -701,10 +752,56 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
         std::vector<double> eps_b(Northo);
         // scalapackpp::hereigd( scalapackpp::Job::Vec, scalapackpp::Uplo::Lower,
         //                       Fp_sca, eps_b.data(), Ca_sca );
+#if defined(TAMM_USE_ELPA)
+        elpa_t handle;
+        int    error;
+
+        // Initialize ELPA
+        if(elpa_init(20221109) != ELPA_OK) tamm_terminate("ELPA API not supported");
+
+        // Get and ELPA handle
+        handle = elpa_allocate(&error);
+        if(error != ELPA_OK) tamm_terminate("Could not create ELPA handle");
+
+        auto [na_rows, na_cols] = (*blockcyclic_dist).get_local_dims(Northo, Northo);
+
+        // Set parameters
+        elpa_set(handle, "na", Northo, &error);
+        elpa_set(handle, "nev", Northo, &error);
+        elpa_set(handle, "local_nrows", (int) na_rows, &error);
+        elpa_set(handle, "local_ncols", (int) na_cols, &error);
+        elpa_set(handle, "nblk", (int) mb, &error);
+        elpa_set(handle, "mpi_comm_parent", MPI_Comm_c2f(scalapack_info.comm), &error);
+        elpa_set(handle, "process_row", (int) grid.ipr(), &error);
+        elpa_set(handle, "process_col", (int) grid.ipc(), &error);
+#if defined(USE_CUDA)
+        elpa_set(handle, "nvidia-gpu", (int) 1, &error);
+        // elpa_set(handle, "use_gpu_id", 1, &error);
+#endif
+        error = elpa_setup(handle);
+        if(error != ELPA_OK) tamm_terminate(" ERROR: Could not setup ELPA");
+
+        elpa_set(handle, "solver", ELPA_SOLVER_2STAGE, &error);
+#if defined(USE_CUDA)
+        elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_NVIDIA_GPU, &error);
+#else
+        elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_AVX2_BLOCK2, &error);
+#endif
+        // elpa_set(handle, "debug", 1, &error);
+        // if (rank == 0 ) std::cout << " Calling ELPA " << std::endl;
+        elpa_eigenvectors(handle, Fp_sca.data(), eps_b.data(), Ca_sca.data(), &error);
+        if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA Eigendecompoistion failed");
+
+        // Clean-up
+        elpa_deallocate(handle, &error);
+        elpa_uninit(&error);
+        if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA deallocation failed");
+
+#else
         /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, Fp_sca.m(),
                                      Fp_sca.data(), 1, 1, Fp_sca.desc(), eps_b.data(),
                                      Ca_sca.data(), 1, 1, Ca_sca.desc());
-
+#endif
         // Backtransform TMP = X * Cb -> TMP**T = Cb**T * X
         // scalapackpp::pgemm( scalapackpp::Op::Trans, scalapackpp::Op::NoTrans,
         //                     1., Ca_sca, Xa_sca, 0., TMP2_sca );
@@ -721,6 +818,7 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
       }
     } // rank participates in ScaLAPACK call
   }
+  sch.ec().pg().barrier();
 
 #else
 

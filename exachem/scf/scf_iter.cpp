@@ -178,7 +178,7 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
       std::cout << std::fixed << std::setprecision(2) << "diis: " << do_time << "s, ";
   }
 
-  if(lshift > 0) {
+  if(lshift > 0 && iter >= 1) {
     double lval = is_rhf ? 0.5 * lshift : lshift;
     // clang-format off
     sch
@@ -606,9 +606,57 @@ void exachem::scf::SCFIter::init_ri(ExecutionContext& ec, ChemEnv& chem_env,
       auto desc_S = desc_lambda(ndf, ndf);
       auto desc_V = desc_lambda(ndf, ndf);
 
+#if defined(TAMM_USE_ELPA)
+      elpa_t handle;
+      int    error;
+
+      // Initialize ELPA
+      if(elpa_init(20221109) != ELPA_OK) tamm_terminate("ELPA API not supported");
+
+      // Get and ELPA handle
+      handle = elpa_allocate(&error);
+      if(error != ELPA_OK) tamm_terminate("Could not create ELPA handle");
+
+      auto [na_rows, na_cols] = (*blockcyclic_dist).get_local_dims(ndf, ndf);
+
+      // Set parameters
+      elpa_set(handle, "na", ndf, &error);
+      elpa_set(handle, "nev", ndf, &error);
+      elpa_set(handle, "local_nrows", (int) na_rows, &error);
+      elpa_set(handle, "local_ncols", (int) na_cols, &error);
+      elpa_set(handle, "nblk", (int) mb, &error);
+      elpa_set(handle, "mpi_comm_parent", MPI_Comm_c2f(scalapack_info.comm), &error);
+      elpa_set(handle, "process_row", (int) grid.ipr(), &error);
+      elpa_set(handle, "process_col", (int) grid.ipc(), &error);
+#if defined(USE_CUDA)
+      elpa_set(handle, "nvidia-gpu", (int) 1, &error);
+      // elpa_set(handle, "use_gpu_id", 1, &error);
+#endif
+      error = elpa_setup(handle);
+      if(error != ELPA_OK) tamm_terminate(" ERROR: Could not setup ELPA");
+
+      elpa_set(handle, "solver", ELPA_SOLVER_2STAGE, &error);
+#if defined(USE_CUDA)
+      elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_NVIDIA_GPU, &error);
+#else
+      elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_AVX2_BLOCK2, &error);
+#endif
+      // elpa_set(handle, "debug", 1, &error);
+      // if (rank == 0 ) std::cout << " Calling ELPA " << std::endl;
+      elpa_eigenvectors(handle, S_BC.access_local_buf(), eps.data(), V_sca.access_local_buf(),
+                        &error);
+      if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA Eigendecompoistion failed");
+
+      // Clean-up
+      elpa_deallocate(handle, &error);
+      elpa_uninit(&error);
+      if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA deallocation failed");
+
+#else
       /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, desc_S[2],
                                    S_BC.access_local_buf(), 1, 1, desc_S, eps.data(),
                                    V_sca.access_local_buf(), 1, 1, desc_V);
+#endif
     }
 
     Tensor<TensorType>::deallocate(S_BC);

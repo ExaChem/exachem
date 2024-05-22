@@ -142,10 +142,10 @@ void ccsd_natural_orbitals(ChemEnv& chem_env, std::vector<int>& cc_rdm, std::str
   //################################################################################
   // TRANSFORM C AND FORM DENSITY FOR NATURAL ORBITAL BASIS
   //################################################################################
-  Tensor<T> C_alpha_AO2{{mu, nu}};
-  Tensor<T> C_alpha_AOMO{{mu, pa}};
-  Tensor<T> C_alpha_NO_AOMO{{mu, pa}};
-  Tensor<T> alpha_density{{mu, nu}};
+  Tensor<T> C_alpha_AO2{mu, chem_env.AO_ortho};
+  Tensor<T> C_alpha_AOMO{mu, pa};
+  Tensor<T> C_alpha_NO_AOMO{mu, pa};
+  Tensor<T> alpha_density{mu, nu};
   sch.allocate(C_alpha_AO2, C_alpha_AOMO, C_alpha_NO_AOMO, alpha_density).execute();
 
   exachem::scf::SCFIO scf_output;
@@ -158,10 +158,12 @@ void ccsd_natural_orbitals(ChemEnv& chem_env, std::vector<int>& cc_rdm, std::str
   tamm_to_eigen_tensor(C_alpha_AO2, C_alpha_eig);
   eigen_to_tamm_tensor(C_alpha_AOMO, C_alpha_eig);
 
-  sch(alpha_density(mu, nu) = 0.0)(C_alpha_NO_AOMO(mu, qa) =
-                                     C_alpha_AOMO(mu, pa) * natorbs_TAMM(pa, qa))(
-    alpha_density(mu, nu) = 2.0 * C_alpha_NO_AOMO(mu, ia) * C_alpha_NO_AOMO(nu, ia))
-    .execute();
+  // clang-format off
+  sch(alpha_density(mu, nu) = 0.0)
+     (C_alpha_NO_AOMO(mu, qa) = C_alpha_AOMO(mu, pa) * natorbs_TAMM(pa, qa))
+     (alpha_density(mu, nu) = 2.0 * C_alpha_NO_AOMO(mu, ia) * C_alpha_NO_AOMO(nu, ia))
+     .execute();
+  // clang-format on
 
   tamm_to_eigen_tensor(C_alpha_NO_AOMO, C_alpha_eig);
   eigen_to_tamm_tensor(C_alpha_AO2, C_alpha_eig);
@@ -171,7 +173,7 @@ void ccsd_natural_orbitals(ChemEnv& chem_env, std::vector<int>& cc_rdm, std::str
                    chem_env.sys_data.output_file_prefix + +".ccsd.alpha.movecs"
               << std::endl;
   if(rank == 0)
-    std::cout << "\nCCSD natural orbitals density written to" + files_dir + "/scf/" +
+    std::cout << "\nCCSD natural orbitals density written to " + files_dir + "/scf/" +
                    chem_env.sys_data.output_file_prefix + +".ccsd.alpha.density"
               << std::endl;
   scf_output.rw_mat_disk<TensorType>(

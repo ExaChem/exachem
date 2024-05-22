@@ -9,6 +9,16 @@
 #include "ec_molden.hpp"
 #include "txt_utils.hpp"
 
+bool ECMolden::check_molden(std::string moldenfile) {
+  molden_exists = !moldenfile.empty();
+  if(molden_exists) {
+    molden_file_valid = std::filesystem::exists(moldenfile);
+    if(!molden_file_valid)
+      tamm_terminate("ERROR: moldenfile provided: " + moldenfile + " does not exist");
+  }
+  return molden_file_valid;
+}
+
 std::string ECMolden::read_option(std::string line) {
   std::istringstream       oss(line);
   std::vector<std::string> option_string{std::istream_iterator<std::string>{oss},

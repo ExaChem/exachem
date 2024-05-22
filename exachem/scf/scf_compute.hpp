@@ -17,10 +17,9 @@ namespace exachem::scf {
 
 class SCFCompute {
 public:
-  Matrix compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A);
-  void   compute_shellpair_list(const ExecutionContext& ec, const libint2::BasisSet& shells,
-                                SCFVars& scf_vars);
-  void   compute_trafo(const libint2::BasisSet& shells, EigenTensors& etensors);
+  void compute_shellpair_list(const ExecutionContext& ec, const libint2::BasisSet& shells,
+                              SCFVars& scf_vars);
+  void compute_trafo(const libint2::BasisSet& shells, EigenTensors& etensors);
   std::tuple<int, double> compute_NRE(const ExecutionContext&     ec,
                                       std::vector<libint2::Atom>& atoms);
   std::tuple<shellpair_list_t, shellpair_data_t>

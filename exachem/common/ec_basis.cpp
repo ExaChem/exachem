@@ -1,21 +1,9 @@
 #include "ec_basis.hpp"
+namespace fs = std::filesystem;
 
-bool ECBasis::check_molden(ExecutionContext& exc, ChemEnv& chem_env) {
-  SCFOptions& scf_options = chem_env.ioptions.scf_options;
-  if(molden_exists) {
-    molden_file_valid = std::filesystem::exists(scf_options.moldenfile);
-    if(!molden_file_valid)
-      tamm_terminate("ERROR: moldenfile provided: " + scf_options.moldenfile + " does not exist");
-  }
-  return molden_file_valid;
-}
-
-void ECBasis::ecp_check(ExecutionContext& exc, ChemEnv& chem_env) {
-  SCFOptions&          scf_options = chem_env.ioptions.scf_options;
-  std::vector<Atom>&   atoms       = chem_env.atoms;
-  std::vector<ECAtom>& ec_atoms    = chem_env.ec_atoms;
-
-  std::ifstream is(scf_options.basisfile);
+void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vector<lib_atom>& atoms,
+                        std::vector<ECAtom>& ec_atoms) {
+  std::ifstream is(basisfile);
   std::string   line, rest;
   bool          ecp_found{false};
 
@@ -27,7 +15,7 @@ void ECBasis::ecp_check(ExecutionContext& exc, ChemEnv& chem_env) {
   } while(std::getline(is, line));
 
   if(!ecp_found) {
-    std::string bfnf_msg = "ECP block not found in " + scf_options.basisfile;
+    std::string bfnf_msg = "ECP block not found in " + basisfile;
     tamm_terminate(bfnf_msg);
   }
 
@@ -50,7 +38,7 @@ void ECBasis::ecp_check(ExecutionContext& exc, ChemEnv& chem_env) {
     iss_ >> elemsymbol;
 
     // true if line starts with element symbol
-    bool is_es = elemsymbol.find_first_not_of("0123456789") != string::npos;
+    bool is_es = elemsymbol.find_first_not_of("0123456789") != std::string::npos;
 
     // TODO: Check if its valid symbol
 
@@ -60,9 +48,9 @@ void ECBasis::ecp_check(ExecutionContext& exc, ChemEnv& chem_env) {
 
       for(size_t i = 0; i < ec_atoms.size(); i++) {
         if(elemsymbol == ec_atoms[i].esymbol) {
-          chem_env.sys_data.has_ecp = true;
-          ec_atoms[i].has_ecp       = true;
-          ec_atoms[i].ecp_nelec     = nelec;
+          has_ecp               = true;
+          ec_atoms[i].has_ecp   = true;
+          ec_atoms[i].ecp_nelec = nelec;
           atoms[i].atomic_number -= nelec;
           iatom = i;
           break;
@@ -93,29 +81,30 @@ void ECBasis::ecp_check(ExecutionContext& exc, ChemEnv& chem_env) {
     ;
 }
 
-bool ECBasis::basis_has_ecp(ExecutionContext& exc, ChemEnv& chem_env) {
+bool ECBasis::basis_has_ecp(ExecutionContext& exc, std::string basisfile) {
   // parse ECP section of basis file
-  auto        rank        = exc.pg().rank();
-  SCFOptions& scf_options = chem_env.ioptions.scf_options;
-
-  if(!scf_options.basisfile.empty()) {
-    if(!fs::exists(scf_options.basisfile)) {
-      std::string bfnf_msg = scf_options.basisfile + "not found";
+  if(!basisfile.empty()) {
+    if(!fs::exists(basisfile)) {
+      std::string bfnf_msg = basisfile + "not found";
       tamm_terminate(bfnf_msg);
     }
-    else if(rank == 0)
-      std::cout << std::endl << "Parsing ECP block in " << scf_options.basisfile << std::endl;
+    else if(exc.pg().rank() == 0)
+      std::cout << std::endl << "Parsing ECP block in " << basisfile << std::endl;
     return true;
   }
   return false;
 }
 
-void ECBasis::get_shell(ChemEnv& chem_env) {
+void ECBasis::parse_ecp(ExecutionContext& exc, std::string basisfile, std::vector<lib_atom>& atoms,
+                        std::vector<ECAtom>& ec_atoms) {
+  if(basis_has_ecp(exc, basisfile)) ecp_check(exc, basisfile, atoms, ec_atoms);
+}
+
+void ECBasis::construct_shells(std::vector<lib_atom>& atoms, std::vector<ECAtom>& ec_atoms) {
   std::vector<lib_shell> shell_vec;
-  std::vector<Atom>&     atoms    = chem_env.atoms;
-  std::vector<ECAtom>&   ec_atoms = chem_env.ec_atoms;
 
   for(size_t i = 0; i < atoms.size(); i++) {
+    // const auto        Z = atoms[i].atomic_number;
     lib_basis_set ashells(ec_atoms[i].basis, {atoms[i]});
     shell_vec.insert(shell_vec.end(), ashells.begin(), ashells.end());
   }
@@ -125,10 +114,9 @@ void ECBasis::get_shell(ChemEnv& chem_env) {
 
 /* Constructors and initializer */
 
-void ECBasis::initialize(ExecutionContext& exc, ChemEnv& chem_env) {
-  SCFOptions& scf_options = chem_env.ioptions.scf_options;
-
-  basis_set_file        = std::string(DATADIR) + "/basis/" + scf_options.basis + ".g94";
+void ECBasis::basisset(ExecutionContext& exc, std::string basis, std::string gaussian_type,
+                       std::vector<lib_atom>& atoms, std::vector<ECAtom>& ec_atoms) {
+  basis_set_file        = std::string(DATADIR) + "/basis/" + basis + ".g94";
   int basis_file_exists = 0;
   if(exc.pg().rank() == 0) basis_file_exists = std::filesystem::exists(basis_set_file);
   exc.pg().broadcast(&basis_file_exists, 0);
@@ -138,18 +126,18 @@ void ECBasis::initialize(ExecutionContext& exc, ChemEnv& chem_env) {
 
   // Initialize the Libint integrals library
   libint2::initialize(false);
-  get_shell(chem_env);
-  if(scf_options.gaussian_type == "spherical") shells.set_pure(true);
+  construct_shells(atoms, ec_atoms);
+  if(gaussian_type == "spherical") shells.set_pure(true);
   else shells.set_pure(false); // use cartesian gaussians
-  if(basis_has_ecp(exc, chem_env)) ecp_check(exc, chem_env);
-  molden_exists = !scf_options.moldenfile.empty();
-  check_molden(exc, chem_env);
   // libint2::Shell::do_enforce_unit_normalization(false);
 }
 
-ECBasis::ECBasis(ExecutionContext& exc, ChemEnv& chem_env) { initialize(exc, chem_env); }
-
-void ECBasis::operator()(ExecutionContext& exc, ChemEnv& chem_env) { initialize(exc, chem_env); }
+ECBasis::ECBasis(ExecutionContext& exc, std::string basis, std::string basisfile,
+                 std::string gaussian_type, std::vector<lib_atom>& atoms,
+                 std::vector<ECAtom>& ec_atoms) {
+  basisset(exc, basis, gaussian_type, atoms, ec_atoms);
+  parse_ecp(exc, basisfile, atoms, ec_atoms);
+}
 
 void BasisFunctionCount::compute(const bool is_spherical, libint2::Shell& s) {
   // for (const auto& s: shells) {

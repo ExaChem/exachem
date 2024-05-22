@@ -4,6 +4,7 @@
 #include "common/cutils.hpp"
 #include "common/ec_basis.hpp"
 
+#include "scf/scf_compute.hpp"
 #include "scf/scf_eigen_tensors.hpp"
 #include "scf/scf_matrix.hpp"
 #include "scf/scf_tamm_tensors.hpp"
@@ -20,6 +21,7 @@ public:
   void rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info,
                   TAMMTensors& ttensors, EigenTensors& etensors, std::string files_prefix,
                   bool read = false);
+
   template<typename T>
   void rw_mat_disk(Tensor<T> tensor, std::string tfilename, bool profile, bool read = false);
   void print_mulliken(ChemEnv& chem_env, Matrix& D, Matrix& D_beta, Matrix& S);

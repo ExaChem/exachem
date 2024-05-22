@@ -20,7 +20,10 @@ private:
   bool        is_in_line(const std::string str, const std::string line);
 
 public:
-  ECMolden() = default;
+  ECMolden()             = default;
+  bool molden_exists     = false;
+  bool molden_file_valid = false;
+
   template<typename T>
   void reorder_molden_orbitals(const bool is_spherical, std::vector<AtomInfo>& atominfo,
                                Matrix& smat, Matrix& dmat, const bool reorder_cols = true,
@@ -31,8 +34,9 @@ public:
 
   void read_geom_molden(ChemEnv& chem_env);
 
-  // TODO: is this needed? - currently does not make a difference
+  bool check_molden(std::string moldenfile);
 
+  // TODO: is this needed? - currently does not make a difference
   libint2::BasisSet read_basis_molden(const ChemEnv& chem_env);
 
   template<typename T>

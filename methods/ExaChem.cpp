@@ -173,6 +173,12 @@ int main(int argc, char* argv[]) {
     if(task.fci) tamm_terminate("Full CI integration not enabled!");
 #endif
 
+    SCFOptions& scf_options   = chem_env.ioptions.scf_options;
+    chem_env.ec_basis         = ECBasis(ec, scf_options.basis, scf_options.basisfile,
+                                        scf_options.gaussian_type, chem_env.atoms, chem_env.ec_atoms);
+    chem_env.shells           = chem_env.ec_basis.shells;
+    chem_env.sys_data.has_ecp = chem_env.ec_basis.has_ecp;
+
     if(task.sinfo) chem_env.sinfo();
     else if(task.scf) scf::scf_driver(ec, chem_env);
 #if defined(EC_CC)

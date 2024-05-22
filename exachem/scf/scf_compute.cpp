@@ -586,26 +586,6 @@ Matrix exachem::scf::SCFCompute::compute_schwarz_ints(
   return K;
 } // END of compute_schwarz_ints()
 
-Matrix exachem::scf::SCFCompute::compute_shellblock_norm(const libint2::BasisSet& obs,
-                                                         const Matrix&            A) {
-  const auto nsh = obs.size();
-  Matrix     Ash = Matrix::Zero(nsh, nsh);
-
-  auto shell2bf = obs.shell2bf();
-  for(size_t s1 = 0; s1 != nsh; ++s1) {
-    const auto& s1_first = shell2bf[s1];
-    const auto& s1_size  = obs[s1].size();
-    for(size_t s2 = 0; s2 != nsh; ++s2) {
-      const auto& s2_first = shell2bf[s2];
-      const auto& s2_size  = obs[s2].size();
-
-      Ash(s1, s2) = A.block(s1_first, s2_first, s1_size, s2_size).lpNorm<Eigen::Infinity>();
-    }
-  }
-
-  return Ash;
-}
-
 template Matrix exachem::scf::SCFCompute::compute_schwarz_ints<libint2::Operator::coulomb>(
   ExecutionContext& ec, const SCFVars& scf_vars, const libint2::BasisSet& bs1,
   const libint2::BasisSet& bs2, bool use_2norm,

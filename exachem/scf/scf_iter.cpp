@@ -270,8 +270,9 @@ exachem::scf::SCFIter::compute_2bf_taskinfo(ExecutionContext& ec, ChemEnv& chem_
   // auto       rank           = ec.pg().rank();
   const bool is_uhf = sys_data.is_unrestricted;
 
-  Matrix D_shblk_norm = compute_shellblock_norm(obs, D); // matrix of infty-norms of shell blocks
-  if(is_uhf) D_shblk_norm += compute_shellblock_norm(obs, D_beta);
+  Matrix D_shblk_norm =
+    chem_env.compute_shellblock_norm(obs, D); // matrix of infty-norms of shell blocks
+  if(is_uhf) D_shblk_norm += chem_env.compute_shellblock_norm(obs, D_beta);
 
   std::vector<int> s1vec;
   std::vector<int> s2vec;
@@ -768,8 +769,8 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
   sch(Jtmp_tamm() = 0.0).execute();
 
   Matrix D_shblk_norm;
-  D_shblk_norm = compute_shellblock_norm(obs, D); // matrix of infty-norms of shell blocks
-  if(is_uhf) D_shblk_norm += compute_shellblock_norm(obs, D_beta);
+  D_shblk_norm = chem_env.compute_shellblock_norm(obs, D); // matrix of infty-norms of shell blocks
+  if(is_uhf) D_shblk_norm += chem_env.compute_shellblock_norm(obs, D_beta);
 
   const auto       max_engine_precision    = std::numeric_limits<double>::epsilon() / 1e10;
   const auto       ln_max_engine_precision = std::log(max_engine_precision);
@@ -1289,8 +1290,9 @@ void exachem::scf::SCFIter::compute_2bf(ExecutionContext& ec, ChemEnv& chem_env,
   double          do_time;
 
   if(!do_density_fitting) {
-    D_shblk_norm = compute_shellblock_norm(obs, D); // matrix of infty-norms of shell blocks
-    if(is_uhf) D_shblk_norm = D_shblk_norm.cwiseMax(compute_shellblock_norm(obs, D_beta));
+    D_shblk_norm =
+      chem_env.compute_shellblock_norm(obs, D); // matrix of infty-norms of shell blocks
+    if(is_uhf) D_shblk_norm = D_shblk_norm.cwiseMax(chem_env.compute_shellblock_norm(obs, D_beta));
 
     G.setZero(N, N);
     if(is_uhf) G_beta.setZero(N, N);

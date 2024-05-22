@@ -1,37 +1,29 @@
 #pragma once
-#include "common/libint2_includes.hpp"
-#include "scf/scf_common.hpp"
-#include "tamm/tamm.hpp"
-#include <filesystem>
-#include <string>
-#include <vector>
+#include "common/ecatom.hpp"
 
-using namespace tamm;
-using lib_atom      = libint2::Atom;
 using lib_basis_set = libint2::BasisSet;
-using lib_engine    = libint2::Engine;
-using lib_operator  = libint2::Operator;
 using lib_shell     = libint2::Shell;
-
-#include "common/chemenv.hpp"
+using lib_atom      = libint2::Atom;
 
 class ECBasis {
 private:
-  void initialize(ExecutionContext& exc, ChemEnv& chem_env);
-  void get_shell(ChemEnv& chem_env);
-  bool basis_has_ecp(ExecutionContext& exc, ChemEnv& chem_env);
-  bool check_molden(ExecutionContext& exc, ChemEnv& chem_env);
+  void basisset(ExecutionContext& exc, std::string basis, std::string gaussian_type,
+                std::vector<lib_atom>& atoms, std::vector<ECAtom>& ec_atoms);
+  void construct_shells(std::vector<lib_atom>& atoms, std::vector<ECAtom>& ec_atoms);
+  bool basis_has_ecp(ExecutionContext& exc, std::string basisfile);
+  void ecp_check(ExecutionContext& exc, std::string basisfile, std::vector<lib_atom>& atoms,
+                 std::vector<ECAtom>& ec_atoms);
+  void parse_ecp(ExecutionContext& exc, std::string basisfile, std::vector<lib_atom>& atoms,
+                 std::vector<ECAtom>& ec_atoms);
 
 public:
   ECBasis() = default;
-  ECBasis(ExecutionContext& exc, ChemEnv& chem_env);
-  void operator()(ExecutionContext& exc, ChemEnv& chem_env);
-  void ecp_check(ExecutionContext& exc, ChemEnv& chem_env);
+  ECBasis(ExecutionContext& exc, std::string basis, std::string basisfile,
+          std::string gaussian_type, std::vector<lib_atom>& atoms, std::vector<ECAtom>& ec_atoms);
 
   std::string   basis_set_file;
-  bool          molden_exists     = false;
-  bool          molden_file_valid = false;
   lib_basis_set shells;
+  bool          has_ecp{false};
 };
 
 class BasisFunctionCount {

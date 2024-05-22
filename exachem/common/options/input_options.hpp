@@ -22,6 +22,11 @@ public:
   void        print();
 };
 
+class DPlotOptions: public CommonOptions {
+public:
+  bool cube{false};
+};
+
 class SCFOptions: public CommonOptions {
 public:
   int      charge{0};
@@ -261,6 +266,7 @@ public:
   ECOptions() = default;
 
   CommonOptions common_options;
+  DPlotOptions  dplot_options;
   SCFOptions    scf_options;
   CDOptions     cd_options;
   GWOptions     gw_options;

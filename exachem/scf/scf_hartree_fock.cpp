@@ -1,5 +1,6 @@
 #include "scf_hartree_fock.hpp"
 #include "common/cutils.hpp"
+#include "common/ec_dplot.hpp"
 #include "common/options/parser_utils.hpp"
 #include <functional>
 
@@ -15,7 +16,6 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   SCFIO      scf_output;
   ECMolden   ec_molden;
   SCFVars    scf_vars; // init vars
-  ECBasis    ec_basis(exc, chem_env);
 
   bool is_spherical = (chem_env.ioptions.scf_options.gaussian_type == "spherical");
   auto iter         = 0;
@@ -23,9 +23,8 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 
   auto hf_t1 = std::chrono::high_resolution_clock::now();
 
-  if(ec_basis.molden_file_valid) ec_molden.read_geom_molden(chem_env);
-
-  chem_env.shells = ec_basis.shells;
+  ec_molden.check_molden(chem_env.ioptions.scf_options.moldenfile);
+  if(ec_molden.molden_file_valid) ec_molden.read_geom_molden(chem_env);
 
   const int N                                               = chem_env.shells.nbf();
   chem_env.sys_data.nbf                                     = N;
@@ -37,7 +36,7 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   std::string files_prefix = files_dir + "/" + chem_env.sys_data.output_file_prefix;
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
 
-  if(ec_basis.molden_exists && ec_basis.molden_file_valid) {
+  if(ec_molden.molden_exists && ec_molden.molden_file_valid) {
     chem_env.shells = ec_molden.read_basis_molden(chem_env);
     chem_env.shells = ec_molden.renormalize_libint_shells(chem_env.shells);
     if(is_spherical) chem_env.shells.set_pure(true);
@@ -523,7 +522,7 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
       }
       ec.pg().barrier();
     }
-    else if(ec_basis.molden_exists) {
+    else if(ec_molden.molden_exists) {
       auto N      = chem_env.sys_data.nbf_orig;
       auto Northo = chem_env.sys_data.nbf;
 
@@ -532,7 +531,7 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 
       if(rank == 0) {
         cout << endl << "Reading from molden file provided ..." << endl;
-        if(ec_basis.molden_file_valid) {
+        if(ec_molden.molden_file_valid) {
           ec_molden.read_molden<TensorType>(chem_env, etensors.C_alpha, etensors.C_beta);
         }
       }
@@ -850,6 +849,10 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
         cout << std::string(50, '*') << endl;
       }
     }
+
+    if(chem_env.ioptions.dplot_options.cube)
+      EC_DPLOT::write_dencube(ec, chem_env, etensors.D_alpha, etensors.D_beta, files_prefix);
+
     if(chem_env.sys_data.is_ks) { // or rohf
       sch(ttensors.F_alpha_tmp() = 0).execute();
       if(chem_env.sys_data.is_unrestricted) sch(ttensors.F_beta_tmp() = 0).execute();

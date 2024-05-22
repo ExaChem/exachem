@@ -17,8 +17,8 @@ void ECOptionParser::parse_n_check(std::string_view filename, json& jinput) {
   bool parse_result = json::sax_parse(is, &jsax);
   if(!parse_result) tamm_terminate("Error parsing input file");
 
-  const std::vector<std::string> valid_sections{"geometry", "basis", "common", "SCF",  "CD",
-                                                "GW",       "CC",    "FCI",    "TASK", "comments"};
+  const std::vector<std::string> valid_sections{
+    "geometry", "basis", "common", "DPLOT", "SCF", "CD", "GW", "CC", "FCI", "TASK", "comments"};
   for(auto& el: jinput.items()) {
     if(std::find(valid_sections.begin(), valid_sections.end(), el.key()) == valid_sections.end())
       tamm_terminate("INPUT FILE ERROR: Invalid section [" + el.key() + "] in the input file");

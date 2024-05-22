@@ -240,31 +240,6 @@ void ChemEnv::sinfo() {
   std::string      basis  = scf_options.basis;
   int              charge = scf_options.charge;
 
-  libint2::initialize(false);
-
-  std::string basis_set_file = std::string(DATADIR) + "/basis/" + basis + ".g94";
-
-  int basis_file_exists = 0;
-  if(rank == 0) basis_file_exists = std::filesystem::exists(basis_set_file);
-  ec.pg().broadcast(&basis_file_exists, 0);
-
-  if(!basis_file_exists)
-    tamm_terminate("ERROR: basis set file " + basis_set_file + " does not exist");
-
-  libint2::BasisSet shells;
-  {
-    std::vector<libint2::Shell> bset_vec;
-    for(size_t i = 0; i < atoms.size(); i++) {
-      // const auto        Z = atoms[i].atomic_number;
-      libint2::BasisSet ashells(ec_atoms[i].basis, {atoms[i]});
-      bset_vec.insert(bset_vec.end(), ashells.begin(), ashells.end());
-    }
-    libint2::BasisSet bset(bset_vec);
-    shells = std::move(bset);
-  }
-
-  shells.set_pure(true);
-
   const int N = shells.nbf();
 
   auto nelectrons = 0;
@@ -288,4 +263,23 @@ void ChemEnv::sinfo() {
   if(rank == 0) write_sinfo();
 
   ec.flush_and_sync();
+}
+
+Matrix ChemEnv::compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A) {
+  const auto nsh = obs.size();
+  Matrix     Ash = Matrix::Zero(nsh, nsh);
+
+  auto shell2bf = obs.shell2bf();
+  for(size_t s1 = 0; s1 != nsh; ++s1) {
+    const auto& s1_first = shell2bf[s1];
+    const auto& s1_size  = obs[s1].size();
+    for(size_t s2 = 0; s2 != nsh; ++s2) {
+      const auto& s2_first = shell2bf[s2];
+      const auto& s2_size  = obs[s2].size();
+
+      Ash(s1, s2) = A.block(s1_first, s2_first, s1_size, s2_size).lpNorm<Eigen::Infinity>();
+    }
+  }
+
+  return Ash;
 }

@@ -1242,8 +1242,8 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
       ++iter_atom;
       D_a_atom_last            = D_a_atom;
       D_b_atom_last            = D_b_atom;
-      Matrix D_shblk_norm_atom = scf_compute.compute_shellblock_norm(obs, D_a_atom);
-      D_shblk_norm_atom += scf_compute.compute_shellblock_norm(obs, D_b_atom);
+      Matrix D_shblk_norm_atom = chem_env.compute_shellblock_norm(obs, D_a_atom);
+      D_shblk_norm_atom += chem_env.compute_shellblock_norm(obs, D_b_atom);
 
       Matrix G_a_atom2 = Matrix::Zero(nao_atom, nao_atom);
       Matrix G_b_atom2 = Matrix::Zero(nao_atom, nao_atom);

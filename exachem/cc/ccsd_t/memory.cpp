@@ -77,7 +77,7 @@ static void* moreHostMem(size_t bytes) {
 #elif defined(USE_DPCPP)
   ptr = sycl::malloc_host(bytes, tamm::GPUStreamPool::getInstance().getStream().first);
 #else
-  ptr = (void*) malloc(bytes);
+  ptr = (void*) std::malloc(bytes);
 #endif
 
   assert(ptr != nullptr); /*We hopefully have a pointer*/

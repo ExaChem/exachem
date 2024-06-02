@@ -79,7 +79,7 @@ __constant__ int const_df_d2_exec[9 * MAX_NVAB];
 
 #ifdef USE_DPCPP
 #define __global__ __attribute__((always_inline))
-#endif
+#endif // USE_DPCPP
 
 template<typename T>
 __global__ void revised_jk_ccsd_t_fully_fused_kernel(
@@ -105,10 +105,9 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
   int base_size_p6b
 #ifdef USE_DPCPP
   ,
-  sycl::nd_item<2>& item, const int* __restrict__ const_df_s1_size,
-  const int* __restrict__ const_df_s1_exec, const int* __restrict__ const_df_d1_size,
-  const int* __restrict__ const_df_d1_exec, const int* __restrict__ const_df_d2_size,
-  const int* __restrict__ const_df_d2_exec
+  sycl::nd_item<2>& item, const int* const_df_s1_size, const int* const_df_s1_exec,
+  const int* const_df_d1_size, const int* const_df_d1_exec, const int* const_df_d2_size,
+  const int* const_df_d2_exec
 #endif
 ) {
   // For Shared Memory,
@@ -183,18 +182,10 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
   //
   T temp_av;
   T temp_bv[4];
-  T reg_tile[4][4];
-  T reg_singles[4][4];
+  T reg_tile[4][4]    = {{0}};
+  T reg_singles[4][4] = {{0}};
 
   int base_size_h7b, base_size_p7b;
-
-#pragma unroll 4
-  for(int i = 0; i < 4; i++)
-#pragma unroll 4
-    for(int j = 0; j < 4; j++) {
-      reg_tile[i][j]    = 0.0;
-      reg_singles[i][j] = 0.0;
-    }
 
   int energy_str_blk_idx_p4 = str_blk_idx_p4;
   int energy_str_blk_idx_p5 = str_blk_idx_p5;
@@ -288,8 +279,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #pragma unroll 1
       for(int l = 0; l < base_size_h7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of size_internal Indices: 1
@@ -357,8 +348,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #pragma unroll 1
       for(int l = 0; l < base_size_h7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of size_internal Indices: 1
@@ -426,8 +417,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #pragma unroll 1
       for(int l = 0; l < base_size_h7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of size_internal Indices: 1
@@ -567,8 +558,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #pragma unroll 1
       for(int l = 0; l < base_size_p7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of size_internal Indices: 1
@@ -642,8 +633,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
       for(int l = 0; l < base_size_p7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
         // internal_offset = (l + FUSION_SIZE_INT_UNIT) - size_internal;
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of size_internal Indices: 1
@@ -717,8 +708,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
       for(int l = 0; l < base_size_p7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
         // internal_offset = (l + FUSION_SIZE_INT_UNIT) - size_internal;
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of size_internal Indices: 1
@@ -1073,8 +1064,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #pragma unroll 1
       for(int l = 0; l < base_size_h7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of size_internal Indices: 1
@@ -1143,8 +1134,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
       for(int l = 0; l < base_size_h7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
         // internal_offset = (l + FUSION_SIZE_INT_UNIT) - size_internal;
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of Internal Indices: 1
@@ -1213,8 +1204,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
       for(int l = 0; l < base_size_h7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
         // internal_offset = (l + FUSION_SIZE_INT_UNIT) - size_internal;
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of Internal Indices: 1 //63, 21
@@ -1282,8 +1273,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #pragma unroll 1
       for(int l = 0; l < base_size_h7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of Internal Indices: 1
@@ -1351,8 +1342,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #pragma unroll 1
       for(int l = 0; l < base_size_h7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of Internal Indices: 1
@@ -1420,8 +1411,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #pragma unroll 1
       for(int l = 0; l < base_size_h7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_h7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of Internal Indices: 1
@@ -1561,8 +1552,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
       for(int l = 0; l < base_size_p7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
         // internal_offset = (l + FUSION_SIZE_INT_UNIT) - size_internal;
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of size_internal Indices: 1
@@ -1631,8 +1622,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #pragma unroll 1
       for(int l = 0; l < base_size_p7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of size_internal Indices: 1
@@ -1701,8 +1692,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #pragma unroll 1
       for(int l = 0; l < base_size_p7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of size_internal Indices: 1
@@ -1771,8 +1762,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #pragma unroll 1
       for(int l = 0; l < base_size_p7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of size_internal Indices: 1
@@ -1841,8 +1832,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #pragma unroll 1
       for(int l = 0; l < base_size_p7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of size_internal Indices: 1
@@ -1911,8 +1902,8 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #pragma unroll 1
       for(int l = 0; l < base_size_p7b; l += FUSION_SIZE_INT_UNIT) {
         // Part: Generalized Contraction Index (p7b)
-        internal_offset = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
-        if(internal_offset > 0) internal_upperbound = internal_offset;
+        internal_offset     = (l + FUSION_SIZE_INT_UNIT) - base_size_p7b;
+        internal_upperbound = (internal_offset > 0) ? internal_offset : 0;
 
         // Load Input Tensor to Shared Memory: 16:16
         // # of size_internal Indices: 1
@@ -2805,19 +2796,21 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
                             T* df_dev_d1_t2_all, T* df_dev_d1_v2_all, T* df_dev_d2_t2_all,
                             T* df_dev_d2_v2_all, T* df_dev_s1_t1_all, T* df_dev_s1_v2_all,
                             //
-                            int* host_d1_size, int* host_d1_exec, // used
-                            int* host_d2_size, int* host_d2_exec, int* host_s1_size,
-                            int* host_s1_exec,
-                            //
+                            int* host_d1_size, int* host_d1_exec, int* host_d2_size,
+                            int* host_d2_exec, int* host_s1_size, int* host_s1_exec,
+//
+#ifdef USE_DPCPP
+                            int* const_df_s1_size, int* const_df_s1_exec, int* const_df_d1_size,
+                            int* const_df_d1_exec, int* const_df_d2_size, int* const_df_d2_exec,
+#endif // USE_DPCPP
+       //
                             size_t size_noab, size_t size_max_dim_d1_t2, size_t size_max_dim_d1_v2,
                             size_t size_nvab, size_t size_max_dim_d2_t2, size_t size_max_dim_d2_v2,
                             size_t size_max_dim_s1_t1, size_t size_max_dim_s1_v2,
                             //
-                            T factor,
-                            //
                             T* dev_evl_sorted_h1b, T* dev_evl_sorted_h2b, T* dev_evl_sorted_h3b,
                             T* dev_evl_sorted_p4b, T* dev_evl_sorted_p5b, T* dev_evl_sorted_p6b,
-                            T* partial_energies, gpuEvent_t* done_copy) {
+                            T* partial_energies, event_ptr_t done_copy) {
 #ifdef USE_CUDA
   cudaMemcpyToSymbolAsync(const_df_s1_size, host_s1_size, sizeof(int) * (6), 0,
                           cudaMemcpyHostToDevice, stream.first);
@@ -2892,6 +2885,14 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
     (int) base_size_h3b, (int) base_size_p4b, (int) base_size_p5b, (int) base_size_p6b);
 
 #elif defined(USE_DPCPP)
+  auto e0      = stream.first.memcpy(const_df_s1_size, host_s1_size, sizeof(int) * (6));
+  auto e1      = stream.first.memcpy(const_df_s1_exec, host_s1_exec, sizeof(int) * (9));
+  auto e2      = stream.first.memcpy(const_df_d1_size, host_d1_size, sizeof(int) * (7 * size_noab));
+  auto e3      = stream.first.memcpy(const_df_d1_exec, host_d1_exec, sizeof(int) * (9 * size_noab));
+  auto e4      = stream.first.memcpy(const_df_d2_size, host_d2_size, sizeof(int) * (7 * size_nvab));
+  auto e5      = stream.first.memcpy(const_df_d2_exec, host_d2_exec, sizeof(int) * (9 * size_nvab));
+  (*done_copy) = stream.first.ext_oneapi_submit_barrier({e0, e1, e2, e3, e4, e5});
+
   sycl::range<2> gridsize(1, num_blocks);
   sycl::range<2> blocksize(FUSION_SIZE_TB_1_Y, FUSION_SIZE_TB_1_X);
   auto           global_range = gridsize * blocksize;
@@ -2907,7 +2908,8 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
       CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1), CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6),
       CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5), CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4),
       base_size_h1b, base_size_h2b, base_size_h3b, base_size_p4b, base_size_p5b, base_size_p6b,
-      item, host_s1_size, host_s1_exec, host_d1_size, host_d1_exec, host_d2_size, host_d2_exec);
+      item, const_df_s1_size, const_df_s1_exec, const_df_d1_size, const_df_d1_exec,
+      const_df_d2_size, const_df_d2_exec);
   });
 #endif
 }
@@ -2922,16 +2924,19 @@ template void fully_fused_ccsd_t_gpu<double>(
   //
   int* host_d1_size, int* host_d1_exec, // used
   int* host_d2_size, int* host_d2_exec, int* host_s1_size, int* host_s1_exec,
+//
+#ifdef USE_DPCPP
+  int* const_df_s1_size, int* const_df_s1_exec, int* const_df_d1_size, int* const_df_d1_exec,
+  int* const_df_d2_size, int* const_df_d2_exec,
+#endif // USE_DPCPP
   //
   size_t size_noab, size_t size_max_dim_d1_t2, size_t size_max_dim_d1_v2, size_t size_nvab,
   size_t size_max_dim_d2_t2, size_t size_max_dim_d2_v2, size_t size_max_dim_s1_t1,
   size_t size_max_dim_s1_v2,
   //
-  double factor,
-  //
   double* dev_evl_sorted_h1b, double* dev_evl_sorted_h2b, double* dev_evl_sorted_h3b,
   double* dev_evl_sorted_p4b, double* dev_evl_sorted_p5b, double* dev_evl_sorted_p6b,
-  double* partial_energies, gpuEvent_t* done_copy);
+  double* partial_energies, event_ptr_t done_copy);
 // Explicit template instantiation: float
 template void fully_fused_ccsd_t_gpu<float>(
   gpuStream_t& stream, size_t num_blocks, size_t base_size_h1b, size_t base_size_h2b,
@@ -2942,13 +2947,16 @@ template void fully_fused_ccsd_t_gpu<float>(
   //
   int* host_d1_size, int* host_d1_exec, // used
   int* host_d2_size, int* host_d2_exec, int* host_s1_size, int* host_s1_exec,
+//
+#ifdef USE_DPCPP
+  int* const_df_s1_size, int* const_df_s1_exec, int* const_df_d1_size, int* const_df_d1_exec,
+  int* const_df_d2_size, int* const_df_d2_exec,
+#endif // USE_DPCPP
   //
   size_t size_noab, size_t size_max_dim_d1_t2, size_t size_max_dim_d1_v2, size_t size_nvab,
   size_t size_max_dim_d2_t2, size_t size_max_dim_d2_v2, size_t size_max_dim_s1_t1,
   size_t size_max_dim_s1_v2,
   //
-  float factor,
-  //
   float* dev_evl_sorted_h1b, float* dev_evl_sorted_h2b, float* dev_evl_sorted_h3b,
   float* dev_evl_sorted_p4b, float* dev_evl_sorted_p5b, float* dev_evl_sorted_p6b,
-  float* partial_energies, gpuEvent_t* done_copy);
+  float* partial_energies, event_ptr_t done_copy);

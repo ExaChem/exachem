@@ -11,12 +11,14 @@
 
 #include <cassert>
 #include <cstdio>
+#include <memory>
 #include <string>
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
 #include "tamm/gpu_streams.hpp"
 using tamm::gpuEvent_t;
 using tamm::gpuStream_t;
+using event_ptr_t = std::shared_ptr<tamm::gpuEvent_t>;
 #endif
 
 #ifdef USE_CUDA

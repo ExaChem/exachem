@@ -216,6 +216,22 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   T* df_dev_energies = static_cast<T*>(getGpuMem(sizeof(T) * std::pow(max_num_blocks, 6) * 2));
 #endif
 
+#ifdef USE_DPCPP
+  gpuStream_t& stream           = tamm::GPUStreamPool::getInstance().getStream();
+  int*         const_df_s1_size = sycl::malloc_device<int>(
+    (6), stream.first, sycl::ext::oneapi::property::usm::device_read_only());
+  int* const_df_s1_exec = sycl::malloc_device<int>(
+    (9), stream.first, sycl::ext::oneapi::property::usm::device_read_only());
+  int* const_df_d1_size = sycl::malloc_device<int>(
+    (7 * 30), stream.first, sycl::ext::oneapi::property::usm::device_read_only());
+  int* const_df_d1_exec = sycl::malloc_device<int>(
+    (9 * 30), stream.first, sycl::ext::oneapi::property::usm::device_read_only());
+  int* const_df_d2_size = sycl::malloc_device<int>(
+    (7 * 120), stream.first, sycl::ext::oneapi::property::usm::device_read_only());
+  int* const_df_d2_exec = sycl::malloc_device<int>(
+    (9 * 120), stream.first, sycl::ext::oneapi::property::usm::device_read_only());
+#endif // USE_DPCPP
+
   int num_task = 0;
   if(!seq_h3b) {
     if(rank == 0) {
@@ -259,6 +275,11 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
                         //
                         df_simple_s1_size, df_simple_d1_size, df_simple_d2_size, df_simple_s1_exec,
                         df_simple_d1_exec, df_simple_d2_exec,
+//
+#ifdef USE_DPCPP
+                        const_df_s1_size, const_df_s1_exec, const_df_d1_size, const_df_d1_exec,
+                        const_df_d2_size, const_df_d2_exec,
+#endif
                         //
                         df_dev_s1_t1_all, df_dev_s1_v2_all, df_dev_d1_t2_all, df_dev_d1_v2_all,
                         df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_energies,
@@ -275,7 +296,7 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
 #endif
                         cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v,
                         //
-                        done_compute.get(), done_copy.get());
+                        done_compute, done_copy);
 #else
                       total_fused_ccsd_t_cpu<T>(
                         is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2,
@@ -310,6 +331,7 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
     }
   }      // parallel h3b loop
   else { // seq h3b loop
+
 #if 1
     if(rank == 0) {
       std::cout << "14256-seq3 loop variant" << std::endl << std::endl;
@@ -362,6 +384,11 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
                         //
                         df_simple_s1_size, df_simple_d1_size, df_simple_d2_size, df_simple_s1_exec,
                         df_simple_d1_exec, df_simple_d2_exec,
+//
+#ifdef USE_DPCPP
+                        const_df_s1_size, const_df_s1_exec, const_df_d1_size, const_df_d1_exec,
+                        const_df_d2_size, const_df_d2_exec,
+#endif
                         //
                         df_dev_s1_t1_all, df_dev_s1_v2_all, df_dev_d1_t2_all, df_dev_d1_v2_all,
                         df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_energies,
@@ -378,7 +405,7 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
 #endif
                         cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v,
                         //
-                        done_compute.get(), done_copy.get());
+                        done_compute, done_copy);
 #else
             total_fused_ccsd_t_cpu<T>(
               is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2, d_v2,
@@ -415,6 +442,15 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
   gpuDeviceSynchronize();
 #endif
+
+#ifdef USE_DPCPP
+  sycl::free(const_df_s1_size, stream.first);
+  sycl::free(const_df_s1_exec, stream.first);
+  sycl::free(const_df_d1_size, stream.first);
+  sycl::free(const_df_d1_exec, stream.first);
+  sycl::free(const_df_d2_size, stream.first);
+  sycl::free(const_df_d2_exec, stream.first);
+#endif // USE_DPCPP
 
   energy1 = energy_l[0];
   energy2 = energy_l[1];

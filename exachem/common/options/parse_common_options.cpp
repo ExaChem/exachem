@@ -39,4 +39,6 @@ void ParseCommonOptions::parse(ChemEnv& chem_env) {
 
   // parse cube options here for now
   parse_option<bool>(chem_env.ioptions.dplot_options.cube, jinput["DPLOT"], "cube");
+  parse_option<std::string>(chem_env.ioptions.dplot_options.density, jinput["DPLOT"], "density");
+  parse_option<int>(chem_env.ioptions.dplot_options.orbitals, jinput["DPLOT"], "orbitals");
 }

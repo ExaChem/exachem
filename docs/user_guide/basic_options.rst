@@ -57,16 +57,18 @@ Some common options supported are as follows:
 Basis set options
 ~~~~~~~~~~~~~~~~~
 Currently support basis sets consisting of contracted Gaussian functions up to a maximum angular momentum of six (h functions).
-Spherical-harmonic (5 *d*, 7 *f*, 9 *g*, ...) angular functions are utilized by default::
+Spherical-harmonic (5 *d*, 7 *f*, 9 *g*, ...) angular functions are utilized by default.
+
+.. code-block:: json
 
  "basis": {
    "basisset": "cc-pvdz",
    "df_basisset": "cc-pvdz-ri",
    "basisfile": "/path/to/basis_file_with_ecps",
    "atom_basis": {
-     "H": "cc-pvtz",
-     "O": "aug-cc-pvtz"
-    }
+      "H": "cc-pvtz",
+      "O": "aug-cc-pvtz"
+   }
  }
 
 :basisset: String specifying the basis set name. Parsing of the basis set will be handled by *Libint*, which expects to find a ``<basisset>.g94`` file with Gaussian-style format and located at ``$LIBINT_DATA_PATH/basis`` or ``<libint2_install_prefix>/share/libint/<libint2_version>/basis`` (if ``LIBINT_DATA_PATH`` is not defined).
@@ -104,4 +106,27 @@ The **TASK** block of the input file specifies the method to run. Only a single 
  }
 
 A task automatically runs the tasks it depends on. For e.g. if **ccsd** is enabled, it automatically runs the tasks **scf** (hartree fock) and **cd_2e** (cholesky decomposition of the 2e integrals).
+
+.. _DPLOT:
+
+DPLOT Options
+~~~~~~~~~~~~~
+
+This section is used to obtain the plots of various types of electron densities (or orbitals) of the molecule. 
+The electron density is calculated on a specified set of grid points using the molecular orbitals from SCF or DFT calculation. 
+The output file is in the Gaussian Cube format.
+
+.. code-block:: json
+
+ "DPLOT": {
+   "cube": false,
+   "density": "total",
+   "orbitals": 0
+ }
+
+:cube: A boolean used to indicate whether a cube file should be written. ``[default: false]``
+
+:density: Plot total density by default when **cube=true**. The supported string values that specify what kind of density is to be computed are ``"total"`` and ``"spin"``.
+
+:orbitals: Specify the highest occupied orbitals for both spins to be plotted. ``[default: 0]``
 

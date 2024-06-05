@@ -850,8 +850,42 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
       }
     }
 
-    if(chem_env.ioptions.dplot_options.cube)
-      EC_DPLOT::write_dencube(ec, chem_env, etensors.D_alpha, etensors.D_beta, files_prefix);
+    auto dplot_opt = chem_env.ioptions.dplot_options;
+    if(dplot_opt.cube) {
+      // if(dplot_opt.density == "spin") // TODO
+      // else plot total density by default when cube=true
+      /* else */ EC_DPLOT::write_dencube(ec, chem_env, etensors.D_alpha, etensors.D_beta,
+                                         files_prefix);
+#if defined(USE_SCALAPACK)
+      if(scalapack_info.comm != MPI_COMM_NULL) {
+        tamm::from_block_cyclic_tensor(ttensors.C_alpha_BC, ttensors.C_alpha);
+        if(is_uhf) tamm::from_block_cyclic_tensor(ttensors.C_beta_BC, ttensors.C_beta);
+      }
+      tamm_to_eigen_tensor(ttensors.C_alpha, etensors.C_alpha);
+      if(is_uhf) tamm_to_eigen_tensor(ttensors.C_beta, etensors.C_beta);
+#else
+    if(rank != 0) {
+           etensors.C_alpha.resize(chem_env.sys_data.nbf_orig, chem_env.sys_data.nbf);
+           if(is_uhf) { etensors.C_beta.resize(chem_env.sys_data.nbf_orig, chem_env.sys_data.nbf); }
+    }
+    ec.pg().broadcast(etensors.C_alpha.data(), etensors.C_alpha.size(), 0);
+    if(is_uhf) { ec.pg().broadcast(etensors.C_beta.data(), etensors.C_beta.size(), 0); }
+#endif
+      if(dplot_opt.orbitals > 0) {
+        for(int iorb = chem_env.sys_data.nelectrons_alpha - 1;
+            iorb >= chem_env.sys_data.nelectrons_alpha - dplot_opt.orbitals; iorb--) {
+          if(iorb < 0) break;
+          EC_DPLOT::write_mocube(ec, chem_env, etensors.C_alpha, iorb, "alpha", files_prefix);
+        }
+        if(is_uhf) {
+          for(int iorb = chem_env.sys_data.nelectrons_beta - 1;
+              iorb >= chem_env.sys_data.nelectrons_beta - dplot_opt.orbitals; iorb--) {
+            if(iorb < 0) break;
+            EC_DPLOT::write_mocube(ec, chem_env, etensors.C_alpha, iorb, "beta", files_prefix);
+          }
+        }
+      }
+    }
 
     if(chem_env.sys_data.is_ks) { // or rohf
       sch(ttensors.F_alpha_tmp() = 0).execute();

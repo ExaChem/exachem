@@ -24,7 +24,9 @@ public:
 
 class DPlotOptions: public CommonOptions {
 public:
-  bool cube{false};
+  bool        cube{false};
+  std::string density{"total"}; // or spin
+  int         orbitals{0};      // highest occupied orbitals
 };
 
 class SCFOptions: public CommonOptions {

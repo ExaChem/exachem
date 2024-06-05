@@ -33,7 +33,9 @@
     },
 
     "DPLOT": {
-      "cube": false
+      "cube": false,
+      "density": "total",
+      "orbitals": 0
     },
     
     "SCF": {

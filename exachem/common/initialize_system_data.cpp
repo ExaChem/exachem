@@ -1,3 +1,11 @@
+/*
+ * ExaChem: Open Source Exascale Computational Chemistry Software.
+ *
+ * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ *
+ * See LICENSE.txt for details
+ */
+
 #include "initialize_system_data.hpp"
 
 void IniSystemData::initialize(ChemEnv& chem_env) {

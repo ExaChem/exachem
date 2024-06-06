@@ -7,6 +7,7 @@
  */
 
 #include "cc/ccsd/cd_ccsd_os_ann.hpp"
+#include "cholesky/cholesky_2e_driver.hpp"
 
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -14,8 +15,8 @@ namespace fs = std::filesystem;
 namespace exachem::cc::ducc {
 template<typename T>
 void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
-                        Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1, V2Tensors<T>& v2tensors,
-                        size_t nactv, ExecutionHW ex_hw);
+                        Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1,
+                        cholesky_2e::V2Tensors<T>& v2tensors, size_t nactv, ExecutionHW ex_hw);
 
 void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
@@ -50,7 +51,7 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   // TODO: Implement check for UHF
   if(nactv > sys_data.n_vir_alpha && is_rhf) tamm_terminate("[DUCC ERROR]: nactive > n_vir_alpha");
 
-  auto [MO, total_orbitals] = cd_svd::setupMOIS(chem_env, false, nactv);
+  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(chem_env, false, nactv);
 
   std::string out_fp       = chem_env.workspace_dir;
   std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
@@ -67,8 +68,9 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    exachem::cd_svd::cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO,
-                                      shells, shell_tile_map, ccsd_restart, cholfile);
+    exachem::cholesky_2e::cholesky_2e_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO,
+                                                F_beta_AO, shells, shell_tile_map, ccsd_restart,
+                                                cholfile);
   free_tensors(lcao);
 
   // if(ccsd_options.writev) ccsd_options.writet = true;
@@ -193,9 +195,9 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     free_vec_tensors(d_r1s, d_r2s, d_t1s, d_t2s);
   }
 
-  V2Tensors<T> v2tensors;
+  cholesky_2e::V2Tensors<T> v2tensors;
   if(computeTData && !v2tensors.exist_on_disk(files_prefix)) {
-    v2tensors = setupV2Tensors<T>(ec, cholVpr, ex_hw);
+    v2tensors = cholesky_2e::setupV2Tensors<T>(ec, cholVpr, ex_hw);
     if(ccsd_options.writet) { v2tensors.write_to_disk(files_prefix); }
   }
   else {

@@ -101,14 +101,12 @@
     "maxiter": 500
   },
   "SCF": {
-    "tol_int": 1e-20,
-    "tol_lindep": 1e-05,
-    "conve": 0.01,
-    "convd": 0.0001,
-    "diis_hist": 12
+    "conve": 1e-8,
+    "convd": 1e-7,
+    "diis_hist": 10
   },
   "CD": {
-    "diagtol": 1e-06
+    "diagtol": 1e-05
   },
   "CC": {
     "threshold": 1e-06,

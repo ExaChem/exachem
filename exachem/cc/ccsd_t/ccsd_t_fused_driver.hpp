@@ -64,11 +64,12 @@ inline int checkCudaKernelCompatible(bool r0) {
 template<typename T>
 std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   ChemEnv& chem_env, ExecutionContext& ec, std::vector<int>& k_spin, const TiledIndexSpace& MO,
-  Tensor<T>& d_t1, Tensor<T>& d_t2, V2Tensors<T>& d_v2, std::vector<T>& k_evl_sorted,
-  T hf_ccsd_energy, bool is_restricted, LRUCache<Index, std::vector<T>>& cache_s1t,
-  LRUCache<Index, std::vector<T>>& cache_s1v, LRUCache<Index, std::vector<T>>& cache_d1t,
-  LRUCache<Index, std::vector<T>>& cache_d1v, LRUCache<Index, std::vector<T>>& cache_d2t,
-  LRUCache<Index, std::vector<T>>& cache_d2v, bool seq_h3b = false, bool tilesize_opt = true) {
+  Tensor<T>& d_t1, Tensor<T>& d_t2, exachem::cholesky_2e::V2Tensors<T>& d_v2,
+  std::vector<T>& k_evl_sorted, T hf_ccsd_energy, bool is_restricted,
+  LRUCache<Index, std::vector<T>>& cache_s1t, LRUCache<Index, std::vector<T>>& cache_s1v,
+  LRUCache<Index, std::vector<T>>& cache_d1t, LRUCache<Index, std::vector<T>>& cache_d1v,
+  LRUCache<Index, std::vector<T>>& cache_d2t, LRUCache<Index, std::vector<T>>& cache_d2v,
+  bool seq_h3b = false, bool tilesize_opt = true) {
   //
   auto rank     = ec.pg().rank().value();
   bool nodezero = rank == 0;

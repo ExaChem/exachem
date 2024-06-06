@@ -1,3 +1,11 @@
+/*
+ * ExaChem: Open Source Exascale Computational Chemistry Software.
+ *
+ * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ *
+ * See LICENSE.txt for details
+ */
+
 #pragma once
 
 #include "common/chemenv.hpp"
@@ -400,8 +408,8 @@ public:
     int                       zbatches = npoints[2] % batch_size == 0 ? npoints[2] / batch_size
                                                                       : npoints[2] / batch_size + 1;
 
-    const double dV = spacing[0] * spacing[1] * spacing[2];
-    double       rho_int{0.0};
+    // const double dV = spacing[0] * spacing[1] * spacing[2];
+    // double       rho_int{0.0};
 
     Eigen::VectorXi lmax_at(natoms);
     Eigen::VectorXd minalpha_at(natoms);

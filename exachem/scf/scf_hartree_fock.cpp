@@ -1,3 +1,11 @@
+/*
+ * ExaChem: Open Source Exascale Computational Chemistry Software.
+ *
+ * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ *
+ * See LICENSE.txt for details
+ */
+
 #include "scf_hartree_fock.hpp"
 #include "common/cutils.hpp"
 #include "common/ec_dplot.hpp"
@@ -570,10 +578,13 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
       Matrix S(chem_env.sys_data.nbf_orig, chem_env.sys_data.nbf_orig);
       tamm_to_eigen_tensor(ttensors.S1, S);
       if(chem_env.sys_data.is_restricted)
-        cout << "debug #electrons       = " << (etensors.D_alpha * S).trace() << endl;
+        cout << "debug #electrons       = " << (int) std::ceil((etensors.D_alpha * S).trace())
+             << endl;
       if(chem_env.sys_data.is_unrestricted) {
-        cout << "debug #alpha electrons = " << (etensors.D_alpha * S).trace() << endl;
-        cout << "debug #beta  electrons = " << (etensors.D_beta * S).trace() << endl;
+        cout << "debug #alpha electrons = " << (int) std::ceil((etensors.D_alpha * S).trace())
+             << endl;
+        cout << "debug #beta  electrons = " << (int) std::ceil((etensors.D_beta * S).trace())
+             << endl;
       }
     }
     if(rank == 0 && !no_scf) {
@@ -1067,6 +1078,13 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   if(chem_env.sys_data.is_unrestricted)
     scf_output.rw_mat_disk<TensorType>(C_beta_tamm, movecsfile_beta,
                                        chem_env.ioptions.scf_options.debug, true);
+
+  if(rank == 0 && chem_env.ioptions.scf_options.molden) {
+    Matrix C_a = tamm_to_eigen_matrix(C_alpha_tamm);
+    if(chem_env.sys_data.is_unrestricted)
+      std::cout << "[MOLDEN] molden write for UHF unsupported!" << std::endl;
+    else ec_molden.write_molden(chem_env, C_a, etensors.eps_a, files_prefix);
+  }
 
   exc.pg().barrier();
 

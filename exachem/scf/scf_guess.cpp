@@ -657,9 +657,9 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
                          desc_Xa[3], 1., Xa_tamm_lptr, 1, 1, desc_Xa, TMP1_sca.data(), 1, 1,
                          TMP1_sca.desc(), 0., Fp_sca.data(), 1, 1, Fp_sca.desc());
       // Solve EVP
-      std::vector<TensorType> eps_a(Northo);
+      etensors.eps_a.resize(Northo, 0.0);
       // scalapackpp::hereigd( scalapackpp::Job::Vec, scalapackpp::Uplo::Lower,
-      //                       Fp_sca, eps_a.data(), Ca_sca );
+      //                       Fp_sca, etensors.eps_a.data(), Ca_sca );
 
 #if defined(TAMM_USE_ELPA)
       elpa_t handle;
@@ -700,7 +700,7 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
 
       // elpa_set(handle, "debug", 1, &error);
       // if (rank == 0 ) std::cout << " Calling ELPA " << std::endl;
-      elpa_eigenvectors(handle, Fp_sca.data(), eps_a.data(), Ca_sca.data(), &error);
+      elpa_eigenvectors(handle, Fp_sca.data(), etensors.eps_a.data(), Ca_sca.data(), &error);
       if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA Eigendecompoistion failed");
 
       // Clean-up
@@ -710,8 +710,8 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
 
 #else
       /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, Fp_sca.m(),
-                                   Fp_sca.data(), 1, 1, Fp_sca.desc(), eps_a.data(), Ca_sca.data(),
-                                   1, 1, Ca_sca.desc());
+                                   Fp_sca.data(), 1, 1, Fp_sca.desc(), etensors.eps_a.data(),
+                                   Ca_sca.data(), 1, 1, Ca_sca.desc());
 #endif
 
       // Backtransform TMP = X * Ca -> TMP**T = Ca**T * X
@@ -721,7 +721,8 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
                          Ca_sca.m(), 1., Ca_sca.data(), 1, 1, Ca_sca.desc(), Xa_tamm_lptr, 1, 1,
                          desc_Xa, 0., Ca_tamm_lptr, 1, 1, desc_Xa);
 
-      if(!scf_vars.lshift_reset) hl_gap = eps_a[nelectrons_alpha] - eps_a[nelectrons_alpha - 1];
+      if(!scf_vars.lshift_reset)
+        hl_gap = etensors.eps_a[nelectrons_alpha] - etensors.eps_a[nelectrons_alpha - 1];
 
       // Gather results
       // if(scalapack_info.pg.rank() == 0) C_alpha.resize(N, Northo);
@@ -749,9 +750,9 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
                            1, 1, TMP1_sca.desc(), 0., Fp_sca.data(), 1, 1, Fp_sca.desc());
 
         // Solve EVP
-        std::vector<double> eps_b(Northo);
+        etensors.eps_b.resize(Northo, 0.0);
         // scalapackpp::hereigd( scalapackpp::Job::Vec, scalapackpp::Uplo::Lower,
-        //                       Fp_sca, eps_b.data(), Ca_sca );
+        //                       Fp_sca, etensors.eps_b.data(), Ca_sca );
 #if defined(TAMM_USE_ELPA)
         elpa_t handle;
         int    error;
@@ -789,7 +790,7 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
 #endif
         // elpa_set(handle, "debug", 1, &error);
         // if (rank == 0 ) std::cout << " Calling ELPA " << std::endl;
-        elpa_eigenvectors(handle, Fp_sca.data(), eps_b.data(), Ca_sca.data(), &error);
+        elpa_eigenvectors(handle, Fp_sca.data(), etensors.eps_b.data(), Ca_sca.data(), &error);
         if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA Eigendecompoistion failed");
 
         // Clean-up
@@ -799,7 +800,7 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
 
 #else
         /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, Fp_sca.m(),
-                                     Fp_sca.data(), 1, 1, Fp_sca.desc(), eps_b.data(),
+                                     Fp_sca.data(), 1, 1, Fp_sca.desc(), etensors.eps_b.data(),
                                      Ca_sca.data(), 1, 1, Ca_sca.desc());
 #endif
         // Backtransform TMP = X * Cb -> TMP**T = Cb**T * X
@@ -814,7 +815,8 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
         // TMP2_sca.gather_from(Northo, N, C_beta.data(), Northo, 0, 0);
 
         if(!scf_vars.lshift_reset)
-          hl_gap = std::min(hl_gap, eps_b[nelectrons_beta] - eps_b[nelectrons_beta - 1]);
+          hl_gap =
+            std::min(hl_gap, etensors.eps_b[nelectrons_beta] - etensors.eps_b[nelectrons_beta - 1]);
       }
     } // rank participates in ScaLAPACK call
   }
@@ -833,17 +835,18 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
     Matrix Fp = tamm_to_eigen_matrix(ttensors.F_alpha);
     X_a       = tamm_to_eigen_matrix(ttensors.X_alpha);
     C_alpha.resize(N, Northo_a);
-    std::vector<double> eps_a(Northo_a);
+    etensors.eps_a.resize(Northo_a, 0.0);
 
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans, N, Northo_a, N, 1.,
                Fp.data(), N, X_a.data(), Northo_a, 0., C_alpha.data(), N);
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, Northo_a, Northo_a, N,
                1., X_a.data(), Northo_a, C_alpha.data(), N, 0., Fp.data(), Northo_a);
     lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, Northo_a, Fp.data(), Northo_a,
-                  eps_a.data());
+                  etensors.eps_a.data());
     blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, Northo_a, N, Northo_a,
                1., Fp.data(), Northo_a, X_a.data(), Northo_a, 0., C_alpha.data(), Northo_a);
-    if(!scf_vars.lshift_reset) hl_gap = eps_a[nelectrons_alpha] - eps_a[nelectrons_alpha - 1];
+    if(!scf_vars.lshift_reset)
+      hl_gap = etensors.eps_a[nelectrons_alpha] - etensors.eps_a[nelectrons_alpha - 1];
   }
 
   if(is_uhf) {
@@ -852,20 +855,21 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
       // beta
       Matrix Fp = tamm_to_eigen_matrix(ttensors.F_beta);
       C_beta.resize(N, Northo_b);
-      std::vector<double> eps_b(Northo_b);
-      Matrix&             X_b = X_a;
+      etensors.eps_b.resize(Northo_b, 0.0);
+      Matrix& X_b = X_a;
 
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans, N, Northo_b, N, 1.,
                  Fp.data(), N, X_b.data(), Northo_b, 0., C_beta.data(), N);
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, Northo_b, Northo_b,
                  N, 1., X_b.data(), Northo_b, C_beta.data(), N, 0., Fp.data(), Northo_b);
       lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, Northo_b, Fp.data(), Northo_b,
-                    eps_b.data());
+                    etensors.eps_b.data());
       blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, Northo_b, N, Northo_b,
                  1., Fp.data(), Northo_b, X_b.data(), Northo_b, 0., C_beta.data(), Northo_b);
 
       if(!scf_vars.lshift_reset)
-        hl_gap = std::min(hl_gap, eps_b[nelectrons_beta] - eps_b[nelectrons_beta - 1]);
+        hl_gap =
+          std::min(hl_gap, etensors.eps_b[nelectrons_beta] - etensors.eps_b[nelectrons_beta - 1]);
     }
   }
 #endif

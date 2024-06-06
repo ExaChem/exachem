@@ -1,3 +1,11 @@
+/*
+ * ExaChem: Open Source Exascale Computational Chemistry Software.
+ *
+ * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ *
+ * See LICENSE.txt for details
+ */
+
 #if defined(USE_GAUXC)
 #include <gauxc/molecular_weights.hpp>
 #include <gauxc/molgrid/defaults.hpp>

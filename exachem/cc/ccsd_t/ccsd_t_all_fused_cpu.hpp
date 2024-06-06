@@ -21,7 +21,7 @@ template<typename T>
 void total_fused_ccsd_t_cpu(
   bool is_restricted, const Index noab, const Index nvab, int64_t rank, std::vector<int>& k_spin,
   std::vector<size_t>& k_range, std::vector<size_t>& k_offset, Tensor<T>& d_t1, Tensor<T>& d_t2,
-  V2Tensors<T>& d_v2, std::vector<T>& k_evl_sorted,
+  exachem::cholesky_2e::V2Tensors<T>& d_v2, std::vector<T>& k_evl_sorted,
   //
   T* df_host_pinned_s1_t1, T* df_host_pinned_s1_v2, T* df_host_pinned_d1_t2,
   T* df_host_pinned_d1_v2, T* df_host_pinned_d2_t2, T* df_host_pinned_d2_v2, T* host_energies,

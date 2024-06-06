@@ -1,3 +1,11 @@
+/*
+ * ExaChem: Open Source Exascale Computational Chemistry Software.
+ *
+ * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ *
+ * See LICENSE.txt for details
+ */
+
 #include "scf_compute.hpp"
 
 void exachem::scf::SCFCompute::compute_shellpair_list(const ExecutionContext&  ec,

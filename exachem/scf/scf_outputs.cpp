@@ -1,3 +1,11 @@
+/*
+ * ExaChem: Open Source Exascale Computational Chemistry Software.
+ *
+ * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ *
+ * See LICENSE.txt for details
+ */
+
 #include "scf_outputs.hpp"
 #include "common/options/parser_utils.hpp"
 #include "scf_matrix.hpp"
@@ -54,7 +62,7 @@ void exachem::scf::SCFIO::print_energies(ExecutionContext& ec, ChemEnv& chem_env
   }
 
   if(ec.pg().rank() == 0) {
-    std::cout << "#electrons        = " << nelectrons << endl;
+    std::cout << "#electrons        = " << (int) std::ceil(nelectrons) << endl;
     std::cout << "1e energy kinetic = " << std::setprecision(16) << kinetic_1e << endl;
     std::cout << "1e energy N-e     = " << NE_1e << endl;
     std::cout << "1e energy         = " << energy_1e << endl;

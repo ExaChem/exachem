@@ -52,7 +52,7 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = cd_svd::setupMOIS(chem_env);
+  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(chem_env);
 
   const bool is_rhf = sys_data.is_restricted;
 
@@ -73,8 +73,8 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd::cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
-                             shell_tile_map, ccsd_restart, cholfile);
+    cholesky_2e::cholesky_2e_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO,
+                                       shells, shell_tile_map, ccsd_restart, cholfile);
 
   // if(ccsd_options.writev) ccsd_options.writet = true;
 
@@ -198,9 +198,9 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
     free_vec_tensors(d_r1s, d_r2s, d_t1s, d_t2s);
   }
 
-  V2Tensors<T> v2tensors;
+  cholesky_2e::V2Tensors<T> v2tensors;
   if(computeTData && !v2tensors.exist_on_disk(files_prefix)) {
-    v2tensors = setupV2Tensors<T>(ec, cholVpr, ex_hw);
+    v2tensors = cholesky_2e::setupV2Tensors<T>(ec, cholVpr, ex_hw);
     if(ccsd_options.writet) { v2tensors.write_to_disk(files_prefix); }
   }
   else {

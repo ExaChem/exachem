@@ -8,6 +8,7 @@
 
 #include "ec_molden.hpp"
 #include "txt_utils.hpp"
+#include <libint2/lcao/molden.h>
 
 bool ECMolden::check_molden(std::string moldenfile) {
   molden_exists = !moldenfile.empty();
@@ -17,6 +18,37 @@ bool ECMolden::check_molden(std::string moldenfile) {
       tamm_terminate("ERROR: moldenfile provided: " + moldenfile + " does not exist");
   }
   return molden_file_valid;
+}
+
+void ECMolden::write_molden(ChemEnv& chem_env, Matrix& C_a, std::vector<double>& eps_a_vec,
+                            std::string files_prefix) {
+  Eigen::VectorXd occs(C_a.cols());
+  occs.setZero();
+  const auto ndocc = chem_env.sys_data.nelectrons / 2;
+  for(int i = 0; i < ndocc; i++) occs[i] = 2.0;
+
+  std::vector<libint2::Shell> mshells_(chem_env.shells.size());
+  for(size_t i = 0; i < mshells_.size(); i++) {
+    mshells_[i] = chem_env.shells[i];
+    for(auto& contr: mshells_[i].contr) {
+      if(contr.l <= 1) contr.pure = false;
+    }
+  }
+
+  libint2::BasisSet mshells(mshells_);
+
+  Matrix eps_a(eps_a_vec.size(), 1);
+  for(Eigen::Index i = 0; i < eps_a.rows(); i++) eps_a(i, 0) = eps_a_vec[i];
+
+  std::vector<std::string> symmetry_labels;
+  std::vector<bool>        spincases;
+  double                   b2a                 = libint2::constants::codata_2018::bohr_to_angstrom;
+  double                   coefficient_epsilon = 0.0;
+
+  libint2::molden::Export molden_export(chem_env.atoms, mshells, C_a, occs, eps_a, symmetry_labels,
+                                        spincases, b2a, coefficient_epsilon);
+  std::ofstream           molden_file(files_prefix + ".molden");
+  molden_export.write(molden_file);
 }
 
 std::string ECMolden::read_option(std::string line) {

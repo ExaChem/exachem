@@ -145,14 +145,15 @@ struct EOM_X2Tensors {
 template<typename T>
 void eomccsd_x1(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const Tensor<T>& t1,
                 const Tensor<T>& t2, const Tensor<T>& x1, const Tensor<T>& x2, const Tensor<T>& f1,
-                V2Tensors<T>& v2tensors, EOM_X1Tensors<T>& x1tensors);
+                exachem::cholesky_2e::V2Tensors<T>& v2tensors, EOM_X1Tensors<T>& x1tensors);
 
 template<typename T>
 void eomccsd_x2(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const Tensor<T>& t1,
                 const Tensor<T>& t2, const Tensor<T>& x1, const Tensor<T>& x2, const Tensor<T>& f1,
-                V2Tensors<T>& v2tensors, EOM_X2Tensors<T>& x2tensors);
+                exachem::cholesky_2e::V2Tensors<T>& v2tensors, EOM_X2Tensors<T>& x2tensors);
 
 template<typename T>
 void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
-                          Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1, V2Tensors<T>& v2tensors,
-                          std::vector<T> p_evl_sorted);
+                          Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1,
+                          exachem::cholesky_2e::V2Tensors<T>& v2tensors,
+                          std::vector<T>                      p_evl_sorted);

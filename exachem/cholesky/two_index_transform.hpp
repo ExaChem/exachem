@@ -11,8 +11,9 @@
 #include "scf/scf_outputs.hpp"
 #include "tamm/eigen_utils.hpp"
 using namespace tamm;
+using TAMM_GA_SIZE = int64_t;
 
-namespace exachem::cd_svd {
+namespace exachem::cholesky_2e {
 
 template<typename TensorType>
 void print_mo_vectors_analysis(ChemEnv& chem_env, Matrix& C_alpha_eig, Matrix& C_beta_eig,
@@ -266,4 +267,4 @@ void two_index_transform(ChemEnv& chem_env, ExecutionContext& ec, Tensor<TensorT
   if(pcore >= 0 && is_rhf)
     tamm_terminate("[RHF] pcore>=0 selected, fock and movecs written to disk");
 }
-} // namespace exachem::cd_svd
+} // namespace exachem::cholesky_2e

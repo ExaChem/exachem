@@ -101,10 +101,8 @@
     "maxiter": 500
   },
   "SCF": {
-    "tol_int": 1e-20,
-    "tol_lindep": 1e-05,
-    "conve": 1e-10,
-    "convd": 1e-08,
+    "conve": 1e-8,
+    "convd": 1e-7,
     "diis_hist": 10,
     "charge": 0,
     "multiplicity": 3,

@@ -10,6 +10,7 @@
 
 #include "cc/ccsd/cd_ccsd_os_ann.hpp"
 #include "scf/scf_main.hpp"
+
 using namespace tamm;
 
 namespace exachem::cc::ccsd_lambda {
@@ -239,21 +240,21 @@ struct Y2Tensors {
 template<typename T>
 void lambda_ccsd_y1(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
                     Tensor<T>& i0, const Tensor<T>& t1, const Tensor<T>& t2, const Tensor<T>& y1,
-                    const Tensor<T>& y2, const Tensor<T>& f1, V2Tensors<T>& v2tensors,
+                    const Tensor<T>& y2, const Tensor<T>& f1, cholesky_2e::V2Tensors<T>& v2tensors,
                     Tensor<T>& cv3d, Y1Tensors<T>& y1tensors);
 
 template<typename T>
 void lambda_ccsd_y2(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
                     Tensor<T>& i0, const Tensor<T>& t1, Tensor<T>& t2, const Tensor<T>& y1,
-                    Tensor<T>& y2, const Tensor<T>& f1, V2Tensors<T>& v2tensors, Tensor<T>& cv3d,
-                    Y2Tensors<T>& y2tensors);
+                    Tensor<T>& y2, const Tensor<T>& f1, cholesky_2e::V2Tensors<T>& v2tensors,
+                    Tensor<T>& cv3d, Y2Tensors<T>& y2tensors);
 
 template<typename T>
 std::tuple<double, double>
 lambda_ccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                    const TiledIndexSpace& CI, Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_f1,
-                   V2Tensors<T>& v2tensors, Tensor<T>& cv3d, Tensor<T>& d_r1, Tensor<T>& d_r2,
-                   Tensor<T>& d_y1, Tensor<T>& d_y2, std::vector<Tensor<T>>& d_r1s,
+                   cholesky_2e::V2Tensors<T>& v2tensors, Tensor<T>& cv3d, Tensor<T>& d_r1,
+                   Tensor<T>& d_r2, Tensor<T>& d_y1, Tensor<T>& d_y2, std::vector<Tensor<T>>& d_r1s,
                    std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_y1s,
                    std::vector<Tensor<T>>& d_y2s, std::vector<T>& p_evl_sorted);
 } // namespace exachem::cc::ccsd_lambda

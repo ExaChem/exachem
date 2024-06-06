@@ -36,6 +36,9 @@ public:
 
   bool check_molden(std::string moldenfile);
 
+  void write_molden(ChemEnv& chem_env, Matrix& C_a, std::vector<double>& eps_a,
+                    std::string files_prefix);
+
   // TODO: is this needed? - currently does not make a difference
   libint2::BasisSet read_basis_molden(const ChemEnv& chem_env);
 

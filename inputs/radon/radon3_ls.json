@@ -67,7 +67,6 @@
     "tilesize": 30,
     "restart": false,
     "diis_hist": 10,
-    "tol_int": 1e-16,
     "tol_lindep": 1e-06,    
     "conve": 1e-8,
     "convd": 1e-7,    

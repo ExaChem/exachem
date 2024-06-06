@@ -1,3 +1,11 @@
+/*
+ * ExaChem: Open Source Exascale Computational Chemistry Software.
+ *
+ * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ *
+ * See LICENSE.txt for details
+ */
+
 #include "parse_scf_options.hpp"
 
 ParseSCFOptions::ParseSCFOptions(ChemEnv& chem_env) {
@@ -14,7 +22,7 @@ void ParseSCFOptions::parse_check(json& jinput) {
   // clang-format off
   const std::vector<std::string> valid_scf{"charge", "multiplicity", "lshift", "tol_int", "tol_sch",
     "tol_lindep", "conve", "convd", "diis_hist","force_tilesize","tilesize","df_tilesize",
-    "damp","writem","nnodes","restart","noscf","moldenfile", "guess",
+    "damp","writem","nnodes","restart","noscf", "molden", "moldenfile", "guess",
     "debug","scf_type", "n_lindep","restart_size","scalapack_nb",
     "scalapack_np_row", "scalapack_np_col", "ext_data_path", "PRINT",
     "qed_omegas", "qed_lambdas", "qed_volumes", "qed_polvecs",
@@ -58,9 +66,10 @@ void ParseSCFOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(scf_options.restart, jscf, "restart");
   parse_option<bool>(scf_options.noscf, jscf, "noscf");
   parse_option<bool>(scf_options.debug, jscf, "debug");
-  parse_option<std::string>(scf_options.moldenfile, jscf, "moldenfile");
   parse_option<std::string>(scf_options.scf_type, jscf, "scf_type");
   parse_option<bool>(scf_options.direct_df, jscf, "direct_df");
+  parse_option<bool>(scf_options.molden, jscf, "molden");
+  parse_option<std::string>(scf_options.moldenfile, jscf, "moldenfile");
 
   json jdft = jscf["DFT"];
   parse_option<bool>(scf_options.snK, jdft, "snK");

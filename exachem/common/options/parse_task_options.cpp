@@ -1,3 +1,11 @@
+/*
+ * ExaChem: Open Source Exascale Computational Chemistry Software.
+ *
+ * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ *
+ * See LICENSE.txt for details
+ */
+
 #include "parse_task_options.hpp"
 
 ParseTaskOptions::ParseTaskOptions(ChemEnv& chem_env) {
@@ -7,9 +15,9 @@ ParseTaskOptions::ParseTaskOptions(ChemEnv& chem_env) {
 
 void ParseTaskOptions::parse_check(json& jinput) {
   const std::vector<string> valid_tasks{
-    "sinfo",  "scf",         "fci",          "fcidump",   "mp2",        "gw",      "cd_2e",
-    "cc2",    "dlpno_ccsd",  "dlpno_ccsd_t", "ducc",      "ccsd",       "ccsd_sf", "ccsd_t",
-    "gfccsd", "ccsd_lambda", "eom_ccsd",     "rteom_cc2", "rteom_ccsd", "comments"};
+    "sinfo", "scf",        "fci",          "fcidump",  "mp2",       "gw",         "cd_2e",
+    "cc2",   "dlpno_ccsd", "dlpno_ccsd_t", "ducc",     "ccsd",      "ccsd_sf",    "ccsd_t",
+    "ccsdt", "gfccsd",     "ccsd_lambda",  "eom_ccsd", "rteom_cc2", "rteom_ccsd", "comments"};
 
   for(auto& el: jinput["TASK"].items()) {
     if(std::find(valid_tasks.begin(), valid_tasks.end(), el.key()) == valid_tasks.end())
@@ -35,6 +43,7 @@ void ParseTaskOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(task_options.ccsd, jtask, "ccsd");
   parse_option<bool>(task_options.ccsd_sf, jtask, "ccsd_sf");
   parse_option<bool>(task_options.ccsd_t, jtask, "ccsd_t");
+  parse_option<bool>(task_options.ccsdt,  jtask, "ccsdt");
   parse_option<bool>(task_options.ccsd_lambda, jtask, "ccsd_lambda");
   parse_option<bool>(task_options.eom_ccsd, jtask, "eom_ccsd");
   parse_option<bool>(task_options.rteom_cc2, jtask, "rteom_cc2");

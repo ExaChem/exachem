@@ -6,17 +6,16 @@
  * See LICENSE.txt for details
  */
 
-#include "cc/ccsd/ccsd_util.hpp"
-#include "common/termcolor.hpp"
-#include "scf/scf_main.hpp"
+//  #include "cc/ccsd/ccsd_util.hpp"
+
+#include "cd_mp2.hpp"
 #include <filesystem>
-namespace fs = std::filesystem;
 
 namespace exachem::mp2 {
 
 void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env) {
-  using T = double;
-  using namespace termcolor;
+  namespace fs = std::filesystem;
+  using T      = double;
 
   auto rank = ec.pg().rank();
 
@@ -35,9 +34,10 @@ void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env) {
   if(rank == 0) ccsd_options.print();
 
   if(rank == 0)
-    cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
+    std::cout << std::endl
+              << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << std::endl;
 
-  auto [MO, total_orbitals] = cd_svd::setupMOIS(chem_env);
+  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(chem_env);
 
   const bool is_rhf = sys_data.is_restricted;
 
@@ -55,8 +55,8 @@ void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // deallocates F_AO, C_AO
   auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cd_svd::cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO, shells,
-                             shell_tile_map, mp2_restart, cholfile);
+    cholesky_2e::cholesky_2e_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO,
+                                       shells, shell_tile_map, mp2_restart, cholfile);
   free_tensors(lcao);
 
   if(mp2_restart) {
@@ -73,7 +73,7 @@ void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env) {
 
     if(rank == 0) {
       std::ofstream out(cholfile, std::ios::out);
-      if(!out) cerr << "Error opening file " << cholfile << endl;
+      if(!out) cerr << "Error opening file " << cholfile << std::endl;
       out << chol_count << std::endl;
       out.close();
     }
@@ -216,12 +216,13 @@ void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env) {
     std::chrono::duration_cast<std::chrono::duration<double>>((mp_t2 - mp_t1)).count();
 
   if(rank == 0) {
-    if(is_rhf) cout << "Closed-Shell ";
-    else cout << "Open-Shell ";
-    cout << "MP2 energy / hartree: " << std::fixed << std::setprecision(15) << mp2_energy << endl;
-    cout << "Time to compute MP2 energy: " << std::fixed << std::setprecision(2) << mp2_time
-         << " secs" << endl
-         << endl;
+    if(is_rhf) std::cout << "Closed-Shell ";
+    else std::cout << "Open-Shell ";
+    std::cout << "MP2 energy / hartree: " << std::fixed << std::setprecision(15) << mp2_energy
+              << std::endl;
+    std::cout << "Time to compute MP2 energy: " << std::fixed << std::setprecision(2) << mp2_time
+              << " secs" << std::endl
+              << std::endl;
   }
 
   sch.deallocate(dtmp, v2ijab).execute();

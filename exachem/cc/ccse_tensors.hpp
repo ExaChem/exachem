@@ -8,9 +8,10 @@
 
 #pragma once
 
-#include "cd_svd/cd_svd.hpp"
-#include "cd_svd/two_index_transform.hpp"
-
+// clang-format off
+#include "cholesky/two_index_transform.hpp"
+#include "cholesky/cholesky_2e.hpp"
+// clang-format on
 using namespace tamm;
 
 /**

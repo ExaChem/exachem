@@ -1,3 +1,11 @@
+/*
+ * ExaChem: Open Source Exascale Computational Chemistry Software.
+ *
+ * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ *
+ * See LICENSE.txt for details
+ */
+
 #pragma once
 
 #include "common/ecatom.hpp"
@@ -48,11 +56,12 @@ public:
   bool     force_tilesize{false};
   bool     direct_df{false};
   bool     snK{false};
-  int restart_size{2000}; // read/write orthogonalizer, schwarz, etc matrices when N>=restart_size
-  int scalapack_nb{256};
-  int nnodes{1};
-  int scalapack_np_row{0};
-  int scalapack_np_col{0};
+  int  restart_size{2000}; // read/write orthogonalizer, schwarz, etc matrices when N>=restart_size
+  int  scalapack_nb{256};
+  int  nnodes{1};
+  int  scalapack_np_row{0};
+  int  scalapack_np_col{0};
+  bool molden{false};
   std::string         moldenfile{""};
   int                 n_lindep{0};
   int                 writem{1};
@@ -253,6 +262,7 @@ public:
   bool                         ccsd{false};
   bool                         ccsd_sf{false};
   bool                         ccsd_t{false};
+  bool                         ccsdt{false};
   bool                         ccsd_lambda{false};
   bool                         eom_ccsd{false};
   bool                         rteom_cc2{false};

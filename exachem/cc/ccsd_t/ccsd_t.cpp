@@ -10,6 +10,7 @@
 // clang-format off
 #include "cc/ccsd/cd_ccsd_os_ann.hpp"
 #include "cc/ccsd_t/ccsd_t_fused_driver.hpp"
+#include "cholesky/cholesky_2e_driver.hpp"
 // clang-format on
 
 double ccsdt_s1_t1_GetTime  = 0;
@@ -92,7 +93,7 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = cd_svd::setupMOIS(chem_env);
+  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(chem_env);
 
   std::string out_fp       = chem_env.workspace_dir;
   std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
@@ -126,8 +127,9 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   if(!skip_ccsd) {
     // deallocates F_AO, C_AO
     std::tie(cholVpr, d_f1, lcao, chol_count, max_cvecs, CI) =
-      exachem::cd_svd::cd_svd_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO,
-                                        shells, shell_tile_map, ccsd_restart, cholfile);
+      exachem::cholesky_2e::cholesky_2e_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO,
+                                                  F_beta_AO, shells, shell_tile_map, ccsd_restart,
+                                                  cholfile);
     free_tensors(lcao);
 
     if(ccsd_options.writev) ccsd_options.writet = true;
@@ -282,14 +284,14 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
     ec.flush_and_sync();
   }
   else { // skip ccsd
-    cd_svd::update_sysdata(chem_env, MO);
+    cholesky_2e::update_sysdata(chem_env, MO);
     N    = MO("all");
     d_f1 = {{N, N}, {1, 1}};
     Tensor<T>::allocate(&ec, d_f1);
     if(rank == 0) sys_data.print();
   }
 
-  auto [MO1, total_orbitals1] = cd_svd::setupMOIS(chem_env, true);
+  auto [MO1, total_orbitals1] = cholesky_2e::setupMOIS(chem_env, true);
   TiledIndexSpace N1          = MO1("all");
   TiledIndexSpace O1          = MO1("occ");
   TiledIndexSpace V1          = MO1("virt");
@@ -298,10 +300,10 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   // Tensor<T> t_d_f1{{N1,N1},{1,1}};
   // Tensor<T> t_d_v2{{N1,N1,N1,N1}, {2,2}};
 
-  Tensor<T>    t_d_t1{{V1, O1}, {1, 1}};
-  Tensor<T>    t_d_t2{{V1, V1, O1, O1}, {2, 2}};
-  Tensor<T>    t_d_cv2{{N1, N1, CI}, {1, 1}};
-  V2Tensors<T> v2tensors({"ijab", "ijka", "iabc"});
+  Tensor<T>                 t_d_t1{{V1, O1}, {1, 1}};
+  Tensor<T>                 t_d_t2{{V1, V1, O1, O1}, {2, 2}};
+  Tensor<T>                 t_d_cv2{{N1, N1, CI}, {1, 1}};
+  cholesky_2e::V2Tensors<T> v2tensors({"ijab", "ijka", "iabc"});
 
   T            ccsd_t_mem{};
   const double gib   = (1024 * 1024 * 1024.0);
@@ -392,7 +394,7 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
     retile_tamm_tensor(cholVpr, t_d_cv2, "CholV2");
     free_tensors(cholVpr);
 
-    v2tensors = setupV2Tensors<T>(ec, t_d_cv2, ex_hw, v2tensors.get_blocks());
+    v2tensors = cholesky_2e::setupV2Tensors<T>(ec, t_d_cv2, ex_hw, v2tensors.get_blocks());
     if(ccsd_options.writev) {
       v2tensors.write_to_disk(files_prefix);
       v2tensors.deallocate();

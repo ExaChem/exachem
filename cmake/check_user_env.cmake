@@ -38,7 +38,7 @@ macro(check_compiler_version lang_arg comp_type comp_version)
     endif()
 endmacro()
 
-set(GA_RUNTIME_TAMM OPENIB MPI-PR MPI-TS MPI_2SIDED MPI_PROGRESS_RANK)
+set(GA_RUNTIME_TAMM MPI_RMA OPENIB MPI-PR MPI-TS MPI_2SIDED MPI_PROGRESS_RANK)
 if(DEFINED GA_RUNTIME)
     list(FIND GA_RUNTIME_TAMM ${GA_RUNTIME} _index)
     if(${_index} EQUAL -1)

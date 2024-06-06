@@ -23,6 +23,7 @@
 #include "exachem/common/chemenv.hpp"
 #include "exachem/common/options/parse_options.hpp"
 #include "scf/scf_main.hpp"
+#include "mp2/cd_mp2.hpp"
 // clang-format on
 using namespace exachem;
 
@@ -50,6 +51,31 @@ int main(int argc, char* argv[]) {
 
   if(argc < 2) tamm_terminate("Please provide an input file or folder!");
 
+  const auto       rank = ProcGroup::world_rank();
+  ProcGroup        pg   = ProcGroup::create_world_coll();
+  ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
+
+  if(rank == 0) {
+    std::cout << exachem_git_info() << std::endl;
+    std::cout << tamm_git_info() << std::endl;
+  }
+
+  std::ostringstream cur_date;
+  if(rank == 0) {
+    auto current_time   = std::chrono::system_clock::now();
+    auto current_time_t = std::chrono::system_clock::to_time_t(current_time);
+    auto cur_local_time = localtime(&current_time_t);
+    cur_date << std::put_time(cur_local_time, "%c");
+    cout << endl << "date: " << cur_date.str() << endl;
+    cout << "program: " << fs::canonical(argv[0]) << endl;
+    std::cout << "nnodes: " << ec.nnodes() << ", ";
+    std::cout << "nproc_per_node: " << ec.ppn() << ", ";
+    std::cout << "nproc_total: " << ec.nnodes() * ec.ppn() << ", ";
+    std::cout << "ngpus_per_node: " << ec.gpn() << ", ";
+    std::cout << "ngpus_total: " << ec.nnodes() * ec.gpn() << endl << endl;
+    ec.print_mem_info();
+  }
+
   auto                     input_fpath = std::string(argv[1]);
   std::vector<std::string> inputfiles;
 
@@ -66,22 +92,19 @@ int main(int argc, char* argv[]) {
 
   if(inputfiles.empty()) tamm_terminate("No input files provided");
 
-  const auto       rank = ProcGroup::world_rank();
-  ProcGroup        pg   = ProcGroup::create_world_coll();
-  ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
-
   for(auto ifile: inputfiles) {
     std::string   input_file = fs::canonical(ifile);
     std::ifstream testinput(input_file);
     if(!testinput) tamm_terminate("Input file provided [" + input_file + "] does not exist!");
 
-    auto current_time   = std::chrono::system_clock::now();
-    auto current_time_t = std::chrono::system_clock::to_time_t(current_time);
-    auto cur_local_time = localtime(&current_time_t);
-
     // read geometry from a json file
     ChemEnv chem_env;
     chem_env.input_file = input_file;
+
+    if(rank == 0) {
+      cout << endl << std::string(60, '-') << endl;
+      cout << endl << "Input file provided: " << input_file << endl << endl;
+    }
 
     // This call should update all input options and SystemData object
     std::unique_ptr<ECOptionParser> iparse = std::make_unique<ECOptionParser>(chem_env);
@@ -98,26 +121,10 @@ int main(int argc, char* argv[]) {
     chem_env.workspace_dir = chem_env.sys_data.output_file_prefix + "_files/";
 
     if(rank == 0) {
-      std::cout << exachem_git_info() << std::endl;
-      std::cout << tamm_git_info() << std::endl;
-    }
-
-    if(rank == 0) {
-      std::ostringstream cur_date;
-      cur_date << std::put_time(cur_local_time, "%c");
-      cout << endl << "date: " << cur_date.str() << endl;
-      cout << "program: " << fs::canonical(argv[0]) << endl;
-      cout << "input: " << input_file << endl;
-      std::cout << "nnodes: " << ec.nnodes() << ", ";
-      std::cout << "nproc_per_node: " << ec.ppn() << ", ";
-      std::cout << "nproc_total: " << ec.nnodes() * ec.ppn() << ", ";
-      std::cout << "ngpus_per_node: " << ec.gpn() << ", ";
-      std::cout << "ngpus_total: " << ec.nnodes() * ec.gpn() << std::endl;
-      cout << "prefix: " << chem_env.sys_data.output_file_prefix << endl << endl;
-      ec.print_mem_info();
-      cout << endl << endl;
-      cout << "Input file provided" << endl << std::string(20, '-') << endl;
       std::cout << chem_env.jinput.dump(2) << std::endl;
+      cout << endl
+           << "Output folder & files prefix: " << chem_env.sys_data.output_file_prefix << endl
+           << endl;
       chem_env.sys_data.results["output"]["machine_info"]["date"]           = cur_date.str();
       chem_env.sys_data.results["output"]["machine_info"]["nnodes"]         = ec.nnodes();
       chem_env.sys_data.results["output"]["machine_info"]["nproc_per_node"] = ec.ppn();
@@ -183,7 +190,7 @@ int main(int argc, char* argv[]) {
     else if(task.scf) scf::scf_driver(ec, chem_env);
 #if defined(EC_CC)
     else if(task.mp2) mp2::cd_mp2(ec, chem_env);
-    else if(task.cd_2e) cd::cd_2e_driver(ec, chem_env);
+    else if(task.cd_2e) cholesky_2e::cholesky_decomp_2e(ec, chem_env);
     else if(task.ccsd) cc::ccsd::cd_ccsd(ec, chem_env);
     else if(task.ccsd_t) cc::ccsd_t::ccsd_t_driver(ec, chem_env);
     else if(task.cc2) cc2::cd_cc2_driver(ec, chem_env);

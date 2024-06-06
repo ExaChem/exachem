@@ -32,7 +32,7 @@ echo ""
 
 export OMP_NUM_THREADS=1
 
-#QED-SCF
+#QED-CCSD
 $MPIEXEC $EXE_PATH $CHEM_INP/h2o_qed.json
 
 #CCSD

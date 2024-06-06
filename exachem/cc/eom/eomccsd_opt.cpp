@@ -14,7 +14,7 @@ using namespace exachem::scf;
 template<typename T>
 void eomccsd_x1(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const Tensor<T>& t1,
                 const Tensor<T>& t2, const Tensor<T>& x1, const Tensor<T>& x2, const Tensor<T>& f1,
-                V2Tensors<T>& v2tensors, EOM_X1Tensors<T>& x1tensors) {
+                exachem::cholesky_2e::V2Tensors<T>& v2tensors, EOM_X1Tensors<T>& x1tensors) {
   auto [h1, h3, h4, h5, h6, h8] = MO.labels<6>("occ");
   auto [p2, p3, p4, p5, p6, p7] = MO.labels<6>("virt");
 
@@ -72,7 +72,7 @@ void eomccsd_x1(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const 
 template<typename T>
 void eomccsd_x2(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const Tensor<T>& t1,
                 const Tensor<T>& t2, const Tensor<T>& x1, const Tensor<T>& x2, const Tensor<T>& f1,
-                V2Tensors<T>& v2tensors, EOM_X2Tensors<T>& x2tensors) {
+                exachem::cholesky_2e::V2Tensors<T>& v2tensors, EOM_X2Tensors<T>& x2tensors) {
   TiledIndexLabel h1, h2, h5, h6, h7, h8, h9, h10;
   TiledIndexLabel p3, p4, p5, p6, p7, p8, p9;
 
@@ -253,8 +253,9 @@ void eomccsd_x2(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const 
 
 template<typename T>
 void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
-                          Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1, V2Tensors<T>& v2tensors,
-                          std::vector<T> p_evl_sorted) {
+                          Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1,
+                          exachem::cholesky_2e::V2Tensors<T>& v2tensors,
+                          std::vector<T>                      p_evl_sorted) {
   SystemData&     sys_data    = chem_env.sys_data;
   const TAMM_SIZE n_occ_alpha = static_cast<TAMM_SIZE>(sys_data.n_occ_alpha);
   const TAMM_SIZE n_occ_beta  = static_cast<TAMM_SIZE>(sys_data.n_occ_beta);
@@ -774,5 +775,5 @@ void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIn
 using T = double;
 template void right_eomccsd_driver<T>(ChemEnv& chem_env, ExecutionContext& ec,
                                       const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
-                                      Tensor<T>& f1, V2Tensors<T>& v2tensors,
+                                      Tensor<T>& f1, exachem::cholesky_2e::V2Tensors<T>& v2tensors,
                                       std::vector<T> p_evl_sorted);

@@ -84,14 +84,12 @@
       "units": "angstrom"
     },
     "basis": {
-      "basisset": "cc-pvdz",
-      "gaussian_type": "spherical"
+      "basisset": "cc-pvdz"
     },
     "common": {
       "maxiter": 50
     },
     "SCF": {
-      "tol_int": 1e-16,
       "tol_lindep": 1e-6,
       "conve": 1e-10,
       "convd": 1e-09,

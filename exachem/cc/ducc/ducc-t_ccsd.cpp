@@ -7,6 +7,7 @@
  */
 
 #include "cc/ccsd/cd_ccsd_os_ann.hpp"
+#include "cholesky/v2tensors.hpp"
 #include <tamm/op_executor.hpp>
 
 using namespace tamm;
@@ -18,7 +19,7 @@ void H_0(Scheduler& sch, const TiledIndexSpace& MO,
             const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
             const Tensor<T>& vtijkl, const Tensor<T>& vtijka,
             const Tensor<T>& vtaijb, const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
-            const Tensor<T>& f1, V2Tensors<T>& v2tensors, size_t nactv, ExecutionHW ex_hw = ExecutionHW::CPU){
+            const Tensor<T>& f1, exachem::cholesky_2e::V2Tensors<T>&v2tensors, size_t nactv, ExecutionHW ex_hw = ExecutionHW::CPU){
 
   auto [i, j, k, l] = MO.labels<4>("occ");
   auto [a, b, c, d] = MO.labels<4>("virt_int");
@@ -147,7 +148,7 @@ void V_1(Scheduler& sch, const TiledIndexSpace& MO,
             const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
             const Tensor<T>& vtijkl, const Tensor<T>& vtijka,
             const Tensor<T>& vtaijb, const Tensor<T>& vtijab, const Tensor<T>& vtiabc,
-            const Tensor<T>& vtabcd, V2Tensors<T>& v2tensors,
+            const Tensor<T>& vtabcd, exachem::cholesky_2e::V2Tensors<T>& v2tensors,
             const Tensor<T>& t1, const Tensor<T>& t2, size_t nactv, ExecutionHW ex_hw = ExecutionHW::CPU){
 
   TiledIndexLabel a, b, c, d;
@@ -537,9 +538,11 @@ void ducc_tensors_io(ExecutionContext& ec, std::vector<Tensor<T>>& rwtensors,
 namespace exachem::cc::ducc {
 template<typename T>
 void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
-                        Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1, V2Tensors<T>& v2tensors,
-                        size_t nactv, ExecutionHW ex_hw = ExecutionHW::CPU) {
-  Scheduler sch{ec};
+                        Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1,
+                        cholesky_2e::V2Tensors<T>& v2tensors, size_t nactv,
+                        ExecutionHW ex_hw = ExecutionHW::CPU) {
+  Scheduler   sch{ec};
+  SystemData& sys_data = chem_env.sys_data;
 
   const TiledIndexSpace& O = MO("occ");
   // const TiledIndexSpace& V  = MO("virt");
@@ -559,7 +562,6 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
 
   std::cout.precision(15);
 
-  SystemData& sys_data     = chem_env.sys_data;
   std::string out_fp       = chem_env.workspace_dir;
   std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type + "/ducc";
   std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
@@ -890,6 +892,6 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
 using T = double;
 template void DUCC_T_CCSD_Driver<T>(ChemEnv& chem_env, ExecutionContext& ec,
                                     const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
-                                    Tensor<T>& f1, V2Tensors<T>& v2tensors, size_t nactv,
-                                    ExecutionHW ex_hw);
+                                    Tensor<T>& f1, cholesky_2e::V2Tensors<T>& v2tensors,
+                                    size_t nactv, ExecutionHW ex_hw);
 } // namespace exachem::cc::ducc

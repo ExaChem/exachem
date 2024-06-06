@@ -1,3 +1,11 @@
+/*
+ * ExaChem: Open Source Exascale Computational Chemistry Software.
+ *
+ * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ *
+ * See LICENSE.txt for details
+ */
+
 #pragma once
 
 #include "tamm/eigen_utils.hpp"
@@ -10,6 +18,7 @@ public:
   Matrix G_beta, D_beta; // allocated on all ranks for 4c HF, only D_beta on rank 0 otherwise.
   Matrix D_alpha_cart, D_beta_cart;
   Matrix VXC_alpha_cart, VXC_beta_cart;
+  std::vector<double>                   eps_a, eps_b;
   Eigen::Vector<double, Eigen::Dynamic> dfNorm; // Normalization coefficients for DF basis
   std::vector<Matrix>                   trafo_ctos, trafo_stoc;
   Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>

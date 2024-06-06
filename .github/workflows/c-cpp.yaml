@@ -57,14 +57,6 @@ jobs:
             cxx: g++
             cc: gcc
             fc: gfortran
-            backend: upcxx
-            use_cuda: cuda
-            use_scalapack: no-scalapack      
-          - os: [self-hosted, ubuntu22]
-            mpi_impl: mpich
-            cxx: g++
-            cc: gcc
-            fc: gfortran
             backend: ga
             use_cuda: no-cuda
             use_scalapack: scalapack
@@ -84,6 +76,14 @@ jobs:
             fc: gfortran
             backend: upcxx
             use_cuda: no-cuda
+            use_scalapack: no-scalapack
+          - os: [self-hosted, ubuntu22]
+            mpi_impl: mpich
+            cxx: g++
+            cc: gcc
+            fc: gfortran
+            backend: upcxx
+            use_cuda: cuda
             use_scalapack: no-scalapack
       fail-fast: true
 

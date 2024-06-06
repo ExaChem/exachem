@@ -219,7 +219,6 @@
     }
   },
   "SCF": {
-    "tol_int": 1e-16,
     "tol_lindep": 1e-06,
     "conve": 1e-5,
     "convd": 1e-4,
@@ -232,10 +231,6 @@
     "diagtol": 1e-5
   },
   "CC": {
-    "print": {
-      "tamplitudes": [false,0.05],
-      "ccsd_diagnostics" : false
-    },    
     "threshold": 1e-8,
     "ccsd_maxiter": 50,
     "writet": true,

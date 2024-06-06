@@ -32,7 +32,6 @@
     "maxiter": 100
   },
   "SCF": {
-    "tol_int": 1e-16,
     "tol_lindep": 1e-06,
     "conve": 1e-4,
     "convd": 1e-3,

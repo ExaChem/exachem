@@ -14,7 +14,7 @@ include_directories(${EXACHEM_SRC_DIR})
 include(${EXACHEM_SRC_DIR}/scf/scf.cmake)
 
 include(${EXACHEM_SRC_DIR}/mp2/mp2.cmake)
-include(${EXACHEM_SRC_DIR}/cc/cd.cmake)
+include(${EXACHEM_SRC_DIR}/cholesky/cholesky.cmake)
 include(${EXACHEM_SRC_DIR}/cc/cc2/cc2.cmake)
 include(${EXACHEM_SRC_DIR}/cc/eom/eom.cmake)
 include(${EXACHEM_SRC_DIR}/cc/ccsd/ccsd.cmake)

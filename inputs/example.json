@@ -83,6 +83,7 @@
         "scalapack_np_row": 0,
         "scalapack_np_col": 0,
         "n_lindep": 0,
+        "molden": false,
         "moldenfile": "",
         "guess": {
           "atom_options":{

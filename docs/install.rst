@@ -22,6 +22,9 @@ In addition to the TAMM `dependencies <https://tamm.readthedocs.io/en/latest/ins
 Build instructions for a quick start
 ------------------------------------
 
+.. note:: 
+   When using a specific git tag for TAMM and ExaChem, add -DCMSB_TAG=<tag-name> to the CMake configure lines listed in the steps below.
+
 Step 1
 
 ::

@@ -884,15 +884,25 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 #endif
       if(dplot_opt.orbitals > 0) {
         for(int iorb = chem_env.sys_data.nelectrons_alpha - 1;
-            iorb >= chem_env.sys_data.nelectrons_alpha - dplot_opt.orbitals; iorb--) {
-          if(iorb < 0) break;
+            iorb >= std::max(0, chem_env.sys_data.nelectrons_alpha - dplot_opt.orbitals); iorb--) {
+          EC_DPLOT::write_mocube(ec, chem_env, etensors.C_alpha, iorb, "alpha", files_prefix);
+        }
+        for(int iorb = chem_env.sys_data.nelectrons_alpha;
+            iorb < std::min(chem_env.sys_data.nbf,
+                            chem_env.sys_data.nelectrons_alpha + dplot_opt.orbitals);
+            iorb++) {
           EC_DPLOT::write_mocube(ec, chem_env, etensors.C_alpha, iorb, "alpha", files_prefix);
         }
         if(is_uhf) {
           for(int iorb = chem_env.sys_data.nelectrons_beta - 1;
-              iorb >= chem_env.sys_data.nelectrons_beta - dplot_opt.orbitals; iorb--) {
-            if(iorb < 0) break;
-            EC_DPLOT::write_mocube(ec, chem_env, etensors.C_alpha, iorb, "beta", files_prefix);
+              iorb >= std::max(0, chem_env.sys_data.nelectrons_beta - dplot_opt.orbitals); iorb--) {
+            EC_DPLOT::write_mocube(ec, chem_env, etensors.C_beta, iorb, "beta", files_prefix);
+          }
+          for(int iorb = chem_env.sys_data.nelectrons_beta - 1;
+              iorb < std::min(chem_env.sys_data.nbf,
+                              chem_env.sys_data.nelectrons_beta + dplot_opt.orbitals);
+              iorb++) {
+            EC_DPLOT::write_mocube(ec, chem_env, etensors.C_beta, iorb, "beta", files_prefix);
           }
         }
       }

@@ -113,10 +113,10 @@ public:
     std::vector<bool>   skipshells(nshells);
     std::vector<double> local_rho(batch_size * batch_size * batch_size);
 
-    constexpr double sqrt3  = std::sqrt(3.0);
-    constexpr double sqrt10 = std::sqrt(10.0);
-    constexpr double sqrt14 = std::sqrt(14.0);
-    constexpr double sqrt35 = std::sqrt(35.0);
+    double sqrt3  = std::sqrt(3.0);
+    double sqrt10 = std::sqrt(10.0);
+    double sqrt14 = std::sqrt(14.0);
+    double sqrt35 = std::sqrt(35.0);
 
     angular.row(0).setConstant(1.0);
     Pi.row(0).setConstant(1.0);                           // 0,0
@@ -304,10 +304,10 @@ public:
     std::vector<bool>   skipshells(nshells);
     std::vector<double> local_rho(batch_size * batch_size * batch_size);
 
-    constexpr double sqrt3  = std::sqrt(3.0);
-    constexpr double sqrt10 = std::sqrt(10.0);
-    constexpr double sqrt14 = std::sqrt(14.0);
-    constexpr double sqrt35 = std::sqrt(35.0);
+    double sqrt3  = std::sqrt(3.0);
+    double sqrt10 = std::sqrt(10.0);
+    double sqrt14 = std::sqrt(14.0);
+    double sqrt35 = std::sqrt(35.0);
 
     angular.row(0).setConstant(1.0);
     Pi.row(0).setConstant(1.0);                           // 0,0
@@ -393,14 +393,14 @@ private:
                           Eigen::ArrayXXd& radial, Eigen::ArrayXXd& rgrid, Eigen::ArrayXXd& rsq,
                           Eigen::MatrixXd& chi, Eigen::ArrayXXd& gridxyz, Eigen::ArrayXXd& Am,
                           Eigen::ArrayXXd& Bm, Eigen::ArrayXXd& Pi) {
-    constexpr double sqrt3   = std::sqrt(3.0);
-    constexpr double sqrt5   = std::sqrt(5.0);
-    constexpr double sqrt6   = std::sqrt(6.0);
-    constexpr double sqrt10  = std::sqrt(10.0);
-    constexpr double sqrt15  = std::sqrt(15.0);
-    constexpr double sqrt35  = std::sqrt(35.0);
-    constexpr double sqrt70  = std::sqrt(70.0);
-    constexpr double sqrt105 = std::sqrt(105.0);
+    double sqrt3   = std::sqrt(3.0);
+    double sqrt5   = std::sqrt(5.0);
+    double sqrt6   = std::sqrt(6.0);
+    double sqrt10  = std::sqrt(10.0);
+    double sqrt15  = std::sqrt(15.0);
+    double sqrt35  = std::sqrt(35.0);
+    double sqrt70  = std::sqrt(70.0);
+    double sqrt105 = std::sqrt(105.0);
 
     const int natoms     = atoms.size();
     auto      atom2shell = shells.atom2shell(atoms);

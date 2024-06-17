@@ -463,7 +463,7 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   // Given the singleton pool created by the TAMM is not used by the (T) kernel calculation.
   // We artifically destroy the pool
   tamm::reset_rmm_pool();
-  // tamm::reinitialize_rmm_pool();
+  tamm::reinitialize_rmm_pool();
 
   std::string dev_str = "[CPU]";
 #if defined(USE_CUDA)

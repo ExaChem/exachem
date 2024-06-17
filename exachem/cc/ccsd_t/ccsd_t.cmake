@@ -4,7 +4,6 @@ include(TargetMacros)
 set(CCSD_T_SRCDIR ${CMAKE_CURRENT_SOURCE_DIR}/../exachem/cc/ccsd_t)
 set(CCSD_T_COMMON_SRCS
     ${CCSD_T_SRCDIR}/ccsd_t.cpp    
-    ${CCSD_T_SRCDIR}/memory.cpp
     ${CCSD_T_SRCDIR}/ccsd_t_common.hpp
     ${CCSD_T_SRCDIR}/hybrid.cpp
     ${CCSD_T_SRCDIR}/ccsd_t_fused_driver.hpp

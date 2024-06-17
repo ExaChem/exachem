@@ -188,12 +188,13 @@ void ccsd_t_fully_fused_none_df_none_task(
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
   if(!gpuEventQuery(*done_compute)) { gpuEventSynchronize(*done_compute); }
 
-  T* dev_evl_sorted_h1b = static_cast<T*>(getGpuMem(sizeof(T) * base_size_h1b));
-  T* dev_evl_sorted_h2b = static_cast<T*>(getGpuMem(sizeof(T) * base_size_h2b));
-  T* dev_evl_sorted_h3b = static_cast<T*>(getGpuMem(sizeof(T) * base_size_h3b));
-  T* dev_evl_sorted_p4b = static_cast<T*>(getGpuMem(sizeof(T) * base_size_p4b));
-  T* dev_evl_sorted_p5b = static_cast<T*>(getGpuMem(sizeof(T) * base_size_p5b));
-  T* dev_evl_sorted_p6b = static_cast<T*>(getGpuMem(sizeof(T) * base_size_p6b));
+  auto& memDevPool         = RMMMemoryManager::getInstance().getDeviceMemoryPool();
+  T*    dev_evl_sorted_h1b = static_cast<T*>(memDevPool.allocate(sizeof(T) * base_size_h1b));
+  T*    dev_evl_sorted_h2b = static_cast<T*>(memDevPool.allocate(sizeof(T) * base_size_h2b));
+  T*    dev_evl_sorted_h3b = static_cast<T*>(memDevPool.allocate(sizeof(T) * base_size_h3b));
+  T*    dev_evl_sorted_p4b = static_cast<T*>(memDevPool.allocate(sizeof(T) * base_size_p4b));
+  T*    dev_evl_sorted_p5b = static_cast<T*>(memDevPool.allocate(sizeof(T) * base_size_p5b));
+  T*    dev_evl_sorted_p6b = static_cast<T*>(memDevPool.allocate(sizeof(T) * base_size_p6b));
 
   gpuMemcpyAsync<T>(dev_evl_sorted_h1b, host_evl_sorted_h1b, base_size_h1b, gpuMemcpyHostToDevice,
                     stream);
@@ -289,11 +290,11 @@ void ccsd_t_fully_fused_none_df_none_task(
     [&](sycl::handler& cgh) { cgh.host_task([=]() { hostEnergyReduce(reduceData); }); });
 #endif
 
-  freeGpuMem(dev_evl_sorted_h1b);
-  freeGpuMem(dev_evl_sorted_h2b);
-  freeGpuMem(dev_evl_sorted_h3b);
-  freeGpuMem(dev_evl_sorted_p4b);
-  freeGpuMem(dev_evl_sorted_p5b);
-  freeGpuMem(dev_evl_sorted_p6b);
+  memDevPool.deallocate(dev_evl_sorted_h1b, sizeof(T) * base_size_h1b);
+  memDevPool.deallocate(dev_evl_sorted_h2b, sizeof(T) * base_size_h2b);
+  memDevPool.deallocate(dev_evl_sorted_h3b, sizeof(T) * base_size_h3b);
+  memDevPool.deallocate(dev_evl_sorted_p4b, sizeof(T) * base_size_p4b);
+  memDevPool.deallocate(dev_evl_sorted_p5b, sizeof(T) * base_size_p5b);
+  memDevPool.deallocate(dev_evl_sorted_p6b, sizeof(T) * base_size_p6b);
 #endif
 }

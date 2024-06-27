@@ -2782,7 +2782,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #ifndef USE_DPCPP
     reduced_energy[blockIdx_x + gridDim.x] = final_energy_2;
 #else
-    reduced_energy[blockIdx_x + item.get_group_range(1)] = final_energy_2;
+    reduced_energy[blockIdx_x + static_cast<int>(item.get_group_range(1))] = final_energy_2;
 #endif
   }
 }

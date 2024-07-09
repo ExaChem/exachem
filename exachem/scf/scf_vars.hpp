@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "common/libint2_includes.hpp"
+#include "exachem/common/libint2_includes.hpp"
 #include "tamm/tamm.hpp"
 #include <libecpint.hpp>
 

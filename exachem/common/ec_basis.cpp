@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "ec_basis.hpp"
+#include "exachem/common/ec_basis.hpp"
 namespace fs = std::filesystem;
 
 void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vector<lib_atom>& atoms,

@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "initialize_system_data.hpp"
+#include "exachem/common/initialize_system_data.hpp"
 
 void IniSystemData::initialize(ChemEnv& chem_env) {
   chem_env.sys_data.results          = json::object();

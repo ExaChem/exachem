@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "common/ec_molden.hpp"
+#include "exachem/common/ec_molden.hpp"
 #include <string>
 
 using TensorType = double;

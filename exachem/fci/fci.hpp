@@ -9,7 +9,7 @@
 #pragma once
 
 #include "cholesky/cholesky_2e_driver.hpp"
-#include "common/fcidump.hpp"
+#include "exachem/common/fcidump.hpp"
 #if defined(USE_MACIS)
 #include "macis.hpp"
 #endif

@@ -7,13 +7,13 @@
  */
 
 #pragma once
-#include "common/ec_basis.hpp"
-#include "common/system_data.hpp"
-#include "ecatom.hpp"
+#include "exachem/common/ec_basis.hpp"
+#include "exachem/common/ecatom.hpp"
+#include "exachem/common/system_data.hpp"
 #include "options/input_options.hpp"
 // #include "libint2_includes.hpp"
+#include "exachem/common/txt_utils.hpp"
 #include "tamm/tamm.hpp"
-#include "txt_utils.hpp"
 #include <nlohmann/json.hpp>
 using json = nlohmann::ordered_json;
 

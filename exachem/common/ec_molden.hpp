@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include "atom_info.hpp"
-#include "chemenv.hpp"
-#include "libint2_includes.hpp"
+#include "exachem/common/atom_info.hpp"
+#include "exachem/common/chemenv.hpp"
+#include "exachem/common/libint2_includes.hpp"
 #include <iostream>
 
 class ECMolden {

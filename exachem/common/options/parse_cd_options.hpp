@@ -7,9 +7,9 @@
  */
 
 #pragma once
-#include "common/chemenv.hpp"
-#include "common/options/input_options.hpp"
-#include "common/options/parser_utils.hpp"
+#include "exachem/common/chemenv.hpp"
+#include "exachem/common/options/input_options.hpp"
+#include "exachem/common/options/parser_utils.hpp"
 
 class ParseCDOptions: public ParserUtils {
 private:

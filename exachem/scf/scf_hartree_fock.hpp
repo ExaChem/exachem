@@ -7,15 +7,15 @@
  */
 
 #pragma once
-#include "common/chemenv.hpp"
-#include "common/ec_basis.hpp"
-#include "common/ec_molden.hpp"
-#include "common/system_data.hpp"
-#include "scf_compute.hpp"
-#include "scf_iter.hpp"
-#include "scf_outputs.hpp"
-#include "scf_restart.hpp"
-#include "scf_taskmap.hpp"
+#include "exachem/common/chemenv.hpp"
+#include "exachem/common/ec_basis.hpp"
+#include "exachem/common/ec_molden.hpp"
+#include "exachem/common/system_data.hpp"
+#include "exachem/scf/scf_compute.hpp"
+#include "exachem/scf/scf_iter.hpp"
+#include "exachem/scf/scf_outputs.hpp"
+#include "exachem/scf/scf_restart.hpp"
+#include "exachem/scf/scf_taskmap.hpp"
 #include <variant>
 
 #define SCF_THROTTLE_RESOURCES 1

@@ -7,7 +7,7 @@
  */
 
 #pragma once
-#include "libint2_includes.hpp"
+#include "exachem/common/libint2_includes.hpp"
 class AtomInfo {
 public:
   size_t                      nbf;

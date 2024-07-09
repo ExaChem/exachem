@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "common/ecatom.hpp"
-#include "common/txt_utils.hpp"
+#include "exachem/common/ecatom.hpp"
+#include "exachem/common/txt_utils.hpp"
 #include <iostream>
 #include <limits>
 #include <map>

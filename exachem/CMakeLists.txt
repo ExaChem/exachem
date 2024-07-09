@@ -7,7 +7,7 @@ set(EXACHEM_LFLAGS )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-# include(${CMAKE_CURRENT_SOURCE_DIR}/scf/scf.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/scf/scf.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/common/common.cmake)
 # include(${CMAKE_CURRENT_SOURCE_DIR}/mp2/mp2.cmake)
 # include(${CMAKE_CURRENT_SOURCE_DIR}/cc/cd.cmake)

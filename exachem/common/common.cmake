@@ -6,10 +6,14 @@ set(COMMON_INCLUDES
     ${COMMON_SRCDIR}/cutils.hpp
     ${COMMON_SRCDIR}/ecatom.hpp
     ${COMMON_SRCDIR}/fcidump.hpp
-    ${COMMON_SRCDIR}/txt_utils.hpp    
+    ${COMMON_SRCDIR}/atom_info.hpp
+    ${COMMON_SRCDIR}/txt_utils.hpp
     ${COMMON_SRCDIR}/system_data.hpp
     ${COMMON_SRCDIR}/chemenv.hpp
     ${COMMON_SRCDIR}/ec_basis.hpp
+    ${COMMON_SRCDIR}/ec_dplot.hpp
+    ${COMMON_SRCDIR}/ec_molden.hpp
+    ${COMMON_SRCDIR}/libint2_includes.hpp
     ${COMMON_SRCDIR}/options/parse_options.hpp
     ${COMMON_SRCDIR}/options/parse_common_options.hpp
     ${COMMON_SRCDIR}/options/parse_scf_options.hpp
@@ -20,7 +24,6 @@ set(COMMON_INCLUDES
     ${COMMON_SRCDIR}/options/parse_task_options.hpp  
     ${COMMON_SRCDIR}/options/input_options.hpp    
     ${COMMON_SRCDIR}/initialize_system_data.hpp
-    ${COMMON_SRCDIR}/ec_molden.hpp 
 )
 
 set(COMMON_SRCS

@@ -6,7 +6,8 @@
  * See LICENSE.txt for details
  */
 
-#include "ecatom.hpp"
+#include "exachem/common/ecatom.hpp"
+
 int ECAtom::get_atomic_number(std::string element_symbol) {
   int Z = -1;
   for(const auto& e: libint2::chemistry::get_element_info()) {

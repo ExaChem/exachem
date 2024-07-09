@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "system_data.hpp"
+#include "exachem/common/system_data.hpp"
 
 void SystemData::print() {
   std::cout << "scf_type = " << scf_type_string << std::endl;

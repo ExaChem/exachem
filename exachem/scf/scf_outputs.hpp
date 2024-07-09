@@ -8,15 +8,14 @@
 
 #pragma once
 
-#include "common/chemenv.hpp"
-#include "common/cutils.hpp"
-#include "common/ec_basis.hpp"
+#include "exachem/common/cutils.hpp"
+#include "exachem/common/ec_basis.hpp"
 
-#include "scf/scf_compute.hpp"
-#include "scf/scf_eigen_tensors.hpp"
-#include "scf/scf_matrix.hpp"
-#include "scf/scf_tamm_tensors.hpp"
-#include "scf/scf_vars.hpp"
+#include "exachem/scf/scf_compute.hpp"
+#include "exachem/scf/scf_eigen_tensors.hpp"
+#include "exachem/scf/scf_matrix.hpp"
+#include "exachem/scf/scf_tamm_tensors.hpp"
+#include "exachem/scf/scf_vars.hpp"
 
 namespace exachem::scf {
 

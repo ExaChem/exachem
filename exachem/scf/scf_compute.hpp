@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include "common/chemenv.hpp"
-#include "common/cutils.hpp"
-#include "scf/scf_common.hpp"
-#include "scf/scf_guess.hpp"
+#include "exachem/common/chemenv.hpp"
+#include "exachem/common/cutils.hpp"
+#include "exachem/scf/scf_common.hpp"
+#include "exachem/scf/scf_guess.hpp"
 using libint2::Atom;
 using TensorType       = double;
 using shellpair_list_t = std::unordered_map<size_t, std::vector<size_t>>;

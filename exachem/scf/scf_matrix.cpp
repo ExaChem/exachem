@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "scf_matrix.hpp"
+#include "exachem/scf/scf_matrix.hpp"
 
 template<typename T>
 Matrix exachem::scf::SCFMatrix::read_scf_mat(std::string matfile) {

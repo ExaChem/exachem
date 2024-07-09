@@ -6,8 +6,8 @@
  * See LICENSE.txt for details
  */
 
-#include "common/chemenv.hpp"
-#include "common/options/parser_utils.hpp"
+#include "exachem/common/chemenv.hpp"
+#include "exachem/common/options/parser_utils.hpp"
 
 class ParseCommonOptions: public ParserUtils {
 private:

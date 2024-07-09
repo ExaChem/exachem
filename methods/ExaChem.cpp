@@ -9,11 +9,10 @@
 #include <exachem/exachem_git.hpp>
 #include <tamm/tamm_git.hpp>
 
-#define EC_CC
 #define EC_COMPLEX
 
 // clang-format off
-#if defined(EC_CC)
+#if defined(ENABLE_CC)
 #include "cc/ccsd/cd_ccsd_os_ann.hpp"
 #include "cc/ccsd_t/ccsd_t_fused_driver.hpp"
 #include "exachem/cc/lambda/ccsd_lambda.hpp"
@@ -22,12 +21,12 @@
 
 #include "exachem/common/chemenv.hpp"
 #include "exachem/common/options/parse_options.hpp"
-#include "scf/scf_main.hpp"
+#include "exachem/scf/scf_main.hpp"
 #include "mp2/cd_mp2.hpp"
 // clang-format on
 using namespace exachem;
 
-#if !defined(USE_UPCXX) and defined(EC_COMPLEX) and defined(EC_CC)
+#if !defined(USE_UPCXX) and defined(EC_COMPLEX) and defined(ENABLE_CC)
 namespace exachem::cc::gfcc {
 void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env);
 }
@@ -37,7 +36,7 @@ void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env);
 #include "exachem/fci/fci.hpp"
 #endif
 
-#if defined(EC_CC)
+#if defined(ENABLE_CC)
 namespace exachem::cc2 {
 void cd_cc2_driver(ExecutionContext& ec, ChemEnv& chem_env);
 }
@@ -188,7 +187,7 @@ int main(int argc, char* argv[]) {
 
     if(task.sinfo) chem_env.sinfo();
     else if(task.scf) scf::scf_driver(ec, chem_env);
-#if defined(EC_CC)
+#if defined(ENABLE_CC)
     else if(task.mp2) mp2::cd_mp2(ec, chem_env);
     else if(task.cd_2e) cholesky_2e::cholesky_decomp_2e(ec, chem_env);
     else if(task.ccsd) cc::ccsd::cd_ccsd(ec, chem_env);

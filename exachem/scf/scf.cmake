@@ -1,8 +1,10 @@
 
 include(TargetMacros)
 
-set(SCF_SRCDIR ${CMAKE_CURRENT_SOURCE_DIR}/../exachem/scf)
+set(SCF_SRCDIR scf)
+
 set(SCF_INCLUDES
+    ${SCF_SRCDIR}/scf_vars.hpp
     ${SCF_SRCDIR}/scf_iter.hpp
     ${SCF_SRCDIR}/scf_main.hpp
     ${SCF_SRCDIR}/scf_gauxc.hpp
@@ -14,6 +16,8 @@ set(SCF_INCLUDES
     ${SCF_SRCDIR}/scf_restart.hpp
     ${SCF_SRCDIR}/scf_outputs.hpp
     ${SCF_SRCDIR}/scf_hartree_fock.hpp
+    ${SCF_SRCDIR}/scf_tamm_tensors.hpp
+    ${SCF_SRCDIR}/scf_eigen_tensors.hpp
     )
 
 set(SCF_SRCS
@@ -27,6 +31,6 @@ set(SCF_SRCS
     ${SCF_SRCDIR}/scf_matrix.cpp 
     ${SCF_SRCDIR}/scf_restart.cpp         
     ${SCF_SRCDIR}/scf_outputs.cpp
-    ${SCF_SRCDIR}/scf_hartree_fock.cpp    
+    ${SCF_SRCDIR}/scf_hartree_fock.cpp
     )
 

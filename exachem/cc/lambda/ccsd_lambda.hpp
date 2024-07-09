@@ -9,7 +9,7 @@
 #pragma once
 
 #include "cc/ccsd/cd_ccsd_os_ann.hpp"
-#include "scf/scf_main.hpp"
+#include "exachem/scf/scf_main.hpp"
 
 using namespace tamm;
 

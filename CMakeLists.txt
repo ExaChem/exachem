@@ -44,7 +44,7 @@ set(BUILD_TESTS OFF)
 if(DEFINED MODULES AND (NOT "${MODULES}" STREQUAL ""))
   list(TRANSFORM MODULES TOUPPER)
 else()
-  set(MODULES "CC")
+  message(FATAL_ERROR "Modules not specified")
 endif()
 message(STATUS "MODULES TO BE BUILT = ${MODULES}")
 

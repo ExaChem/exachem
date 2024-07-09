@@ -8,8 +8,7 @@
 
 #pragma once
 
-#include "common/chemenv.hpp"
-#include "cutils.hpp"
+#include "exachem/common/cutils.hpp"
 #include <fstream>
 
 namespace fcidump {

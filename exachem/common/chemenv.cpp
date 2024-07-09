@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "chemenv.hpp"
+#include "exachem/common/chemenv.hpp"
 
 int ChemEnv::get_nfcore() {
   if(ioptions.ccsd_options.freeze_atomic) {
@@ -255,7 +255,12 @@ void ChemEnv::sinfo() {
   nelectrons -= charge;
 
   // sys_data.nelectrons = nelectrons;
-  EXPECTS((nelectrons + scf_options.multiplicity - 1) % 2 == 0);
+  if((nelectrons + scf_options.multiplicity - 1) % 2 != 0) {
+    std::string err_msg = "[ERROR] Number of electrons (" + std::to_string(nelectrons) + ") " +
+                          "and multiplicity (" + std::to_string(scf_options.multiplicity) + ") " +
+                          " not compatible!";
+    tamm_terminate(err_msg);
+  }
 
   int nelectrons_alpha = (nelectrons + scf_options.multiplicity - 1) / 2;
   int nelectrons_beta  = nelectrons - nelectrons_alpha;

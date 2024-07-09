@@ -22,10 +22,10 @@
 #include "tamm/tamm.hpp"
 #include <nlohmann/json.hpp>
 
-#include "common/libint2_includes.hpp"
-#include "common/ecatom.hpp"
-#include "common/txt_utils.hpp"
-#include "common/chemenv.hpp"
+#include "exachem/common/libint2_includes.hpp"
+#include "exachem/common/ecatom.hpp"
+#include "exachem/common/txt_utils.hpp"
+#include "exachem/common/chemenv.hpp"
 
 using namespace tamm;
 using std::cerr;

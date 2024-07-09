@@ -6,8 +6,8 @@
  * See LICENSE.txt for details
  */
 
-#include "ec_molden.hpp"
-#include "txt_utils.hpp"
+#include "exachem/common/ec_molden.hpp"
+#include "exachem/common/txt_utils.hpp"
 #include <libint2/lcao/molden.h>
 
 bool ECMolden::check_molden(std::string moldenfile) {

@@ -6,10 +6,7 @@
  * See LICENSE.txt for details
  */
 
-// clang-format off
-#include "chemenv.hpp"
-#include "cutils.hpp"
-// clang-format on
+#include "exachem/common/cutils.hpp"
 
 #if defined(USE_SCALAPACK)
 

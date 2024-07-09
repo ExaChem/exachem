@@ -6,8 +6,8 @@
  * See LICENSE.txt for details
  */
 #include "ccsd_lambda.hpp"
-#include "common/termcolor.hpp"
-#include "scf/scf_guess.hpp"
+#include "exachem/common/termcolor.hpp"
+#include "exachem/scf/scf_guess.hpp"
 #include <filesystem>
 
 namespace fs = std::filesystem;

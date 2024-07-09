@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "scf_iter.hpp"
+#include "exachem/scf/scf_iter.hpp"
 
 template<typename TensorType>
 std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(

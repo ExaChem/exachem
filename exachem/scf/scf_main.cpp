@@ -6,11 +6,11 @@
  * See LICENSE.txt for details
  */
 
-#include "scf/scf_main.hpp"
-#include "common/termcolor.hpp"
-#include "scf/scf_common.hpp"
-#include "scf/scf_hartree_fock.hpp"
-#include "scf/scf_outputs.hpp"
+#include "exachem/scf/scf_main.hpp"
+#include "exachem/common/termcolor.hpp"
+#include "exachem/scf/scf_common.hpp"
+#include "exachem/scf/scf_hartree_fock.hpp"
+#include "exachem/scf/scf_outputs.hpp"
 #include <string_view>
 
 namespace exachem::scf {

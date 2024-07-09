@@ -6,10 +6,10 @@
  * See LICENSE.txt for details
  */
 
-#include "scf_hartree_fock.hpp"
-#include "common/cutils.hpp"
-#include "common/ec_dplot.hpp"
-#include "common/options/parser_utils.hpp"
+#include "exachem/scf/scf_hartree_fock.hpp"
+#include "exachem/common/cutils.hpp"
+#include "exachem/common/ec_dplot.hpp"
+#include "exachem/common/options/parser_utils.hpp"
 #include <functional>
 
 void exachem::scf::SCFHartreeFock::initialize(ExecutionContext& exc, ChemEnv& chem_env) {
@@ -135,7 +135,12 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   //    if(k.has_ecp)
   //      nelectrons -= k.ecp_nelec;
   chem_env.sys_data.nelectrons = nelectrons;
-  EXPECTS((nelectrons + chem_env.ioptions.scf_options.multiplicity - 1) % 2 == 0);
+  if((nelectrons + chem_env.ioptions.scf_options.multiplicity - 1) % 2 != 0) {
+    std::string err_msg =
+      "[ERROR] Number of electrons (" + std::to_string(nelectrons) + ") " + "and multiplicity (" +
+      std::to_string(chem_env.ioptions.scf_options.multiplicity) + ") " + " not compatible!";
+    tamm_terminate(err_msg);
+  }
 
   chem_env.sys_data.nelectrons_alpha =
     (nelectrons + chem_env.ioptions.scf_options.multiplicity - 1) / 2;

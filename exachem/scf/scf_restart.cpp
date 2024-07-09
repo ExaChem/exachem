@@ -6,8 +6,8 @@
  * See LICENSE.txt for details
  */
 
-#include "scf/scf_restart.hpp"
-#include "scf/scf_matrix.hpp"
+#include "exachem/scf/scf_restart.hpp"
+#include "exachem/scf/scf_matrix.hpp"
 
 // Originally scf_restart_test
 void exachem::scf::SCFRestart::operator()(const ExecutionContext& ec, ChemEnv& chem_env,

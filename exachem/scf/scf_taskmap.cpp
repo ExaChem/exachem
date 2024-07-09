@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "scf_taskmap.hpp"
+#include "exachem/scf/scf_taskmap.hpp"
 
 void exachem::scf::Loads::readLoads(std::vector<NODE_T>& s1_all, std::vector<NODE_T>& s2_all,
                                     std::vector<VAL_T> ntasks_all) {

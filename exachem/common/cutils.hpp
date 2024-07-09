@@ -8,8 +8,11 @@
 
 #pragma once
 
-#include "common/system_data.hpp"
+// clang-format off
+#include "exachem/common/chemenv.hpp"
+#include "exachem/common/system_data.hpp"
 #include "options/input_options.hpp"
+// clang-format on
 using namespace tamm;
 
 #if defined(USE_SCALAPACK)

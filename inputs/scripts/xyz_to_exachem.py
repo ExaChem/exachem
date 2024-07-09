@@ -11,6 +11,7 @@ Parses a single xyz file or a folder with multiple xyz files and returns ExaChem
 
 Args:
   input_file: The path to a single xyz file (OR) path to a folder contatining xyz files.
+  optional_args: task-name
 
 Returns:
   json input file(s) for ExaChem.
@@ -83,6 +84,8 @@ def dict_to_json(dictname):
 
 if __name__ == '__main__':
   input_fpath = sys.argv[1]
+  taskname = "sinfo"
+  if len(sys.argv) == 3: taskname = sys.argv[2]
 
   input_files = []
 
@@ -152,11 +155,7 @@ if __name__ == '__main__':
     ccsd_pt["ccsdt_tilesize"] = 40
 
     exachem_opt["TASK"] = {}
-    exachem_opt["TASK"]["sinfo"] = True
-    exachem_opt["TASK"]["scf"] = False
-    exachem_opt["TASK"]["cd_2e"] = False
-    exachem_opt["TASK"]["ccsd"] = False
-    exachem_opt["TASK"]["ccsd_t"] = False
+    exachem_opt["TASK"][taskname] = True
 
     exachem_opt = dict_to_json(exachem_opt)
 

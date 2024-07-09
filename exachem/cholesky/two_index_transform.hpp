@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "scf/scf_outputs.hpp"
+#include "exachem/scf/scf_outputs.hpp"
 #include "tamm/eigen_utils.hpp"
 using namespace tamm;
 using TAMM_GA_SIZE = int64_t;

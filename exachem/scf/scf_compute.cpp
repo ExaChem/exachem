@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "scf_compute.hpp"
+#include "exachem/scf/scf_compute.hpp"
 
 void exachem::scf::SCFCompute::compute_shellpair_list(const ExecutionContext&  ec,
                                                       const libint2::BasisSet& shells,

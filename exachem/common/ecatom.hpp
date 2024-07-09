@@ -10,10 +10,10 @@
 #include <iostream>
 #include <vector>
 
-#include "atom_info.hpp"
-#include "libint2_includes.hpp"
+#include "exachem/common/atom_info.hpp"
+#include "exachem/common/libint2_includes.hpp"
+#include "exachem/common/txt_utils.hpp"
 #include "tamm/tamm.hpp"
-#include "txt_utils.hpp"
 using namespace tamm;
 using libint2::Atom;
 class ECAtom: public AtomInfo {

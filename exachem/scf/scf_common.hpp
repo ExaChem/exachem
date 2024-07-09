@@ -10,11 +10,11 @@
 
 #include <cctype>
 
-#include "common/chemenv.hpp"
-#include "common/cutils.hpp"
-#include "scf_eigen_tensors.hpp"
-#include "scf_tamm_tensors.hpp"
-#include "scf_vars.hpp"
+#include "exachem/common/chemenv.hpp"
+#include "exachem/common/cutils.hpp"
+#include "exachem/scf/scf_eigen_tensors.hpp"
+#include "exachem/scf/scf_tamm_tensors.hpp"
+#include "exachem/scf/scf_vars.hpp"
 
 using namespace tamm;
 using libint2::Atom;

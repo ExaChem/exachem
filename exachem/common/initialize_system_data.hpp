@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "common/chemenv.hpp"
-#include "common/txt_utils.hpp"
+#include "exachem/common/chemenv.hpp"
+#include "exachem/common/txt_utils.hpp"
 #include <filesystem>
 namespace fs = std::filesystem;
 using json   = nlohmann::ordered_json;

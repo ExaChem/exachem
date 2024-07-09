@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "scf/scf_common.hpp"
+#include "exachem/scf/scf_common.hpp"
 #if defined(TAMM_USE_ELPA)
 #include <elpa/elpa.h>
 #endif

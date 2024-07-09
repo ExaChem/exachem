@@ -33,8 +33,8 @@
 #include <tuple>
 #include <vector>
 
-#include "common/chemenv.hpp"
-#include "scf/scf_taskmap.hpp"
+#include "exachem/common/chemenv.hpp"
+#include "exachem/scf/scf_taskmap.hpp"
 
 using libint2::BasisSet;
 

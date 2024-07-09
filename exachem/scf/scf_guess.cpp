@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "scf/scf_guess.hpp"
+#include "exachem/scf/scf_guess.hpp"
 #include <algorithm>
 #include <iterator>
 

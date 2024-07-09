@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "common/chemenv.hpp"
+#include "exachem/common/chemenv.hpp"
 
 class EC_DPLOT {
 public:

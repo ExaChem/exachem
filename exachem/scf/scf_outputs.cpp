@@ -6,9 +6,9 @@
  * See LICENSE.txt for details
  */
 
-#include "scf_outputs.hpp"
-#include "common/options/parser_utils.hpp"
-#include "scf_matrix.hpp"
+#include "exachem/scf/scf_outputs.hpp"
+#include "exachem/common/options/parser_utils.hpp"
+#include "exachem/scf/scf_matrix.hpp"
 
 template<typename TensorType>
 double exachem::scf::SCFIO::tt_trace(ExecutionContext& ec, Tensor<TensorType>& T1,

@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "scf/scf_common.hpp"
-#include "scf/scf_compute.hpp"
+#include "exachem/scf/scf_common.hpp"
+#include "exachem/scf/scf_compute.hpp"
 
 #if defined(TAMM_USE_ELPA)
 #include <elpa/elpa.h>

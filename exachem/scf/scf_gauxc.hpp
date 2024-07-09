@@ -15,12 +15,12 @@
 #endif
 
 #if defined(USE_GAUXC)
-#include "common/chemenv.hpp"
-#include "common/options/input_options.hpp"
-#include "scf/scf_compute.hpp"
-#include "scf/scf_eigen_tensors.hpp"
-#include "scf/scf_tamm_tensors.hpp"
-#include "scf/scf_vars.hpp"
+#include "exachem/common/chemenv.hpp"
+#include "exachem/common/options/input_options.hpp"
+#include "exachem/scf/scf_compute.hpp"
+#include "exachem/scf/scf_eigen_tensors.hpp"
+#include "exachem/scf/scf_tamm_tensors.hpp"
+#include "exachem/scf/scf_vars.hpp"
 
 namespace exachem::scf::gauxc {
 

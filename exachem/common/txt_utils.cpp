@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "txt_utils.hpp"
+#include "exachem/common/txt_utils.hpp"
 #include <iostream>
 
 void txt_utils::to_upper(std::string& str) {

@@ -7,7 +7,7 @@
  */
 
 #pragma once
-#include "common/ecatom.hpp"
+#include "exachem/common/ecatom.hpp"
 
 using lib_basis_set = libint2::BasisSet;
 using lib_shell     = libint2::Shell;

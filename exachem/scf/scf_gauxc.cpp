@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "scf/scf_gauxc.hpp"
+#include "exachem/scf/scf_gauxc.hpp"
 
 #if defined(USE_GAUXC)
 

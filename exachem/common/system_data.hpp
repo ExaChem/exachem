@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "common/txt_utils.hpp"
+#include "exachem/common/txt_utils.hpp"
 #include "options/input_options.hpp"
 #include "tamm/eigen_utils.hpp"
 #include "tamm/tamm.hpp"

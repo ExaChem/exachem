@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "fcidump.hpp"
+#include "exachem/common/fcidump.hpp"
 
 template<typename T = double>
 bool nonzero(T value) {

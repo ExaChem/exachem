@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include "scf/scf_compute.hpp"
-#include "scf/scf_gauxc.hpp"
-#include "scf/scf_guess.hpp"
+#include "exachem/scf/scf_compute.hpp"
+#include "exachem/scf/scf_gauxc.hpp"
+#include "exachem/scf/scf_guess.hpp"
 
 namespace exachem::scf {
 class SCFIter: public SCFCompute {

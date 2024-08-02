@@ -72,6 +72,7 @@ void ChemEnv::write_json_data(const std::string cmodule) {
   results["input"]["molecule"]["name"] = sys_data.input_molecule;
   results["input"]["geometry"]         = jinput["geometry"];
   results["input"]["basis"]            = jinput["basis"];
+  results["input"]["common"]           = jinput["common"];
 
   // SCF options
   results["input"]["SCF"]["charge"]         = scf.charge;

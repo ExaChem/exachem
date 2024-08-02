@@ -184,6 +184,9 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   int* host_d1_size = static_cast<int*>(operator new[](noab * sizeof(int), std::nothrow));
   int* host_d2_size = static_cast<int*>(operator new[](nvab * sizeof(int), std::nothrow));
 
+  size_t max_num_blocks = chem_env.ioptions.ccsd_options.ccsdt_tilesize;
+  max_num_blocks        = std::ceil((max_num_blocks + 4 - 1) / 4.0);
+
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
   auto& memDevPool       = RMMMemoryManager::getInstance().getDeviceMemoryPool();
   T*    df_dev_s1_t1_all = static_cast<T*>(memDevPool.allocate(sizeof(T) * size_T_s1_t1));
@@ -200,6 +203,9 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   df_host_pinned_d2_t2 = static_cast<T*>(tamm::getPinnedMem(sizeof(T) * size_T_d2_t2));
   df_host_pinned_d2_v2 = static_cast<T*>(tamm::getPinnedMem(sizeof(T) * size_T_d2_v2));
 
+  T* df_host_energies =
+    static_cast<T*>(tamm::getPinnedMem(sizeof(T) * std::pow(max_num_blocks, 6) * 2));
+
 #else // cpu
   df_host_pinned_s1_t1 = static_cast<T*>(operator new[](size_T_s1_t1 * sizeof(T), std::nothrow));
   df_host_pinned_s1_v2 = static_cast<T*>(operator new[](size_T_s1_v2 * sizeof(T), std::nothrow));
@@ -207,13 +213,10 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   df_host_pinned_d1_v2 = static_cast<T*>(operator new[](size_T_d1_v2 * sizeof(T), std::nothrow));
   df_host_pinned_d2_t2 = static_cast<T*>(operator new[](size_T_d2_t2 * sizeof(T), std::nothrow));
   df_host_pinned_d2_v2 = static_cast<T*>(operator new[](size_T_d2_v2 * sizeof(T), std::nothrow));
-#endif
-
-  size_t max_num_blocks = chem_env.ioptions.ccsd_options.ccsdt_tilesize;
-  max_num_blocks        = std::ceil((max_num_blocks + 4 - 1) / 4.0);
-
   T* df_host_energies =
     static_cast<T*>(operator new[](std::pow(max_num_blocks, 6) * 2 * sizeof(T), std::nothrow));
+#endif
+
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
   T* df_dev_energies =
     static_cast<T*>(memDevPool.allocate(sizeof(T) * std::pow(max_num_blocks, 6) * 2));
@@ -468,8 +471,6 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   operator delete[](host_d1_size);
   operator delete[](host_d2_size);
 
-  operator delete[](df_host_energies);
-
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
   memDevPool.deallocate(df_dev_s1_t1_all, sizeof(T) * size_T_s1_t1);
   memDevPool.deallocate(df_dev_s1_v2_all, sizeof(T) * size_T_s1_v2);
@@ -485,6 +486,7 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   tamm::freePinnedMem(df_host_pinned_d1_v2);
   tamm::freePinnedMem(df_host_pinned_d2_t2);
   tamm::freePinnedMem(df_host_pinned_d2_v2);
+  tamm::freePinnedMem(df_host_energies);
 
 #else // cpu
 operator delete[](df_host_pinned_s1_t1);
@@ -493,6 +495,7 @@ operator delete[](df_host_pinned_d1_t2);
 operator delete[](df_host_pinned_d1_v2);
 operator delete[](df_host_pinned_d2_t2);
 operator delete[](df_host_pinned_d2_v2);
+operator delete[](df_host_energies);
 #endif
 
   auto cc_t2 = std::chrono::high_resolution_clock::now();

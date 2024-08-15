@@ -58,8 +58,8 @@ inline constexpr short MAX_NVAB{120};
 
 #ifdef USE_DPCPP
 using namespace sycl::ext::oneapi::experimental;
-device_global<int[6]> const_df_s1_size;
-device_global<int[9]> const_df_s1_exec;
+device_global<int[6]>            const_df_s1_size;
+device_global<int[9]>            const_df_s1_exec;
 device_global<int[7 * MAX_NOAB]> const_df_d1_size;
 device_global<int[9 * MAX_NOAB]> const_df_d1_exec;
 device_global<int[7 * MAX_NVAB]> const_df_d2_size;

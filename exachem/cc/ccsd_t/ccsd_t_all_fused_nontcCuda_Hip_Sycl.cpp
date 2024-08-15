@@ -56,7 +56,17 @@ inline constexpr short NUM_ENERGIES{2};
 inline constexpr short MAX_NOAB{30};
 inline constexpr short MAX_NVAB{120};
 
-#ifndef USE_DPCPP
+#ifdef USE_DPCPP
+using namespace sycl::ext::oneapi::experimental;
+device_global<int[6]> const_df_s1_size;
+device_global<int[9]> const_df_s1_exec;
+device_global<int[7 * MAX_NOAB]> const_df_d1_size;
+device_global<int[9 * MAX_NOAB]> const_df_d1_exec;
+device_global<int[7 * MAX_NVAB]> const_df_d2_size;
+device_global<int[9 * MAX_NVAB]> const_df_d2_exec;
+
+#else
+
 // 64 KB = 65536 bytes = 16384 (int) = 8192 (size_t)
 // 9 * 9 * noab = 81 * noab
 
@@ -105,9 +115,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
   int base_size_p6b
 #ifdef USE_DPCPP
   ,
-  sycl::nd_item<2>& item, const int* const_df_s1_size, const int* const_df_s1_exec,
-  const int* const_df_d1_size, const int* const_df_d1_exec, const int* const_df_d2_size,
-  const int* const_df_d2_exec
+  sycl::nd_item<2>& item
 #endif
 ) {
   // For Shared Memory,
@@ -2798,12 +2806,7 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
                             //
                             int* host_d1_size, int* host_d1_exec, int* host_d2_size,
                             int* host_d2_exec, int* host_s1_size, int* host_s1_exec,
-//
-#ifdef USE_DPCPP
-                            int* const_df_s1_size, int* const_df_s1_exec, int* const_df_d1_size,
-                            int* const_df_d1_exec, int* const_df_d2_size, int* const_df_d2_exec,
-#endif // USE_DPCPP
-       //
+                            //
                             size_t size_noab, size_t size_max_dim_d1_t2, size_t size_max_dim_d1_v2,
                             size_t size_nvab, size_t size_max_dim_d2_t2, size_t size_max_dim_d2_v2,
                             size_t size_max_dim_s1_t1, size_t size_max_dim_s1_v2,
@@ -2885,20 +2888,20 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
     (int) base_size_h3b, (int) base_size_p4b, (int) base_size_p5b, (int) base_size_p6b);
 
 #elif defined(USE_DPCPP)
-  auto e0      = stream.first.memcpy(const_df_s1_size, host_s1_size, sizeof(int) * (6));
-  auto e1      = stream.first.memcpy(const_df_s1_exec, host_s1_exec, sizeof(int) * (9));
-  auto e2      = stream.first.memcpy(const_df_d1_size, host_d1_size, sizeof(int) * (7 * size_noab));
-  auto e3      = stream.first.memcpy(const_df_d1_exec, host_d1_exec, sizeof(int) * (9 * size_noab));
-  auto e4      = stream.first.memcpy(const_df_d2_size, host_d2_size, sizeof(int) * (7 * size_nvab));
-  auto e5      = stream.first.memcpy(const_df_d2_exec, host_d2_exec, sizeof(int) * (9 * size_nvab));
-  (*done_copy) = stream.first.ext_oneapi_submit_barrier({e0, e1, e2, e3, e4, e5});
+  stream.first.memcpy(const_df_s1_size, host_s1_size, sizeof(int) * (6));
+  stream.first.memcpy(const_df_s1_exec, host_s1_exec, sizeof(int) * (9));
+  stream.first.memcpy(const_df_d1_size, host_d1_size, sizeof(int) * (7 * size_noab));
+  stream.first.memcpy(const_df_d1_exec, host_d1_exec, sizeof(int) * (9 * size_noab));
+  stream.first.memcpy(const_df_d2_size, host_d2_size, sizeof(int) * (7 * size_nvab));
+  stream.first.memcpy(const_df_d2_exec, host_d2_exec, sizeof(int) * (9 * size_nvab));
+  (*done_copy) = stream.first.ext_oneapi_submit_barrier();
 
   sycl::range<2> gridsize(1, num_blocks);
   sycl::range<2> blocksize(FUSION_SIZE_TB_1_Y, FUSION_SIZE_TB_1_X);
   auto           global_range = gridsize * blocksize;
 
   stream.first.parallel_for(sycl::nd_range<2>(global_range, blocksize), [=](auto item) {
-    revised_jk_ccsd_t_fully_fused_kernel(
+    revised_jk_ccsd_t_fully_fused_kernel<T>(
       size_noab, size_nvab, size_max_dim_s1_t1, size_max_dim_s1_v2, size_max_dim_d1_t2,
       size_max_dim_d1_v2, size_max_dim_d2_t2, size_max_dim_d2_v2, df_dev_d1_t2_all,
       df_dev_d1_v2_all, df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_s1_t1_all, df_dev_s1_v2_all,
@@ -2908,8 +2911,7 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
       CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1), CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6),
       CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5), CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4),
       base_size_h1b, base_size_h2b, base_size_h3b, base_size_p4b, base_size_p5b, base_size_p6b,
-      item, const_df_s1_size, const_df_s1_exec, const_df_d1_size, const_df_d1_exec,
-      const_df_d2_size, const_df_d2_exec);
+      item);
   });
 #endif
 }
@@ -2924,11 +2926,6 @@ template void fully_fused_ccsd_t_gpu<double>(
   //
   int* host_d1_size, int* host_d1_exec, // used
   int* host_d2_size, int* host_d2_exec, int* host_s1_size, int* host_s1_exec,
-//
-#ifdef USE_DPCPP
-  int* const_df_s1_size, int* const_df_s1_exec, int* const_df_d1_size, int* const_df_d1_exec,
-  int* const_df_d2_size, int* const_df_d2_exec,
-#endif // USE_DPCPP
   //
   size_t size_noab, size_t size_max_dim_d1_t2, size_t size_max_dim_d1_v2, size_t size_nvab,
   size_t size_max_dim_d2_t2, size_t size_max_dim_d2_v2, size_t size_max_dim_s1_t1,
@@ -2947,11 +2944,6 @@ template void fully_fused_ccsd_t_gpu<float>(
   //
   int* host_d1_size, int* host_d1_exec, // used
   int* host_d2_size, int* host_d2_exec, int* host_s1_size, int* host_s1_exec,
-//
-#ifdef USE_DPCPP
-  int* const_df_s1_size, int* const_df_s1_exec, int* const_df_d1_size, int* const_df_d1_exec,
-  int* const_df_d2_size, int* const_df_d2_exec,
-#endif // USE_DPCPP
   //
   size_t size_noab, size_t size_max_dim_d1_t2, size_t size_max_dim_d1_v2, size_t size_nvab,
   size_t size_max_dim_d2_t2, size_t size_max_dim_d2_v2, size_t size_max_dim_s1_t1,

@@ -43,12 +43,7 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
                             int* host_d1_size, int* host_d1_exec, // used
                             int* host_d2_size, int* host_d2_exec, int* host_s1_size,
                             int* host_s1_exec,
-//
-#ifdef USE_DPCPP
-                            int* const_df_s1_size, int* const_df_s1_exec, int* const_df_d1_size,
-                            int* const_df_d1_exec, int* const_df_d2_size, int* const_df_d2_exec,
-#endif // USE_DPCPP
-       //
+                            //
                             size_t size_noab, size_t size_max_dim_d1_t2, size_t size_max_dim_d1_v2,
                             size_t size_nvab, size_t size_max_dim_d2_t2, size_t size_max_dim_d2_v2,
                             size_t size_max_dim_s1_t1, size_t size_max_dim_s1_v2,
@@ -90,11 +85,6 @@ void ccsd_t_fully_fused_none_df_none_task(
   //
   int* df_simple_s1_size, int* df_simple_d1_size, int* df_simple_d2_size, int* df_simple_s1_exec,
   int* df_simple_d1_exec, int* df_simple_d2_exec,
-//
-#ifdef USE_DPCPP
-  int* const_df_s1_size, int* const_df_s1_exec, int* const_df_d1_size, int* const_df_d1_exec,
-  int* const_df_d2_size, int* const_df_d2_exec,
-#endif // USE_DPCPP
   //
   T* df_dev_s1_t1_all, T* df_dev_s1_v2_all, T* df_dev_d1_t2_all, T* df_dev_d1_v2_all,
   T* df_dev_d2_t2_all, T* df_dev_d2_v2_all, T* dev_energies,
@@ -237,12 +227,7 @@ void ccsd_t_fully_fused_none_df_none_task(
                          //
                          df_simple_d1_size, df_simple_d1_exec, df_simple_d2_size, df_simple_d2_exec,
                          df_simple_s1_size, df_simple_s1_exec,
-//
-#ifdef USE_DPCPP
-                         const_df_s1_size, const_df_s1_exec, const_df_d1_size, const_df_d1_exec,
-                         const_df_d2_size, const_df_d2_exec,
-#endif // USE_DPCPP
-       //
+                         //
                          noab, max_dim_d1_t2, max_dim_d1_v2, nvab, max_dim_d2_t2, max_dim_d2_v2,
                          max_dim_s1_t1, max_dim_s1_v2,
                          //

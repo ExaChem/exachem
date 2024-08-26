@@ -57,6 +57,7 @@ inline constexpr short MAX_NOAB{30};
 inline constexpr short MAX_NVAB{120};
 
 #ifdef USE_DPCPP
+class ccsd_t_sycl_kernel;
 using namespace sycl::ext::oneapi::experimental;
 device_global<int[6]>            const_df_s1_size;
 device_global<int[9]>            const_df_s1_exec;
@@ -123,14 +124,14 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
   __shared__ T sm_a[16][64 + 1];
   __shared__ T sm_b[16][64 + 1];
 
-  int threadIdx_x = threadIdx.x;
-  int threadIdx_y = threadIdx.y;
-  int blockIdx_x  = blockIdx.x;
+  uint32_t threadIdx_x = threadIdx.x;
+  uint32_t threadIdx_y = threadIdx.y;
+  uint32_t blockIdx_x  = blockIdx.x;
 #elif defined(USE_DPCPP)
   sycl::group thread_block = item.get_group();
-  int         threadIdx_x  = static_cast<int>(item.get_local_id(1));
-  int         threadIdx_y  = static_cast<int>(item.get_local_id(0));
-  int         blockIdx_x   = static_cast<int>(item.get_group(1));
+  uint32_t    threadIdx_x  = static_cast<uint32_t>(item.get_local_id(1));
+  uint32_t    threadIdx_y  = static_cast<uint32_t>(item.get_local_id(0));
+  uint32_t    blockIdx_x   = static_cast<uint32_t>(item.get_group(1));
   using tile_t             = T[16][64 + 1];
   tile_t& sm_a = *sycl::ext::oneapi::group_local_memory_for_overwrite<tile_t>(thread_block);
   tile_t& sm_b = *sycl::ext::oneapi::group_local_memory_for_overwrite<tile_t>(thread_block);
@@ -2900,19 +2901,20 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
   sycl::range<2> blocksize(FUSION_SIZE_TB_1_Y, FUSION_SIZE_TB_1_X);
   auto           global_range = gridsize * blocksize;
 
-  stream.first.parallel_for(sycl::nd_range<2>(global_range, blocksize), [=](auto item) {
-    revised_jk_ccsd_t_fully_fused_kernel<T>(
-      size_noab, size_nvab, size_max_dim_s1_t1, size_max_dim_s1_v2, size_max_dim_d1_t2,
-      size_max_dim_d1_v2, size_max_dim_d2_t2, size_max_dim_d2_v2, df_dev_d1_t2_all,
-      df_dev_d1_v2_all, df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_s1_t1_all, df_dev_s1_v2_all,
-      dev_evl_sorted_h1b, dev_evl_sorted_h2b, dev_evl_sorted_h3b, dev_evl_sorted_p4b,
-      dev_evl_sorted_p5b, dev_evl_sorted_p6b, partial_energies,
-      CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3), CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2),
-      CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1), CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6),
-      CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5), CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4),
-      base_size_h1b, base_size_h2b, base_size_h3b, base_size_p4b, base_size_p5b, base_size_p6b,
-      item);
-  });
+  stream.first.parallel_for<class ccsd_t_sycl_kernel>(
+    sycl::nd_range<2>(global_range, blocksize), [=](auto item) {
+      revised_jk_ccsd_t_fully_fused_kernel<T>(
+        size_noab, size_nvab, size_max_dim_s1_t1, size_max_dim_s1_v2, size_max_dim_d1_t2,
+        size_max_dim_d1_v2, size_max_dim_d2_t2, size_max_dim_d2_v2, df_dev_d1_t2_all,
+        df_dev_d1_v2_all, df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_s1_t1_all, df_dev_s1_v2_all,
+        dev_evl_sorted_h1b, dev_evl_sorted_h2b, dev_evl_sorted_h3b, dev_evl_sorted_p4b,
+        dev_evl_sorted_p5b, dev_evl_sorted_p6b, partial_energies,
+        CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3), CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2),
+        CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1), CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6),
+        CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5), CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4),
+        base_size_h1b, base_size_h2b, base_size_h3b, base_size_p4b, base_size_p5b, base_size_p6b,
+        item);
+    });
 #endif
 }
 
@@ -2934,21 +2936,3 @@ template void fully_fused_ccsd_t_gpu<double>(
   double* dev_evl_sorted_h1b, double* dev_evl_sorted_h2b, double* dev_evl_sorted_h3b,
   double* dev_evl_sorted_p4b, double* dev_evl_sorted_p5b, double* dev_evl_sorted_p6b,
   double* partial_energies, event_ptr_t done_copy);
-// Explicit template instantiation: float
-template void fully_fused_ccsd_t_gpu<float>(
-  gpuStream_t& stream, size_t num_blocks, size_t base_size_h1b, size_t base_size_h2b,
-  size_t base_size_h3b, size_t base_size_p4b, size_t base_size_p5b, size_t base_size_p6b,
-  //
-  float* df_dev_d1_t2_all, float* df_dev_d1_v2_all, float* df_dev_d2_t2_all,
-  float* df_dev_d2_v2_all, float* df_dev_s1_t1_all, float* df_dev_s1_v2_all,
-  //
-  int* host_d1_size, int* host_d1_exec, // used
-  int* host_d2_size, int* host_d2_exec, int* host_s1_size, int* host_s1_exec,
-  //
-  size_t size_noab, size_t size_max_dim_d1_t2, size_t size_max_dim_d1_v2, size_t size_nvab,
-  size_t size_max_dim_d2_t2, size_t size_max_dim_d2_v2, size_t size_max_dim_s1_t1,
-  size_t size_max_dim_s1_v2,
-  //
-  float* dev_evl_sorted_h1b, float* dev_evl_sorted_h2b, float* dev_evl_sorted_h3b,
-  float* dev_evl_sorted_p4b, float* dev_evl_sorted_p5b, float* dev_evl_sorted_p6b,
-  float* partial_energies, event_ptr_t done_copy);

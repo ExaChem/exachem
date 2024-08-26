@@ -223,201 +223,203 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
 #endif
 
   int num_task = 0;
-  if(!seq_h3b) {
-    if(rank == 0) {
-      std::cout << "456123 parallel 6d loop variant" << std::endl << std::endl;
-      // std::cout << "tile142563,kernel,memcpy,data,total" << std::endl;
-    }
+  //   if(!seq_h3b) {
+  //     if(rank == 0) {
+  //       std::cout << "456123 parallel 6d loop variant" << std::endl << std::endl;
+  //       // std::cout << "tile142563,kernel,memcpy,data,total" << std::endl;
+  //     }
+  //     for(size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
+  //       for(size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
+  //         for(size_t t_p6b = t_p5b; t_p6b < noab + nvab; t_p6b++) {
+  //           for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) { //
+  //             for(size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
+  //               for(size_t t_h3b = t_h2b; t_h3b < noab; t_h3b++) {
+  //                 if((k_spin[t_p4b] + k_spin[t_p5b] + k_spin[t_p6b]) ==
+  //                    (k_spin[t_h1b] + k_spin[t_h2b] + k_spin[t_h3b])) {
+  //                   if((!is_restricted) || (k_spin[t_p4b] + k_spin[t_p5b] + k_spin[t_p6b] +
+  //                                           k_spin[t_h1b] + k_spin[t_h2b] + k_spin[t_h3b]) <= 8)
+  //                                           {
+  //                     if(next == taskcount) {
+  //                       //
+  //                       T factor = 1.0;
+  //                       if(is_restricted) factor = 2.0;
+  //                       if((t_p4b == t_p5b) && (t_p5b == t_p6b)) { factor /= 6.0; }
+  //                       else if((t_p4b == t_p5b) || (t_p5b == t_p6b)) { factor /= 2.0; }
+
+  //                       if((t_h1b == t_h2b) && (t_h2b == t_h3b)) { factor /= 6.0; }
+  //                       else if((t_h1b == t_h2b) || (t_h2b == t_h3b)) { factor /= 2.0; }
+
+  //                       num_task++;
+
+  // #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
+  //                       ccsd_t_fully_fused_none_df_none_task<T>(
+  //                         is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2,
+  //                         d_v2, k_evl_sorted,
+  //                         //
+  //                         df_host_pinned_s1_t1, df_host_pinned_s1_v2, df_host_pinned_d1_t2,
+  //                         df_host_pinned_d1_v2, df_host_pinned_d2_t2, df_host_pinned_d2_v2,
+  //                         df_host_energies,
+  //                         //
+  //                         //
+  //                         //
+  //                         host_d1_size, host_d2_size,
+  //                         //
+  //                         df_simple_s1_size, df_simple_d1_size, df_simple_d2_size,
+  //                         df_simple_s1_exec, df_simple_d1_exec, df_simple_d2_exec,
+  //                         //
+  //                         df_dev_s1_t1_all, df_dev_s1_v2_all, df_dev_d1_t2_all, df_dev_d1_v2_all,
+  //                         df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_energies,
+  //                         //
+  //                         t_h1b, t_h2b, t_h3b, t_p4b, t_p5b, t_p6b, factor, taskcount,
+  //                         max_d1_kernels_pertask, max_d2_kernels_pertask,
+  //                         //
+  //                         size_T_s1_t1, size_T_s1_v2, size_T_d1_t2, size_T_d1_v2, size_T_d2_t2,
+  //                         size_T_d2_v2,
+  //                         //
+  //                         energy_l,
+  // #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
+  //                         reduceData.get(),
+  // #endif
+  //                         cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v,
+  //                         //
+  //                         done_compute, done_copy);
+  // #else
+  //                       total_fused_ccsd_t_cpu<T>(
+  //                         is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2,
+  //                         d_v2, k_evl_sorted,
+  //                         //
+  //                         df_host_pinned_s1_t1, df_host_pinned_s1_v2, df_host_pinned_d1_t2,
+  //                         df_host_pinned_d1_v2, df_host_pinned_d2_t2, df_host_pinned_d2_v2,
+  //                         df_host_energies, host_d1_size, host_d2_size,
+  //                         //
+  //                         df_simple_s1_size, df_simple_d1_size, df_simple_d2_size,
+  //                         df_simple_s1_exec, df_simple_d1_exec, df_simple_d2_exec,
+  //                         //
+  //                         t_h1b, t_h2b, t_h3b, t_p4b, t_p5b, t_p6b, factor, taskcount,
+  //                         max_d1_kernels_pertask, max_d2_kernels_pertask,
+  //                         //
+  //                         size_T_s1_t1, size_T_s1_v2, size_T_d1_t2, size_T_d1_v2, size_T_d2_t2,
+  //                         size_T_d2_v2,
+  //                         //
+  //                         energy_l, cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t,
+  //                         cache_d2v);
+  // #endif
+
+  //                       next = ac->fetch_add(0, 1);
+  //                     }
+  //                     taskcount++;
+  //                   }
+  //                 }
+  //               }
+  //             }
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }      // parallel h3b loop
+  //   else { // seq h3b loop
+
+#if 1
+  if(rank == 0) {
+    std::cout << "14256-seq3 loop variant" << std::endl << std::endl;
+    // std::cout << "tile142563,kernel,memcpy,data,total" << std::endl;
+  }
+  for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) { //
     for(size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
-      for(size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
-        for(size_t t_p6b = t_p5b; t_p6b < noab + nvab; t_p6b++) {
-          for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) { //
-            for(size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
+      for(size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
+        for(size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
+          for(size_t t_p6b = t_p5b; t_p6b < noab + nvab; t_p6b++) {
+#endif
+            // #if 0
+            //     for (size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
+            //     for (size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
+            //     for (size_t t_p6b = t_p5b; t_p6b < noab + nvab; t_p6b++) {
+            //     for (size_t t_h1b = 0; t_h1b < noab; t_h1b++) {
+            //     for (size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
+            // #endif
+            if(next == taskcount) {
               for(size_t t_h3b = t_h2b; t_h3b < noab; t_h3b++) {
                 if((k_spin[t_p4b] + k_spin[t_p5b] + k_spin[t_p6b]) ==
                    (k_spin[t_h1b] + k_spin[t_h2b] + k_spin[t_h3b])) {
                   if((!is_restricted) || (k_spin[t_p4b] + k_spin[t_p5b] + k_spin[t_p6b] +
                                           k_spin[t_h1b] + k_spin[t_h2b] + k_spin[t_h3b]) <= 8) {
-                    if(next == taskcount) {
+                    T factor = 1.0;
+                    if(is_restricted) factor = 2.0;
+
+                    //
+                    if((t_p4b == t_p5b) && (t_p5b == t_p6b)) { factor /= 6.0; }
+                    else if((t_p4b == t_p5b) || (t_p5b == t_p6b)) { factor /= 2.0; }
+
+                    if((t_h1b == t_h2b) && (t_h2b == t_h3b)) { factor /= 6.0; }
+                    else if((t_h1b == t_h2b) || (t_h2b == t_h3b)) { factor /= 2.0; }
+
+                    //
+                    num_task++;
+
+#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
+                    ccsd_t_fully_fused_none_df_none_task<T>(
+                      is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2, d_v2,
+                      k_evl_sorted,
                       //
-                      T factor = 1.0;
-                      if(is_restricted) factor = 2.0;
-                      if((t_p4b == t_p5b) && (t_p5b == t_p6b)) { factor /= 6.0; }
-                      else if((t_p4b == t_p5b) || (t_p5b == t_p6b)) { factor /= 2.0; }
-
-                      if((t_h1b == t_h2b) && (t_h2b == t_h3b)) { factor /= 6.0; }
-                      else if((t_h1b == t_h2b) || (t_h2b == t_h3b)) { factor /= 2.0; }
-
-                      num_task++;
-
+                      df_host_pinned_s1_t1, df_host_pinned_s1_v2, df_host_pinned_d1_t2,
+                      df_host_pinned_d1_v2, df_host_pinned_d2_t2, df_host_pinned_d2_v2,
+                      df_host_energies,
+                      //
+                      //
+                      //
+                      host_d1_size, host_d2_size,
+                      //
+                      df_simple_s1_size, df_simple_d1_size, df_simple_d2_size, df_simple_s1_exec,
+                      df_simple_d1_exec, df_simple_d2_exec,
+                      //
+                      df_dev_s1_t1_all, df_dev_s1_v2_all, df_dev_d1_t2_all, df_dev_d1_v2_all,
+                      df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_energies,
+                      //
+                      t_h1b, t_h2b, t_h3b, t_p4b, t_p5b, t_p6b, factor, taskcount,
+                      max_d1_kernels_pertask, max_d2_kernels_pertask,
+                      //
+                      size_T_s1_t1, size_T_s1_v2, size_T_d1_t2, size_T_d1_v2, size_T_d2_t2,
+                      size_T_d2_v2,
+                      //
+                      energy_l,
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-                      ccsd_t_fully_fused_none_df_none_task<T>(
-                        is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2,
-                        d_v2, k_evl_sorted,
-                        //
-                        df_host_pinned_s1_t1, df_host_pinned_s1_v2, df_host_pinned_d1_t2,
-                        df_host_pinned_d1_v2, df_host_pinned_d2_t2, df_host_pinned_d2_v2,
-                        df_host_energies,
-                        //
-                        //
-                        //
-                        host_d1_size, host_d2_size,
-                        //
-                        df_simple_s1_size, df_simple_d1_size, df_simple_d2_size, df_simple_s1_exec,
-                        df_simple_d1_exec, df_simple_d2_exec,
-                        //
-                        df_dev_s1_t1_all, df_dev_s1_v2_all, df_dev_d1_t2_all, df_dev_d1_v2_all,
-                        df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_energies,
-                        //
-                        t_h1b, t_h2b, t_h3b, t_p4b, t_p5b, t_p6b, factor, taskcount,
-                        max_d1_kernels_pertask, max_d2_kernels_pertask,
-                        //
-                        size_T_s1_t1, size_T_s1_v2, size_T_d1_t2, size_T_d1_v2, size_T_d2_t2,
-                        size_T_d2_v2,
-                        //
-                        energy_l,
-#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-                        reduceData.get(),
+                      reduceData.get(),
 #endif
-                        cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v,
-                        //
-                        done_compute, done_copy);
+                      cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v,
+                      //
+                      done_compute, done_copy);
 #else
-                      total_fused_ccsd_t_cpu<T>(
-                        is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2,
-                        d_v2, k_evl_sorted,
-                        //
-                        df_host_pinned_s1_t1, df_host_pinned_s1_v2, df_host_pinned_d1_t2,
-                        df_host_pinned_d1_v2, df_host_pinned_d2_t2, df_host_pinned_d2_v2,
-                        df_host_energies, host_d1_size, host_d2_size,
-                        //
-                        df_simple_s1_size, df_simple_d1_size, df_simple_d2_size, df_simple_s1_exec,
-                        df_simple_d1_exec, df_simple_d2_exec,
-                        //
-                        t_h1b, t_h2b, t_h3b, t_p4b, t_p5b, t_p6b, factor, taskcount,
-                        max_d1_kernels_pertask, max_d2_kernels_pertask,
-                        //
-                        size_T_s1_t1, size_T_s1_v2, size_T_d1_t2, size_T_d1_v2, size_T_d2_t2,
-                        size_T_d2_v2,
-                        //
-                        energy_l, cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v);
+          total_fused_ccsd_t_cpu<T>(
+            is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2, d_v2,
+            k_evl_sorted,
+            //
+            df_host_pinned_s1_t1, df_host_pinned_s1_v2, df_host_pinned_d1_t2, df_host_pinned_d1_v2,
+            df_host_pinned_d2_t2, df_host_pinned_d2_v2, df_host_energies, host_d1_size,
+            host_d2_size,
+            //
+            df_simple_s1_size, df_simple_d1_size, df_simple_d2_size, df_simple_s1_exec,
+            df_simple_d1_exec, df_simple_d2_exec,
+            //
+            t_h1b, t_h2b, t_h3b, t_p4b, t_p5b, t_p6b, factor, taskcount, max_d1_kernels_pertask,
+            max_d2_kernels_pertask,
+            //
+            size_T_s1_t1, size_T_s1_v2, size_T_d1_t2, size_T_d1_v2, size_T_d2_t2, size_T_d2_v2,
+            //
+            energy_l, cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v);
 #endif
-
-                      next = ac->fetch_add(0, 1);
-                    }
-                    taskcount++;
                   }
                 }
-              }
+              } // h3b
+
+              next = ac->fetch_add(0, 1);
             }
+            taskcount++;
           }
         }
       }
     }
-  }      // parallel h3b loop
-  else { // seq h3b loop
-
-#if 1
-    if(rank == 0) {
-      std::cout << "14256-seq3 loop variant" << std::endl << std::endl;
-      // std::cout << "tile142563,kernel,memcpy,data,total" << std::endl;
-    }
-    for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) { //
-      for(size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
-        for(size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
-          for(size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
-            for(size_t t_p6b = t_p5b; t_p6b < noab + nvab; t_p6b++) {
-#endif
-              // #if 0
-              //     for (size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
-              //     for (size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
-              //     for (size_t t_p6b = t_p5b; t_p6b < noab + nvab; t_p6b++) {
-              //     for (size_t t_h1b = 0; t_h1b < noab; t_h1b++) {
-              //     for (size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
-              // #endif
-              if(next == taskcount) {
-                for(size_t t_h3b = t_h2b; t_h3b < noab; t_h3b++) {
-                  if((k_spin[t_p4b] + k_spin[t_p5b] + k_spin[t_p6b]) ==
-                     (k_spin[t_h1b] + k_spin[t_h2b] + k_spin[t_h3b])) {
-                    if((!is_restricted) || (k_spin[t_p4b] + k_spin[t_p5b] + k_spin[t_p6b] +
-                                            k_spin[t_h1b] + k_spin[t_h2b] + k_spin[t_h3b]) <= 8) {
-                      T factor = 1.0;
-                      if(is_restricted) factor = 2.0;
-
-                      //
-                      if((t_p4b == t_p5b) && (t_p5b == t_p6b)) { factor /= 6.0; }
-                      else if((t_p4b == t_p5b) || (t_p5b == t_p6b)) { factor /= 2.0; }
-
-                      if((t_h1b == t_h2b) && (t_h2b == t_h3b)) { factor /= 6.0; }
-                      else if((t_h1b == t_h2b) || (t_h2b == t_h3b)) { factor /= 2.0; }
-
-                      //
-                      num_task++;
-
-#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-                      ccsd_t_fully_fused_none_df_none_task<T>(
-                        is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2,
-                        d_v2, k_evl_sorted,
-                        //
-                        df_host_pinned_s1_t1, df_host_pinned_s1_v2, df_host_pinned_d1_t2,
-                        df_host_pinned_d1_v2, df_host_pinned_d2_t2, df_host_pinned_d2_v2,
-                        df_host_energies,
-                        //
-                        //
-                        //
-                        host_d1_size, host_d2_size,
-                        //
-                        df_simple_s1_size, df_simple_d1_size, df_simple_d2_size, df_simple_s1_exec,
-                        df_simple_d1_exec, df_simple_d2_exec,
-                        //
-                        df_dev_s1_t1_all, df_dev_s1_v2_all, df_dev_d1_t2_all, df_dev_d1_v2_all,
-                        df_dev_d2_t2_all, df_dev_d2_v2_all, df_dev_energies,
-                        //
-                        t_h1b, t_h2b, t_h3b, t_p4b, t_p5b, t_p6b, factor, taskcount,
-                        max_d1_kernels_pertask, max_d2_kernels_pertask,
-                        //
-                        size_T_s1_t1, size_T_s1_v2, size_T_d1_t2, size_T_d1_v2, size_T_d2_t2,
-                        size_T_d2_v2,
-                        //
-                        energy_l,
-#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-                        reduceData.get(),
-#endif
-                        cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v,
-                        //
-                        done_compute, done_copy);
-#else
-            total_fused_ccsd_t_cpu<T>(
-              is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2, d_v2,
-              k_evl_sorted,
-              //
-              df_host_pinned_s1_t1, df_host_pinned_s1_v2, df_host_pinned_d1_t2,
-              df_host_pinned_d1_v2, df_host_pinned_d2_t2, df_host_pinned_d2_v2, df_host_energies,
-              host_d1_size, host_d2_size,
-              //
-              df_simple_s1_size, df_simple_d1_size, df_simple_d2_size, df_simple_s1_exec,
-              df_simple_d1_exec, df_simple_d2_exec,
-              //
-              t_h1b, t_h2b, t_h3b, t_p4b, t_p5b, t_p6b, factor, taskcount, max_d1_kernels_pertask,
-              max_d2_kernels_pertask,
-              //
-              size_T_s1_t1, size_T_s1_v2, size_T_d1_t2, size_T_d1_v2, size_T_d2_t2, size_T_d2_v2,
-              //
-              energy_l, cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v);
-#endif
-                    }
-                  }
-                } // h3b
-
-                next = ac->fetch_add(0, 1);
-              }
-              taskcount++;
-            }
-          }
-        }
-      }
-    }
-  } // end seq h3b
+  }
+  // } // end seq h3b
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
   gpuDeviceSynchronize();

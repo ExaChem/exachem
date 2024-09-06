@@ -28,10 +28,18 @@ void ECMolden::write_molden(ChemEnv& chem_env, Matrix& C_a, std::vector<double>&
   for(int i = 0; i < ndocc; i++) occs[i] = 2.0;
 
   std::vector<libint2::Shell> mshells_(chem_env.shells.size());
+  auto                        shell2bf = chem_env.shells.shell2bf();
+  Matrix                      C_copy   = C_a;
   for(size_t i = 0; i < mshells_.size(); i++) {
     mshells_[i] = chem_env.shells[i];
     for(auto& contr: mshells_[i].contr) {
-      if(contr.l <= 1) contr.pure = false;
+      if(contr.l == 1) {
+        contr.pure          = false;
+        size_t ibf          = shell2bf[i];
+        C_copy.row(ibf)     = C_a.row(ibf + 2);
+        C_copy.row(ibf + 1) = C_a.row(ibf);
+        C_copy.row(ibf + 2) = C_a.row(ibf + 1);
+      }
     }
   }
 
@@ -45,8 +53,8 @@ void ECMolden::write_molden(ChemEnv& chem_env, Matrix& C_a, std::vector<double>&
   double                   b2a                 = libint2::constants::codata_2018::bohr_to_angstrom;
   double                   coefficient_epsilon = 0.0;
 
-  libint2::molden::Export molden_export(chem_env.atoms, mshells, C_a, occs, eps_a, symmetry_labels,
-                                        spincases, b2a, coefficient_epsilon);
+  libint2::molden::Export molden_export(chem_env.atoms, mshells, C_copy, occs, eps_a,
+                                        symmetry_labels, spincases, b2a, coefficient_epsilon);
   std::ofstream           molden_file(files_prefix + ".molden");
   molden_export.write(molden_file);
 }

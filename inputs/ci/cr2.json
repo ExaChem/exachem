@@ -1,0 +1,70 @@
+{
+  "geometry": {
+    "coordinates": [
+      "Cr1   0.00000000     0.00000000    0.00000000",
+      "Cr2   0.00000000     0.00000000    1.68000000"
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "def2-svp"
+  },
+  "common": {
+    "maxiter": 100
+  },
+  "SCF": {
+    "tol_lindep": 1e-06,
+    "scf_type": "unrestricted",
+    "conve": 1e-09,
+    "convd": 1e-07,
+    "diis_hist": 10,
+    "tilesize": 30,
+    "lshift": 0.1,
+    "DFT": {
+      "xc_type": ["PBE"]
+    },
+    "guess": {
+      "atom_options":{
+        "Cr1": [0,3],
+        "Cr2": [0,-3]
+      }
+    }
+  },
+  "CD": {
+    "diagtol": 1e-08
+  },
+  "CC": {
+    "threshold": 1e-06,
+    "writet": true,
+    "GFCCSD": {
+      "gf_ip": true,
+      "gf_ea": false,
+      "gf_os": false,
+      "gf_cs": false,
+      "gf_ngmres": 10,
+      "gf_itriples": false,
+      "gf_maxiter": 100,
+      "gf_damping_factor": 1.0,
+      "gf_p_oi_range": 1,
+      "gf_eta": 0.01,
+      "gf_threshold": 0.01,
+      "gf_omega_min_ip": -0.4,
+      "gf_omega_max_ip": -0.2,
+      "gf_omega_min_ip_e": -2.0,
+      "gf_omega_max_ip_e": 0.0,
+      "gf_omega_delta": 0.01,
+      "gf_omega_delta_e": 0.01,
+      "gf_omega_min_ea": 0.0,
+      "gf_omega_max_ea": 0.1,
+      "gf_omega_min_ea_e": 0.0,
+      "gf_omega_max_ea_e": 0.1
+    }
+  },
+  "TASK": {
+    "scf": true,
+    "mp2": false,
+    "cd_2e": false,
+    "ccsd": false,
+    "ccsd_t": false
+  }  
+}

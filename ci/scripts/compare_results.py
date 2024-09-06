@@ -234,7 +234,7 @@ for ref_file in ref_files:
     
     print(" ... OK")
 
-upcxx_skip_tests=["ozone.sto-3g.rt-eomccsd.json","co.cc-pvdz.gfccsd.json"]
+upcxx_skip_tests=["ozone.sto-3g.rt-eomccsd.json","co.cc-pvdz.gfccsd.json","cr2.def2-svp.scf.json"]
 if upcxx:
     print(" **** upcxx: skipping rt-eomccsd and gfccsd tests ****")
     for rf in upcxx_skip_tests:

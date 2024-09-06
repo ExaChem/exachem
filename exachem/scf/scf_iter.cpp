@@ -962,14 +962,12 @@ void exachem::scf::SCFIter::compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_e
 
   // contract(1.0, xyK, {1, 2, 3}, Co, {2, 4}, 0.0, xiK, {1, 4, 3});
 
-  sch.allocate(Jtmp_tamm).execute();
-
   ig1 = std::chrono::high_resolution_clock::now();
   // compute Coulomb
   // clang-format off
     if (is_uhf) sch(ttensors.D_alpha() += ttensors.D_beta());
 
-    sch
+    sch.allocate(Jtmp_tamm)
       (Jtmp_tamm(d_mu) = xyK(mu,nu,d_mu) * ttensors.D_alpha(mu,nu))
       (F_alpha_tmp(mu, nu) = xyK(mu, nu, d_mu) * Jtmp_tamm(d_mu));
     

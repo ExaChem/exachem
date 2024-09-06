@@ -573,6 +573,10 @@ void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
 
     for(auto& ab: add_bufs) delete ab;
     add_bufs.clear();
+
+    delete lhsp_;
+    delete rhs1p_;
+    delete rhs2p_;
   };
 
   a22_aaaa_os = Tensor<T>{{v_alpha_os, v_alpha_os, v_alpha_os, v_alpha_os}, compute_v4_term};

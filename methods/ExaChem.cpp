@@ -186,7 +186,12 @@ int main(int argc, char* argv[]) {
     chem_env.sys_data.has_ecp = chem_env.ec_basis.has_ecp;
 
     if(task.sinfo) chem_env.sinfo();
-    else if(task.scf) scf::scf_driver(ec, chem_env);
+    else if(task.scf) {
+      scf::scf_driver(ec, chem_env);
+      Tensor<TensorType>::deallocate(chem_env.C_AO, chem_env.F_AO);
+      if(chem_env.sys_data.is_unrestricted)
+        Tensor<TensorType>::deallocate(chem_env.C_beta_AO, chem_env.F_beta_AO);
+    }
 #if defined(ENABLE_CC)
     else if(task.mp2) mp2::cd_mp2(ec, chem_env);
     else if(task.cd_2e) cholesky_2e::cholesky_decomp_2e(ec, chem_env);
@@ -209,6 +214,8 @@ int main(int argc, char* argv[]) {
         "[ERROR] Unsupported task specified (or) code for the specified task is not built");
   }
 
+  ec.flush_and_sync();
+  ec.pg().destroy_coll();
   tamm::finalize();
 
   return 0;

@@ -622,6 +622,9 @@ void total_fused_ccsd_t_cpu(
 
   energy_l[1] += final_energy_2;
 
+  free(host_t3_d);
+  free(host_t3_s);
+
   // printf ("E(4): %.14f, E(5): %.14f\n", host_energy_4, host_energy_5);
   //  printf
   //  ("========================================================================================\n");

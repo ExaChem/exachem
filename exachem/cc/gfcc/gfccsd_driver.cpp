@@ -172,7 +172,7 @@ void write_string_to_disk(ExecutionContext& ec, const std::string& tstring,
     if(!out) cerr << "Error opening file " << filename << endl;
     out << combined_string << std::endl;
     out.close();
-    delete combined_string;
+    delete[] combined_string;
   }
 }
 
@@ -324,9 +324,9 @@ void gfccsd_driver_ip_a(
   auto world_comm = gec.pg().comm();
   auto world_rank = gec.pg().rank().value();
 
-  MPI_Group world_group;
-  int       world_size;
-  MPI_Comm_group(world_comm, &world_group);
+  // MPI_Group world_group;
+  int world_size;
+  // MPI_Comm_group(world_comm, &world_group);
   MPI_Comm_size(world_comm, &world_size);
   MPI_Comm gf_comm;
 
@@ -1053,9 +1053,9 @@ void gfccsd_driver_ip_b(
   auto world_comm = gec.pg().comm();
   auto world_rank = gec.pg().rank().value();
 
-  MPI_Group world_group;
+  // MPI_Group world_group;
   int       world_size;
-  MPI_Comm_group(world_comm, &world_group);
+  // MPI_Comm_group(world_comm, &world_group);
   MPI_Comm_size(world_comm, &world_size);
   MPI_Comm gf_comm;
 
@@ -1551,9 +1551,9 @@ void gfccsd_driver_ea_a(
   auto world_comm = gec.pg().comm();
   auto world_rank = gec.pg().rank().value();
 
-  MPI_Group world_group;
+  // MPI_Group world_group;
   int       world_size;
-  MPI_Comm_group(world_comm, &world_group);
+  // MPI_Comm_group(world_comm, &world_group);
   MPI_Comm_size(world_comm, &world_size);
   MPI_Comm gf_comm;
 
@@ -2129,9 +2129,9 @@ void gfccsd_driver_ea_b(
   auto world_comm = gec.pg().comm();
   auto world_rank = gec.pg().rank().value();
 
-  MPI_Group world_group;
+  // MPI_Group world_group;
   int       world_size;
-  MPI_Comm_group(world_comm, &world_group);
+  // MPI_Comm_group(world_comm, &world_group);
   MPI_Comm_size(world_comm, &world_size);
   MPI_Comm gf_comm;
 
@@ -2546,6 +2546,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   MPI_Group_incl(world_group, nsranks, subranks, &subgroup);
   MPI_Comm subcomm;
   MPI_Comm_create(world_comm, subgroup, &subcomm);
+  MPI_Group_free(&subgroup);
+  MPI_Group_free(&world_group);
 
   ProcGroup         sub_pg;
   ExecutionContext* sub_ec = nullptr;
@@ -6422,15 +6424,16 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   // GA_Summarize(0);
   ec.flush_and_sync();
   // MemoryManagerGA::destroy_coll(mgr);
-  ec.pg().destroy_coll();
+  // ec.pg().destroy_coll(); // handled by exachem main
   ec_l.flush_and_sync();
   // MemoryManagerLocal::destroy_coll(mgr_l);
   pg_l.destroy_coll();
   if(subcomm != MPI_COMM_NULL) {
     (*sub_ec).flush_and_sync();
+    sub_pg.destroy_coll();
+    delete sub_ec;
     // MemoryManagerGA::destroy_coll(sub_mgr);
     MPI_Comm_free(&subcomm);
   }
-  // delete ec;
 }
 } // namespace exachem::cc::gfcc

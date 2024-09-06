@@ -186,9 +186,9 @@ if is_uhf: v4_mem += v_alpha*v_alpha*v_alpha*v_alpha+v_beta*v_beta*v_beta*v_beta
 v4_mem *= 8.0 #bytes
 v4_mem = round(v4_mem/gib,2)
 
-# print(" - Storage required V^4 intermediate: " + str(v4_mem) + " GiB")
-# old_mem = v4_mem+ccsd_mem
-# print(" - Total CPU memory required if V^4 intermediate is stored: " + str(old_mem) + " GiB")
+print(" - Storage required V^4 intermediate: " + str(v4_mem) + " GiB")
+old_mem = v4_mem+ccsd_mem
+print(" - Total CPU memory required if V^4 intermediate is stored: " + str(old_mem) + " GiB")
 
 
 # (T)

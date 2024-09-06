@@ -72,6 +72,8 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   MPI_Group_incl(wgroup, hf_nranks, ranks, &hfgroup);
   MPI_Comm hf_comm;
   MPI_Comm_create(gcomm, hfgroup, &hf_comm);
+  MPI_Group_free(&wgroup);
+  MPI_Group_free(&hfgroup);
 #endif
 
 #if defined(USE_SCALAPACK)
@@ -1017,6 +1019,8 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
       Tensor<TensorType>::deallocate(ttensors.F_BC, ttensors.X_alpha, ttensors.C_alpha_BC);
       if(chem_env.sys_data.is_unrestricted) Tensor<TensorType>::deallocate(ttensors.C_beta_BC);
       scalapack_info.ec.flush_and_sync();
+      MPI_Comm_free(&scacomm); // frees scalapack_info.comm
+      scalapack_info.ec.pg().destroy_coll();
     }
 // Free created comms / groups
 // MPI_Comm_free( &scalapack_comm );
@@ -1028,11 +1032,13 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 #endif
 
 #if SCF_THROTTLE_RESOURCES
-
+    ec.pg().destroy_coll();
   } // end scaled down process group
 
 #if defined(USE_UPCXX)
   hf_comm->destroy();
+#else
+  if(hf_comm != MPI_COMM_NULL) MPI_Comm_free(&hf_comm);
 #endif
 
 #endif
@@ -1100,6 +1106,11 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
       std::cout << "[MOLDEN] molden write for UHF unsupported!" << std::endl;
     else ec_molden.write_molden(chem_env, C_a, etensors.eps_a, files_prefix);
   }
+
+  if(chem_env.sys_data.is_ks) schg.deallocate(ttensors.VXC_alpha);
+  if(chem_env.sys_data.is_ks && chem_env.sys_data.is_unrestricted)
+    schg.deallocate(ttensors.VXC_beta);
+  if(chem_env.sys_data.is_ks) schg.execute();
 
   exc.pg().barrier();
 

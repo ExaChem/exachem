@@ -72,6 +72,8 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   MPI_Group_incl(world_group, nsranks, subranks, &subgroup);
   MPI_Comm subcomm;
   MPI_Comm_create(world_comm, subgroup, &subcomm);
+  MPI_Group_free(&world_group);
+  MPI_Group_free(&subgroup);
 #endif
 
   ProcGroup         sub_pg;
@@ -252,6 +254,8 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
 
     if(rank < nsranks) {
       (*sub_ec).flush_and_sync();
+      sub_pg.destroy_coll();
+      delete sub_ec;
 #ifdef USE_UPCXX
       subcomm.destroy();
 #else
@@ -289,6 +293,17 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
     d_f1 = {{N, N}, {1, 1}};
     Tensor<T>::allocate(&ec, d_f1);
     if(rank == 0) sys_data.print();
+
+    if(rank < nsranks) {
+      (*sub_ec).flush_and_sync();
+      sub_pg.destroy_coll();
+      delete sub_ec;
+#ifdef USE_UPCXX
+      subcomm.destroy();
+#else
+      MPI_Comm_free(&subcomm);
+#endif
+    }
   }
 
   auto [MO1, total_orbitals1] = cholesky_2e::setupMOIS(chem_env, true);

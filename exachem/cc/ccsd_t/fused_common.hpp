@@ -109,6 +109,12 @@ long double ccsd_t_fully_fused_performance(
   // printf ("[%s] total task >> s1: %lu, d1: %lu, d2: %lu >> total: %lu\n", __func__,
   // total_num_ops_s1, total_num_ops_d1, total_num_ops_d2, total_overall);
 
+  free(df_simple_s1_size);
+  free(df_simple_s1_exec);
+  free(df_simple_d1_size);
+  free(df_simple_d1_exec);
+  free(df_simple_d2_size);
+  free(df_simple_d2_exec);
   //
   return total_overall;
 }

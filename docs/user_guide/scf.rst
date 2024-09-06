@@ -23,7 +23,7 @@ The values listed below are the defaults where few options are automatically adj
    "multiplicity": 1,
    "lshift": 0,
    "tol_int": 1e-22,
-   "tol_sch": 1e-10,
+   "tol_sch": 1e-12,
    "tol_lindep": 1e-5,
    "conve": 1e-8,
    "convd": 1e-7,
@@ -89,7 +89,7 @@ The values listed below are the defaults where few options are automatically adj
 
 :tol_int: ``[default=1e-22]`` Used to determine the integral primitive screening threshold for the evaluation of the energy and related Fock-like matrices.
 
-:tol_sch: ``[default=min(1e-10, 1e-2 * conve)]``
+:tol_sch: ``[default=min(1e-12, 1e-2 * conve)]``
   The Schwarz inequality is used to screen the product of integrals and density
   matrices in a manner that results in an accuracy in the energy and Fock matrices that approximates the value specified for **tol_sch**.
 

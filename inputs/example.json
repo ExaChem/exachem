@@ -43,7 +43,7 @@
         "multiplicity": 1,
         "lshift": 0,
         "tol_int": 1e-22,
-        "tol_sch": 1e-10,
+        "tol_sch": 1e-12,
         "tol_lindep": 1e-5,
         "conve": 1e-8,
         "convd": 1e-7,

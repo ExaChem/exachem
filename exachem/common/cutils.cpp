@@ -21,6 +21,8 @@ MPI_Comm get_scalapack_comm(tamm::ExecutionContext& ec, int sca_nranks) {
   MPI_Group_incl(wgroup, sca_nranks, lranks, &sca_group);
   MPI_Comm scacomm;
   MPI_Comm_create(gcomm, sca_group, &scacomm);
+  MPI_Group_free(&wgroup);
+  MPI_Group_free(&sca_group);
   return scacomm;
 }
 

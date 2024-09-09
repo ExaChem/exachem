@@ -293,6 +293,10 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
   scf_compute.compute_shellpair_list(ec, shells, scf_vars);
   auto [obs_shellpair_list, obs_shellpair_data] = scf_compute.compute_shellpairs(shells);
 
+  IndexSpace AO{range(0, shells.nbf())};
+  scf_vars.tAO    = {AO, scf_vars.AO_opttiles};
+  Matrix SchwarzK = scf_compute.compute_schwarz_ints<>(ec, scf_vars, shells);
+
   auto shell2bf = BasisSetMap::map_shell_to_basis_function(shells);
   auto bf2shell = BasisSetMap::map_basis_function_to_shell(shells);
 
@@ -403,7 +407,11 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
     g_d_tamm stores the diagonal integrals, i.e. (uv|uv)'s
     ScrCol temporarily stores all (uv|rs)'s with fixed r and s
   */
-  Engine      engine(Operator::coulomb, max_nprim(shells), max_l(shells), 0);
+  Engine       engine(Operator::coulomb, max_nprim(shells), max_l(shells), 0);
+  const double engine_precision = chem_env.ioptions.scf_options.tol_int;
+
+  // Compute diagonal without primitive screening
+  engine.set_precision(0.0);
   const auto& buf = engine.results();
 
   bool cd_restart = write_cv.first && fs::exists(diag_ao_file) && fs::exists(chol_ao_file) &&
@@ -515,17 +523,22 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
   indx_d0[0] = (int64_t) blkoff[0] + (int64_t) eoff[0];
   indx_d0[1] = (int64_t) blkoff[1] + (int64_t) eoff[1];
 
+  // Reset Engine precision
+  const double schwarz_tol = chem_env.ioptions.scf_options.tol_sch;
+  engine.set_precision(engine_precision);
+
   while(val_d0 > diagtol && count < max_cvecs) {
-    auto bfu   = indx_d0[0];
-    auto bfv   = indx_d0[1];
-    auto s1    = bf2shell[bfu];
-    auto n1    = shells[s1].size();
-    auto s2    = bf2shell[bfv];
-    auto n2    = shells[s2].size();
-    auto n12   = n1 * n2;
-    auto f1    = bfu - shell2bf[s1];
-    auto f2    = bfv - shell2bf[s2];
-    auto ind12 = f1 * n2 + f2;
+    auto bfu        = indx_d0[0];
+    auto bfv        = indx_d0[1];
+    auto s1         = bf2shell[bfu];
+    auto n1         = shells[s1].size();
+    auto s2         = bf2shell[bfv];
+    auto n2         = shells[s2].size();
+    auto n12        = n1 * n2;
+    auto f1         = bfu - shell2bf[s1];
+    auto f2         = bfv - shell2bf[s2];
+    auto ind12      = f1 * n2 + f2;
+    auto schwarz_12 = SchwarzK(s1, s2);
 
 #if !defined(USE_UPCXX)
     cd_tensor_zero(g_r_tamm);
@@ -564,6 +577,7 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
           }
 
           auto n4 = shells[s4].size();
+          if(schwarz_12 * SchwarzK(s3, s4) < schwarz_tol) continue;
 
           // compute shell pair; return is the pointer to the buffer
           engine.compute(shells[s3], shells[s4], shells[s1], shells[s2]);
@@ -605,6 +619,7 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
       for(size_t s4 = 0; s4 != shells.size(); ++s4) {
         auto bf4_first = shell2bf[s4];
         auto n4        = shells[s4].size();
+        if(schwarz_12 * SchwarzK(s3, s4) < schwarz_tol) continue;
 
 #if defined(USE_UPCXX)
         if(g_r_tamm.is_local_element(0, 0, bf3_first, bf4_first)) {

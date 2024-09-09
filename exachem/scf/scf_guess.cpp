@@ -1234,7 +1234,7 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
 
     using libint2::Engine;
     Engine engine(Operator::coulomb, obs.max_nprim(), obs.max_l(), 0);
-    engine.set_precision(fock_precision);
+    engine.set_precision(0.0);
     const auto& buf = engine.results();
 
     Tensor<TensorType> F1tmp_atom2{tAOt_atom, tAOt_atom}; // not allocated

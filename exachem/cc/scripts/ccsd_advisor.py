@@ -3,7 +3,7 @@ import math
 from argparse import ArgumentParser
 from argparse import ArgumentDefaultsHelpFormatter
 
-#python ccsd_memory.py -oa 99 -ob 94 -va 394 -vb 399 -cv 4027 -ctype uhf -diis 5 -nranks 10 -cache 8 -ts 32
+#python ccsd_advisor.py -oa 99 -ob 94 -va 394 -vb 399 -cv 4027 -ppn 4 -ram 512 -ctype uhf -diis 5 -nranks 10 -cache 8 -ts 32
 
 def parseargs(argv=None):
 
@@ -16,15 +16,16 @@ def parseargs(argv=None):
 
     #num_cores = psutil.cpu_count(logical=False)
     parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-oa', '--o_alpha',  type=int, required=True, help='#occupied alpha')
-    parser.add_argument('-ob', '--o_beta' ,  type=int, required=True, help='#occupied beta')
-    parser.add_argument('-va', '--v_alpha',  type=int, required=True, help='#virtual alpha')
-    parser.add_argument('-vb', '--v_beta' ,  type=int, required=True, help='#virtual beta')
-    parser.add_argument('-cv', '--cv_count', type=int, required=True, help='#cholesky vectors')
+    parser.add_argument('-oa',  '--o_alpha',    type=int, required=True, help='#occupied alpha')
+    parser.add_argument('-ob',  '--o_beta' ,    type=int, required=True, help='#occupied beta')
+    parser.add_argument('-va',  '--v_alpha',    type=int, required=True, help='#virtual alpha')
+    parser.add_argument('-vb',  '--v_beta' ,    type=int, required=True, help='#virtual beta')
+    parser.add_argument('-cv',  '--cv_count',   type=int, required=True, help='#cholesky vectors')
+    parser.add_argument('-ppn', '--ppn',        type=int, required=True, help='mpi ranks per node')
+    parser.add_argument('-ram', '--cpu_memory', type=int, required=True, help='CPU Memory per node in GiB')
 
     parser.add_argument('-ctype',  '--scf_type',   type=str, default="rhf", help='RHF/UHF')
     parser.add_argument('-diis',   '--diis'    ,   type=int, default=5,  help='#diis')
-    parser.add_argument('-nranks', '--nranks'  ,   type=int, default=1,  help='#mpi ranks')
     parser.add_argument('-cache',  '--cache_size', type=int, default=8,  help='(T) cache size')
     parser.add_argument('-ts', '--ccsdt_tilesize', type=int, default=32, help='(T) tilesize')
     
@@ -39,9 +40,11 @@ o_beta =cc_args.o_beta
 v_alpha=cc_args.v_alpha
 v_beta =cc_args.v_beta
 CI     =cc_args.cv_count
+ppn    =cc_args.ppn #ppn=num-gpus per node
+cpu_mem=cc_args.cpu_memory
+
 
 ndiis = cc_args.diis
-nranks = cc_args.nranks
 cache_size = cc_args.cache_size
 ccsdt_tilesize = cc_args.ccsdt_tilesize
 
@@ -127,15 +130,15 @@ chol3d_vv = CI*f1_vv  #{V, V, CI}, {"aa", "bb"}
 chol3d_vo = chol3d_ov #{V, O, CI}, {"aa", "bb"}
 
 # skipping f1_oo, f1_ov, f1_vv 
-ccsd_mem += d_f1 + f1_oo + f1_ov + f1_vv + t1_aa + t2_abab + r1_aa + r2_abab + cv3d \
+ccsd_mem += d_f1 + f1_oo + f1_ov + f1_vv + t1_aa + t2_abab + r1_aa + r2_abab \
     + chol3d_oo + chol3d_ov + chol3d_vv +_a02 +_a03
 
 if not is_uhf: ccsd_mem += t2_aaaa + i0_temp +t2_aaaa_temp
 else:
     ccsd_mem += r1_vo + r2_vvoo + t1_vo + t2_vvoo + f1_vo + chol3d_vo
 
-# DIIS
-ccsd_mem += d_r1s + d_r2s + d_t1s + d_t2s
+# DIIS + cv3d // these are not allocated in the tamm standalone test
+ccsd_mem += cv3d + d_r1s + d_r2s + d_t1s + d_t2s
 
 # Intermediates
 _a04  = o_alpha*o_alpha #{O, O},{"aa"}
@@ -176,19 +179,62 @@ ccsd_mem += _a01 + _a04 + _a05 + _a06 + _a001 + _a004 + _a006 \
 
 gib=1024*1024*1024.0
 
-ccsd_mem = round(ccsd_mem*8/gib,2) #bytes
-chol_mem = round(chol_mem*8/gib,2) #bytes 
-print("Total CPU memory required for Cholesky decomp of the 2e integrals: " + str(chol_mem) + " GiB")
-print("Total CPU memory required for CCSD calculation: " + str(ccsd_mem) + " GiB")
+#Multiply by 2 to account for posix shared mem
+ccsd_mem = round(2*ccsd_mem*8/gib,2) #bytes
+chol_mem = round(2*chol_mem*8/gib,2) #bytes 
 
 v4_mem = v_alpha*v_alpha*v_beta*v_beta
 if is_uhf: v4_mem += v_alpha*v_alpha*v_alpha*v_alpha+v_beta*v_beta*v_beta*v_beta
 v4_mem *= 8.0 #bytes
-v4_mem = round(v4_mem/gib,2)
+#Multiply by 2 to account for posix shared mem
+v4_mem = round(2*v4_mem/gib,2)
 
-print(" - Storage required V^4 intermediate: " + str(v4_mem) + " GiB")
-old_mem = v4_mem+ccsd_mem
-print(" - Total CPU memory required if V^4 intermediate is stored: " + str(old_mem) + " GiB")
+# print("---------------------------------------------------------------------------")
+# print(" - Storage required V^4 intermediate: " + str(v4_mem) + " GiB")
+# old_mem = v4_mem+ccsd_mem
+# print(" - Total CPU memory required if V^4 intermediate is stored: " + str(old_mem) + " GiB")
+# print("---------------------------------------------------------------------------")
+
+nnodes = math.ceil(ccsd_mem/cpu_mem)
+
+nranks = nnodes*ppn
+
+print("nbf: "    + str(nbf))
+
+print("\nTotal CPU memory required for Cholesky decomp of the 2e integrals: " + str(chol_mem) + " GiB")
+print("\nTotal CPU memory required for CCSD calculation: " + str(ccsd_mem) + " GiB")
+
+
+VabOab = v_alpha*o_beta*v_beta*o_alpha
+ts_guess=50
+ts_max=ts_guess
+tilesizes = list(range(ts_guess, 501, 5))
+tilesizes.insert(0,73)
+
+def get_ts_recommendation(tilesizes,nranks):
+    ts_guess_ = tilesizes[0]
+    ts_max_    = tilesizes[0]
+    nblocks_  = 10
+    for ts in tilesizes:
+        nblocks = math.ceil(v_alpha/ts) * math.ceil(o_alpha/ts) * math.ceil(v_beta/ts) * math.ceil(o_beta/ts)
+        # print("nblocks %s for TS = %s " %(nblocks,ts))
+        ts_max_ = ts
+        if nblocks <= nranks:
+            ts_max_ = ts_guess_
+            break
+        ts_guess_=ts
+        nblocks_=nblocks
+
+    return [ts_max_,nblocks_]
+
+[ts_max,nblocks] = get_ts_recommendation(tilesizes,nranks)
+print("Min #nodes required = %s, nranks = %s, nblocks = %s, max tilesize = %s" %(nnodes, nranks, nblocks, ts_max))
+
+nodecounts = list(range(nnodes+10, nnodes*10+1, 10))
+for nc in nodecounts:
+    [ts_max,nblocks] = get_ts_recommendation(tilesizes,nc*ppn)
+    if nblocks <= nc*ppn: break
+    print("For node count = %s, nranks = %s, nblocks = %s, max tilesize = %s" %(nc, nc*ppn, nblocks, ts_max))
 
 
 # (T)
@@ -275,13 +321,13 @@ cache_mem_per_rank += (noa+nob + nva+nvb) * 2 * cache_size * cache_buf_size # d1
 cache_mem_per_rank  = cache_mem_per_rank / gib
 total_cache_mem = cache_mem_per_rank * nranks # GiB
 
-ccsd_t_mem = round(ccsd_t_mem,2)
+ccsd_t_mem = 2*round(ccsd_t_mem,2) # 2 for posix shared mem
 total_cache_mem = round(total_cache_mem,2)
 total_extra_buf_mem = round(total_extra_buf_mem,2)
 
 total_ccsd_t_mem = ccsd_t_mem + total_extra_buf_mem + total_cache_mem
 
-print("Total CPU memory required for (T) calculation: " + str(total_ccsd_t_mem) + " GiB")
+print("\nTotal CPU memory required for (T) calculation: " + str(total_ccsd_t_mem) + " GiB" + ", Min nodes required: " + str(math.ceil(total_ccsd_t_mem/cpu_mem)))
 print("-- memory required for the input tensors: " + str(ccsd_t_mem) + " GiB")
 print("-- memory required for intermediate buffers: " + str(total_extra_buf_mem) + " GiB")
 cache_msg = "-- memory required for caching t1,t2,v2 blocks"

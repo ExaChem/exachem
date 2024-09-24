@@ -126,8 +126,6 @@ if __name__ == '__main__':
 
     exachem_opt["SCF"] = {}
     scf_opt = exachem_opt["SCF"]
-    scf_opt["tol_int"] = 1e-12
-    scf_opt["tol_lindep"] = 1e-5
     scf_opt["conve"] = 1e-8
     scf_opt["convd"] = 1e-7
     scf_opt["diis_hist"] = 10

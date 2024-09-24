@@ -43,7 +43,7 @@ public:
   int      multiplicity{1};
   double   lshift{0};        // level shift factor, +ve value b/w 0 and 1
   double   tol_int{1e-22};   // tolerance for integral primitive screening
-  double   tol_sch{1e-10};   // tolerance for schwarz screening
+  double   tol_sch{1e-12};   // tolerance for schwarz screening
   double   tol_lindep{1e-5}; // tolerance for linear dependencies
   double   conve{1e-8};      // energy convergence
   double   convd{1e-7};      // density convergence

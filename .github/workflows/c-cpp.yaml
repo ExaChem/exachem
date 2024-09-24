@@ -150,8 +150,6 @@ jobs:
       if: ${{ matrix.os[1] == 'macos' }}
       shell: bash
       run: |
-        echo "CC=gcc-13" >> $GITHUB_ENV
-        echo "CXX=g++-13" >> $GITHUB_ENV
         echo "LA_VENDOR=OpenBLAS" >> $GITHUB_ENV
 
     - name: Cache install steps (backend = ga)

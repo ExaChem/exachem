@@ -110,7 +110,7 @@ def parse_nwchem_input(input_file):
   nwchem_opt["SCF"]["PRINT"] = {}
   scf_opt = nwchem_opt["SCF"]
   scf_opt["tol_int"] = 1e-22
-  scf_opt["tol_sch"] = 1e-10
+  scf_opt["tol_sch"] = 1e-12
   scf_opt["tol_lindep"] = 1e-5
   scf_opt["conve"] = 1e-8
   scf_opt["convd"] = 1e-7
@@ -129,7 +129,7 @@ def parse_nwchem_input(input_file):
   dft_opt = nwchem_opt["DFT"]
   dft_opt["hfexch"] = False
   dft_opt["tol_int"] = 1e-22
-  dft_opt["tol_sch"] = 1e-10
+  dft_opt["tol_sch"] = 1e-12
   dft_opt["tol_lindep"] = 1e-5
   dft_opt["conve"] = 1e-8
   dft_opt["convd"] = 1e-7

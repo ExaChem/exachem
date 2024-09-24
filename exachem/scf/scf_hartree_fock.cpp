@@ -54,8 +54,8 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   // -------------Everythin related to Basis Sets-----------------------------
 
 #if SCF_THROTTLE_RESOURCES
-  ProcGroupData pgdata = get_spg_data(exc, N, -1, 50, chem_env.ioptions.scf_options.nnodes, -1, 4);
-  auto [t_nnodes, hf_nnodes, ppn, hf_nranks, sca_nnodes, sca_nranks] = pgdata.unpack();
+  ProcGroupData pgdata = get_spg_data(exc, N, -1, 50, chem_env.ioptions.scf_options.nnodes);
+  auto [t_nnodes, hf_nnodes, ppn, hf_nranks] = pgdata.unpack();
 
 #if defined(USE_UPCXX)
   bool         in_new_team = (rank < hf_nranks);
@@ -76,9 +76,6 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   MPI_Group_free(&hfgroup);
 #endif
 
-#if defined(USE_SCALAPACK)
-  MPI_Comm scacomm = get_scalapack_comm(exc, sca_nranks);
-#endif
 #endif
 
   if(rank == 0) {
@@ -86,10 +83,6 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 #if SCF_THROTTLE_RESOURCES
     std::cout << "Number of nodes, processes per node used for SCF calculation: " << hf_nnodes
               << ", " << ppn << std::endl;
-#endif
-#if defined(USE_SCALAPACK)
-    cout << "Number of nodes, processes per node, total processes used for Scalapack operations: "
-         << sca_nnodes << ", " << sca_nranks / sca_nnodes << ", " << sca_nranks << endl;
 #endif
     chem_env.ioptions.common_options.print();
     chem_env.ioptions.scf_options.print();
@@ -268,7 +261,8 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 
     ScalapackInfo scalapack_info;
 #if defined(USE_SCALAPACK)
-    setup_scalapack_info(chem_env, scalapack_info, scacomm);
+    setup_scalapack_info(ec, chem_env, scalapack_info, pgdata);
+    MPI_Comm scacomm = scalapack_info.comm;
 #endif
 
 #if defined(USE_GAUXC)
@@ -585,12 +579,12 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
       Matrix S(chem_env.sys_data.nbf_orig, chem_env.sys_data.nbf_orig);
       tamm_to_eigen_tensor(ttensors.S1, S);
       if(chem_env.sys_data.is_restricted)
-        cout << "debug #electrons       = " << (int) std::ceil((etensors.D_alpha * S).trace())
+        cout << "debug #electrons       = " << (int) std::round((etensors.D_alpha * S).trace())
              << endl;
       if(chem_env.sys_data.is_unrestricted) {
-        cout << "debug #alpha electrons = " << (int) std::ceil((etensors.D_alpha * S).trace())
+        cout << "debug #alpha electrons = " << (int) std::round((etensors.D_alpha * S).trace())
              << endl;
-        cout << "debug #beta  electrons = " << (int) std::ceil((etensors.D_beta * S).trace())
+        cout << "debug #beta  electrons = " << (int) std::round((etensors.D_beta * S).trace())
              << endl;
       }
     }

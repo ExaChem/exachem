@@ -53,6 +53,19 @@ struct ScalapackInfo {
 };
 #endif
 
+// Contains node, ppn information used for creating a smaller process group from world group
+struct ProcGroupData {
+  int nnodes{};     // total number of nodes
+  int spg_nnodes{}; // number of nodes in smaller process group
+  int ppn{};        // processes per node
+  int spg_nranks{}; // number of rank in smaller process group
+  // #nodes used for scalapack operations can further be a subset of the smaller process group
+  int scalapack_nnodes{};
+  int scalapack_nranks{};
+
+  auto unpack() { return std::make_tuple(nnodes, spg_nnodes, ppn, spg_nranks); }
+};
+
 #if defined(USE_SCALAPACK)
 struct ScalapackInfo {
   int64_t                                         npr{}, npc{}, scalapack_nranks{};
@@ -66,25 +79,10 @@ struct ScalapackInfo {
 
 MPI_Comm get_scalapack_comm(tamm::ExecutionContext& ec, int sca_nranks);
 
-void setup_scalapack_info(ChemEnv& chem_env, ScalapackInfo& scalapack_info, MPI_Comm& scacomm);
+void setup_scalapack_info(tamm::ExecutionContext& ec, ChemEnv& chem_env,
+                          ScalapackInfo& scalapack_info, ProcGroupData& pgdata);
 #endif
 
-// Contains node, ppn information used for creating a smaller process group from world group
-struct ProcGroupData {
-  int nnodes{};     // total number of nodes
-  int spg_nnodes{}; // number of nodes in smaller process group
-  int ppn{};        // processes per node
-  int spg_nranks{}; // number of rank in smaller process group
-  // #nodes used for scalapack operations can further be a subset of the smaller process group
-  int scalapack_nnodes{};
-  int scalapack_nranks{};
-
-  auto unpack() {
-    return std::make_tuple(nnodes, spg_nnodes, ppn, spg_nranks, scalapack_nnodes, scalapack_nranks);
-  }
-};
-
-// Nbf, % of nodes, % of Nbf, nnodes from input file, (% of nodes, % of nbf) for scalapack
+// Nbf, % of nodes, % of Nbf, nnodes from input file
 ProcGroupData get_spg_data(ExecutionContext& ec, const size_t N, const int node_p,
-                           const int nbf_p = -1, const int node_inp = -1, const int node_p_sca = -1,
-                           const int nbf_p_sca = -1);
+                           const int nbf_p = -1, const int node_inp = -1);

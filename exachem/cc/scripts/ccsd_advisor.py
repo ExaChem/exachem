@@ -5,6 +5,27 @@ from argparse import ArgumentDefaultsHelpFormatter
 
 #python ccsd_advisor.py -oa 99 -ob 94 -va 394 -vb 399 -cv 4027 -ppn 4 -ram 512 -ctype uhf -diis 5 -nranks 10 -cache 8 -ts 32
 
+def get_mo_tiles(noa,nob,nva,nvb,ts):
+    est_nt = math.ceil(1.0 * noa / ts)
+    mo_tiles = []
+    for x in range(0, est_nt):
+      mo_tiles.append(int(noa / est_nt + (x < (noa % est_nt))))
+
+    # est_nt = math.ceil(1.0 * nob / ts)
+    # for x in range(0, est_nt):
+    #   mo_tiles.append(int(nob / est_nt + (x < (nob % est_nt))))
+
+    est_nt = math.ceil(1.0 * nva / ts)
+    for x in range(0, est_nt):
+       mo_tiles.append(int(nva / est_nt + (x < (nva % est_nt))))
+
+    # est_nt = math.ceil(1.0 * nvb / ts)
+    # for x in range(0, est_nt): 
+    #    mo_tiles.append(int(nvb / est_nt + (x < (nvb % est_nt))))
+
+    return mo_tiles
+
+
 def parseargs(argv=None):
 
     '''Command line options.'''
@@ -202,14 +223,13 @@ nranks = nnodes*ppn
 print("nbf: "    + str(nbf))
 
 print("\nTotal CPU memory required for Cholesky decomp of the 2e integrals: " + str(chol_mem) + " GiB")
-print("\nTotal CPU memory required for CCSD calculation: " + str(ccsd_mem) + " GiB")
+print("\nTotal CPU memory required for CCSD calculation: " + str(ccsd_mem) + " GiB\n")
 
 
 VabOab = v_alpha*o_beta*v_beta*o_alpha
 ts_guess=50
 ts_max=ts_guess
-tilesizes = list(range(ts_guess, 501, 5))
-tilesizes.insert(0,73)
+tilesizes = list(range(ts_guess, 301, 10))
 
 def get_ts_recommendation(tilesizes,nranks):
     ts_guess_ = tilesizes[0]
@@ -217,9 +237,10 @@ def get_ts_recommendation(tilesizes,nranks):
     nblocks_  = 10
     for ts in tilesizes:
         nblocks = math.ceil(v_alpha/ts) * math.ceil(o_alpha/ts) * math.ceil(v_beta/ts) * math.ceil(o_beta/ts)
-        # print("nblocks %s for TS = %s " %(nblocks,ts))
+        # print ("  --> MO Tiles for tilesize %s, nblocks=%s: %s" %(ts, nblocks, get_mo_tiles(o_alpha,o_beta,v_alpha,v_beta,ts)))
         ts_max_ = ts
-        if nblocks <= nranks:
+        #nblocks <= nranks
+        if (nblocks*1.0/nranks) < 0.31 or ts_max_ >= v_alpha+10:
             ts_max_ = ts_guess_
             break
         ts_guess_=ts
@@ -229,12 +250,16 @@ def get_ts_recommendation(tilesizes,nranks):
 
 [ts_max,nblocks] = get_ts_recommendation(tilesizes,nranks)
 print("Min #nodes required = %s, nranks = %s, nblocks = %s, max tilesize = %s" %(nnodes, nranks, nblocks, ts_max))
+# print ("  --> MO Tiles = %s" %(get_mo_tiles(o_alpha,o_beta,v_alpha,v_beta,ts_max)))
 
 nodecounts = list(range(nnodes+10, nnodes*10+1, 10))
 for nc in nodecounts:
+    # print ("-----------------------------------------------------------------------")
     [ts_max,nblocks] = get_ts_recommendation(tilesizes,nc*ppn)
-    if nblocks <= nc*ppn: break
+    # if nblocks <= nc*ppn: break
+    if (nblocks*1.0/nc*ppn) < 0.31: break
     print("For node count = %s, nranks = %s, nblocks = %s, max tilesize = %s" %(nc, nc*ppn, nblocks, ts_max))
+    # print ("  --> MO Tiles = %s" %(get_mo_tiles(o_alpha,o_beta,v_alpha,v_beta,ts_max)))
 
 
 # (T)
@@ -326,6 +351,7 @@ total_cache_mem = round(total_cache_mem,2)
 total_extra_buf_mem = round(total_extra_buf_mem,2)
 
 total_ccsd_t_mem = ccsd_t_mem + total_extra_buf_mem + total_cache_mem
+total_ccsd_t_mem = round(total_ccsd_t_mem,2)
 
 print("\nTotal CPU memory required for (T) calculation: " + str(total_ccsd_t_mem) + " GiB" + ", Min nodes required: " + str(math.ceil(total_ccsd_t_mem/cpu_mem)))
 print("-- memory required for the input tensors: " + str(ccsd_t_mem) + " GiB")

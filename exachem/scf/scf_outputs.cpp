@@ -62,7 +62,7 @@ void exachem::scf::SCFIO::print_energies(ExecutionContext& ec, ChemEnv& chem_env
   }
 
   if(ec.pg().rank() == 0) {
-    std::cout << "#electrons        = " << (int) std::ceil(nelectrons) << endl;
+    std::cout << "#electrons        = " << (int) std::round(nelectrons) << endl;
     std::cout << "1e energy kinetic = " << std::setprecision(16) << kinetic_1e << endl;
     std::cout << "1e energy N-e     = " << NE_1e << endl;
     std::cout << "1e energy         = " << energy_1e << endl;

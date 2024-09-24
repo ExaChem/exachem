@@ -23,7 +23,6 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
 
   const bool   is_uhf = sys_data.is_unrestricted;
   const bool   is_rhf = sys_data.is_restricted;
-  const bool   do_snK = sys_data.do_snK;
   const double lshift = scf_vars.lshift;
 
   Tensor<TensorType>& H1       = ttensors.H1;
@@ -59,6 +58,7 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
   double ehf = 0.0;
 
 #if defined(USE_GAUXC)
+  const bool do_snK = sys_data.do_snK;
   if(do_snK) {
     const auto snK_start = std::chrono::high_resolution_clock::now();
     scf::gauxc::compute_exx<TensorType>(ec, chem_env, scf_vars, ttensors, etensors,
@@ -447,8 +447,6 @@ void exachem::scf::SCFIter::compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_
   using libint2::Operator;
 
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
-
-  auto rank = ec.pg().rank();
 
   const libint2::BasisSet&   dfbs              = scf_vars.dfbs;
   const std::vector<Tile>&   dfAO_tiles        = scf_vars.dfAO_tiles;

@@ -51,7 +51,7 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   // TODO: Implement check for UHF
   if(nactv > sys_data.n_vir_alpha && is_rhf) tamm_terminate("[DUCC ERROR]: nactive > n_vir_alpha");
 
-  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(chem_env, false, nactv);
+  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(ec, chem_env, false, nactv);
 
   std::string out_fp       = chem_env.workspace_dir;
   std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;

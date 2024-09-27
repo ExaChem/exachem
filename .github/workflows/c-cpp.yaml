@@ -22,7 +22,6 @@ jobs:
           - [self-hosted, macos]
         backend:
           - ga
-          - upcxx
         mpi_impl:
           - mpich
         cxx:
@@ -218,7 +217,7 @@ jobs:
         # TAMM build
         git clone https://github.com/NWChemEx/TAMM $GITHUB_WORKSPACE/TAMM
         cd $GITHUB_WORKSPACE/TAMM
-        cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DLINALG_VENDOR=${{ env.LA_VENDOR }} -DGPU_ARCH=70 -DMODULES="CC;DFT" -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DUSE_SCALAPACK=${{ env.USE_SCALAPACK }}
+        cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DLINALG_VENDOR=${{ env.LA_VENDOR }} -DGPU_ARCH=70 -DMODULES="CC" -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DUSE_SCALAPACK=${{ env.USE_SCALAPACK }}
         cd build
         make -j${{ env.EC_NPROC }}
         make install
@@ -227,7 +226,7 @@ jobs:
 
         # Chem build
         cd $GITHUB_WORKSPACE
-        cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES="CC;DFT" -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }}
+        cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES="CC" -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }}
         cd build
         make -j${{ env.EC_NPROC }}
         # make install

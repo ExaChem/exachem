@@ -37,7 +37,7 @@ void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env) {
     std::cout << std::endl
               << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << std::endl;
 
-  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(chem_env);
+  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(ec, chem_env);
 
   const bool is_rhf = sys_data.is_restricted;
 

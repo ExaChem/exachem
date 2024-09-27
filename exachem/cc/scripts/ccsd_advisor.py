@@ -240,7 +240,7 @@ def get_ts_recommendation(tilesizes,nranks):
         # print ("  --> MO Tiles for tilesize %s, nblocks=%s: %s" %(ts, nblocks, get_mo_tiles(o_alpha,o_beta,v_alpha,v_beta,ts)))
         ts_max_ = ts
         #nblocks <= nranks
-        if (nblocks*1.0/nranks) < 0.31 or ts_max_ >= v_alpha+10:
+        if (nblocks*1.0/nranks) < 0.31 or ts_max_ >= v_alpha+10 or nblocks==1:
             ts_max_ = ts_guess_
             break
         ts_guess_=ts
@@ -257,7 +257,7 @@ for nc in nodecounts:
     # print ("-----------------------------------------------------------------------")
     [ts_max,nblocks] = get_ts_recommendation(tilesizes,nc*ppn)
     # if nblocks <= nc*ppn: break
-    if (nblocks*1.0/nc*ppn) < 0.31: break
+    if (nblocks*1.0/nc*ppn) < 0.31 or ts_max >= v_alpha+10 or nblocks==1: break
     print("For node count = %s, nranks = %s, nblocks = %s, max tilesize = %s" %(nc, nc*ppn, nblocks, ts_max))
     # print ("  --> MO Tiles = %s" %(get_mo_tiles(o_alpha,o_beta,v_alpha,v_beta,ts_max)))
 

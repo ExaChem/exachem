@@ -52,7 +52,7 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(chem_env);
+  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(ec, chem_env);
 
   const bool is_rhf = sys_data.is_restricted;
 

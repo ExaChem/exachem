@@ -9,14 +9,17 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/scf/scf.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/common/common.cmake)
-# include(${CMAKE_CURRENT_SOURCE_DIR}/mp2/mp2.cmake)
-# include(${CMAKE_CURRENT_SOURCE_DIR}/cc/cd.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/mp2/mp2.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cholesky/cholesky.cmake)
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/cc/cc2/cc2.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cc/ccsd/ccsd.cmake)
 
 #Add the current directory's sources to the list
-set(EXACHEM_SRCS ${SCF_SRCS} ${COMMON_SRCS} ${MP2_SRCS} ${CD_SRCS})
+set(EXACHEM_SRCS ${SCF_SRCS} ${COMMON_SRCS} ${MP2_SRCS} ${CD_SRCS} ${CC2_SRCS} ${CCSD_SRCS})
 
 #Add the current directory's header files to the list
-set(EXACHEM_INCLUDES ${SCF_INCLUDES} ${COMMON_INCLUDES} ${CD_INCLUDES})
+set(EXACHEM_INCLUDES ${SCF_INCLUDES} ${COMMON_INCLUDES} ${CD_INCLUDES} ${MP2_INCLUDES} ${CC2_INCLUDES} ${CCSD_INCLUDES})
 
 cmsb_add_library(exachem EXACHEM_SRCS EXACHEM_INCLUDES EXACHEM_CFLAGS EXACHEM_LFLAGS)
 target_include_directories(exachem PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

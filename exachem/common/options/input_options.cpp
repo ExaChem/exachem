@@ -129,7 +129,7 @@ void CCSDOptions::print() {
   if(nactive > 0) std::cout << " nactive              = " << nactive << std::endl;
   if(pcore > 0) std::cout << " pcore                = " << pcore << std::endl;
   std::cout << " ccsd_maxiter         = " << ccsd_maxiter << std::endl;
-  txt_utils::print_bool(" freeze_atomic        ", freeze_atomic);
+  txt_utils::print_bool(" freeze_atomic       ", freeze_atomic);
   std::cout << " freeze_core          = " << freeze_core << std::endl;
   std::cout << " freeze_virtual       = " << freeze_virtual << std::endl;
   if(lshift != 0) std::cout << " lshift               = " << lshift << std::endl;

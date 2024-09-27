@@ -1,7 +1,7 @@
 
 include(TargetMacros)
 
-set(CC2_SRCDIR ${CMAKE_CURRENT_SOURCE_DIR}/../exachem/cc/cc2)
+set(CC2_SRCDIR cc/cc2)
 set(CC2_SRCS
     ${CC2_SRCDIR}/cd_cc2.cpp    
     ${CC2_SRCDIR}/cd_cc2_cs.cpp
@@ -9,3 +9,7 @@ set(CC2_SRCS
     #${CC2_SRCDIR}/cc2_canonical.cpp
     )
 
+set(CC2_INCLUDES
+    ${CC2_SRCDIR}/cd_cc2_cs.hpp
+    ${CC2_SRCDIR}/cd_cc2_os.hpp
+)

@@ -49,7 +49,7 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
 
 :force_tilesize: ``[default=false]``
 
-:tilesize: ``[default=50]`` The tilesize for the MO or MSO dimension. An integer value that is automatically set to ``ceil(10% * Nbf)`` where the maximum allowed size is 100. If **force_tilesize=true**, the value specified by the user is respected. It is recommended to let the CC module automatically determine this value.
+:tilesize: ``[default=40]`` The tilesize for the MO or MSO space. An integer value that is automatically set. If **force_tilesize=true**, the value specified by the user is respected. It is recommended to let the CC module automatically determine this value.
 
 :lshift: ``[default=0]`` The level shift option that increases small orbital energy differences used in calculating the updates for cluster amplitudes. When calculating ground states with multi-configurational character or if convergence is slow, one may need to specify a typical values for lshift between 0.3 and 0.5.
 

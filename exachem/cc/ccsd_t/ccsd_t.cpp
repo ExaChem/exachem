@@ -95,7 +95,7 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(chem_env);
+  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(ec, chem_env);
 
   std::string out_fp       = chem_env.workspace_dir;
   std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
@@ -288,7 +288,7 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
     ec.flush_and_sync();
   }
   else { // skip ccsd
-    cholesky_2e::update_sysdata(chem_env, MO);
+    cholesky_2e::update_sysdata(ec, chem_env, MO);
     N    = MO("all");
     d_f1 = {{N, N}, {1, 1}};
     Tensor<T>::allocate(&ec, d_f1);
@@ -306,7 +306,7 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
     }
   }
 
-  auto [MO1, total_orbitals1] = cholesky_2e::setupMOIS(chem_env, true);
+  auto [MO1, total_orbitals1] = cholesky_2e::setupMOIS(ec, chem_env, true);
   TiledIndexSpace N1          = MO1("all");
   TiledIndexSpace O1          = MO1("occ");
   TiledIndexSpace V1          = MO1("virt");

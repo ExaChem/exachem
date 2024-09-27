@@ -39,7 +39,7 @@ class Exachem(CMakePackage,CudaPackage):
         args = [
             # This was not able to detect presence of libint in first test
             #'-DLibInt2_ROOT=%s' % self.spec['libint'].prefix,
-            '-DMODULES=CC;DFT',
+            '-DMODULES=CC',
             '-DHDF5_ROOT=%s' % self.spec['hdf5'].prefix,
             '-DLINALG_VENDOR=IntelMKL',
             '-DLINALG_PREFIX=%s' % join_path(self.spec['intel-oneapi-mkl'].prefix, 'mkl', 'latest'),

@@ -70,10 +70,10 @@ int main(int argc, char* argv[]) {
     std::cout << "nnodes: " << ec.nnodes() << ", ";
     std::cout << "nproc_per_node: " << ec.ppn() << ", ";
     std::cout << "nproc_total: " << ec.nnodes() * ec.ppn() << ", ";
-#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-    std::cout << "ngpus_per_node: " << ec.gpn() << ", ";
-    std::cout << "ngpus_total: " << ec.nnodes() * ec.gpn() << endl;
-#endif
+    if(ec.has_gpu()) {
+      std::cout << "ngpus_per_node: " << ec.gpn() << ", ";
+      std::cout << "ngpus_total: " << ec.nnodes() * ec.gpn() << endl;
+    }
     std::cout << std::endl;
     ec.print_mem_info();
   }

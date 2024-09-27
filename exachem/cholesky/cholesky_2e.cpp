@@ -21,22 +21,60 @@ auto cd_tensor_zero(Tensor<T>& tens) {
 
 namespace exachem::cholesky_2e {
 
-std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ChemEnv& chem_env, bool triples) {
+int get_ts_recommendation(int nranks, ChemEnv& chem_env) {
+  int ts_guess = chem_env.ioptions.ccsd_options.tilesize;
+
+  SystemData& sys_data = chem_env.sys_data;
+  const auto  o_alpha  = sys_data.n_occ_alpha;
+  const auto  v_alpha  = sys_data.n_vir_alpha;
+  const auto  o_beta   = sys_data.n_occ_beta;
+  const auto  v_beta   = sys_data.n_vir_beta;
+
+  std::vector<int> tilesizes;
+  for(int i = ts_guess; i <= 300; i += 10) { tilesizes.push_back(i); }
+
+  int ts_guess_ = tilesizes[0];
+  int ts_max_   = tilesizes[0];
+
+  for(int ts: tilesizes) {
+    int nblocks =
+      std::ceil(static_cast<double>(v_alpha) / ts) * std::ceil(static_cast<double>(o_alpha) / ts) *
+      std::ceil(static_cast<double>(v_beta) / ts) * std::ceil(static_cast<double>(o_beta) / ts);
+
+    ts_max_ = ts;
+
+    if((nblocks * 1.0 / nranks) < 0.31 || ts_max_ >= v_alpha + 10 || nblocks == 1) {
+      ts_max_ = ts_guess_;
+      break;
+    }
+
+    ts_guess_ = ts;
+  }
+
+  return ts_max_;
+}
+
+std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ExecutionContext& ec, ChemEnv& chem_env,
+                                                    bool triples) {
   SystemData& sys_data    = chem_env.sys_data;
   TAMM_SIZE   n_occ_alpha = sys_data.n_occ_alpha;
   TAMM_SIZE   n_vir_alpha = sys_data.n_vir_alpha;
 
-  Tile tce_tile = chem_env.ioptions.ccsd_options.tilesize;
+  const int rank         = ec.pg().rank().value();
+  auto      ccsd_options = chem_env.ioptions.ccsd_options;
+
+  Tile tce_tile = ccsd_options.tilesize;
   if(!triples) {
-    if((tce_tile < static_cast<Tile>(sys_data.nbf / 10) || tce_tile < 50) &&
-       !chem_env.ioptions.ccsd_options.force_tilesize) {
+    if(!ccsd_options.force_tilesize && ec.has_gpu()) {
       tce_tile = static_cast<Tile>(sys_data.nbf / 10);
-      if(tce_tile < 50) tce_tile = 50; // 50 is the default tilesize for CCSD.
-      if(ProcGroup::world_rank() == 0)
-        std::cout << std::endl << "Resetting CCSD tilesize to: " << tce_tile << std::endl;
+      if(tce_tile < 50) tce_tile = 50;        // 50 is the default tilesize
+      else if(tce_tile > 100) tce_tile = 100; // 100 is the max tilesize
+      if(rank == 0)
+        std::cout << std::endl
+                  << "Resetting tilesize for the MO space to: " << tce_tile << std::endl;
     }
   }
-  else tce_tile = chem_env.ioptions.ccsd_options.ccsdt_tilesize;
+  else tce_tile = ccsd_options.ccsdt_tilesize;
 
   const TAMM_SIZE total_orbitals = sys_data.nbf;
 
@@ -57,26 +95,28 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ChemEnv& chem_env, bool trip
 
   TiledIndexSpace MO{MO_IS, mo_tiles};
 
+  if(rank == 0 && ccsd_options.debug) { cout << endl << "MO Tiles = " << mo_tiles << endl; }
+
   return std::make_tuple(MO, total_orbitals);
 }
 
-std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ChemEnv& chem_env, bool triples, int nactv) {
+std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& chem_env,
+                                                 bool triples, int nactv) {
   SystemData& sys_data    = chem_env.sys_data;
   TAMM_SIZE   n_occ_alpha = sys_data.n_occ_alpha;
   TAMM_SIZE   n_occ_beta  = sys_data.n_occ_beta;
 
-  auto ccsd_options = chem_env.ioptions.ccsd_options;
+  const int rank         = ec.pg().rank().value();
+  auto      ccsd_options = chem_env.ioptions.ccsd_options;
 
   Tile tce_tile      = ccsd_options.tilesize;
   bool balance_tiles = ccsd_options.balance_tiles;
   if(!triples) {
-    if((tce_tile < static_cast<Tile>(sys_data.nbf / 10) || tce_tile < 50 || tce_tile > 100) &&
-       !ccsd_options.force_tilesize) {
-      tce_tile = static_cast<Tile>(sys_data.nbf / 10);
-      if(tce_tile < 50) tce_tile = 50;   // 50 is the default tilesize for CCSD.
-      if(tce_tile > 100) tce_tile = 100; // 100 is the max tilesize for CCSD.
-      if(ProcGroup::world_rank() == 0)
-        std::cout << std::endl << "Resetting CCSD tilesize to: " << tce_tile << std::endl;
+    if(!ccsd_options.force_tilesize && ec.has_gpu()) {
+      tce_tile = get_ts_recommendation(ec.nnodes() * ec.ppn(), chem_env);
+      if(rank == 0)
+        std::cout << std::endl
+                  << "Resetting tilesize for the MSO space to: " << tce_tile << std::endl;
     }
   }
   else {
@@ -192,10 +232,12 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ChemEnv& chem_env, bool triples
 
   TiledIndexSpace MO{MO_IS, mo_tiles}; //{ova,ova,ovb,ovb}};
 
+  if(rank == 0 && ccsd_options.debug) { cout << endl << "MO Tiles = " << mo_tiles << endl; }
+
   return std::make_tuple(MO, total_orbitals);
 }
 
-void update_sysdata(ChemEnv& chem_env, TiledIndexSpace& MO, bool is_mso) {
+void update_sysdata(ExecutionContext& ec, ChemEnv& chem_env, TiledIndexSpace& MO, bool is_mso) {
   SystemData& sys_data       = chem_env.sys_data;
   const bool  do_freeze      = sys_data.n_frozen_core > 0 || sys_data.n_frozen_virtual > 0;
   TAMM_SIZE   total_orbitals = sys_data.nmo;
@@ -208,8 +250,8 @@ void update_sysdata(ChemEnv& chem_env, TiledIndexSpace& MO, bool is_mso) {
       sys_data.n_vir_beta -= sys_data.n_frozen_virtual;
     }
     sys_data.update();
-    if(!is_mso) std::tie(MO, total_orbitals) = setup_mo_red(chem_env);
-    else std::tie(MO, total_orbitals) = cholesky_2e::setupMOIS(chem_env);
+    if(!is_mso) std::tie(MO, total_orbitals) = setup_mo_red(ec, chem_env);
+    else std::tie(MO, total_orbitals) = cholesky_2e::setupMOIS(ec, chem_env);
   }
 }
 
@@ -868,7 +910,7 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
               << endl;
   }
 
-  update_sysdata(chem_env, tMO, is_mso);
+  update_sysdata(ec, chem_env, tMO, is_mso);
 
   const bool do_freeze = (sys_data.n_frozen_core > 0 || sys_data.n_frozen_virtual > 0);
 

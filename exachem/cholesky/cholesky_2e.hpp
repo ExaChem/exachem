@@ -23,12 +23,17 @@ using namespace tamm;
 using TAMM_GA_SIZE = int64_t;
 
 namespace exachem::cholesky_2e {
-std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ChemEnv& chem_env, bool triples = false);
 
-std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ChemEnv& chem_env, bool triples = false,
-                                                 int nactv = 0);
+int get_ts_recommendation(int nranks, ChemEnv& chem_env);
 
-void update_sysdata(ChemEnv& chem_env, TiledIndexSpace& MO, bool is_mso = true);
+std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ExecutionContext& ec, ChemEnv& chem_env,
+                                                    bool triples = false);
+
+std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& chem_env,
+                                                 bool triples = false, int nactv = 0);
+
+void update_sysdata(ExecutionContext& ec, ChemEnv& chem_env, TiledIndexSpace& MO,
+                    bool is_mso = true);
 
 // reshape F/lcao after freezing
 Matrix reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat, bool is_lcao = false);

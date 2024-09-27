@@ -32,7 +32,7 @@ void exachem::cholesky_2e::cholesky_decomp_2e(ExecutionContext& ec, ChemEnv& che
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(chem_env);
+  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(ec, chem_env);
 
   std::string out_fp       = chem_env.workspace_dir;
   std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
@@ -140,7 +140,7 @@ exachem::cholesky_2e::cholesky_2e_driver(ChemEnv& chem_env, ExecutionContext& ec
              << endl;
     }
 
-    if(!is_dlpno) exachem::cholesky_2e::update_sysdata(chem_env, MO, is_mso);
+    if(!is_dlpno) exachem::cholesky_2e::update_sysdata(ec, chem_env, MO, is_mso);
 
     IndexSpace      chol_is{range(0, chol_count)};
     TiledIndexSpace CI{chol_is, static_cast<tamm::Tile>(itile_size)};

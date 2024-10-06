@@ -8,7 +8,7 @@
  */
 
 // (1) Pure FP64
-#include "ccsd_t_common.hpp"
+#include "exachem/cc/ccsd_t/ccsd_t_common.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>

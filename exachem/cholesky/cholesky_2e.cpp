@@ -7,7 +7,7 @@
  * See LICENSE.txt for details
  */
 
-#include "cholesky/cholesky_2e.hpp"
+#include "exachem/cholesky/cholesky_2e.hpp"
 using namespace exachem::scf;
 bool cd_debug = false;
 #define CD_USE_PGAS_API

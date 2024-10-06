@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include "ccsd_t_all_fused_doubles1.hpp"
-#include "ccsd_t_all_fused_doubles2.hpp"
-#include "ccsd_t_all_fused_singles.hpp"
-#include "ccsd_t_common.hpp"
+#include "exachem/cc/ccsd_t/ccsd_t_all_fused_doubles1.hpp"
+#include "exachem/cc/ccsd_t/ccsd_t_all_fused_doubles2.hpp"
+#include "exachem/cc/ccsd_t/ccsd_t_all_fused_singles.hpp"
+#include "exachem/cc/ccsd_t/ccsd_t_common.hpp"
 
 inline void helper_calculate_num_ops(const Index noab, const Index nvab, int* df_simple_s1_size,
                                      int* df_simple_d1_size, int* df_simple_d2_size,

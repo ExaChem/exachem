@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "cholesky/cholesky_2e_driver.hpp"
+#include "exachem/cholesky/cholesky_2e_driver.hpp"
 #include "exachem/common/ec_basis.hpp"
 #include "exachem/common/system_data.hpp"
 #include "exachem/scf/scf_compute.hpp"

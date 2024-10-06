@@ -8,10 +8,10 @@
 
 #pragma once
 // clang-format off
-#include "cc/ccse_tensors.hpp"
-#include "cc/diis.hpp"
+#include "exachem/cc/ccse_tensors.hpp"
+#include "exachem/cc/diis.hpp"
 #include "exachem/scf/scf_main.hpp"
-#include "cholesky/cholesky_2e_driver.hpp"
+#include "exachem/cholesky/cholesky_2e_driver.hpp"
 // clang-format on
 
 template<typename T>

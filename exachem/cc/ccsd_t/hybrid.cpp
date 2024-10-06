@@ -9,11 +9,7 @@
 
 /*-------------hybrid execution------------*/
 
-#include "ccsd_t_common.hpp"
-#include "ga/ga-mpi.h"
-#include "ga/ga.h"
-#include "ga/typesf2c.h"
-#include "mpi.h"
+#include "exachem/cc/ccsd_t/ccsd_t_common.hpp"
 #include <assert.h>
 #include <cmath>
 #include <iomanip>
@@ -24,16 +20,15 @@
 #include <upcxx/upcxx.hpp>
 #endif
 
-//
-int util_my_smp_index() {
-#ifdef USE_UPCXX
-  int ppn = upcxx::local_team().rank_n();
-  return upcxx::rank_me() % ppn;
-#else
-  auto ppn = GA_Cluster_nprocs(0);
-  return GA_Nodeid() % ppn;
-#endif
-}
+// int util_my_smp_index() {
+// #ifdef USE_UPCXX
+//   int ppn = upcxx::local_team().rank_n();
+//   return upcxx::rank_me() % ppn;
+// #else
+//   auto ppn = GA_Cluster_nprocs(0);
+//   return GA_Nodeid() % ppn;
+// #endif
+// }
 
 std::string check_memory_req(const int cc_t_ts, const int nbf) {
   size_t      total_gpu_mem{0};

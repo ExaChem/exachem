@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "cd_ccsd_cs_ann.hpp"
+#include "exachem/cc/ccsd/cd_ccsd_cs_ann.hpp"
 
 template<typename T>
 void ccsd_e_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI, Tensor<T>& de,

@@ -9,8 +9,8 @@
 #pragma once
 
 // clang-format off
-#include "cholesky/two_index_transform.hpp"
-#include "cholesky/cholesky_2e.hpp"
+#include "exachem/cholesky/two_index_transform.hpp"
+#include "exachem/cholesky/cholesky_2e.hpp"
 // clang-format on
 using namespace tamm;
 

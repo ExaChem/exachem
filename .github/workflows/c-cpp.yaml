@@ -226,7 +226,7 @@ jobs:
 
         # Chem build
         cd $GITHUB_WORKSPACE
-        cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES="CC" -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }}
+        cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES="CC" -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }}
         cd build
         make -j${{ env.EC_NPROC }}
         # make install
@@ -256,7 +256,7 @@ jobs:
 
         # Chem build
         cd $GITHUB_WORKSPACE
-        UPCXX_CODEMODE=O3 CXX=upcxx cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES=CC -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DUSE_UPCXX=ON -DMPIRUN_EXECUTABLE=${{ env.CI_MPIEXEC }}
+        UPCXX_CODEMODE=O3 CXX=upcxx cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES=CC -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DUSE_UPCXX=ON -DMPIRUN_EXECUTABLE=${{ env.CI_MPIEXEC }}
         cd build
         UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make -j${{ env.EC_NPROC }}
 

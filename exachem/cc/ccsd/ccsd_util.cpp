@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "ccsd_util.hpp"
+#include "exachem/cc/ccsd/ccsd_util.hpp"
 using namespace exachem::scf;
 template<typename T>
 void setup_full_t1t2(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& dt1_full,

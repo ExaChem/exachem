@@ -7,8 +7,8 @@
  * See LICENSE.txt for details
  */
 
-#include "cc/ccsd/cd_ccsd_os_ann.hpp"
-#include "cholesky/cholesky_2e_driver.hpp"
+#include "exachem/cc/ccsd/cd_ccsd_os_ann.hpp"
+#include "exachem/cholesky/cholesky_2e_driver.hpp"
 
 #include <filesystem>
 namespace fs = std::filesystem;

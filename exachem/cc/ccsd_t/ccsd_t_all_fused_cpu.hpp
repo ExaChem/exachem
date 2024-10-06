@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "fused_common.hpp"
+#include "exachem/cc/ccsd_t/fused_common.hpp"
 
 #ifdef _OPENMP
 #include <omp.h>

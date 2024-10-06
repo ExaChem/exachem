@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include "cc/ccse_tensors.hpp"
-#include "cc/diis.hpp"
-#include "cholesky/v2tensors.hpp"
+#include "exachem/cc/ccse_tensors.hpp"
+#include "exachem/cc/diis.hpp"
+#include "exachem/cholesky/v2tensors.hpp"
 #include "exachem/scf/scf_main.hpp"
 
 namespace exachem::cholesky_2e {

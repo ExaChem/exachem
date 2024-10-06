@@ -16,7 +16,6 @@ list(FIND MODULES "CC" _cc_index)
 if(NOT _cc_index EQUAL -1)
   message(STATUS "Compiling CC modules")
   include(${EXACHEM_SRC_DIR}/cc/eom/eom.cmake)
-  include(${EXACHEM_SRC_DIR}/cc/ccsd_t/ccsd_t.cmake)
   include(${EXACHEM_SRC_DIR}/cc/lambda/lambda.cmake)
   include(${EXACHEM_SRC_DIR}/cc/ducc/ducc.cmake)
 
@@ -25,8 +24,8 @@ if(NOT _cc_index EQUAL -1)
     include(${EXACHEM_SRC_DIR}/cc/rteom/rteom.cmake)
   endif()
 
-  set(CoupledCluster_SRCS ${CCSDT_SRCS} ${CCSD_T_SRCS} 
-  ${CC_LAMBDA_SRCS} ${CC_EOM_SRCS} ${GFCC_SRCS} ${RTEOM_SRCS} ${DUCC_SRCS})
+  set(CoupledCluster_SRCS ${CCSDT_SRCS} ${CC_LAMBDA_SRCS} ${CC_EOM_SRCS} 
+     ${GFCC_SRCS} ${RTEOM_SRCS} ${DUCC_SRCS})
 
 endif()
 

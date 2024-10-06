@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "cc/ccse_tensors.hpp"
+#include "exachem/cc/ccse_tensors.hpp"
 #include <string>
 #include <vector>
 using T = double;

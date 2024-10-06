@@ -10,11 +10,11 @@
 #pragma once
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-#include "ccsd_t_all_fused.hpp"
+#include "exachem/cc/ccsd_t/ccsd_t_all_fused.hpp"
 #else
-#include "ccsd_t_all_fused_cpu.hpp"
+#include "exachem/cc/ccsd_t/ccsd_t_all_fused_cpu.hpp"
 #endif
-#include "ccsd_t_common.hpp"
+#include "exachem/cc/ccsd_t/ccsd_t_common.hpp"
 
 namespace exachem::cc::ccsd_t {
 void ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env);

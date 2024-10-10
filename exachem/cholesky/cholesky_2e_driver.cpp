@@ -168,7 +168,7 @@ exachem::cholesky_2e::cholesky_2e_driver(ChemEnv& chem_env, ExecutionContext& ec
   IndexSpace      chol_is{range(0, chol_count)};
   TiledIndexSpace CI{chol_is, static_cast<tamm::Tile>(itile_size)};
 
-  sys_data.num_chol_vectors                              = chol_count;
+  chem_env.cd_context.num_chol_vectors                   = chol_count;
   sys_data.results["output"]["CD"]["n_cholesky_vectors"] = chol_count;
 
   sys_data.results["output"]["CD"]["diagtol"] = chem_env.ioptions.cd_options.diagtol;

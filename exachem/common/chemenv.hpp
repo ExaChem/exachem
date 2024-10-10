@@ -12,7 +12,10 @@
 #include "exachem/common/system_data.hpp"
 #include "options/input_options.hpp"
 // #include "libint2_includes.hpp"
+#include "exachem/common/context/cc_context.hpp"
+#include "exachem/common/context/cd_context.hpp"
 #include "exachem/common/txt_utils.hpp"
+
 #include "tamm/tamm.hpp"
 #include <nlohmann/json.hpp>
 using json = nlohmann::ordered_json;
@@ -50,6 +53,9 @@ public:
   bool                     no_scf;
 
   std::string workspace_dir{};
+
+  CDContext cd_context;
+  CCContext cc_context;
 
   void write_json_data(const std::string cmodule);
 

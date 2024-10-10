@@ -280,12 +280,14 @@ cc2_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO
     residual = 0.0;
   }
 
-  sys_data.ccsd_corr_energy = energy;
+  chem_env.cc_context.cc2_correlation_energy = energy;
+  chem_env.cc_context.cc2_total_energy       = chem_env.hf_energy + energy;
 
   if(ec.pg().rank() == 0) {
     sys_data.results["output"]["CC2"]["n_iterations"]                = niter + 1;
     sys_data.results["output"]["CC2"]["final_energy"]["correlation"] = energy;
-    sys_data.results["output"]["CC2"]["final_energy"]["total"]       = sys_data.scf_energy + energy;
+    sys_data.results["output"]["CC2"]["final_energy"]["total"] =
+      chem_env.cc_context.cc2_total_energy;
 
     chem_env.write_json_data("CC2");
   }

@@ -83,7 +83,7 @@ void macis_driver(ExecutionContext& ec, SystemData& sys_data, const std::string 
   // Create Logger
   auto console = world_rank ? spdlog::null_logger_mt("CI") : spdlog::stdout_color_mt("CI");
 
-  auto ci_options = sys_data.options_map.fci_options;
+  auto ci_options = chem_env.ioptions.fci_options;
 
   // Required Keywords
   auto nalpha        = ci_options.nalpha;

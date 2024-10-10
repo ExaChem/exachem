@@ -1064,7 +1064,6 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   chem_env.sys_data.update();
   if(rank == 0 && chem_env.ioptions.scf_options.debug) chem_env.sys_data.print();
 
-  chem_env.sys_data.scf_energy = ehf;
   // iter not broadcasted, but fine since only rank 0 writes to json
   if(rank == 0) {
     chem_env.sys_data.results["output"]["SCF"]["final_energy"] = ehf;

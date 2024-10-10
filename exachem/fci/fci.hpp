@@ -22,7 +22,7 @@ template<typename T>
 std::string generate_fcidump(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MSO,
                              Tensor<T>& lcao, Tensor<T>& d_f1, Tensor<T>& full_v2,
                              ExecutionHW ex_hw = ExecutionHW::CPU) {
-  // int nactv = sys_data.options_map.fci_options.nactive;
+  // int nactv = chem_env.ioptions.fci_options.nactive;
   Scheduler sch{ec};
 
   std::cout.precision(15);

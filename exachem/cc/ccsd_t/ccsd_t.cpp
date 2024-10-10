@@ -524,24 +524,35 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   energy1 = ec.pg().reduce(&energy1, ReduceOp::sum, 0);
   energy2 = ec.pg().reduce(&energy2, ReduceOp::sum, 0);
 
+  CCContext& cc_context                 = chem_env.cc_context;
+  cc_context.ccsd_st_correction_energy  = energy1;
+  cc_context.ccsd_st_correlation_energy = corr_energy + energy1;
+  cc_context.ccsd_st_total_energy       = hf_energy + corr_energy + energy1;
+
+  cc_context.ccsd_pt_correction_energy  = energy2;
+  cc_context.ccsd_pt_correlation_energy = corr_energy + energy2;
+  cc_context.ccsd_pt_total_energy       = hf_energy + corr_energy + energy2;
+
   if(rank == 0 && !skip_ccsd) {
     std::cout.precision(15);
     cout << "CCSD[T] correction energy / hartree  = " << energy1 << endl;
-    cout << "CCSD[T] correlation energy / hartree = " << corr_energy + energy1 << endl;
-    cout << "CCSD[T] total energy / hartree       = " << hf_energy + corr_energy + energy1 << endl;
+    cout << "CCSD[T] correlation energy / hartree = " << cc_context.ccsd_st_correlation_energy
+         << endl;
+    cout << "CCSD[T] total energy / hartree       = " << cc_context.ccsd_st_total_energy << endl;
 
     cout << "CCSD(T) correction energy / hartree  = " << energy2 << endl;
-    cout << "CCSD(T) correlation energy / hartree = " << corr_energy + energy2 << endl;
-    cout << "CCSD(T) total energy / hartree       = " << hf_energy + corr_energy + energy2 << endl;
+    cout << "CCSD(T) correlation energy / hartree = " << cc_context.ccsd_pt_correlation_energy
+         << endl;
+    cout << "CCSD(T) total energy / hartree       = " << cc_context.ccsd_pt_total_energy << endl;
 
-    sys_data.results["output"]["CCSD(T)"]["[T]Energies"]["correction"]  = energy1;
-    sys_data.results["output"]["CCSD(T)"]["[T]Energies"]["correlation"] = corr_energy + energy1;
-    sys_data.results["output"]["CCSD(T)"]["[T]Energies"]["total"] =
-      hf_energy + corr_energy + energy1;
-    sys_data.results["output"]["CCSD(T)"]["(T)Energies"]["correction"]  = energy2;
-    sys_data.results["output"]["CCSD(T)"]["(T)Energies"]["correlation"] = corr_energy + energy2;
-    sys_data.results["output"]["CCSD(T)"]["(T)Energies"]["total"] =
-      hf_energy + corr_energy + energy2;
+    sys_data.results["output"]["CCSD(T)"]["[T]Energies"]["correction"] = energy1;
+    sys_data.results["output"]["CCSD(T)"]["[T]Energies"]["correlation"] =
+      cc_context.ccsd_st_correlation_energy;
+    sys_data.results["output"]["CCSD(T)"]["[T]Energies"]["total"] = cc_context.ccsd_st_total_energy;
+    sys_data.results["output"]["CCSD(T)"]["(T)Energies"]["correction"] = energy2;
+    sys_data.results["output"]["CCSD(T)"]["(T)Energies"]["correlation"] =
+      cc_context.ccsd_pt_correlation_energy;
+    sys_data.results["output"]["CCSD(T)"]["(T)Energies"]["total"] = cc_context.ccsd_pt_total_energy;
   }
 
   long double total_num_ops = 0;

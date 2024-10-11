@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "eomccsd_opt.hpp"
+#include "exachem/cc/eom/eomccsd_opt.hpp"
 
 #include <filesystem>
 namespace fs = std::filesystem;

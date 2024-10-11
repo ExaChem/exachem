@@ -6,8 +6,8 @@
  * See LICENSE.txt for details
  */
 
-#include "cholesky/cholesky_2e.hpp"
-#include "cholesky/cholesky_2e_driver.hpp"
+#include "exachem/cholesky/cholesky_2e.hpp"
+#include "exachem/cholesky/cholesky_2e_driver.hpp"
 #include "tamm/eigen_utils.hpp"
 
 namespace exachem::mp2 {

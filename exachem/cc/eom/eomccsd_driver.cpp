@@ -6,8 +6,8 @@
  * See LICENSE.txt for details
  */
 
-#include "cholesky/cholesky_2e_driver.hpp"
-#include "eomccsd_opt.hpp"
+#include "exachem/cc/eom/eomccsd_opt.hpp"
+#include "exachem/cholesky/cholesky_2e_driver.hpp"
 void exachem::cc::eom::eom_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
 

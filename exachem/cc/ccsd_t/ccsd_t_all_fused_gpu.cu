@@ -12,7 +12,7 @@
   3rd. Generation Tensor Cores (FP64)
 */
 // (1) Pure FP64
-#include "ccsd_t_common.hpp"
+#include "exachem/cc/ccsd_t/ccsd_t_common.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
@@ -125,7 +125,7 @@ __device__ inline void rt_load_fixed(double* smem, const int idx_x_1, const int 
   }
 }
 
-#include "ccsd_t_g2s_device_functions.cu"
+#include "exachem/cc/ccsd_t/ccsd_t_g2s_device_functions.cu"
 
 //------------------------------------------------------------------------------
 // created by tc_gen_code_Kernel()

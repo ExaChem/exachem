@@ -6,8 +6,8 @@
  * See LICENSE.txt for details
  */
 
-#include "cc/lambda/ccsd_lambda.hpp"
-#include "cholesky/cholesky_2e_driver.hpp"
+#include "exachem/cc/lambda/ccsd_lambda.hpp"
+#include "exachem/cholesky/cholesky_2e_driver.hpp"
 #include "gf_diis.hpp"
 #include "gf_guess.hpp"
 #include "gfccsd_ea.hpp"

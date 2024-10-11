@@ -7,43 +7,8 @@
  */
 
 #include <exachem/exachem_git.hpp>
+#include <exachem/task/ec_task.hpp>
 #include <tamm/tamm_git.hpp>
-
-#define EC_COMPLEX
-
-// clang-format off
-#if defined(ENABLE_CC)
-#include "cc/ccsd/cd_ccsd_os_ann.hpp"
-#include "cc/ccsd_t/ccsd_t_fused_driver.hpp"
-#include "exachem/cc/lambda/ccsd_lambda.hpp"
-#include "exachem/cc/eom/eomccsd_opt.hpp"
-#endif
-
-#include "exachem/common/chemenv.hpp"
-#include "exachem/common/options/parse_options.hpp"
-#include "exachem/scf/scf_main.hpp"
-#include "mp2/cd_mp2.hpp"
-// clang-format on
-using namespace exachem;
-
-#if !defined(USE_UPCXX) and defined(EC_COMPLEX) and defined(ENABLE_CC)
-namespace exachem::cc::gfcc {
-void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env);
-}
-namespace exachem::rteom_cc::ccsd {
-void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env);
-}
-#include "exachem/fci/fci.hpp"
-#endif
-
-#if defined(ENABLE_CC)
-namespace exachem::cc2 {
-void cd_cc2_driver(ExecutionContext& ec, ChemEnv& chem_env);
-}
-namespace exachem::cc::ducc {
-void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env);
-}
-#endif
 
 int main(int argc, char* argv[]) {
   tamm::initialize(argc, argv);
@@ -159,6 +124,7 @@ int main(int argc, char* argv[]) {
                                     task.cd_2e,
                                     task.ducc,
                                     task.ccsd,
+                                    task.ccsdt,
                                     task.ccsd_t,
                                     task.ccsd_lambda,
                                     task.eom_ccsd,
@@ -188,34 +154,9 @@ int main(int argc, char* argv[]) {
     chem_env.shells           = chem_env.ec_basis.shells;
     chem_env.sys_data.has_ecp = chem_env.ec_basis.has_ecp;
 
-    if(task.sinfo) chem_env.sinfo();
-    else if(task.scf) {
-      scf::scf_driver(ec, chem_env);
-      Tensor<TensorType>::deallocate(chem_env.C_AO, chem_env.F_AO);
-      if(chem_env.sys_data.is_unrestricted)
-        Tensor<TensorType>::deallocate(chem_env.C_beta_AO, chem_env.F_beta_AO);
-    }
-#if defined(ENABLE_CC)
-    else if(task.mp2) mp2::cd_mp2(ec, chem_env);
-    else if(task.cd_2e) cholesky_2e::cholesky_decomp_2e(ec, chem_env);
-    else if(task.ccsd) cc::ccsd::cd_ccsd(ec, chem_env);
-    else if(task.ccsd_t) cc::ccsd_t::ccsd_t_driver(ec, chem_env);
-    else if(task.cc2) cc2::cd_cc2_driver(ec, chem_env);
-    else if(task.ccsd_lambda) cc::ccsd_lambda::ccsd_lambda_driver(ec, chem_env);
-    else if(task.eom_ccsd) cc::eom::eom_ccsd_driver(ec, chem_env);
-    else if(task.ducc) cc::ducc::ducc_driver(ec, chem_env);
-#if !defined(USE_UPCXX) and defined(EC_COMPLEX)
-    else if(task.fci || task.fcidump) fci::fci_driver(ec, chem_env);
-    else if(task.gfccsd) cc::gfcc::gfccsd_driver(ec, chem_env);
-    else if(task.rteom_ccsd) rteom_cc::ccsd::rt_eom_cd_ccsd_driver(ec, chem_env);
-#endif
+    exachem::task::ec_execute_task(ec, chem_env, ec_arg2);
 
-#endif
-
-    else
-      tamm_terminate(
-        "[ERROR] Unsupported task specified (or) code for the specified task is not built");
-  }
+  } // loop over input files
 
   ec.flush_and_sync();
   ec.pg().destroy_coll();

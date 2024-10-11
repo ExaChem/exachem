@@ -6,9 +6,9 @@
  * See LICENSE.txt for details
  */
 
-//  #include "cc/ccsd/ccsd_util.hpp"
+//  #include "exachem/cc/ccsd/ccsd_util.hpp"
 
-#include "cd_mp2.hpp"
+#include "exachem/mp2/cd_mp2.hpp"
 #include <filesystem>
 
 namespace exachem::mp2 {

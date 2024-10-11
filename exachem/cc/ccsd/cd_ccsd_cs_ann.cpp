@@ -7,7 +7,7 @@
  * See LICENSE.txt for details
  */
 
-#include "cd_ccsd_cs_ann.hpp"
+#include "exachem/cc/ccsd/cd_ccsd_cs_ann.hpp"
 
 using CCEType = double;
 CCSE_Tensors<CCEType> _a021;

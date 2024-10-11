@@ -6,17 +6,14 @@
  * See LICENSE.txt for details
  */
 
-#include "cc/ccsd/cd_ccsd_os_ann.hpp"
-#include "cholesky/cholesky_2e_driver.hpp"
+#include "exachem/cc/ccsd/cd_ccsd_os_ann.hpp"
+#include "exachem/cc/ducc/ducc-t_ccsd.hpp"
+#include "exachem/cholesky/cholesky_2e_driver.hpp"
 
 #include <filesystem>
 namespace fs = std::filesystem;
 
 namespace exachem::cc::ducc {
-template<typename T>
-void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
-                        Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1,
-                        cholesky_2e::V2Tensors<T>& v2tensors, size_t nactv, ExecutionHW ex_hw);
 
 void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;

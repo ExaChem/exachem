@@ -6,8 +6,8 @@
  * See LICENSE.txt for details
  */
 
-#include "cc/ccsd/ccsd_util.hpp"
-// #include "cc/ducc/ducc_driver.cpp"
+#include "exachem/cc/ccsd/ccsd_util.hpp"
+// #include "exachem/cc/ducc/ducc_driver.cpp"
 #include <tamm/tamm.hpp>
 
 using namespace tamm;

@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "cholesky/cholesky_2e_driver.hpp"
+#include "exachem/cholesky/cholesky_2e_driver.hpp"
 using namespace exachem::scf;
 
 void exachem::cholesky_2e::cholesky_decomp_2e(ExecutionContext& ec, ChemEnv& chem_env) {

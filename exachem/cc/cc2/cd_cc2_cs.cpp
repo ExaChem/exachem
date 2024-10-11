@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "cd_cc2_cs.hpp"
+#include "exachem/cc/cc2/cd_cc2_cs.hpp"
 
 namespace cc2_cs {
 

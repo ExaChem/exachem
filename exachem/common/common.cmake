@@ -24,7 +24,8 @@ set(COMMON_INCLUDES
     ${COMMON_SRCDIR}/options/parse_fci_options.hpp 
     ${COMMON_SRCDIR}/options/parse_gw_options.hpp                
     ${COMMON_SRCDIR}/options/parse_task_options.hpp  
-    ${COMMON_SRCDIR}/options/input_options.hpp    
+    ${COMMON_SRCDIR}/options/input_options.hpp
+    ${COMMON_SRCDIR}/options/parser_utils.hpp    
     ${COMMON_SRCDIR}/initialize_system_data.hpp
 )
 
@@ -44,7 +45,7 @@ set(COMMON_SRCS
     ${COMMON_SRCDIR}/options/parse_fci_options.cpp 
     ${COMMON_SRCDIR}/options/parse_gw_options.cpp                
     ${COMMON_SRCDIR}/options/parse_task_options.cpp  
-    ${COMMON_SRCDIR}/options/input_options.cpp    
+    ${COMMON_SRCDIR}/options/input_options.cpp
     ${COMMON_SRCDIR}/initialize_system_data.cpp
     ${COMMON_SRCDIR}/ec_molden.cpp                   
     )

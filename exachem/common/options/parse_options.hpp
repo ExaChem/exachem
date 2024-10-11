@@ -8,14 +8,14 @@
 
 #pragma once
 // clang-format off
-#include "parser_utils.hpp"
-#include "parse_common_options.hpp"
-#include "parse_cd_options.hpp"
-#include "parse_ccsd_options.hpp"
-#include "parse_fci_options.hpp"
-#include "parse_gw_options.hpp"
-#include "parse_scf_options.hpp"
-#include "parse_task_options.hpp"
+#include "exachem/common/options/parser_utils.hpp"
+#include "exachem/common/options/parse_common_options.hpp"
+#include "exachem/common/options/parse_cd_options.hpp"
+#include "exachem/common/options/parse_ccsd_options.hpp"
+#include "exachem/common/options/parse_fci_options.hpp"
+#include "exachem/common/options/parse_gw_options.hpp"
+#include "exachem/common/options/parse_scf_options.hpp"
+#include "exachem/common/options/parse_task_options.hpp"
 #include "exachem/common/initialize_system_data.hpp"
 // clang-format on
 

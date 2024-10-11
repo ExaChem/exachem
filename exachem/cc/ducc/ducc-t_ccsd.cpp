@@ -6,8 +6,8 @@
  * See LICENSE.txt for details
  */
 
-#include "cc/ccsd/cd_ccsd_os_ann.hpp"
-#include "cholesky/v2tensors.hpp"
+#include "exachem/cc/ducc/ducc-t_ccsd.hpp"
+#include "exachem/cc/ccsd/cd_ccsd_os_ann.hpp"
 #include <tamm/op_executor.hpp>
 
 using namespace tamm;
@@ -539,8 +539,7 @@ namespace exachem::cc::ducc {
 template<typename T>
 void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                         Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1,
-                        cholesky_2e::V2Tensors<T>& v2tensors, size_t nactv,
-                        ExecutionHW ex_hw = ExecutionHW::CPU) {
+                        cholesky_2e::V2Tensors<T>& v2tensors, size_t nactv, ExecutionHW ex_hw) {
   Scheduler   sch{ec};
   SystemData& sys_data = chem_env.sys_data;
 

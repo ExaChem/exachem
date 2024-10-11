@@ -10,6 +10,7 @@ set(CC2_SRCS
     )
 
 set(CC2_INCLUDES
+    ${CC2_SRCDIR}/cd_cc2.hpp
     ${CC2_SRCDIR}/cd_cc2_cs.hpp
     ${CC2_SRCDIR}/cd_cc2_os.hpp
 )

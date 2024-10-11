@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "ccsd_lambda.hpp"
+#include "exachem/cc/lambda/ccsd_lambda.hpp"
 
 void exachem::cc::ccsd_lambda::iteration_print_lambda(ChemEnv& chem_env, const ProcGroup& pg,
                                                       int iter, double residual, double time) {

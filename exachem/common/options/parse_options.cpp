@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "parse_options.hpp"
+#include "exachem/common/options/parse_options.hpp"
 
 ECOptionParser::ECOptionParser(ChemEnv& chem_env) {
   initialize(chem_env);

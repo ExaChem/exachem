@@ -6,8 +6,9 @@
  * See LICENSE.txt for details
  */
 
-#include "cc/ccsd/ccsd_util.hpp"
-#include "cholesky/cholesky_2e_driver.hpp"
+#include "exachem/cc/rteom/rt_eom_cd_ccsd.hpp"
+#include "exachem/cc/ccsd/ccsd_util.hpp"
+#include "exachem/cholesky/cholesky_2e_driver.hpp"
 
 using namespace tamm;
 namespace exachem::rteom_cc::ccsd {

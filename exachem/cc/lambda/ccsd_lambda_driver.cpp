@@ -5,8 +5,9 @@
  *
  * See LICENSE.txt for details
  */
-#include "ccsd_lambda.hpp"
-#include "exachem/common/termcolor.hpp"
+
+#include "exachem/cc/lambda/ccsd_lambda.hpp"
+// #include "exachem/common/termcolor.hpp"
 #include "exachem/scf/scf_guess.hpp"
 #include <filesystem>
 
@@ -27,7 +28,7 @@ Tensor<T> compute_2rdm(std::vector<int>&, std::string, Scheduler&, TiledIndexSpa
 
 void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
-  using namespace termcolor;
+  // using namespace termcolor;
   auto rank = ec.pg().rank();
 
   scf::scf_driver(ec, chem_env);

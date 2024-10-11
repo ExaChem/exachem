@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "eomguess_opt.hpp"
+#include "exachem/cc/eom/eomguess_opt.hpp"
 
 using namespace tamm;
 

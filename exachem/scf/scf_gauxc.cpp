@@ -251,9 +251,8 @@ void exachem::scf::gauxc::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, S
                                       exachem::scf::TAMMTensors&   ttensors,
                                       exachem::scf::EigenTensors&  etensors,
                                       GauXC::XCIntegrator<Matrix>& xc_integrator) {
-  const SystemData&        sys_data    = chem_env.sys_data;
-  const SCFOptions&        scf_options = chem_env.ioptions.scf_options;
-  exachem::scf::SCFCompute scf_compute;
+  const SystemData& sys_data    = chem_env.sys_data;
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   Scheduler              sch{ec};
   const TiledIndexSpace& tAO = scf_vars.tAO;
@@ -269,6 +268,7 @@ void exachem::scf::gauxc::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, S
   sn_link_settings.k_tol      = scf_options.xc_snK_ktol;
 
 #ifdef GAUXC_HAS_DEVICE
+  exachem::scf::SCFCompute scf_compute;
   Matrix&                  D_alpha = etensors.D_alpha_cart;
   Matrix&                  K_alpha = etensors.VXC_alpha_cart;
   Matrix&                  D_beta  = etensors.D_beta_cart;
@@ -325,14 +325,14 @@ TensorType exachem::scf::gauxc::compute_xcf(ExecutionContext& ec, ChemEnv& chem_
                                             GauXC::XCIntegrator<Matrix>& xc_integrator) {
   SystemData& sys_data = chem_env.sys_data;
 
-  const bool               is_uhf = sys_data.is_unrestricted;
-  const bool               is_rhf = sys_data.is_restricted;
-  auto                     rank0  = ec.pg().rank() == 0;
-  exachem::scf::SCFCompute scf_compute;
+  const bool is_uhf = sys_data.is_unrestricted;
+  const bool is_rhf = sys_data.is_restricted;
+  auto       rank0  = ec.pg().rank() == 0;
 
   double EXC{};
 
 #ifdef GAUXC_HAS_DEVICE
+  exachem::scf::SCFCompute scf_compute;
   Matrix&                  D_alpha   = etensors.D_alpha_cart;
   Matrix&                  vxc_alpha = etensors.VXC_alpha_cart;
   Matrix&                  D_beta    = etensors.D_beta_cart;

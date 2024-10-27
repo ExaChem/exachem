@@ -26,18 +26,22 @@ double exachem::scf::SCFIO::tt_trace(ExecutionContext& ec, Tensor<TensorType>& T
 void exachem::scf::SCFIO::print_energies(ExecutionContext& ec, ChemEnv& chem_env,
                                          TAMMTensors& ttensors, EigenTensors& etensors,
                                          SCFVars& scf_vars, ScalapackInfo& scalapack_info) {
-  const SystemData& sys_data = chem_env.sys_data;
+  const SystemData& sys_data    = chem_env.sys_data;
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;
   const bool is_ks  = sys_data.is_ks;
+  const bool is_qed = sys_data.is_qed;
+  const bool do_qed = sys_data.do_qed;
 
-  double nelectrons = 0.0;
-  double kinetic_1e = 0.0;
-  double NE_1e      = 0.0;
-  double energy_1e  = 0.0;
-  double energy_2e  = 0.0;
-
+  double nelectrons    = 0.0;
+  double kinetic_1e    = 0.0;
+  double NE_1e         = 0.0;
+  double energy_1e     = 0.0;
+  double energy_2e     = 0.0;
+  double energy_qed    = 0.0;
+  double energy_qed_et = 0.0;
   if(is_rhf) {
     nelectrons = tt_trace(ec, ttensors.D_last_alpha, ttensors.S1);
     kinetic_1e = tt_trace(ec, ttensors.D_last_alpha, ttensors.T1);
@@ -45,7 +49,62 @@ void exachem::scf::SCFIO::print_energies(ExecutionContext& ec, ChemEnv& chem_env
     energy_1e  = tt_trace(ec, ttensors.D_last_alpha, ttensors.H1);
     energy_2e  = 0.5 * tt_trace(ec, ttensors.D_last_alpha, ttensors.F_alpha_tmp);
 
-    if(is_ks) { energy_2e += scf_vars.exc; }
+    if(is_ks) {
+      if((!is_qed) || (is_qed && do_qed)) { energy_2e += scf_vars.exc; }
+    }
+
+    if(is_qed) {
+      if(do_qed) {
+        energy_qed = tt_trace(ec, ttensors.D_last_alpha, ttensors.QED_1body);
+        energy_qed += 0.5 * tt_trace(ec, ttensors.D_last_alpha, ttensors.QED_2body);
+      }
+      else { energy_qed = scf_vars.eqed; }
+
+      Tensor<double> X_a;
+
+#if defined(USE_SCALAPACK)
+      X_a = {scf_vars.tAO, scf_vars.tAO_ortho};
+      Tensor<double>::allocate(&ec, X_a);
+      if(scalapack_info.comm != MPI_COMM_NULL) {
+        tamm::from_block_cyclic_tensor(ttensors.X_alpha, X_a);
+      }
+#else
+      X_a = ttensors.X_alpha;
+#endif
+
+      energy_qed_et              = 0.0;
+      std::vector<double> polvec = {0.0, 0.0, 0.0};
+      Scheduler           sch{ec};
+      Tensor<double>      ehf_tmp{scf_vars.tAO, scf_vars.tAO};
+      Tensor<double>      QED_Qxx{scf_vars.tAO, scf_vars.tAO};
+      Tensor<double>      QED_Qyy{scf_vars.tAO, scf_vars.tAO};
+      sch.allocate(ehf_tmp, QED_Qxx, QED_Qyy).execute();
+
+      for(int i = 0; i < sys_data.qed_nmodes; i++) {
+        polvec = scf_options.qed_polvecs[i];
+
+        // clang-format off
+        sch
+          (ehf_tmp("i", "j")  = X_a("i", "k") * X_a("j", "k"))
+          (ehf_tmp("i", "j") -= 0.5 * ttensors.D_last_alpha("i", "j"))
+          (QED_Qxx("i", "j")  = polvec[0] * ttensors.QED_Dx("i", "j"))
+          (QED_Qxx("i", "j") += polvec[1] * ttensors.QED_Dy("i", "j"))
+          (QED_Qxx("i", "j") += polvec[2] * ttensors.QED_Dz("i", "j"))
+          (QED_Qyy("i", "j")  = QED_Qxx("i", "k") * ehf_tmp("k", "j"))
+          (ehf_tmp("i", "j")  = QED_Qyy("i", "k") * QED_Qxx("k", "j"))
+          .execute();
+        // clang-format on
+
+        const double coupl_strength = pow(scf_options.qed_lambdas[i], 2);
+        energy_qed_et +=
+          0.5 * coupl_strength * tt_trace(ec, ttensors.D_last_alpha, ttensors.ehf_tmp);
+      }
+      sch.deallocate(ehf_tmp, QED_Qxx, QED_Qyy).execute();
+
+#if defined(USE_SCALAPACK)
+      Tensor<double>::deallocate(X_a);
+#endif
+    }
   }
   if(is_uhf) {
     nelectrons = tt_trace(ec, ttensors.D_last_alpha, ttensors.S1);
@@ -72,6 +131,13 @@ void exachem::scf::SCFIO::print_energies(ExecutionContext& ec, ChemEnv& chem_env
     chem_env.sys_data.results["output"]["SCF"]["kinetic_1e"] = kinetic_1e;
     chem_env.sys_data.results["output"]["SCF"]["energy_1e"]  = energy_1e;
     chem_env.sys_data.results["output"]["SCF"]["energy_2e"]  = energy_2e;
+
+    if(is_qed) {
+      std::cout << "QED energy        = " << energy_qed << std::endl;
+      std::cout << "QED eT energy     = " << energy_qed_et << std::endl;
+      chem_env.sys_data.results["output"]["SCF"]["energy_qed"]    = energy_qed;
+      chem_env.sys_data.results["output"]["SCF"]["energy_qed_et"] = energy_qed_et;
+    }
   }
 }
 

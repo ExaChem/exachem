@@ -30,10 +30,22 @@ public:
   Tensor<TensorType> ehf_tmp;
   Tensor<TensorType> ehf_beta_tmp;
 
-  Tensor<TensorType> H1; // core hamiltonian
-  Tensor<TensorType> S1; // overlap ints
-  Tensor<TensorType> T1; // kinetic ints
-  Tensor<TensorType> V1; // nuclear ints
+  Tensor<TensorType> H1;      // core hamiltonian
+  Tensor<TensorType> S1;      // overlap ints
+  Tensor<TensorType> T1;      // kinetic ints
+  Tensor<TensorType> V1;      // nuclear ints
+  Tensor<TensorType> QED_Dx;  // dipole ints
+  Tensor<TensorType> QED_Dy;  // dipole ints
+  Tensor<TensorType> QED_Dz;  // dipole ints
+  Tensor<TensorType> QED_Qxx; // quadrupole ints
+  Tensor<TensorType> QED_Qxy; // quadrupole ints
+  Tensor<TensorType> QED_Qxz; // quadrupole ints
+  Tensor<TensorType> QED_Qyy; // quadrupole ints
+  Tensor<TensorType> QED_Qyz; // quadrupole ints
+  Tensor<TensorType> QED_Qzz; // quadrupole ints
+  Tensor<TensorType> QED_1body;
+  Tensor<TensorType> QED_2body;
+  Tensor<TensorType> QED_energy;
 
   Tensor<TensorType> X_alpha;
   Tensor<TensorType> F_alpha; // H1+F_alpha_tmp

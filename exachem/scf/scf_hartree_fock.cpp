@@ -18,6 +18,7 @@ void exachem::scf::SCFHartreeFock::initialize(ExecutionContext& exc, ChemEnv& ch
 
 void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_env) {
   SCFCompute scf_compute;
+  SCFQed     scf_qed;
   SCFIter    scf_iter;
   SCFGuess   scf_guess;
   SCFRestart scf_restart;
@@ -336,6 +337,27 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
     /*** compute 1-e integrals       ***/
     /*** =========================== ***/
     scf_compute.compute_hamiltonian<TensorType>(ec, scf_vars, chem_env, ttensors, etensors);
+    if(chem_env.sys_data.is_qed) {
+      ttensors.QED_Dx    = {tAO, tAO};
+      ttensors.QED_Dy    = {tAO, tAO};
+      ttensors.QED_Dz    = {tAO, tAO};
+      ttensors.QED_Qxx   = {tAO, tAO};
+      ttensors.QED_Qxy   = {tAO, tAO};
+      ttensors.QED_Qxz   = {tAO, tAO};
+      ttensors.QED_Qyy   = {tAO, tAO};
+      ttensors.QED_Qyz   = {tAO, tAO};
+      ttensors.QED_Qzz   = {tAO, tAO};
+      ttensors.QED_1body = {tAO, tAO};
+      ttensors.QED_2body = {tAO, tAO};
+      Tensor<TensorType>::allocate(&ec, ttensors.QED_Dx, ttensors.QED_Dy, ttensors.QED_Dz,
+                                   ttensors.QED_Qxx, ttensors.QED_Qxy, ttensors.QED_Qxz,
+                                   ttensors.QED_Qyy, ttensors.QED_Qyz, ttensors.QED_Qzz,
+                                   ttensors.QED_1body, ttensors.QED_2body);
+
+      scf_qed.compute_qed_emult_ints<TensorType>(ec, chem_env, scf_vars, ttensors);
+      if(chem_env.sys_data.do_qed)
+        scf_qed.compute_QED_1body<TensorType>(ec, chem_env, scf_vars, ttensors);
+    }
 
     if(chem_env.sys_data.has_ecp) {
       Tensor<TensorType> ECP{tAO, tAO};
@@ -653,6 +675,11 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
                                        shell2bf, SchwarzK, max_nprim4, ttensors, etensors,
                                        is_3c_init, do_density_fitting, xHF);
 
+      // Add QED contribution
+      if(chem_env.sys_data.do_qed) {
+        scf_qed.compute_QED_2body<TensorType>(ec, chem_env, scf_vars, ttensors);
+      }
+
 #if defined(USE_GAUXC)
       // Add snK contribution
       if(chem_env.sys_data.do_snK) {
@@ -707,6 +734,7 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
         auto debug = chem_env.ioptions.scf_options.debug;
         if(rank == 0 && debug)
           std::cout << std::fixed << std::setprecision(2) << "xcf: " << xcf_time << "s, ";
+        if(sys_data.is_qed && !sys_data.do_qed) { scf_vars.eqed = gauxc_exc; }
       }
 
       ehf += gauxc_exc;
@@ -769,6 +797,11 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
       scf_iter.compute_2bf<TensorType>(ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen,
                                        shell2bf, SchwarzK, max_nprim4, ttensors, etensors,
                                        is_3c_init, do_density_fitting, xHF);
+
+      // Add QED contribution
+      if(chem_env.sys_data.do_qed) {
+        scf_qed.compute_QED_2body<TensorType>(ec, chem_env, scf_vars, ttensors);
+      }
 
       std::tie(ehf, rmsd) = scf_iter.scf_iter_body<TensorType>(ec, chem_env, scalapack_info, iter,
                                                                scf_vars, ttensors, etensors
@@ -920,6 +953,13 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
       scf_iter.compute_2bf<TensorType>(ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen,
                                        shell2bf, SchwarzK, max_nprim4, ttensors, etensors,
                                        is_3c_init, do_density_fitting, xHF_adjust);
+
+      // Add QED contribution;
+      // CHECK
+
+      if(chem_env.sys_data.do_qed) {
+        scf_qed.compute_QED_2body<TensorType>(ec, chem_env, scf_vars, ttensors);
+      }
     }
     else if(scf_vars.lshift > 0) {
       // Remove level shift from Fock matrix
@@ -1000,6 +1040,20 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
                                            chem_env.ioptions.scf_options.debug);
       Tensor<TensorType>::deallocate(ttensors.VXC_alpha);
       if(chem_env.sys_data.is_unrestricted) Tensor<TensorType>::deallocate(ttensors.VXC_beta);
+    }
+    if(chem_env.sys_data.is_qed) {
+      scf_output.rw_mat_disk<TensorType>(ttensors.QED_Dx, files_prefix + ".QED_Dx",
+                                         chem_env.ioptions.scf_options.debug);
+      scf_output.rw_mat_disk<TensorType>(ttensors.QED_Dy, files_prefix + ".QED_Dy",
+                                         chem_env.ioptions.scf_options.debug);
+      scf_output.rw_mat_disk<TensorType>(ttensors.QED_Dz, files_prefix + ".QED_Dz",
+                                         chem_env.ioptions.scf_options.debug);
+      scf_output.rw_mat_disk<TensorType>(ttensors.QED_Qxx, files_prefix + ".QED_Qxx",
+                                         chem_env.ioptions.scf_options.debug);
+      Tensor<TensorType>::deallocate(ttensors.QED_Dx, ttensors.QED_Dy, ttensors.QED_Dz,
+                                     ttensors.QED_Qxx, ttensors.QED_Qxy, ttensors.QED_Qxz,
+                                     ttensors.QED_Qyy, ttensors.QED_Qyz, ttensors.QED_Qzz,
+                                     ttensors.QED_1body, ttensors.QED_2body);
     }
 #if SCF_THROTTLE_RESOURCES
     ec.flush_and_sync();

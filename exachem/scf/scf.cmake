@@ -4,6 +4,7 @@ include(TargetMacros)
 set(SCF_SRCDIR scf)
 
 set(SCF_INCLUDES
+    ${SCF_SRCDIR}/scf_qed.hpp
     ${SCF_SRCDIR}/scf_vars.hpp
     ${SCF_SRCDIR}/scf_iter.hpp
     ${SCF_SRCDIR}/scf_main.hpp
@@ -21,6 +22,7 @@ set(SCF_INCLUDES
     )
 
 set(SCF_SRCS
+    ${SCF_SRCDIR}/scf_qed.cpp    
     ${SCF_SRCDIR}/scf_iter.cpp        
     ${SCF_SRCDIR}/scf_main.cpp
     ${SCF_SRCDIR}/scf_gauxc.cpp            

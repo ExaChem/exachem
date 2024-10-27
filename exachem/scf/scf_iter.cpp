@@ -109,6 +109,7 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
       std::chrono::duration_cast<std::chrono::duration<double>>((xcf_stop - xcf_start)).count();
     if(rank == 0 && debug)
       std::cout << std::fixed << std::setprecision(2) << "xcf: " << xcf_time << "s, ";
+    if(sys_data.is_qed && !sys_data.do_qed) { scf_vars.eqed = gauxc_exc; }
   }
 
   ehf += gauxc_exc;

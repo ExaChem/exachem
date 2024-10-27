@@ -14,6 +14,7 @@
 #include "exachem/scf/scf_compute.hpp"
 #include "exachem/scf/scf_iter.hpp"
 #include "exachem/scf/scf_outputs.hpp"
+#include "exachem/scf/scf_qed.hpp"
 #include "exachem/scf/scf_restart.hpp"
 #include "exachem/scf/scf_taskmap.hpp"
 #include <variant>

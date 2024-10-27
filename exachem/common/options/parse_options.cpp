@@ -42,7 +42,8 @@ void ECOptionParser::parse_n_check(std::string_view filename, json& jinput) {
                      "] in the input file");
   }
 
-  const std::vector<std::string> valid_common{"comments", "maxiter", "debug", "file_prefix"};
+  const std::vector<std::string> valid_common{"comments", "maxiter", "debug", "file_prefix",
+                                              "output_dir"};
   for(auto& el: jinput["common"].items()) {
     if(std::find(valid_common.begin(), valid_common.end(), el.key()) == valid_common.end()) {
       tamm_terminate("INPUT FILE ERROR: Invalid common section option [" + el.key() +

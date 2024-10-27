@@ -55,7 +55,6 @@ struct ScalapackInfo {
 
 // Contains node, ppn information used for creating a smaller process group from world group
 struct ProcGroupData {
-  int nnodes{};     // total number of nodes
   int spg_nnodes{}; // number of nodes in smaller process group
   int ppn{};        // processes per node
   int spg_nranks{}; // number of rank in smaller process group
@@ -63,7 +62,7 @@ struct ProcGroupData {
   int scalapack_nnodes{};
   int scalapack_nranks{};
 
-  auto unpack() { return std::make_tuple(nnodes, spg_nnodes, ppn, spg_nranks); }
+  auto unpack() { return std::make_tuple(spg_nnodes, ppn, spg_nranks); }
 };
 
 #if defined(USE_SCALAPACK)

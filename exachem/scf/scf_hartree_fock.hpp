@@ -93,7 +93,6 @@ private:
 #if SCF_THROTTLE_RESOURCES
   ProcGroupData pgdata;
   ProcGroup     pg;
-  int           hf_nranks, hf_nnodes, t_nnodes;
 #endif
 
 #if defined(USE_SCALAPACK)

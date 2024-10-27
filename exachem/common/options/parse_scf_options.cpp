@@ -118,6 +118,11 @@ void ParseSCFOptions::parse(ChemEnv& chem_env) {
   if(scf_options.nnodes < 1 || scf_options.nnodes > 100) {
     tamm_terminate("INPUT FILE ERROR: SCF option nnodes should be a number between 1 and 100");
   }
+  if(scf_options.multiplicity > 1 && scf_options.scf_type != "unrestricted") {
+    tamm_terminate(
+      "INPUT FILE ERROR: SCF option scf_type should be set to unrestricted when multiplicity>1");
+  }
+
   {
     auto xc_grid_str = scf_options.xc_grid_type;
     xc_grid_str.erase(remove_if(xc_grid_str.begin(), xc_grid_str.end(), isspace),
@@ -143,5 +148,6 @@ void ParseSCFOptions::update_common_options(ChemEnv& chem_env) {
   scf_options.gaussian_type = common_options.gaussian_type;
   scf_options.geom_units    = common_options.geom_units;
   scf_options.file_prefix   = common_options.file_prefix;
+  scf_options.output_dir    = common_options.output_dir;
   scf_options.ext_data_path = common_options.ext_data_path;
 }

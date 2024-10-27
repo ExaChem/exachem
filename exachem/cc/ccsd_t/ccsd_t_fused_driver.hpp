@@ -222,7 +222,7 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
     static_cast<T*>(memDevPool.allocate(sizeof(T) * std::pow(max_num_blocks, 6) * 2));
 #endif
 
-  int num_task = 0;
+  // int num_task = 0;
   //   if(!seq_h3b) {
   //     if(rank == 0) {
   //       std::cout << "456123 parallel 6d loop variant" << std::endl << std::endl;
@@ -354,7 +354,7 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
                     else if((t_h1b == t_h2b) || (t_h2b == t_h3b)) { factor /= 2.0; }
 
                     //
-                    num_task++;
+                    // num_task++;
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
                     ccsd_t_fully_fused_none_df_none_task<T>(

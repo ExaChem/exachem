@@ -50,5 +50,7 @@ void ParseGWOptions::update_common_options(ChemEnv& chem_env) {
   gw_options.gaussian_type = common_options.gaussian_type;
   gw_options.geom_units    = common_options.geom_units;
   gw_options.file_prefix   = common_options.file_prefix;
+  gw_options.output_dir    = common_options.output_dir;
+
   gw_options.ext_data_path = common_options.ext_data_path;
 }

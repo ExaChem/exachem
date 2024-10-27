@@ -11,6 +11,7 @@
 using namespace exachem::scf;
 bool cd_debug = false;
 #define CD_USE_PGAS_API
+#define CD_THROTTLE
 
 template<typename T>
 auto cd_tensor_zero(Tensor<T>& tens) {
@@ -21,7 +22,8 @@ auto cd_tensor_zero(Tensor<T>& tens) {
 
 namespace exachem::cholesky_2e {
 
-int get_ts_recommendation(int nranks, ChemEnv& chem_env) {
+int get_ts_recommendation(ExecutionContext& ec, ChemEnv& chem_env) {
+  int nranks   = ec.nnodes() * ec.ppn();
   int ts_guess = chem_env.ioptions.ccsd_options.tilesize;
 
   SystemData& sys_data = chem_env.sys_data;
@@ -30,8 +32,20 @@ int get_ts_recommendation(int nranks, ChemEnv& chem_env) {
   const auto  o_beta   = sys_data.n_occ_beta;
   const auto  v_beta   = sys_data.n_vir_beta;
 
+  int           max_ts = 180; // gpu_mem=64
+  tamm::meminfo minfo  = ec.mem_info();
+  if(ec.has_gpu()) {
+    const auto gpu_mem = minfo.gpu_mem_per_device;
+    if(gpu_mem <= 8) max_ts = 100;
+    else if(gpu_mem <= 12) max_ts = 120;
+    else if(gpu_mem <= 16) max_ts = 130;
+    else if(gpu_mem <= 24) max_ts = 145;
+    else if(gpu_mem <= 32) max_ts = 155;
+    else if(gpu_mem <= 48) max_ts = 170;
+  }
+
   std::vector<int> tilesizes;
-  for(int i = ts_guess; i <= 300; i += 10) { tilesizes.push_back(i); }
+  for(int i = ts_guess; i <= max_ts; i += 5) { tilesizes.push_back(i); }
 
   int ts_guess_ = tilesizes[0];
   int ts_max_   = tilesizes[0];
@@ -68,7 +82,7 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ExecutionContext& ec, ChemEn
     if(!ccsd_options.force_tilesize && ec.has_gpu()) {
       tce_tile = static_cast<Tile>(sys_data.nbf / 10);
       if(tce_tile < 50) tce_tile = 50;        // 50 is the default tilesize
-      else if(tce_tile > 100) tce_tile = 100; // 100 is the max tilesize
+      else if(tce_tile > 140) tce_tile = 140; // 140 is the max tilesize
       if(rank == 0)
         std::cout << std::endl
                   << "Resetting tilesize for the MO space to: " << tce_tile << std::endl;
@@ -113,7 +127,7 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& 
   bool balance_tiles = ccsd_options.balance_tiles;
   if(!triples) {
     if(!ccsd_options.force_tilesize && ec.has_gpu()) {
-      tce_tile = get_ts_recommendation(ec.nnodes() * ec.ppn(), chem_env);
+      tce_tile = get_ts_recommendation(ec, chem_env);
       if(rank == 0)
         std::cout << std::endl
                   << "Resetting tilesize for the MSO space to: " << tce_tile << std::endl;
@@ -346,8 +360,6 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
   std::vector<tamm::Tile> AO_tiles       = scf_vars.AO_tiles;
 
   // TiledIndexSpace tAOt{tAO.index_space(), AO_tiles};
-  ExecutionContext ec_dense{ec.pg(), DistributionKind::dense, MemoryManagerKind::ga};
-  auto             rank = ec_dense.pg().rank().value();
 
   TAMM_GA_SIZE    N = tMO("all").max_num_indices();
   IndexSpace      CI{range(0, max_cvecs)};
@@ -357,11 +369,17 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
   lcao_eig.setZero();
   tamm_to_eigen_tensor(lcao, lcao_eig);
 
+  auto rank = ec.pg().rank().value();
+
   // Cholesky decomposition
   if(rank == 0) {
     cout << endl << "    Begin Cholesky Decomposition" << endl;
     cout << std::string(45, '-') << endl;
   }
+
+  auto   cd_t1   = std::chrono::high_resolution_clock::now();
+  auto   cd_t2   = cd_t1;
+  double cd_time = 0;
 
   const auto nbf   = nao;
   int64_t    count = 0; // Initialize cholesky vector count
@@ -373,9 +391,31 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
   const auto  diag_ao_file  = files_prefix + ".diag_ao";
   const auto  cv_count_file = files_prefix + ".cholcount";
 
-  std::vector<int64_t> lo_x(4, -1); // The lower limits of blocks
-  std::vector<int64_t> hi_x(4, -2); // The upper limits of blocks
-  std::vector<int64_t> ld_x(4);     // The leading dims of blocks
+  int64_t cd_nranks = /* std::abs(std::log10(diagtol)) */ nbf / 2; // max cores
+  auto    nnodes    = ec.nnodes();
+  auto    ppn       = ec.ppn();
+  int     cd_nnodes = cd_nranks / ppn;
+  if(cd_nranks % ppn > 0 || cd_nnodes == 0) cd_nnodes++;
+  if(cd_nnodes > nnodes) cd_nnodes = nnodes;
+  cd_nranks = cd_nnodes * ppn;
+  if(rank == 0) {
+    cout << "Total # of mpi ranks used for Cholesky decomposition: " << cd_nranks << endl
+         << "  --> Number of nodes, mpi ranks per node: " << cd_nnodes << ", " << ppn << endl;
+  }
+
+#if defined(CD_THROTTLE)
+  std::vector<int> ranks(cd_nranks);
+  for(int i = 0; i < cd_nranks; i++) ranks[i] = i;
+  MPI_Group wgroup;
+  MPI_Group cdgroup;
+  MPI_Comm  cd_comm;
+  auto      gcomm = ec.pg().comm();
+  MPI_Comm_group(gcomm, &wgroup);
+  MPI_Group_incl(wgroup, cd_nranks, ranks.data(), &cdgroup);
+  MPI_Comm_create(gcomm, cdgroup, &cd_comm);
+  MPI_Group_free(&wgroup);
+  MPI_Group_free(&cdgroup);
+#endif
 
   Tensor<TensorType> g_d_tamm{tAO, tAO};
   Tensor<TensorType> g_r_tamm{tAO, tAO};
@@ -394,264 +434,282 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
   g_d_tamm.set_dense();
   g_chol_tamm.set_dense();
 
-  Tensor<TensorType>::allocate(&ec_dense, g_d_tamm, g_r_tamm, g_chol_tamm);
+  bool cd_throttle = true; // SCF_THROTTLE_RESOURCES flag
+  if(rank >= cd_nranks) cd_throttle = false;
+
+#if defined(CD_THROTTLE)
+  if(cd_throttle) {
+    EXPECTS(cd_comm != MPI_COMM_NULL);
+    ProcGroup        pg_cd = ProcGroup::create_coll(cd_comm);
+    ExecutionContext ec_cd{pg_cd, DistributionKind::nw, MemoryManagerKind::ga};
+#else
+  ExecutionContext& ec_cd = ec;
+#endif
+
+    ExecutionContext ec_dense{ec_cd.pg(), DistributionKind::dense, MemoryManagerKind::ga};
+
+    std::vector<int64_t> lo_x(4, -1); // The lower limits of blocks
+    std::vector<int64_t> hi_x(4, -2); // The upper limits of blocks
+    std::vector<int64_t> ld_x(4);     // The leading dims of blocks
+
+    Tensor<TensorType>::allocate(&ec_dense, g_d_tamm, g_r_tamm, g_chol_tamm);
 
 #if !defined(USE_UPCXX)
-  cd_tensor_zero(g_d_tamm);
-  cd_tensor_zero(g_r_tamm);
-  cd_tensor_zero(g_chol_tamm);
+    cd_tensor_zero(g_d_tamm);
+    cd_tensor_zero(g_r_tamm);
+    cd_tensor_zero(g_chol_tamm);
 
-  auto write_chol_vectors = [&]() {
-    write_to_disk(g_d_tamm, diag_ao_file);
-    write_to_disk(g_chol_tamm, chol_ao_file);
-    if(rank == 0) {
-      std::ofstream out(cv_count_file, std::ios::out);
-      if(!out) cerr << "Error opening file " << cv_count_file << endl;
-      out << count << std::endl;
-      out.close();
-      if(rank == 0)
-        cout << endl << "- Number of cholesky vectors written to disk = " << count << endl;
-    }
-  };
+    auto write_chol_vectors = [&]() {
+      write_to_disk(g_d_tamm, diag_ao_file);
+      write_to_disk(g_chol_tamm, chol_ao_file);
+      if(rank == 0) {
+        std::ofstream out(cv_count_file, std::ios::out);
+        if(!out) cerr << "Error opening file " << cv_count_file << endl;
+        out << count << std::endl;
+        out.close();
+        if(rank == 0)
+          cout << endl << "- Number of cholesky vectors written to disk = " << count << endl;
+      }
+    };
 
-  const int g_chol = g_chol_tamm.ga_handle();
-  const int g_d    = g_d_tamm.ga_handle();
-  const int g_r    = g_r_tamm.ga_handle();
+    const int g_chol = g_chol_tamm.ga_handle();
+    const int g_d    = g_d_tamm.ga_handle();
+    const int g_r    = g_r_tamm.ga_handle();
 
 #if defined(CD_USE_PGAS_API)
-  std::vector<int64_t> lo_b(g_chol_tamm.num_modes(), -1); // The lower limits of blocks of B
-  std::vector<int64_t> hi_b(g_chol_tamm.num_modes(), -2); // The upper limits of blocks of B
-  std::vector<int64_t> ld_b(g_chol_tamm.num_modes());     // The leading dims of blocks of B
+    std::vector<int64_t> lo_b(g_chol_tamm.num_modes(), -1); // The lower limits of blocks of B
+    std::vector<int64_t> hi_b(g_chol_tamm.num_modes(), -2); // The upper limits of blocks of B
+    std::vector<int64_t> ld_b(g_chol_tamm.num_modes());     // The leading dims of blocks of B
 
-  std::vector<int64_t> lo_r(g_r_tamm.num_modes(), -1); // The lower limits of blocks of R
-  std::vector<int64_t> hi_r(g_r_tamm.num_modes(), -2); // The upper limits of blocks of R
-  std::vector<int64_t> ld_r(g_r_tamm.num_modes());     // The leading dims of blocks of R
+    std::vector<int64_t> lo_r(g_r_tamm.num_modes(), -1); // The lower limits of blocks of R
+    std::vector<int64_t> hi_r(g_r_tamm.num_modes(), -2); // The upper limits of blocks of R
+    std::vector<int64_t> ld_r(g_r_tamm.num_modes());     // The leading dims of blocks of R
 
-  std::vector<int64_t> lo_d(g_d_tamm.num_modes(), -1); // The lower limits of blocks of D
-  std::vector<int64_t> hi_d(g_d_tamm.num_modes(), -2); // The upper limits of blocks of D
-  std::vector<int64_t> ld_d(g_d_tamm.num_modes());     // The leading dims of blocks of D
+    std::vector<int64_t> lo_d(g_d_tamm.num_modes(), -1); // The lower limits of blocks of D
+    std::vector<int64_t> hi_d(g_d_tamm.num_modes(), -2); // The upper limits of blocks of D
+    std::vector<int64_t> ld_d(g_d_tamm.num_modes());     // The leading dims of blocks of D
 
-  // Distribution Check
-  NGA_Distribution64(g_chol, rank, lo_b.data(), hi_b.data());
-  NGA_Distribution64(g_d, rank, lo_d.data(), hi_d.data());
-  NGA_Distribution64(g_r, rank, lo_r.data(), hi_r.data());
+    // Distribution Check
+    NGA_Distribution64(g_chol, rank, lo_b.data(), hi_b.data());
+    NGA_Distribution64(g_d, rank, lo_d.data(), hi_d.data());
+    NGA_Distribution64(g_r, rank, lo_r.data(), hi_r.data());
 
-  bool has_gc_data = (lo_b[0] >= 0 && hi_b[0] >= 0);
-  bool has_gd_data = (lo_d[0] >= 0 && hi_d[0] >= 0);
-  bool has_gr_data = (lo_r[0] >= 0 && hi_r[0] >= 0);
+    bool has_gc_data = (lo_b[0] >= 0 && hi_b[0] >= 0);
+    bool has_gd_data = (lo_d[0] >= 0 && hi_d[0] >= 0);
+    bool has_gr_data = (lo_r[0] >= 0 && hi_r[0] >= 0);
 #endif
 #endif
 
-  ec_dense.pg().barrier();
+    ec_dense.pg().barrier();
 
-  auto cd_t1 = std::chrono::high_resolution_clock::now();
-  /* Compute the diagonal
-    g_d_tamm stores the diagonal integrals, i.e. (uv|uv)'s
-    ScrCol temporarily stores all (uv|rs)'s with fixed r and s
-  */
-  Engine       engine(Operator::coulomb, max_nprim(shells), max_l(shells), 0);
-  const double engine_precision = chem_env.ioptions.scf_options.tol_int;
-
-  // Compute diagonal without primitive screening
-  engine.set_precision(0.0);
-  const auto& buf = engine.results();
-
-  bool cd_restart = write_cv.first && fs::exists(diag_ao_file) && fs::exists(chol_ao_file) &&
-                    fs::exists(cv_count_file);
-
-  auto compute_diagonals = [&](const IndexVector& blockid) {
-    auto bi0 = blockid[0];
-    auto bi1 = blockid[1];
-
-    const TAMM_SIZE         size       = g_d_tamm.block_size(blockid);
-    auto                    block_dims = g_d_tamm.block_dims(blockid);
-    std::vector<TensorType> dbuf(size);
-
-    auto bd1 = block_dims[1];
-
-    size_t s1range_start = 0;
-    auto   s1range_end   = shell_tile_map[bi0];
-    if(bi0 > 0) s1range_start = shell_tile_map[bi0 - 1] + 1;
-
-    for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
-      auto n1 = shells[s1].size();
-
-      size_t s2range_start = 0;
-      auto   s2range_end   = shell_tile_map[bi1];
-      if(bi1 > 0) s2range_start = shell_tile_map[bi1 - 1] + 1;
-
-      for(size_t s2 = s2range_start; s2 <= s2range_end; ++s2) {
-        if(s2 > s1) {
-          auto s2spl = scf_vars.obs_shellpair_list[s2];
-          if(std::find(s2spl.begin(), s2spl.end(), s1) == s2spl.end()) continue;
-        }
-        else {
-          auto s2spl = scf_vars.obs_shellpair_list[s1];
-          if(std::find(s2spl.begin(), s2spl.end(), s2) == s2spl.end()) continue;
-        }
-
-        auto n2 = shells[s2].size();
-
-        // compute shell pair; return is the pointer to the buffer
-        engine.compute(shells[s1], shells[s2], shells[s1], shells[s2]);
-        const auto* buf_1212 = buf[0];
-        if(buf_1212 == nullptr) continue;
-
-        auto curshelloffset_i = 0U;
-        auto curshelloffset_j = 0U;
-        for(auto x = s1range_start; x < s1; x++) curshelloffset_i += AO_tiles[x];
-        for(auto x = s2range_start; x < s2; x++) curshelloffset_j += AO_tiles[x];
-
-        auto dimi = curshelloffset_i + AO_tiles[s1];
-        auto dimj = curshelloffset_j + AO_tiles[s2];
-
-        for(size_t i = curshelloffset_i; i < dimi; i++) {
-          for(size_t j = curshelloffset_j; j < dimj; j++) {
-            auto f1           = i - curshelloffset_i;
-            auto f2           = j - curshelloffset_j;
-            auto f1212        = f1 * n2 * n1 * n2 + f2 * n1 * n2 + f1 * n2 + f2;
-            dbuf[i * bd1 + j] = buf_1212[f1212];
-          }
-        }
-      }
-    }
-    g_d_tamm.put(blockid, dbuf);
-  };
-  // for(auto blockid: g_d_tamm.loop_nest()) {
-  //   if(g_d_tamm.is_local_block(blockid)) {
-  //     compute_diagonals(blockid);
-  //   }
-  // }
-  if(!cd_restart) block_for(ec_dense, g_d_tamm(), compute_diagonals);
-
-  auto cd_t2   = std::chrono::high_resolution_clock::now();
-  auto cd_time = std::chrono::duration_cast<std::chrono::duration<double>>((cd_t2 - cd_t1)).count();
-  if(rank == 0 && !cd_restart) {
-    std::cout << endl
-              << "- Time for computing the diagonal: " << std::fixed << std::setprecision(2)
-              << cd_time << " secs" << endl;
-  }
-
-#if !defined(USE_UPCXX)
-  if(cd_restart) {
     cd_t1 = std::chrono::high_resolution_clock::now();
+    /* Compute the diagonal
+      g_d_tamm stores the diagonal integrals, i.e. (uv|uv)'s
+      ScrCol temporarily stores all (uv|rs)'s with fixed r and s
+    */
+    Engine       engine(Operator::coulomb, max_nprim(shells), max_l(shells), 0);
+    const double engine_precision = chem_env.ioptions.scf_options.tol_int;
 
-    read_from_disk(g_d_tamm, diag_ao_file);
-    read_from_disk(g_chol_tamm, chol_ao_file);
+    // Compute diagonal without primitive screening
+    engine.set_precision(0.0);
+    const auto& buf = engine.results();
 
-    std::ifstream in(cv_count_file, std::ios::in);
-    int           rstatus = 0;
-    if(in.is_open()) rstatus = 1;
-    if(rstatus == 1) in >> count;
-    else tamm_terminate("Error reading " + cv_count_file);
+    bool cd_restart = write_cv.first && fs::exists(diag_ao_file) && fs::exists(chol_ao_file) &&
+                      fs::exists(cv_count_file);
 
-    if(rank == 0)
-      cout << endl << "- [CD restart] Number of cholesky vectors read = " << count << endl;
-
-    cd_t2   = std::chrono::high_resolution_clock::now();
-    cd_time = std::chrono::duration_cast<std::chrono::duration<double>>((cd_t2 - cd_t1)).count();
-    if(rank == 0) {
-      std::cout << "- [CD restart] Time for reading the diagonal and cholesky vectors: "
-                << std::fixed << std::setprecision(2) << cd_time << " secs" << endl;
-    }
-  }
-#endif
-
-  auto cd_t3 = std::chrono::high_resolution_clock::now();
-
-  auto [val_d0, blkid, eoff]  = tamm::max_element(g_d_tamm);
-  auto                 blkoff = g_d_tamm.block_offsets(blkid);
-  std::vector<int64_t> indx_d0(g_d_tamm.num_modes());
-  indx_d0[0] = (int64_t) blkoff[0] + (int64_t) eoff[0];
-  indx_d0[1] = (int64_t) blkoff[1] + (int64_t) eoff[1];
-
-  // Reset Engine precision
-  const double schwarz_tol = chem_env.ioptions.scf_options.tol_sch;
-  engine.set_precision(engine_precision);
-
-  while(val_d0 > diagtol && count < max_cvecs) {
-    auto bfu        = indx_d0[0];
-    auto bfv        = indx_d0[1];
-    auto s1         = bf2shell[bfu];
-    auto n1         = shells[s1].size();
-    auto s2         = bf2shell[bfv];
-    auto n2         = shells[s2].size();
-    auto n12        = n1 * n2;
-    auto f1         = bfu - shell2bf[s1];
-    auto f2         = bfv - shell2bf[s2];
-    auto ind12      = f1 * n2 + f2;
-    auto schwarz_12 = SchwarzK(s1, s2);
-
-#if !defined(USE_UPCXX)
-    cd_tensor_zero(g_r_tamm);
-#endif
-
-#if !defined(CD_USE_PGAS_API)
-    auto compute_eri = [&](const IndexVector& blockid) {
+    auto compute_diagonals = [&](const IndexVector& blockid) {
       auto bi0 = blockid[0];
       auto bi1 = blockid[1];
 
-      const TAMM_SIZE         size       = g_r_tamm.block_size(blockid);
-      auto                    block_dims = g_r_tamm.block_dims(blockid);
+      const TAMM_SIZE         size       = g_d_tamm.block_size(blockid);
+      auto                    block_dims = g_d_tamm.block_dims(blockid);
       std::vector<TensorType> dbuf(size);
 
       auto bd1 = block_dims[1];
 
-      auto s3range_start = 0l;
-      auto s3range_end   = shell_tile_map[bi0];
-      if(bi0 > 0) s3range_start = shell_tile_map[bi0 - 1] + 1;
+      size_t s1range_start = 0;
+      auto   s1range_end   = shell_tile_map[bi0];
+      if(bi0 > 0) s1range_start = shell_tile_map[bi0 - 1] + 1;
 
-      for(Index s3 = s3range_start; s3 <= s3range_end; ++s3) {
-        auto n3 = shells[s3].size();
+      for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
+        auto n1 = shells[s1].size();
 
-        auto s4range_start = 0l;
-        auto s4range_end   = shell_tile_map[bi1];
-        if(bi1 > 0) s4range_start = shell_tile_map[bi1 - 1] + 1;
+        size_t s2range_start = 0;
+        auto   s2range_end   = shell_tile_map[bi1];
+        if(bi1 > 0) s2range_start = shell_tile_map[bi1 - 1] + 1;
 
-        for(Index s4 = s4range_start; s4 <= s4range_end; ++s4) {
-          if(s4 > s3) {
-            auto s2spl = obs_shellpair_list[s4];
-            if(std::find(s2spl.begin(), s2spl.end(), s3) == s2spl.end()) continue;
+        for(size_t s2 = s2range_start; s2 <= s2range_end; ++s2) {
+          if(s2 > s1) {
+            auto s2spl = scf_vars.obs_shellpair_list[s2];
+            if(std::find(s2spl.begin(), s2spl.end(), s1) == s2spl.end()) continue;
           }
           else {
-            auto s2spl = obs_shellpair_list[s3];
-            if(std::find(s2spl.begin(), s2spl.end(), s4) == s2spl.end()) continue;
+            auto s2spl = scf_vars.obs_shellpair_list[s1];
+            if(std::find(s2spl.begin(), s2spl.end(), s2) == s2spl.end()) continue;
           }
 
-          auto n4 = shells[s4].size();
-          if(schwarz_12 * SchwarzK(s3, s4) < schwarz_tol) continue;
+          auto n2 = shells[s2].size();
 
           // compute shell pair; return is the pointer to the buffer
-          engine.compute(shells[s3], shells[s4], shells[s1], shells[s2]);
-          const auto* buf_3412 = buf[0];
-          if(buf_3412 == nullptr) continue; // if all integrals screened out, skip to next quartet
+          engine.compute(shells[s1], shells[s2], shells[s1], shells[s2]);
+          const auto* buf_1212 = buf[0];
+          if(buf_1212 == nullptr) continue;
 
           auto curshelloffset_i = 0U;
           auto curshelloffset_j = 0U;
-          for(auto x = s3range_start; x < s3; x++) curshelloffset_i += AO_tiles[x];
-          for(auto x = s4range_start; x < s4; x++) curshelloffset_j += AO_tiles[x];
+          for(auto x = s1range_start; x < s1; x++) curshelloffset_i += AO_tiles[x];
+          for(auto x = s2range_start; x < s2; x++) curshelloffset_j += AO_tiles[x];
 
-          auto dimi = curshelloffset_i + AO_tiles[s3];
-          auto dimj = curshelloffset_j + AO_tiles[s4];
+          auto dimi = curshelloffset_i + AO_tiles[s1];
+          auto dimj = curshelloffset_j + AO_tiles[s2];
 
           for(size_t i = curshelloffset_i; i < dimi; i++) {
             for(size_t j = curshelloffset_j; j < dimj; j++) {
-              auto f3           = i - curshelloffset_i;
-              auto f4           = j - curshelloffset_j;
-              auto f3412        = f3 * n4 * n12 + f4 * n12 + ind12;
-              auto x            = buf_3412[f3412];
-              dbuf[i * bd1 + j] = x;
+              auto f1           = i - curshelloffset_i;
+              auto f2           = j - curshelloffset_j;
+              auto f1212        = f1 * n2 * n1 * n2 + f2 * n1 * n2 + f1 * n2 + f2;
+              dbuf[i * bd1 + j] = buf_1212[f1212];
             }
           }
         }
       }
-      g_r_tamm.put(blockid, dbuf);
+      g_d_tamm.put(blockid, dbuf);
     };
-    // for(auto blockid: g_r_tamm.loop_nest()) {
-    //   if(g_r_tamm.is_local_block(blockid))
-    //    {  compute_eri(blockid); }
+    // for(auto blockid: g_d_tamm.loop_nest()) {
+    //   if(g_d_tamm.is_local_block(blockid)) {
+    //     compute_diagonals(blockid);
+    //   }
     // }
-    block_for(ec_dense, g_r_tamm(), compute_eri);
+    if(!cd_restart) block_for(ec_dense, g_d_tamm(), compute_diagonals);
+
+    cd_t2   = std::chrono::high_resolution_clock::now();
+    cd_time = std::chrono::duration_cast<std::chrono::duration<double>>((cd_t2 - cd_t1)).count();
+    if(rank == 0 && !cd_restart) {
+      std::cout << endl
+                << "- Time for computing the diagonal: " << std::fixed << std::setprecision(2)
+                << cd_time << " secs" << endl;
+    }
+
+#if !defined(USE_UPCXX)
+    if(cd_restart) {
+      cd_t1 = std::chrono::high_resolution_clock::now();
+
+      read_from_disk(g_d_tamm, diag_ao_file);
+      read_from_disk(g_chol_tamm, chol_ao_file);
+
+      std::ifstream in(cv_count_file, std::ios::in);
+      int           rstatus = 0;
+      if(in.is_open()) rstatus = 1;
+      if(rstatus == 1) in >> count;
+      else tamm_terminate("Error reading " + cv_count_file);
+
+      if(rank == 0)
+        cout << endl << "- [CD restart] Number of cholesky vectors read = " << count << endl;
+
+      cd_t2   = std::chrono::high_resolution_clock::now();
+      cd_time = std::chrono::duration_cast<std::chrono::duration<double>>((cd_t2 - cd_t1)).count();
+      if(rank == 0) {
+        std::cout << "- [CD restart] Time for reading the diagonal and cholesky vectors: "
+                  << std::fixed << std::setprecision(2) << cd_time << " secs" << endl;
+      }
+    }
+#endif
+
+    auto cd_t3 = std::chrono::high_resolution_clock::now();
+
+    auto [val_d0, blkid, eoff]  = tamm::max_element(g_d_tamm);
+    auto                 blkoff = g_d_tamm.block_offsets(blkid);
+    std::vector<int64_t> indx_d0(g_d_tamm.num_modes());
+    indx_d0[0] = (int64_t) blkoff[0] + (int64_t) eoff[0];
+    indx_d0[1] = (int64_t) blkoff[1] + (int64_t) eoff[1];
+
+    // Reset Engine precision
+    const double schwarz_tol = chem_env.ioptions.scf_options.tol_sch;
+    engine.set_precision(engine_precision);
+
+    while(val_d0 > diagtol && count < max_cvecs) {
+      auto bfu        = indx_d0[0];
+      auto bfv        = indx_d0[1];
+      auto s1         = bf2shell[bfu];
+      auto n1         = shells[s1].size();
+      auto s2         = bf2shell[bfv];
+      auto n2         = shells[s2].size();
+      auto n12        = n1 * n2;
+      auto f1         = bfu - shell2bf[s1];
+      auto f2         = bfv - shell2bf[s2];
+      auto ind12      = f1 * n2 + f2;
+      auto schwarz_12 = SchwarzK(s1, s2);
+
+#if !defined(USE_UPCXX)
+      cd_tensor_zero(g_r_tamm);
+#endif
+
+#if !defined(CD_USE_PGAS_API)
+      auto compute_eri = [&](const IndexVector& blockid) {
+        auto bi0 = blockid[0];
+        auto bi1 = blockid[1];
+
+        const TAMM_SIZE         size       = g_r_tamm.block_size(blockid);
+        auto                    block_dims = g_r_tamm.block_dims(blockid);
+        std::vector<TensorType> dbuf(size);
+
+        auto bd1 = block_dims[1];
+
+        auto s3range_start = 0l;
+        auto s3range_end   = shell_tile_map[bi0];
+        if(bi0 > 0) s3range_start = shell_tile_map[bi0 - 1] + 1;
+
+        for(Index s3 = s3range_start; s3 <= s3range_end; ++s3) {
+          auto n3 = shells[s3].size();
+
+          auto s4range_start = 0l;
+          auto s4range_end   = shell_tile_map[bi1];
+          if(bi1 > 0) s4range_start = shell_tile_map[bi1 - 1] + 1;
+
+          for(Index s4 = s4range_start; s4 <= s4range_end; ++s4) {
+            if(s4 > s3) {
+              auto s2spl = obs_shellpair_list[s4];
+              if(std::find(s2spl.begin(), s2spl.end(), s3) == s2spl.end()) continue;
+            }
+            else {
+              auto s2spl = obs_shellpair_list[s3];
+              if(std::find(s2spl.begin(), s2spl.end(), s4) == s2spl.end()) continue;
+            }
+
+            auto n4 = shells[s4].size();
+            if(schwarz_12 * SchwarzK(s3, s4) < schwarz_tol) continue;
+
+            // compute shell pair; return is the pointer to the buffer
+            engine.compute(shells[s3], shells[s4], shells[s1], shells[s2]);
+            const auto* buf_3412 = buf[0];
+            if(buf_3412 == nullptr) continue; // if all integrals screened out, skip to next quartet
+
+            auto curshelloffset_i = 0U;
+            auto curshelloffset_j = 0U;
+            for(auto x = s3range_start; x < s3; x++) curshelloffset_i += AO_tiles[x];
+            for(auto x = s4range_start; x < s4; x++) curshelloffset_j += AO_tiles[x];
+
+            auto dimi = curshelloffset_i + AO_tiles[s3];
+            auto dimj = curshelloffset_j + AO_tiles[s4];
+
+            for(size_t i = curshelloffset_i; i < dimi; i++) {
+              for(size_t j = curshelloffset_j; j < dimj; j++) {
+                auto f3           = i - curshelloffset_i;
+                auto f4           = j - curshelloffset_j;
+                auto f3412        = f3 * n4 * n12 + f4 * n12 + ind12;
+                auto x            = buf_3412[f3412];
+                dbuf[i * bd1 + j] = x;
+              }
+            }
+          }
+        }
+        g_r_tamm.put(blockid, dbuf);
+      };
+      // for(auto blockid: g_r_tamm.loop_nest()) {
+      //   if(g_r_tamm.is_local_block(blockid))
+      //    {  compute_eri(blockid); }
+      // }
+      block_for(ec_dense, g_r_tamm(), compute_eri);
 
 #else
     for(size_t s3 = 0; s3 != shells.size(); ++s3) {
@@ -699,16 +757,16 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
 #endif
 
 #ifndef USE_UPCXX
-    lo_x[0] = indx_d0[0];
-    lo_x[1] = indx_d0[1];
-    lo_x[2] = 0;
-    lo_x[3] = 0;
-    hi_x[0] = indx_d0[0];
-    hi_x[1] = indx_d0[1];
-    hi_x[2] = count;
-    hi_x[3] = 0;
-    ld_x[0] = 1;
-    ld_x[1] = hi_x[2] + 1;
+      lo_x[0] = indx_d0[0];
+      lo_x[1] = indx_d0[1];
+      lo_x[2] = 0;
+      lo_x[3] = 0;
+      hi_x[0] = indx_d0[0];
+      hi_x[1] = indx_d0[1];
+      hi_x[2] = count;
+      hi_x[3] = 0;
+      ld_x[0] = 1;
+      ld_x[1] = hi_x[2] + 1;
 #else
     lo_x[0] = 0;
     lo_x[1] = indx_d0[0];
@@ -720,83 +778,83 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
     hi_x[3] = count;
 #endif
 
-    std::vector<TensorType> k_row(max_cvecs);
+      std::vector<TensorType> k_row(max_cvecs);
 
 #if !defined(CD_USE_PGAS_API)
-    auto update_diagonals = [&](const IndexVector& blockid) {
-      auto bi0 = blockid[0];
-      auto bi1 = blockid[1];
+      auto update_diagonals = [&](const IndexVector& blockid) {
+        auto bi0 = blockid[0];
+        auto bi1 = blockid[1];
 
-      IndexVector             rdblockid  = {bi0, bi1};
-      const TAMM_SIZE         size       = g_chol_tamm.block_size(blockid);
-      auto                    block_dims = g_chol_tamm.block_dims(blockid);
-      const TAMM_SIZE         rdsize     = g_r_tamm.block_size(rdblockid);
-      std::vector<TensorType> cbuf(size);
-      std::vector<TensorType> rbuf(rdsize);
-      std::vector<TensorType> dbuf(rdsize);
+        IndexVector             rdblockid  = {bi0, bi1};
+        const TAMM_SIZE         size       = g_chol_tamm.block_size(blockid);
+        auto                    block_dims = g_chol_tamm.block_dims(blockid);
+        const TAMM_SIZE         rdsize     = g_r_tamm.block_size(rdblockid);
+        std::vector<TensorType> cbuf(size);
+        std::vector<TensorType> rbuf(rdsize);
+        std::vector<TensorType> dbuf(rdsize);
 
-      g_r_tamm.get(rdblockid, rbuf);
-      g_d_tamm.get(rdblockid, dbuf);
-      g_chol_tamm.get(blockid, cbuf);
+        g_r_tamm.get(rdblockid, rbuf);
+        g_d_tamm.get(rdblockid, dbuf);
+        g_chol_tamm.get(blockid, cbuf);
 
-      auto bd0 = block_dims[1];
-      auto bd1 = block_dims[2];
+        auto bd0 = block_dims[1];
+        auto bd1 = block_dims[2];
 
-      auto s3range_start = 0l;
-      auto s3range_end   = shell_tile_map[bi0];
-      if(bi0 > 0) s3range_start = shell_tile_map[bi0 - 1] + 1;
+        auto s3range_start = 0l;
+        auto s3range_end   = shell_tile_map[bi0];
+        if(bi0 > 0) s3range_start = shell_tile_map[bi0 - 1] + 1;
 
-      for(Index s3 = s3range_start; s3 <= s3range_end; ++s3) {
-        auto n3 = shells[s3].size();
+        for(Index s3 = s3range_start; s3 <= s3range_end; ++s3) {
+          auto n3 = shells[s3].size();
 
-        auto s4range_start = 0l;
-        auto s4range_end   = shell_tile_map[bi1];
-        if(bi1 > 0) s4range_start = shell_tile_map[bi1 - 1] + 1;
+          auto s4range_start = 0l;
+          auto s4range_end   = shell_tile_map[bi1];
+          if(bi1 > 0) s4range_start = shell_tile_map[bi1 - 1] + 1;
 
-        for(Index s4 = s4range_start; s4 <= s4range_end; ++s4) {
-          if(s4 > s3) {
-            auto s2spl = obs_shellpair_list[s4];
-            if(std::find(s2spl.begin(), s2spl.end(), s3) == s2spl.end()) continue;
-          }
-          else {
-            auto s2spl = obs_shellpair_list[s3];
-            if(std::find(s2spl.begin(), s2spl.end(), s4) == s2spl.end()) continue;
-          }
+          for(Index s4 = s4range_start; s4 <= s4range_end; ++s4) {
+            if(s4 > s3) {
+              auto s2spl = obs_shellpair_list[s4];
+              if(std::find(s2spl.begin(), s2spl.end(), s3) == s2spl.end()) continue;
+            }
+            else {
+              auto s2spl = obs_shellpair_list[s3];
+              if(std::find(s2spl.begin(), s2spl.end(), s4) == s2spl.end()) continue;
+            }
 
-          auto n4 = shells[s4].size();
+            auto n4 = shells[s4].size();
 
-          auto curshelloffset_i = 0U;
-          auto curshelloffset_j = 0U;
-          for(auto x = s3range_start; x < s3; x++) curshelloffset_i += AO_tiles[x];
-          for(auto x = s4range_start; x < s4; x++) curshelloffset_j += AO_tiles[x];
+            auto curshelloffset_i = 0U;
+            auto curshelloffset_j = 0U;
+            for(auto x = s3range_start; x < s3; x++) curshelloffset_i += AO_tiles[x];
+            for(auto x = s4range_start; x < s4; x++) curshelloffset_j += AO_tiles[x];
 
-          auto dimi = curshelloffset_i + AO_tiles[s3];
-          auto dimj = curshelloffset_j + AO_tiles[s4];
+            auto dimi = curshelloffset_i + AO_tiles[s3];
+            auto dimj = curshelloffset_j + AO_tiles[s4];
 
-          for(size_t i = curshelloffset_i; i < dimi; i++) {
-            for(size_t j = curshelloffset_j; j < dimj; j++) {
-              for(decltype(count) icount = 0; icount < count; icount++) {
-                rbuf[i * bd0 + j] -= cbuf[icount + j * bd1 + i * bd0 * bd1] * k_row[icount];
+            for(size_t i = curshelloffset_i; i < dimi; i++) {
+              for(size_t j = curshelloffset_j; j < dimj; j++) {
+                for(decltype(count) icount = 0; icount < count; icount++) {
+                  rbuf[i * bd0 + j] -= cbuf[icount + j * bd1 + i * bd0 * bd1] * k_row[icount];
+                }
+                auto vtmp                             = rbuf[i * bd0 + j] / sqrt(val_d0);
+                cbuf[count + j * bd1 + i * bd1 * bd0] = vtmp;
+                dbuf[i * bd0 + j] -= vtmp * vtmp;
               }
-              auto vtmp                             = rbuf[i * bd0 + j] / sqrt(val_d0);
-              cbuf[count + j * bd1 + i * bd1 * bd0] = vtmp;
-              dbuf[i * bd0 + j] -= vtmp * vtmp;
             }
           }
         }
-      }
 
-      g_r_tamm.put(rdblockid, rbuf);
-      g_d_tamm.put(rdblockid, dbuf);
-      g_chol_tamm.put(blockid, cbuf);
-    };
-    // for(auto blockid: g_chol_tamm.loop_nest()) {
-    //   if(g_chol_tamm.is_local_block(blockid))
-    //    {  update_diagonals(blockid); }
-    // }
-    block_for(ec_dense, g_chol_tamm(), update_diagonals);
+        g_r_tamm.put(rdblockid, rbuf);
+        g_d_tamm.put(rdblockid, dbuf);
+        g_chol_tamm.put(blockid, cbuf);
+      };
+      // for(auto blockid: g_chol_tamm.loop_nest()) {
+      //   if(g_chol_tamm.is_local_block(blockid))
+      //    {  update_diagonals(blockid); }
+      // }
+      block_for(ec_dense, g_chol_tamm(), update_diagonals);
 
-    count++;
+      count++;
 
 #else
 
@@ -881,34 +939,55 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
 #endif
 #endif
 
-    std::tie(val_d0, blkid, eoff) = tamm::max_element(g_d_tamm);
-    blkoff                        = g_d_tamm.block_offsets(blkid);
-    indx_d0[0]                    = (int64_t) blkoff[0] + (int64_t) eoff[0];
-    indx_d0[1]                    = (int64_t) blkoff[1] + (int64_t) eoff[1];
+      std::tie(val_d0, blkid, eoff) = tamm::max_element(g_d_tamm);
+      blkoff                        = g_d_tamm.block_offsets(blkid);
+      indx_d0[0]                    = (int64_t) blkoff[0] + (int64_t) eoff[0];
+      indx_d0[1]                    = (int64_t) blkoff[1] + (int64_t) eoff[1];
 
 #if !defined(USE_UPCXX)
-    // Restart
-    if(write_cv.first && count % write_cv.second == 0 && nbf > 1000) { write_chol_vectors(); }
+      // Restart
+      if(write_cv.first && count % write_cv.second == 0 && nbf > 1000) { write_chol_vectors(); }
 #endif
 
-  } // while
+    } // while
 
-  if(rank == 0) std::cout << endl << "- Total number of cholesky vectors = " << count << std::endl;
+    if(rank == 0)
+      std::cout << endl << "- Total number of cholesky vectors = " << count << std::endl;
 
 #if !defined(USE_UPCXX)
-  if(write_cv.first && nbf > 1000) write_chol_vectors();
+    if(write_cv.first && nbf > 1000) write_chol_vectors();
 #endif
 
-  Tensor<TensorType>::deallocate(g_d_tamm, g_r_tamm);
+    write_to_disk(g_chol_tamm, chol_ao_file);
+    Tensor<TensorType>::deallocate(g_d_tamm, g_r_tamm, g_chol_tamm);
 
-  auto cd_t4 = std::chrono::high_resolution_clock::now();
-  cd_time    = std::chrono::duration_cast<std::chrono::duration<double>>((cd_t4 - cd_t3)).count();
-  if(rank == 0) {
-    std::cout << endl
-              << "- Time to compute cholesky vectors: " << std::fixed << std::setprecision(2)
-              << cd_time << " secs" << endl
-              << endl;
-  }
+    auto cd_t4 = std::chrono::high_resolution_clock::now();
+    cd_time    = std::chrono::duration_cast<std::chrono::duration<double>>((cd_t4 - cd_t3)).count();
+    if(rank == 0) {
+      std::cout << endl
+                << "- Time to compute cholesky vectors: " << std::fixed << std::setprecision(2)
+                << cd_time << " secs" << endl
+                << endl;
+    }
+
+#if defined(CD_THROTTLE)
+    ec_cd.flush_and_sync();
+    ec_dense.flush_and_sync();
+    ec_cd.pg().destroy_coll();
+  } // if(cd_throttle)
+
+  if(cd_comm != MPI_COMM_NULL) MPI_Comm_free(&cd_comm);
+  ExecutionContext ec_dense{ec.pg(), DistributionKind::dense, MemoryManagerKind::ga};
+#endif
+
+  ec.pg().barrier();
+  ec.pg().broadcast(&count, 0);
+
+  Tensor<TensorType> g_chol_tamm1{tAO, tAO, tCI};
+  g_chol_tamm1.set_dense();
+  Tensor<TensorType>::allocate(&ec_dense, g_chol_tamm1);
+  read_from_disk(g_chol_tamm1, chol_ao_file);
+  fs::remove(chol_ao_file);
 
   update_sysdata(ec, chem_env, tMO, is_mso);
 
@@ -941,9 +1020,10 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
 
     std::vector<TensorType> sbuf(dsize);
 #ifdef USE_UPCXX
-    g_chol_tamm.get_raw(lo, hi, sbuf.data());
+    g_chol_tamm1.get_raw(lo, hi, sbuf.data());
 #else
-    int64_t ld[2] = {cd_ncast<size_t>(block_dims[1]), cd_ncast<size_t>(block_dims[2])};
+    int64_t   ld[2]  = {cd_ncast<size_t>(block_dims[1]), cd_ncast<size_t>(block_dims[2])};
+    const int g_chol = g_chol_tamm1.ga_handle();
     NGA_Get64(g_chol, &lo[1], &hi[1], sbuf.data(), ld);
 #endif
 
@@ -963,7 +1043,8 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
     if(rank == 0) eigen_to_tamm_tensor(lcao, lcao_new);
   }
 
-  Tensor<TensorType>::deallocate(g_chol_tamm);
+  Tensor<TensorType>::deallocate(g_chol_tamm1);
+  ec_dense.flush_and_sync();
 
   Tensor<TensorType> CholVpr_tmp{tMO, tAO, tCIp};
   Tensor<TensorType> CholVpr_tamm{{tMO, tMO, tCIp},

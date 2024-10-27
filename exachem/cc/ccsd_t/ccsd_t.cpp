@@ -59,7 +59,7 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   int ga_cnn = ec.nnodes();
   if(nsranks > ga_cnn) nsranks = ga_cnn;
   nsranks = nsranks * GA_Cluster_nprocs(0);
-  int subranks[nsranks];
+  std::vector<int> subranks(nsranks);
   for(int i = 0; i < nsranks; i++) subranks[i] = i;
 
 #if defined(USE_UPCXX)
@@ -69,7 +69,7 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   MPI_Group world_group;
   MPI_Comm_group(world_comm, &world_group);
   MPI_Group subgroup;
-  MPI_Group_incl(world_group, nsranks, subranks, &subgroup);
+  MPI_Group_incl(world_group, nsranks, subranks.data(), &subgroup);
   MPI_Comm subcomm;
   MPI_Comm_create(world_comm, subgroup, &subcomm);
   MPI_Group_free(&world_group);

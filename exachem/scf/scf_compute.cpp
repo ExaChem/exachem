@@ -144,11 +144,11 @@ void exachem::scf::SCFCompute::compute_sdens_to_cdens(const libint2::BasisSet& s
   std::vector<Matrix>& CtoS     = etensors.trafo_ctos;
   auto                 shell2bf = shells.shell2bf();
   int                  nsh      = shells.size();
-  int                  Nspher{0};
-  int                  Ncart{0};
+  // int                  Nspher{0};
+  int Ncart{0};
   for(auto& shell: shells) {
     int l = shell.contr[0].l;
-    Nspher += 2 * l + 1;
+    // Nspher += 2 * l + 1;
     Ncart += ((l + 1) * (l + 2)) / 2;
   }
 
@@ -190,11 +190,11 @@ void exachem::scf::SCFCompute::compute_cpot_to_spot(const libint2::BasisSet& she
   auto                 shell2bf = shells.shell2bf();
   int                  nsh      = shells.size();
   int                  Nspher{0};
-  int                  Ncart{0};
+  // int                  Ncart{0};
   for(auto& shell: shells) {
     int l = shell.contr[0].l;
     Nspher += 2 * l + 1;
-    Ncart += ((l + 1) * (l + 2)) / 2;
+    // Ncart += ((l + 1) * (l + 2)) / 2;
   }
 
   Spherical         = Matrix::Zero(Nspher, Nspher);

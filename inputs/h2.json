@@ -23,7 +23,7 @@
     "diagtol": 1e-08
   },
   "CC": {
-    "threshold": 1e-10,
+    "threshold": 1e-8,
     "GFCCSD": {
       "gf_ip": true,
       "gf_ea": false,

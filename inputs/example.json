@@ -17,6 +17,7 @@
       "maxiter": 50,
       "debug": false,
       "file_prefix": "",
+      "output_dir": "",
       "comments": {
         "comment1": "example comment"
       }  

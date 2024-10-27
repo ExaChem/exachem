@@ -24,7 +24,7 @@ using TAMM_GA_SIZE = int64_t;
 
 namespace exachem::cholesky_2e {
 
-int get_ts_recommendation(int nranks, ChemEnv& chem_env);
+int get_ts_recommendation(ExecutionContext& ec, ChemEnv& chem_env);
 
 std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ExecutionContext& ec, ChemEnv& chem_env,
                                                     bool triples = false);

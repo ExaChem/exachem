@@ -26,6 +26,7 @@ public:
   std::string gaussian_type{"spherical"};
   std::string geom_units{"angstrom"};
   std::string file_prefix{};
+  std::string output_dir{};
   std::string ext_data_path{};
   void        print();
 };

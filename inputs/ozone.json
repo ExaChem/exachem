@@ -15,12 +15,10 @@
     "restart": false
   },
   "CD": {
-    "diagtol": 1e-06,
-    "max_cvecs": 8
+    "diagtol": 1e-06
   },
   "CC": {
-    "threshold": 1e-10,
-    "tilesize": 30,
+    "threshold": 1e-8,
     "debug": false,
     "EOMCCSD": {
       "eom_nroots": 2,
@@ -30,10 +28,10 @@
     }
   },
   "TASK": {
-    "scf": true,
+    "scf": false,
     "mp2": false,
     "cd_2e": false,
-    "ccsd": false,
+    "ccsd": true,
     "ccsd_t": false
   }
 }

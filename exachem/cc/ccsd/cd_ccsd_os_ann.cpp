@@ -1086,7 +1086,7 @@ cd_ccsd_os_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace
 
         iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
 
-        if(writet && (((iter + 1) % writet_iter == 0) /*|| (residual < thresh)*/)) {
+        if(writet && ((iter + 1) % writet_iter == 0)) {
           write_to_disk(d_t1, t1file);
           write_to_disk(d_t2, t2file);
         }
@@ -1102,14 +1102,6 @@ cd_ccsd_os_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace
             .deallocate(t2_copy)
             .execute();
           // clang-format on
-          if(writet) {
-            write_to_disk(d_t1, t1file);
-            write_to_disk(d_t2, t2file);
-            if(computeTData && chem_env.ioptions.ccsd_options.writev) {
-              fs::copy_file(t1file, ccsd_fp + ".fullT1amp", fs::copy_options::update_existing);
-              fs::copy_file(t2file, ccsd_fp + ".fullT2amp", fs::copy_options::update_existing);
-            }
-          }
           break;
         }
       }
@@ -1127,6 +1119,15 @@ cd_ccsd_os_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace
       std::vector<std::vector<Tensor<T>>> ts{d_t1s, d_t2s};
       std::vector<Tensor<T>>              next_t{d_t1, d_t2};
       diis<T>(ec, rs, ts, next_t);
+    }
+
+    if(writet) {
+      write_to_disk(d_t1, t1file);
+      write_to_disk(d_t2, t2file);
+      if(computeTData && chem_env.ioptions.ccsd_options.writev) {
+        fs::copy_file(t1file, ccsd_fp + ".fullT1amp", fs::copy_options::update_existing);
+        fs::copy_file(t2file, ccsd_fp + ".fullT2amp", fs::copy_options::update_existing);
+      }
     }
 
     if(profile && ec.print()) {

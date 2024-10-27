@@ -116,11 +116,10 @@ void setup_scalapack_info(tamm::ExecutionContext& ec, ChemEnv& chem_env,
 ProcGroupData get_spg_data(ExecutionContext& ec, const size_t N, const int node_p, const int nbf_p,
                            const int node_inp) {
   ProcGroupData pgdata;
-  pgdata.nnodes = ec.nnodes();
-  pgdata.ppn    = ec.ppn();
+  pgdata.ppn = ec.ppn();
 
   const int ppn    = pgdata.ppn;
-  const int nnodes = pgdata.nnodes;
+  const int nnodes = ec.nnodes();
 
   int spg_guessranks = std::ceil((nbf_p / 100.0) * N);
   if(node_p > 0) spg_guessranks = std::ceil((node_p / 100.0) * nnodes);

@@ -354,8 +354,8 @@ void ccsd_t_data_d1_info_only(bool is_restricted, const Index noab, const Index 
   } // end ia6
 
   // ia6 -- compute sizes and permutations
-  int idx_offset = 0;
-  int detailed_stats[noab][9];
+  int                             idx_offset = 0;
+  std::vector<std::array<int, 9>> detailed_stats(noab);
 
   for(Index idx_noab = 0; idx_noab < noab; idx_noab++) {
     detailed_stats[idx_noab][0] = 0;
@@ -394,7 +394,7 @@ void ccsd_t_data_d1_info_only(bool is_restricted, const Index noab, const Index 
       detailed_stats[h7b][7] = 0;
       detailed_stats[h7b][8] = 0;
 
-      int idx_new_offset = 0;
+      // int idx_new_offset = 0;
       if(!ia6_enabled[ia6 * noab + h7b]) continue;
 
       size_t dim_common = k_range[h7b];
@@ -405,55 +405,55 @@ void ccsd_t_data_d1_info_only(bool is_restricted, const Index noab, const Index 
       if(ref_p456_h123 == cur_p456_h123) {
         df_simple_d1_exec[0 + h7b * 9] = idx_offset;
         *num_enabled_kernels           = *num_enabled_kernels + 1;
-        idx_new_offset++;
+        // idx_new_offset++;
         detailed_stats[h7b][0] = detailed_stats[h7b][0] + 1;
       }
       if(ref_p456_h123 == cur_p456_h213) {
         df_simple_d1_exec[1 + h7b * 9] = idx_offset;
         *num_enabled_kernels           = *num_enabled_kernels + 1;
-        idx_new_offset++;
+        // idx_new_offset++;
         detailed_stats[h7b][1] = detailed_stats[h7b][1] + 1;
       }
       if(ref_p456_h123 == cur_p456_h231) {
         df_simple_d1_exec[2 + h7b * 9] = idx_offset;
         *num_enabled_kernels           = *num_enabled_kernels + 1;
-        idx_new_offset++;
+        // idx_new_offset++;
         detailed_stats[h7b][2] = detailed_stats[h7b][2] + 1;
       }
       if(ref_p456_h123 == cur_p645_h123) {
         df_simple_d1_exec[3 + h7b * 9] = idx_offset;
         *num_enabled_kernels           = *num_enabled_kernels + 1;
-        idx_new_offset++;
+        // idx_new_offset++;
         detailed_stats[h7b][3] = detailed_stats[h7b][3] + 1;
       }
       if(ref_p456_h123 == cur_p645_h213) {
         df_simple_d1_exec[4 + h7b * 9] = idx_offset;
         *num_enabled_kernels           = *num_enabled_kernels + 1;
-        idx_new_offset++;
+        // idx_new_offset++;
         detailed_stats[h7b][4] = detailed_stats[h7b][4] + 1;
       }
       if(ref_p456_h123 == cur_p645_h231) {
         df_simple_d1_exec[5 + h7b * 9] = idx_offset;
         *num_enabled_kernels           = *num_enabled_kernels + 1;
-        idx_new_offset++;
+        // idx_new_offset++;
         detailed_stats[h7b][5] = detailed_stats[h7b][5] + 1;
       }
       if(ref_p456_h123 == cur_p465_h123) {
         df_simple_d1_exec[6 + h7b * 9] = idx_offset;
         *num_enabled_kernels           = *num_enabled_kernels + 1;
-        idx_new_offset++;
+        // idx_new_offset++;
         detailed_stats[h7b][6] = detailed_stats[h7b][6] + 1;
       }
       if(ref_p456_h123 == cur_p465_h213) {
         df_simple_d1_exec[7 + h7b * 9] = idx_offset;
         *num_enabled_kernels           = *num_enabled_kernels + 1;
-        idx_new_offset++;
+        // idx_new_offset++;
         detailed_stats[h7b][7] = detailed_stats[h7b][7] + 1;
       }
       if(ref_p456_h123 == cur_p465_h231) {
         df_simple_d1_exec[8 + h7b * 9] = idx_offset;
         *num_enabled_kernels           = *num_enabled_kernels + 1;
-        idx_new_offset++;
+        // idx_new_offset++;
         detailed_stats[h7b][8] = detailed_stats[h7b][8] + 1;
       }
 

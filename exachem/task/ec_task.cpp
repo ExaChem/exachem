@@ -10,7 +10,7 @@
 
 namespace exachem::task {
 
-void ec_execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) {
+void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) {
   const auto task       = chem_env.ioptions.task_options;
   const auto input_file = chem_env.input_file;
 

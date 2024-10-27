@@ -162,5 +162,6 @@ void ParseCCSDOptions::update_common_options(ChemEnv& chem_env) {
   cc_options.gaussian_type = common_options.gaussian_type;
   cc_options.geom_units    = common_options.geom_units;
   cc_options.file_prefix   = common_options.file_prefix;
+  cc_options.output_dir    = common_options.output_dir;
   cc_options.ext_data_path = common_options.ext_data_path;
 }

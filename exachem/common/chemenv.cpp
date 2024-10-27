@@ -222,8 +222,7 @@ void ChemEnv::write_json_data(const std::string cmodule) {
   std::string l_module = cmodule;
   txt_utils::to_lower(l_module);
 
-  std::string files_dir =
-    sys_data.output_file_prefix + "_files/" + ioptions.scf_options.scf_type + "/json";
+  std::string files_dir = workspace_dir + ioptions.scf_options.scf_type + "/json";
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
   std::string files_prefix = files_dir + "/" + sys_data.output_file_prefix;
   std::string json_file    = files_prefix + "." + l_module + ".json";

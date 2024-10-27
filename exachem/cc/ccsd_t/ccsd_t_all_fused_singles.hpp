@@ -447,8 +447,8 @@ void ccsd_t_data_s1_info_only(bool is_restricted, const Index noab, const Index 
   detailed_stats[8] = 0;
 
   // ia6 -- compute sizes and permutations
-  int idx_offset     = 0;
-  int idx_new_offset = 0;
+  int idx_offset = 0;
+  // int idx_new_offset = 0;
   for(auto ia6 = 0; ia6 < 9; ia6++) {
     if(!ia6_enabled[ia6]) { continue; }
 
@@ -474,55 +474,55 @@ void ccsd_t_data_s1_info_only(bool is_restricted, const Index noab, const Index 
     if(ref_p456_h123 == cur_p456_h123) {
       df_simple_s1_exec[0] = idx_offset;
       *num_enabled_kernels = *num_enabled_kernels + 1;
-      idx_new_offset++;
+      // idx_new_offset++;
       detailed_stats[0] = detailed_stats[0] + 1;
     }
     if(ref_p456_h123 == cur_p456_h213) {
       df_simple_s1_exec[1] = idx_offset;
       *num_enabled_kernels = *num_enabled_kernels + 1;
-      idx_new_offset++;
+      // idx_new_offset++;
       detailed_stats[1] = detailed_stats[1] + 1;
     }
     if(ref_p456_h123 == cur_p456_h231) {
       df_simple_s1_exec[2] = idx_offset;
       *num_enabled_kernels = *num_enabled_kernels + 1;
-      idx_new_offset++;
+      // idx_new_offset++;
       detailed_stats[2] = detailed_stats[2] + 1;
     }
     if(ref_p456_h123 == cur_p546_h123) {
       df_simple_s1_exec[3] = idx_offset;
       *num_enabled_kernels = *num_enabled_kernels + 1;
-      idx_new_offset++;
+      // idx_new_offset++;
       detailed_stats[3] = detailed_stats[3] + 1;
     }
     if(ref_p456_h123 == cur_p546_h213) {
       df_simple_s1_exec[4] = idx_offset;
       *num_enabled_kernels = *num_enabled_kernels + 1;
-      idx_new_offset++;
+      // idx_new_offset++;
       detailed_stats[4] = detailed_stats[4] + 1;
     }
     if(ref_p456_h123 == cur_p546_h231) {
       df_simple_s1_exec[5] = idx_offset;
       *num_enabled_kernels = *num_enabled_kernels + 1;
-      idx_new_offset++;
+      // idx_new_offset++;
       detailed_stats[5] = detailed_stats[5] + 1;
     }
     if(ref_p456_h123 == cur_p564_h123) {
       df_simple_s1_exec[6] = idx_offset;
       *num_enabled_kernels = *num_enabled_kernels + 1;
-      idx_new_offset++;
+      // idx_new_offset++;
       detailed_stats[6] = detailed_stats[6] + 1;
     }
     if(ref_p456_h123 == cur_p564_h213) {
       df_simple_s1_exec[7] = idx_offset;
       *num_enabled_kernels = *num_enabled_kernels + 1;
-      idx_new_offset++;
+      // idx_new_offset++;
       detailed_stats[7] = detailed_stats[7] + 1;
     }
     if(ref_p456_h123 == cur_p564_h231) {
       df_simple_s1_exec[8] = idx_offset;
       *num_enabled_kernels = *num_enabled_kernels + 1;
-      idx_new_offset++;
+      // idx_new_offset++;
       detailed_stats[8] = detailed_stats[8] + 1;
     }
     //

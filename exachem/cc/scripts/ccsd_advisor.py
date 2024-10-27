@@ -227,9 +227,9 @@ print("\nTotal CPU memory required for CCSD calculation: " + str(ccsd_mem) + " G
 
 
 VabOab = v_alpha*o_beta*v_beta*o_alpha
-ts_guess=50
+ts_guess=40
 ts_max=ts_guess
-tilesizes = list(range(ts_guess, 301, 10))
+tilesizes = list(range(ts_guess, 181, 10))
 
 def get_ts_recommendation(tilesizes,nranks):
     ts_guess_ = tilesizes[0]

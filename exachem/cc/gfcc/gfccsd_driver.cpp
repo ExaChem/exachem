@@ -2534,16 +2534,16 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   int nsranks = sys_data.nbf / 15;
   if(nsranks < 1) nsranks = 1;
-  int ga_cnn = GA_Cluster_nnodes();
+  int ga_cnn = ec.nnodes();
   if(nsranks > ga_cnn) nsranks = ga_cnn;
-  nsranks = nsranks * GA_Cluster_nprocs(0);
-  int subranks[nsranks];
+  nsranks = nsranks * ec.ppn();
+  std::vector<int> subranks(nsranks);
   for(int i = 0; i < nsranks; i++) subranks[i] = i;
   auto      world_comm = ec.pg().comm();
   MPI_Group world_group;
   MPI_Comm_group(world_comm, &world_group);
   MPI_Group subgroup;
-  MPI_Group_incl(world_group, nsranks, subranks, &subgroup);
+  MPI_Group_incl(world_group, nsranks, subranks.data(), &subgroup);
   MPI_Comm subcomm;
   MPI_Comm_create(world_comm, subgroup, &subcomm);
   MPI_Group_free(&subgroup);

@@ -84,5 +84,6 @@ void ParseFCIOptions::update_common_options(ChemEnv& chem_env) {
   fci_options.gaussian_type = common_options.gaussian_type;
   fci_options.geom_units    = common_options.geom_units;
   fci_options.file_prefix   = common_options.file_prefix;
+  fci_options.output_dir    = common_options.output_dir;
   fci_options.ext_data_path = common_options.ext_data_path;
 }

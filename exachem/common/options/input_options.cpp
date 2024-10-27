@@ -219,6 +219,7 @@ void CommonOptions::print() {
   std::cout << " geom_units = " << geom_units << std::endl;
   txt_utils::print_bool(" debug     ", debug);
   if(!file_prefix.empty()) std::cout << " file_prefix    = " << file_prefix << std::endl;
+  if(!output_dir.empty()) std::cout << " output_dir    = " << output_dir << std::endl;
   std::cout << "}" << std::endl;
 }
 

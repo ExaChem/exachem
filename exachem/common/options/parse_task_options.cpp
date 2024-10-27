@@ -67,5 +67,6 @@ void ParseTaskOptions::update_common_options(ChemEnv& chem_env) {
   task_options.gaussian_type = common_options.gaussian_type;
   task_options.geom_units    = common_options.geom_units;
   task_options.file_prefix   = common_options.file_prefix;
+  task_options.output_dir    = common_options.output_dir;
   task_options.ext_data_path = common_options.ext_data_path;
 }

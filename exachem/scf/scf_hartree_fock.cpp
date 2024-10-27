@@ -746,7 +746,7 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 
 #if SCF_THROTTLE_RESOURCES
   pgdata = get_spg_data(exc, N, -1, 50, chem_env.ioptions.scf_options.nnodes);
-  auto [t_nnodes, hf_nnodes, ppn, hf_nranks] = pgdata.unpack();
+  auto [hf_nnodes, ppn, hf_nranks] = pgdata.unpack();
   if(rank == 0) {
     std::cout << "\n Number of nodes, processes per node used for SCF calculation: " << hf_nnodes
               << ", " << ppn << std::endl;
@@ -756,11 +756,11 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   gcomm       = exc.pg().team();
   hf_comm = new upcxx::team(gcomm->split(in_new_team ? 0 : upcxx::team::color_none, rank.value()));
 #else
-  int ranks[hf_nranks];
+  std::vector<int> ranks(hf_nranks);
   for(int i = 0; i < hf_nranks; i++) ranks[i] = i;
   auto gcomm = exc.pg().comm();
   MPI_Comm_group(gcomm, &wgroup);
-  MPI_Group_incl(wgroup, hf_nranks, ranks, &hfgroup);
+  MPI_Group_incl(wgroup, hf_nranks, ranks.data(), &hfgroup);
   MPI_Comm_create(gcomm, hfgroup, &hf_comm);
   MPI_Group_free(&wgroup);
   MPI_Group_free(&hfgroup);

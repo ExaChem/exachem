@@ -79,13 +79,22 @@ int main(int argc, char* argv[]) {
     ECOptions& ioptions              = chem_env.ioptions;
     chem_env.sys_data.input_molecule = ParserUtils::getfilename(input_file);
 
+    std::string output_dir = chem_env.ioptions.common_options.output_dir;
     if(chem_env.ioptions.common_options.file_prefix.empty()) {
       chem_env.ioptions.common_options.file_prefix = chem_env.sys_data.input_molecule;
+    }
+    if(!output_dir.empty()) {
+      output_dir += "/";
+      const auto    test_file = output_dir + "ec_test_file.tmp";
+      std::ofstream ofs(test_file);
+      if(!ofs)
+        tamm_terminate("Path provided as output_dir [" +
+                       chem_env.ioptions.common_options.output_dir + "] is not writable!");
     }
 
     chem_env.sys_data.output_file_prefix =
       chem_env.ioptions.common_options.file_prefix + "." + chem_env.ioptions.common_options.basis;
-    chem_env.workspace_dir = chem_env.sys_data.output_file_prefix + "_files/";
+    chem_env.workspace_dir = output_dir + chem_env.sys_data.output_file_prefix + "_files/";
 
     if(rank == 0) {
       std::cout << chem_env.jinput.dump(2) << std::endl;
@@ -154,7 +163,7 @@ int main(int argc, char* argv[]) {
     chem_env.shells           = chem_env.ec_basis.shells;
     chem_env.sys_data.has_ecp = chem_env.ec_basis.has_ecp;
 
-    exachem::task::ec_execute_task(ec, chem_env, ec_arg2);
+    exachem::task::execute_task(ec, chem_env, ec_arg2);
 
   } // loop over input files
 

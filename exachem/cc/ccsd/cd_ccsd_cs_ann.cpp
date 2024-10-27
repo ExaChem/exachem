@@ -771,7 +771,7 @@ std::tuple<double, double> exachem::cc::ccsd::cd_ccsd_cs_driver(
 
         iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
 
-        if(writet && (((iter + 1) % writet_iter == 0) || (residual < thresh))) {
+        if(writet && ((iter + 1) % writet_iter == 0)) {
           write_to_disk(t1_aa, t1file);
           write_to_disk(t2_abab, t2file);
         }
@@ -790,6 +790,11 @@ std::tuple<double, double> exachem::cc::ccsd::cd_ccsd_cs_driver(
       std::vector<std::vector<Tensor<T>>> ts{d_t1s, d_t2s};
       std::vector<Tensor<T>>              next_t{t1_aa, t2_abab};
       diis<T>(ec, rs, ts, next_t);
+    }
+
+    if(writet) {
+      write_to_disk(t1_aa, t1file);
+      write_to_disk(t2_abab, t2file);
     }
 
     if(profile && ec.print()) {

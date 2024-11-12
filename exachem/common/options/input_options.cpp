@@ -225,7 +225,6 @@ void CommonOptions::print() {
 
 void CCSDOptions::initialize() {
   threshold      = 1e-6;
-  force_tilesize = false;
   tilesize       = 40;
   ndiis          = 5;
   lshift         = 0;

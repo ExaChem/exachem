@@ -18,7 +18,6 @@
     "conve": 1e-09,
     "convd": 1e-07,
     "diis_hist": 10,
-    "tilesize": 30,
     "lshift": 0.1,
     "DFT": {
       "xc_type": ["PBE"]

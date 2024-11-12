@@ -491,8 +491,11 @@ void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
       abuf = static_cast<TensorElType2*>(memHostPool.allocate(asize * sizeof(TensorElType2)));
       bbuf = static_cast<TensorElType3*>(memHostPool.allocate(bsize * sizeof(TensorElType3)));
 
-      atensor.get(translated_ablockid, {abuf, asize});
-      btensor.get(translated_bblockid, {bbuf, bsize});
+      {
+        TimerGuard tg_get{&oprof.multOpGetTime};
+        atensor.get(translated_ablockid, {abuf, asize});
+        btensor.get(translated_bblockid, {bbuf, bsize});
+      }
 
       const auto& adims = atensor.block_dims(translated_ablockid);
       const auto& bdims = btensor.block_dims(translated_bblockid);
@@ -506,6 +509,7 @@ void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
 
       // A*B
       {
+        TimerGuard                                           tg_bc{&oprof.multOpBCTime};
         AddBuf<TensorElType1, TensorElType2, TensorElType3>* abptr{nullptr};
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
         if(hw == ExecutionHW::GPU) {
@@ -522,16 +526,13 @@ void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
         abptr->abuf_ = abuf;
         abptr->bbuf_ = bbuf;
 
-        {
-          TimerGuard tg_dgemm{&oprof.multOpDgemmTime};
-          kernels::block_multiply<T, TensorElType1, TensorElType2, TensorElType3>(
+        kernels::block_multiply<T, TensorElType1, TensorElType2, TensorElType3>(
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-            abptr->ta_, abptr->tb_,
+          abptr->ta_, abptr->tb_,
 #endif
-            thandle, 1.0, abptr->abuf_, adims_sz, rhs1_int_labels_, abptr->bbuf_, bdims_sz,
-            rhs2_int_labels_, cscale, cbuf.data(), cdims_sz, lhs_int_labels_, hw, false,
-            cbuf_dev_ptr, cbuf_tmp_dev_ptr);
-        }
+          thandle, 1.0, abptr->abuf_, adims_sz, rhs1_int_labels_, abptr->bbuf_, bdims_sz,
+          rhs2_int_labels_, cscale, cbuf.data(), cdims_sz, lhs_int_labels_, hw, false, cbuf_dev_ptr,
+          cbuf_tmp_dev_ptr);
 
 #if(defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP))
         if(hw == ExecutionHW::GPU) {
@@ -550,6 +551,7 @@ void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
 #if(defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP))
       // copy to host
       if(hw == ExecutionHW::GPU) {
+        TimerGuard     tg_bc{&oprof.multOpBCTime};
         TensorElType1* cbuf_tmp{nullptr};
         cbuf_tmp = static_cast<TensorElType1*>(memHostPool.allocate(csize * sizeof(TensorElType1)));
         std::memset(cbuf_tmp, 0, csize * sizeof(TensorElType1));
@@ -557,9 +559,9 @@ void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
           TimerGuard tg_copy{&oprof.multOpCopyTime};
           gpuMemcpyAsync<TensorElType1>(cbuf_tmp, cbuf_dev_ptr, csize, gpuMemcpyDeviceToHost,
                                         thandle);
+          gpuStreamSynchronize(thandle);
         }
         // cbuf+=cbuf_tmp
-        gpuStreamSynchronize(thandle);
         blas::axpy(csize, TensorElType1{1}, cbuf_tmp, 1, cbuf.data(), 1);
 
         memHostPool.deallocate(cbuf_tmp, csize * sizeof(TensorElType1));
@@ -1165,7 +1167,7 @@ cd_ccsd_os_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace
   }
 
   chem_env.cc_context.ccsd_correlation_energy = energy;
-  chem_env.cc_context.ccsd_total_energy       = chem_env.hf_energy + energy;
+  chem_env.cc_context.ccsd_total_energy       = chem_env.scf_context.hf_energy + energy;
 
   auto   cc_t2 = std::chrono::high_resolution_clock::now();
   double ccsd_time =

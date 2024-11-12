@@ -14,72 +14,22 @@
 namespace exachem::mp2 {
 
 void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env) {
-  namespace fs = std::filesystem;
-  using T      = double;
-
+  using T   = double;
   auto rank = ec.pg().rank();
 
-  scf::scf_driver(ec, chem_env);
-  SystemData sys_data = chem_env.sys_data;
+  cholesky_2e::cholesky_2e_driver(ec, chem_env);
 
-  libint2::BasisSet   shells         = chem_env.shells;
-  Tensor<T>           C_AO           = chem_env.C_AO;
-  Tensor<T>           C_beta_AO      = chem_env.C_beta_AO;
-  Tensor<T>           F_AO           = chem_env.F_AO;
-  Tensor<T>           F_beta_AO      = chem_env.F_beta_AO;
-  TiledIndexSpace     AO_opt         = chem_env.AO_opt;
-  std::vector<size_t> shell_tile_map = chem_env.shell_tile_map;
+  Scheduler sch{ec};
 
-  CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
-  if(rank == 0) ccsd_options.print();
+  SystemData       sys_data = chem_env.sys_data;
+  TiledIndexSpace& MO       = chem_env.is_context.MSO;
+  TiledIndexSpace& CI       = chem_env.is_context.CI;
 
-  if(rank == 0)
-    std::cout << std::endl
-              << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << std::endl;
-
-  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(ec, chem_env);
+  Tensor<T> d_f1    = chem_env.cd_context.d_f1;
+  Tensor<T> cholVpr = chem_env.cd_context.cholV2;
 
   const bool is_rhf = sys_data.is_restricted;
 
-  std::string out_fp       = chem_env.workspace_dir;
-  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
-  std::string f1file       = files_prefix + ".f1_mo";
-  std::string t1file       = files_prefix + ".t1amp";
-  std::string t2file       = files_prefix + ".t2amp";
-  std::string v2file       = files_prefix + ".cholv2";
-  std::string cholfile     = files_prefix + ".cholcount";
-  std::string ccsdstatus   = files_prefix + ".ccsdstatus";
-
-  bool mp2_restart = ccsd_options.readt || (fs::exists(f1file) && fs::exists(v2file));
-
-  // deallocates F_AO, C_AO
-  auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cholesky_2e::cholesky_2e_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO,
-                                       shells, shell_tile_map, mp2_restart, cholfile);
-  free_tensors(lcao);
-
-  if(mp2_restart) {
-    read_from_disk(d_f1, f1file);
-    read_from_disk(cholVpr, v2file);
-    ec.pg().barrier();
-  }
-
-  else if(ccsd_options.writet) {
-    if(!fs::exists(files_dir)) fs::create_directories(files_dir);
-
-    write_to_disk(d_f1, f1file);
-    write_to_disk(cholVpr, v2file);
-
-    if(rank == 0) {
-      std::ofstream out(cholfile, std::ios::out);
-      if(!out) cerr << "Error opening file " << cholfile << std::endl;
-      out << chol_count << std::endl;
-      out.close();
-    }
-  }
-
-  Scheduler sch{ec};
   // get Eigen values
   std::vector<T> p_evl_sorted = tamm::diagonal(d_f1);
   // split into occupied and virtual parts

@@ -23,31 +23,23 @@ double genTime              = 0;
 double ccsd_t_data_per_rank = 0; // in GB
 
 void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env) {
-  using T = double;
-
+  using T   = double;
   auto rank = ec.pg().rank();
 
-  scf::scf_driver(ec, chem_env);
-
-  double              hf_energy      = chem_env.hf_energy;
-  libint2::BasisSet   shells         = chem_env.shells;
-  Tensor<T>           C_AO           = chem_env.C_AO;
-  Tensor<T>           C_beta_AO      = chem_env.C_beta_AO;
-  Tensor<T>           F_AO           = chem_env.F_AO;
-  Tensor<T>           F_beta_AO      = chem_env.F_beta_AO;
-  TiledIndexSpace     AO_opt         = chem_env.AO_opt;
-  TiledIndexSpace     AO_tis         = chem_env.AO_tis;
-  std::vector<size_t> shell_tile_map = chem_env.shell_tile_map;
-  bool                scf_conv       = chem_env.no_scf;
+  cholesky_2e::cholesky_2e_driver(ec, chem_env);
 
   SystemData& sys_data = chem_env.sys_data;
+  const bool  is_rhf   = sys_data.is_restricted;
+
+  std::string files_prefix = chem_env.get_files_prefix();
+
+  CDContext& cd_context = chem_env.cd_context;
+  CCContext& cc_context = chem_env.cc_context;
+  cc_context.init_filenames(files_prefix);
+
   // CCSDOptions& ccsd_options   = chem_env.ioptions.ccsd_options;
   CCSDOptions& ccsd_options   = chem_env.ioptions.ccsd_options;
   const int    ccsdt_tilesize = ccsd_options.ccsdt_tilesize;
-
-  sys_data.freeze_atomic    = chem_env.ioptions.ccsd_options.freeze_atomic;
-  sys_data.n_frozen_core    = chem_env.get_nfcore();
-  sys_data.n_frozen_virtual = chem_env.ioptions.ccsd_options.freeze_virtual;
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
   std::string t_errmsg = check_memory_req(ccsdt_tilesize, sys_data.nbf);
@@ -90,50 +82,38 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
 
   auto debug     = ccsd_options.debug;
   bool skip_ccsd = ccsd_options.skip_ccsd;
+  bool scf_conv  = chem_env.scf_context.no_scf;
+
   if(rank == 0) ccsd_options.print();
 
   if(rank == 0)
     cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
 
-  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(ec, chem_env);
+  std::string       t1file     = cc_context.t1file;
+  std::string       t2file     = cc_context.t2file;
+  const std::string ccsdstatus = cc_context.ccsdstatus;
 
-  std::string out_fp       = chem_env.workspace_dir;
-  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
-  std::string f1file       = files_prefix + ".f1_mo";
-  std::string t1file       = files_prefix + ".t1amp";
-  std::string t2file       = files_prefix + ".t2amp";
-  std::string v2file       = files_prefix + ".cholv2";
-  std::string cholfile     = files_prefix + ".cholcount";
-  std::string ccsdstatus   = files_prefix + ".ccsdstatus";
+  bool ccsd_restart = ccsd_options.readt ||
+                      ((fs::exists(t1file) && fs::exists(t2file) && fs::exists(cd_context.f1file) &&
+                        fs::exists(cd_context.v2file)));
 
-  const bool is_rhf       = sys_data.is_restricted;
-  bool       computeTData = ccsd_options.computeTData;
-
-  bool ccsd_restart = ccsd_options.readt || ((fs::exists(t1file) && fs::exists(t2file) &&
-                                              fs::exists(f1file) && fs::exists(v2file)));
+  bool computeTData = ccsd_options.computeTData;
 
   ExecutionHW ex_hw = ec.exhw();
 
-  TiledIndexSpace N = MO("all");
+  TiledIndexSpace& MO      = chem_env.is_context.MSO;
+  TiledIndexSpace& CI      = chem_env.is_context.CI;
+  TiledIndexSpace  N       = MO("all");
+  Tensor<T>        d_f1    = chem_env.cd_context.d_f1;
+  Tensor<T>        cholVpr = chem_env.cd_context.cholV2;
 
-  Tensor<T>       cholVpr, d_t1, d_t2, d_f1, lcao;
-  TAMM_SIZE       chol_count;
-  tamm::Tile      max_cvecs;
-  TiledIndexSpace CI;
-
+  Tensor<T>      d_t1, d_t2;
   std::vector<T> p_evl_sorted;
   double         residual = 0, corr_energy = 0;
   Tensor<T>      dt1_full, dt2_full;
+  double&        hf_energy = chem_env.scf_context.hf_energy;
 
   if(!skip_ccsd) {
-    // deallocates F_AO, C_AO
-    std::tie(cholVpr, d_f1, lcao, chol_count, max_cvecs, CI) =
-      exachem::cholesky_2e::cholesky_2e_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO,
-                                                  F_beta_AO, shells, shell_tile_map, ccsd_restart,
-                                                  cholfile);
-    free_tensors(lcao);
-
     if(ccsd_options.writev) ccsd_options.writet = true;
 
     Tensor<T>              d_r1, d_r2;
@@ -147,29 +127,11 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
         ec, MO, d_f1, ccsd_options.ndiis, ccsd_restart && fs::exists(ccsdstatus) && scf_conv);
 
     if(ccsd_restart) {
-      read_from_disk(d_f1, f1file);
       if(fs::exists(t1file) && fs::exists(t2file)) {
         read_from_disk(d_t1, t1file);
         read_from_disk(d_t2, t2file);
       }
-      read_from_disk(cholVpr, v2file);
-      ec.pg().barrier();
       p_evl_sorted = tamm::diagonal(d_f1);
-    }
-
-    else if(ccsd_options.writet) {
-      // fs::remove_all(files_dir);
-      if(!fs::exists(files_dir)) fs::create_directories(files_dir);
-
-      write_to_disk(d_f1, f1file);
-      write_to_disk(cholVpr, v2file);
-
-      if(rank == 0) {
-        std::ofstream out(cholfile, std::ios::out);
-        if(!out) cerr << "Error opening file " << cholfile << endl;
-        out << chol_count << std::endl;
-        out.close();
-      }
     }
 
     if(rank == 0 && debug) {
@@ -427,7 +389,7 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   Tensor<T>::allocate(&ec, t_d_t1, t_d_t2);
   if(skip_ccsd || !computeTData) v2tensors.allocate(ec, MO1);
 
-  bool ccsd_t_restart = fs::exists(t1file) && fs::exists(t2file) && fs::exists(f1file) &&
+  bool ccsd_t_restart = fs::exists(t1file) && fs::exists(t2file) && fs::exists(cd_context.f1file) &&
                         v2tensors.exist_on_disk(files_prefix);
 
   if(!ccsd_t_restart && !skip_ccsd) {
@@ -524,7 +486,6 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   energy1 = ec.pg().reduce(&energy1, ReduceOp::sum, 0);
   energy2 = ec.pg().reduce(&energy2, ReduceOp::sum, 0);
 
-  CCContext& cc_context                 = chem_env.cc_context;
   cc_context.ccsd_st_correction_energy  = energy1;
   cc_context.ccsd_st_correlation_energy = corr_energy + energy1;
   cc_context.ccsd_st_total_energy       = hf_energy + corr_energy + energy1;

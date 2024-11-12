@@ -714,6 +714,7 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
     TiledIndexSpace cv3d_utis{
       mo_ut, range(sys_data.nmo - sys_data.n_vir_beta, sys_data.nmo - sys_data.n_vir_beta + 1)};
     auto [c1, c2] = cv3d_utis.labels<2>("all");
+
     // clang-format off
     sch
       (d_f1_ut(h1,h2) += -1.0 * cv3d_ut(h1,h2,cind) * cv3d_ut(c1,c2,cind))
@@ -981,76 +982,33 @@ void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T             = double;
   using ComplexTensor = Tensor<rteom_cc::ccsd::CCEType>;
 
-  auto rank = ec.pg().rank();
+  auto        rank     = ec.pg().rank();
+  SystemData& sys_data = chem_env.sys_data;
 
-  scf::scf_driver(ec, chem_env);
+  cholesky_2e::cholesky_2e_driver(ec, chem_env);
 
-  libint2::BasisSet   shells         = chem_env.shells;
-  Tensor<T>           C_AO           = chem_env.C_AO;
-  Tensor<T>           C_beta_AO      = chem_env.C_beta_AO;
-  Tensor<T>           F_AO           = chem_env.F_AO;
-  Tensor<T>           F_beta_AO      = chem_env.F_beta_AO;
-  TiledIndexSpace     AO_opt         = chem_env.AO_opt;
-  std::vector<size_t> shell_tile_map = chem_env.shell_tile_map;
+  std::string files_dir    = chem_env.get_files_dir();
+  std::string files_prefix = chem_env.get_files_prefix();
 
-  SystemData&  sys_data     = chem_env.sys_data;
+  CDContext& cd_context = chem_env.cd_context;
+  CCContext& cc_context = chem_env.cc_context;
+  cc_context.init_filenames(files_prefix);
   CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
-  // CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
+
   auto debug = ccsd_options.debug;
-  if(rank == 0) ccsd_options.print();
 
-  if(rank == 0)
-    cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
-
-  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(ec, chem_env);
-
-  std::string out_fp       = chem_env.workspace_dir;
-  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
-  std::string f1file       = files_prefix + ".f1_mo";
-  // std::string t1file = files_prefix+".t1amp";
-  // std::string t2file = files_prefix+".t2amp";
-  std::string v2file     = files_prefix + ".cholv2";
-  std::string cholfile   = files_prefix + ".cholcount";
-  std::string ccsdstatus = files_prefix + ".ccsdstatus";
+  TiledIndexSpace& MO      = chem_env.is_context.MSO;
+  TiledIndexSpace& CI      = chem_env.is_context.CI;
+  TiledIndexSpace  N       = MO("all");
+  Tensor<T>        d_f1    = cd_context.d_f1;
+  Tensor<T>        cholVpr = cd_context.cholV2;
 
   const bool is_rhf = sys_data.is_restricted;
   if(is_rhf) tamm_terminate("RHF not supported");
 
-  bool cc_restart = ccsd_options.readt || (fs::exists(f1file) && fs::exists(v2file));
-
-  // deallocates F_AO, C_AO
-  auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    exachem::cholesky_2e::cholesky_2e_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO,
-                                                F_beta_AO, shells, shell_tile_map, cc_restart,
-                                                cholfile);
-  free_tensors(lcao);
-
-  TiledIndexSpace N = MO("all");
-
+  bool cc_restart = ccsd_options.readt ||
+                    (fs::exists(cd_context.f1file) && fs::exists(cd_context.v2file));
   Scheduler sch{ec};
-
-  if(cc_restart) {
-    read_from_disk(d_f1, f1file);
-    read_from_disk(cholVpr, v2file);
-    ec.pg().barrier();
-    // p_evl_sorted = tamm::diagonal(d_f1);
-  }
-
-  else if(ccsd_options.writet) {
-    // fs::remove_all(files_dir);
-    if(!fs::exists(files_dir)) fs::create_directories(files_dir);
-
-    write_to_disk(d_f1, f1file);
-    write_to_disk(cholVpr, v2file);
-
-    if(rank == 0) {
-      std::ofstream out(cholfile, std::ios::out);
-      if(!out) cerr << "Error opening file " << cholfile << endl;
-      out << chol_count << std::endl;
-      out.close();
-    }
-  }
 
   ComplexTensor d_f1_c{{d_f1.tiled_index_spaces()}, {1, 1}};
   ComplexTensor cholVpr_c{{cholVpr.tiled_index_spaces()}, {1, 1}};

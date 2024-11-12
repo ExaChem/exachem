@@ -10,10 +10,7 @@
 
 namespace exachem::task {
 
-void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) {
-  const auto task       = chem_env.ioptions.task_options;
-  const auto input_file = chem_env.input_file;
-
+void print_geometry(ExecutionContext& ec, ChemEnv& chem_env) {
   if(ec.print()) {
     std::cout << std::endl << std::string(60, '-') << std::endl;
     for(auto ecatom: chem_env.ec_atoms) {
@@ -24,17 +21,25 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
                 << ecatom.atom.z << std::endl;
     }
   }
+}
+
+void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) {
+  const auto task       = chem_env.ioptions.task_options;
+  const auto input_file = chem_env.input_file;
+
+  print_geometry(ec, chem_env);
 
   if(task.sinfo) chem_env.sinfo();
   else if(task.scf) {
     scf::scf_driver(ec, chem_env);
-    Tensor<TensorType>::deallocate(chem_env.C_AO, chem_env.F_AO);
+    Tensor<TensorType>::deallocate(chem_env.scf_context.C_AO, chem_env.scf_context.F_AO);
     if(chem_env.sys_data.is_unrestricted)
-      Tensor<TensorType>::deallocate(chem_env.C_beta_AO, chem_env.F_beta_AO);
+      Tensor<TensorType>::deallocate(chem_env.scf_context.C_beta_AO,
+                                     chem_env.scf_context.F_beta_AO);
   }
 #if defined(ENABLE_CC)
   else if(task.mp2) mp2::cd_mp2(ec, chem_env);
-  else if(task.cd_2e) cholesky_2e::cholesky_decomp_2e(ec, chem_env);
+  else if(task.cd_2e) cholesky_2e::cholesky_2e_driver(ec, chem_env);
   else if(task.ccsd) { cc::ccsd::cd_ccsd(ec, chem_env); }
   else if(task.ccsd_t) cc::ccsd_t::ccsd_t_driver(ec, chem_env);
   else if(task.cc2) cc2::cd_cc2_driver(ec, chem_env);
@@ -51,7 +56,7 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
 
   else
     tamm_terminate(
-      "[ERROR] Unsupported task specified (or) code for the specified task is not built");
+      "\n[ERROR] Unsupported task specified (or) code for the specified task is not built");
 }
 
 } // namespace exachem::task

@@ -281,7 +281,7 @@ cc2_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO
   }
 
   chem_env.cc_context.cc2_correlation_energy = energy;
-  chem_env.cc_context.cc2_total_energy       = chem_env.hf_energy + energy;
+  chem_env.cc_context.cc2_total_energy       = chem_env.scf_context.hf_energy + energy;
 
   if(ec.pg().rank() == 0) {
     sys_data.results["output"]["CC2"]["n_iterations"]                = niter + 1;
@@ -304,15 +304,15 @@ void cc2_canonical_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   scf(ec, chem_env);
 
-  double              hf_energy      = chem_env.hf_energy;
+  double              hf_energy      = chem_env.scf_context.hf_energy;
   libint2::BasisSet   shells         = chem_env.shells;
-  Tensor<T>           C_AO           = chem_env.C_AO;
-  Tensor<T>           C_beta_AO      = chem_env.C_beta_AO;
-  Tensor<T>           F_AO           = chem_env.F_AO;
-  Tensor<T>           F_beta_AO      = chem_env.F_beta_AO;
-  TiledIndexSpace     AO_opt         = chem_env.AO_opt;
-  std::vector<size_t> shell_tile_map = chem_env.shell_tile_map;
-  bool                scf_conv       = chem_env.no_scf;
+  Tensor<T>           C_AO           = chem_env.scf_context.C_AO;
+  Tensor<T>           C_beta_AO      = chem_env.scf_context.C_beta_AO;
+  Tensor<T>           F_AO           = chem_env.scf_context.F_AO;
+  Tensor<T>           F_beta_AO      = chem_env.scf_context.F_beta_AO;
+  TiledIndexSpace     AO_opt         = chem_env.is_context.AO_opt;
+  std::vector<size_t> shell_tile_map = chem_env.scf_context.shell_tile_map;
+  bool                scf_conv       = chem_env.scf_context.no_scf;
 
   SystemData&  sys_data     = chem_env.sys_data;
   CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;

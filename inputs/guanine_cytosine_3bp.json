@@ -100,8 +100,7 @@
   "SCF": {
     "conve": 1e-06,
     "convd": 1e-05,
-    "diis_hist": 10,
-    "tilesize": 30
+    "diis_hist": 10
   },
   "CD": {
     "diagtol": 1e-06,

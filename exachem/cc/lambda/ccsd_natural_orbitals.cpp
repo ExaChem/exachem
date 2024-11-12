@@ -142,7 +142,7 @@ void ccsd_natural_orbitals(ChemEnv& chem_env, std::vector<int>& cc_rdm, std::str
   //################################################################################
   // TRANSFORM C AND FORM DENSITY FOR NATURAL ORBITAL BASIS
   //################################################################################
-  Tensor<T> C_alpha_AO2{mu, chem_env.AO_ortho};
+  Tensor<T> C_alpha_AO2{mu, chem_env.is_context.AO_ortho};
   Tensor<T> C_alpha_AOMO{mu, pa};
   Tensor<T> C_alpha_NO_AOMO{mu, pa};
   Tensor<T> alpha_density{mu, nu};

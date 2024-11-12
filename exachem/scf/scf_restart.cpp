@@ -12,27 +12,44 @@
 // Originally scf_restart_test
 void exachem::scf::SCFRestart::operator()(const ExecutionContext& ec, ChemEnv& chem_env,
                                           std::string files_prefix) {
-  bool restart = chem_env.ioptions.scf_options.restart || chem_env.ioptions.scf_options.noscf;
+  const bool restart = chem_env.ioptions.scf_options.restart || chem_env.ioptions.scf_options.noscf;
 
-  if(!restart) return;
-  const auto rank   = ec.pg().rank();
-  const bool is_uhf = (chem_env.sys_data.is_unrestricted);
+  if(restart) {
+    const auto rank   = ec.pg().rank();
+    const bool is_uhf = (chem_env.sys_data.is_unrestricted);
 
-  std::string movecsfile_alpha  = files_prefix + ".alpha.movecs";
-  std::string densityfile_alpha = files_prefix + ".alpha.density";
-  std::string movecsfile_beta   = files_prefix + ".beta.movecs";
-  std::string densityfile_beta  = files_prefix + ".beta.density";
-  bool        status            = false;
+    std::string movecsfile_alpha  = files_prefix + ".alpha.movecs";
+    std::string densityfile_alpha = files_prefix + ".alpha.density";
+    std::string movecsfile_beta   = files_prefix + ".beta.movecs";
+    std::string densityfile_beta  = files_prefix + ".beta.density";
+    bool        status            = false;
 
-  if(rank == 0) {
-    status = fs::exists(movecsfile_alpha) && fs::exists(densityfile_alpha);
-    if(is_uhf) status = status && fs::exists(movecsfile_beta) && fs::exists(densityfile_beta);
+    if(rank == 0) {
+      status = fs::exists(movecsfile_alpha) && fs::exists(densityfile_alpha);
+      if(is_uhf) status = status && fs::exists(movecsfile_beta) && fs::exists(densityfile_beta);
+    }
+    ec.pg().barrier();
+    ec.pg().broadcast(&status, 0);
+    std::string fnf = movecsfile_alpha + "; " + densityfile_alpha;
+    if(is_uhf) fnf = fnf + "; " + movecsfile_beta + "; " + densityfile_beta;
+    if(!status)
+      tamm_terminate("\n [SCF restart] Error reading one or all of the files: [" + fnf + "]");
+
+    const int orig_ts = chem_env.run_context["ao_tilesize"];
+    if(orig_ts != chem_env.is_context.ao_tilesize) {
+      std::string err_msg =
+        "\n[ERROR] Restarting a calculation requires the AO tilesize to be the same\n";
+      err_msg += "  - current tilesize (" + std::to_string(chem_env.is_context.ao_tilesize);
+      err_msg += ") does not match the original tilesize (" + std::to_string(orig_ts) + ")";
+      tamm_terminate(err_msg);
+    }
   }
-  ec.pg().barrier();
-  ec.pg().broadcast(&status, 0);
-  std::string fnf = movecsfile_alpha + "; " + densityfile_alpha;
-  if(is_uhf) fnf = fnf + "; " + movecsfile_beta + "; " + densityfile_beta;
-  if(!status) tamm_terminate("Error reading one or all of the files: [" + fnf + "]");
+  else {
+    chem_env.run_context["ao_tilesize"] = chem_env.is_context.ao_tilesize;
+    if(chem_env.scf_context.do_df)
+      chem_env.run_context["dfao_tilesize"] = chem_env.is_context.dfao_tilesize;
+    chem_env.write_run_context(); // write here as well in case we kill an SCF run midway
+  }
 }
 
 void exachem::scf::SCFRestart::operator()(ExecutionContext& ec, ChemEnv& chem_env,

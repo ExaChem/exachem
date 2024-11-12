@@ -23,9 +23,7 @@
     "charge": 0,
     "multiplicity": 1,
     "scf_type": "restricted",  
-    "writem": 10,
-    "force_tilesize": false,
-    "tilesize": 30
+    "writem": 10
   },
   "CD": {
     "diagtol": 1e-12,

@@ -1,0 +1,92 @@
+
+{
+  "geometry": {
+    "coordinates": [
+      "N   -2.15746458     0.00000000    0.00000000",
+      "C   -0.70321472     0.00000000    0.00000000",
+      "C   -0.01145721     1.21693110    0.00000000",
+      "H   -0.56773625     2.14697503    0.00000000",
+      "C    1.37482052     1.21656683    0.00000000",
+      "H    1.91425302     2.16055505    0.00000000",
+      "C    2.09546989     0.00000000    0.00000000",
+      "N    3.46611936     0.00000000    0.00000000",
+      "H    3.99010150     0.86140500    0.00000000",
+      "H    3.99010150    -0.86140500    0.00000000",
+      "C    1.37482052    -1.21656683    0.00000000",
+      "H    1.91425302    -2.16055505    0.00000000",
+      "C   -0.01145721    -1.21693110    0.00000000",
+      "H   -0.56773625    -2.14697503    0.00000000",
+      "O   -2.73965974     1.09143620    0.00000000",
+      "O   -2.73965974    -1.09143620    0.00000000"   
+    ],
+    "units": "angstrom"
+  },
+
+  "common": {
+    "maxiter": 50,
+    "debug": false
+  },
+
+  "basis": {
+    "basisset": "aug-cc-pvqz",
+    "df_basisset": "",
+    "atom_basis": {
+      "O": "aug-cc-pvqz",
+      "C": "aug-cc-pvqz",
+      "N": "aug-cc-pvqz",
+      "H": "aug-cc-pvqz"
+    }
+  },
+
+  "SCF": {
+    "charge": 0,
+    "multiplicity": 1,
+    "lshift": 0,
+    "tol_lindep": 1e-5,
+    "conve": 1e-12,
+    "convd": 1e-11,
+    "diis_hist": 10,
+    "writem": 10,
+    "restart": false,
+    "noscf": false,
+    "scf_type": "restricted",
+    "debug": false,
+    "qed_omegas" : [0.177867],
+    "qed_volumes": [],
+    "qed_lambdas": [0.1],
+    "qed_polvecs": [[0.0, 0.0, 1.0]]
+  },
+
+  "CD": {
+    "debug": false,
+    "diagtol": 1e-6
+  },
+
+  "CC": {
+    "threshold": 1e-8,
+    "lshift": 0.0,
+    "ndiis": 5,
+    "ccsd_maxiter": 100,
+    "nactive": 0,
+    "freeze":{
+      "atomic":false,
+      "core": 0,
+      "virtual": 0
+    }, 
+
+    "readt": false,
+    "writet": true,
+    "writet_iter": 5,
+
+    "debug": false,
+    "profile_ccsd": false,
+    "balance_tiles": true
+  },
+
+  "TASK": {
+    "scf": false,
+    "ccsd": true
+  }
+
+}
+

@@ -31,4 +31,25 @@ public:
   double ccsd_st_correction_energy{0};
   double ccsd_st_correlation_energy{0};
   double ccsd_st_total_energy{0};
+
+  // tensor files
+  std::string t1file;
+  std::string t2file;
+  std::string t2_11file;
+  std::string t2_21file;
+  std::string t2_12file;
+  std::string t2_22file;
+  std::string ccsdstatus;
+
+  void init_filenames(std::string files_prefix) {
+    this->t1file = files_prefix + ".t1amp";
+    this->t2file = files_prefix + ".t2amp";
+
+    this->t2_11file = files_prefix + ".t2_11amp";
+    this->t2_21file = files_prefix + ".t2_21amp";
+    this->t2_12file = files_prefix + ".t2_12amp";
+    this->t2_22file = files_prefix + ".t2_22amp";
+
+    this->ccsdstatus = files_prefix + ".ccsdstatus";
+  }
 };

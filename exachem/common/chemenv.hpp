@@ -14,6 +14,8 @@
 // #include "libint2_includes.hpp"
 #include "exachem/common/context/cc_context.hpp"
 #include "exachem/common/context/cd_context.hpp"
+#include "exachem/common/context/is_context.hpp"
+#include "exachem/common/context/scf_context.hpp"
 #include "exachem/common/txt_utils.hpp"
 
 #include "tamm/tamm.hpp"
@@ -36,46 +38,37 @@ public:
   SystemData  sys_data;
   ECOptions   ioptions;
   ECBasis     ec_basis;
+  json        run_context;
 
   std::vector<Atom>   atoms;
   std::vector<ECAtom> ec_atoms;
-
-  double                   hf_energy{0.0};
-  libint2::BasisSet        shells;
-  std::vector<size_t>      shell_tile_map;
-  tamm::Tensor<TensorType> C_AO;
-  tamm::Tensor<TensorType> F_AO;
-  tamm::Tensor<TensorType> C_beta_AO;
-  tamm::Tensor<TensorType> F_beta_AO;
-  TiledIndexSpace          AO_opt;
-  TiledIndexSpace          AO_tis;
-  TiledIndexSpace          AO_ortho;
-  bool                     no_scf;
+  libint2::BasisSet   shells;
 
   std::string workspace_dir{};
 
-  CDContext cd_context;
-  CCContext cc_context;
+  SCFContext scf_context;
+  CDContext  cd_context;
+  CCContext  cc_context;
+  ISContext  is_context; // IndexSpaces
 
+  void read_run_context();
+  void write_run_context();
   void write_json_data(const std::string cmodule);
 
   Matrix compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A);
 
-  void update(double hf_energy, libint2::BasisSet shells, std::vector<size_t> shell_tile_map,
-              tamm::Tensor<TensorType> C_AO, tamm::Tensor<TensorType> F_AO,
-              tamm::Tensor<TensorType> C_beta_AO, tamm::Tensor<TensorType> F_beta_AO,
-              TiledIndexSpace AO_opt, TiledIndexSpace AO_tis, TiledIndexSpace AO_ortho,
-              bool no_scf) {
-    this->hf_energy      = hf_energy;
-    this->shells         = shells;
-    this->shell_tile_map = shell_tile_map;
-    this->C_AO           = C_AO;
-    this->F_AO           = F_AO;
-    this->C_beta_AO      = C_beta_AO;
-    this->F_beta_AO      = F_beta_AO;
-    this->AO_opt         = AO_opt;
-    this->AO_tis         = AO_tis;
-    this->AO_ortho       = AO_ortho;
-    this->no_scf         = no_scf;
+  std::string get_files_dir(std::string scf_type = "") {
+    if(scf_type.empty()) scf_type = ioptions.scf_options.scf_type;
+    const std::string files_dir = workspace_dir + scf_type;
+    return files_dir;
+  }
+
+  std::string get_files_prefix(std::string scf_type = "") {
+    if(scf_type.empty()) scf_type = ioptions.scf_options.scf_type;
+
+    const std::string out_fp       = workspace_dir;
+    const std::string files_dir    = out_fp + scf_type;
+    const std::string files_prefix = files_dir + "/" + sys_data.output_file_prefix;
+    return files_prefix;
   }
 };

@@ -297,7 +297,6 @@
     "basisset": "6-31g*"
   },
   "SCF": {
-    "tilesize": 30,
     "restart": false
   },
   "TASK": {

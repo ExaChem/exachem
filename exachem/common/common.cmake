@@ -14,8 +14,10 @@ set(COMMON_INCLUDES
     ${COMMON_SRCDIR}/ec_dplot.hpp
     ${COMMON_SRCDIR}/ec_molden.hpp
     ${COMMON_SRCDIR}/libint2_includes.hpp
+    ${COMMON_SRCDIR}/context/is_context.hpp
     ${COMMON_SRCDIR}/context/cd_context.hpp
     ${COMMON_SRCDIR}/context/cc_context.hpp
+    ${COMMON_SRCDIR}/context/scf_context.hpp
     ${COMMON_SRCDIR}/options/parse_options.hpp
     ${COMMON_SRCDIR}/options/parse_common_options.hpp
     ${COMMON_SRCDIR}/options/parse_scf_options.hpp

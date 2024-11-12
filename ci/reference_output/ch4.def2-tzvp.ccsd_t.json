@@ -450,7 +450,6 @@
       "convd": 1e-06,
       "diis_hist": 20,
       "AO_tilesize": 30,
-      "force_tilesize": "false",
       "scf_type": "unrestricted",
       "multiplicity": 3,
       "lambdas": [],

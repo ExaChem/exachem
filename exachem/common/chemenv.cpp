@@ -26,6 +26,37 @@ int ChemEnv::get_nfcore() {
   return ioptions.ccsd_options.freeze_core;
 }
 
+void ChemEnv::read_run_context() {
+  std::string files_prefix = get_files_prefix();
+  std::string json_file    = files_prefix + ".runcontext.json";
+  bool        json_exists  = std::filesystem::exists(json_file);
+  if(json_exists) {
+    std::ifstream jread(json_file);
+    jread >> run_context;
+  }
+  // else {
+  //   std::string err_msg = "\n[ERROR] " + json_file + " does not exist!"
+  //   tamm_terminate(err_msg);
+  // }
+}
+
+void ChemEnv::write_run_context() {
+  std::string files_dir = get_files_dir();
+  if(!fs::exists(files_dir)) fs::create_directories(files_dir);
+  std::string files_prefix = get_files_prefix();
+  std::string json_file    = files_prefix + ".runcontext.json";
+  bool        json_exists  = std::filesystem::exists(json_file);
+  if(json_exists) {
+    // std::ifstream jread(json_file);
+    // jread >> run_context;
+    std::filesystem::remove(json_file);
+  }
+
+  // std::cout << std::endl << std::endl << run_context.dump() << std::endl;
+  std::ofstream res_file(json_file);
+  res_file << std::setw(2) << run_context << std::endl;
+}
+
 void ChemEnv::write_sinfo() {
   std::string basis = ioptions.scf_options.basis;
 
@@ -75,23 +106,22 @@ void ChemEnv::write_json_data(const std::string cmodule) {
   results["input"]["common"]           = jinput["common"];
 
   // SCF options
-  results["input"]["SCF"]["charge"]         = scf.charge;
-  results["input"]["SCF"]["multiplicity"]   = scf.multiplicity;
-  results["input"]["SCF"]["lshift"]         = scf.lshift;
-  results["input"]["SCF"]["tol_int"]        = scf.tol_int;
-  results["input"]["SCF"]["tol_sch"]        = scf.tol_sch;
-  results["input"]["SCF"]["tol_lindep"]     = scf.tol_lindep;
-  results["input"]["SCF"]["conve"]          = scf.conve;
-  results["input"]["SCF"]["convd"]          = scf.convd;
-  results["input"]["SCF"]["diis_hist"]      = scf.diis_hist;
-  results["input"]["SCF"]["AO_tilesize"]    = scf.AO_tilesize;
-  results["input"]["SCF"]["force_tilesize"] = str_bool(scf.force_tilesize);
-  results["input"]["SCF"]["damp"]           = scf.damp;
-  results["input"]["SCF"]["debug"]          = str_bool(scf.debug);
-  results["input"]["SCF"]["restart"]        = str_bool(scf.restart);
-  results["input"]["SCF"]["noscf"]          = str_bool(scf.noscf);
-  results["input"]["SCF"]["scf_type"]       = scf.scf_type;
-  results["input"]["SCF"]["direct_df"]      = str_bool(scf.direct_df);
+  results["input"]["SCF"]["charge"]       = scf.charge;
+  results["input"]["SCF"]["multiplicity"] = scf.multiplicity;
+  results["input"]["SCF"]["lshift"]       = scf.lshift;
+  results["input"]["SCF"]["tol_int"]      = scf.tol_int;
+  results["input"]["SCF"]["tol_sch"]      = scf.tol_sch;
+  results["input"]["SCF"]["tol_lindep"]   = scf.tol_lindep;
+  results["input"]["SCF"]["conve"]        = scf.conve;
+  results["input"]["SCF"]["convd"]        = scf.convd;
+  results["input"]["SCF"]["diis_hist"]    = scf.diis_hist;
+  results["input"]["SCF"]["AO_tilesize"]  = scf.AO_tilesize;
+  results["input"]["SCF"]["damp"]         = scf.damp;
+  results["input"]["SCF"]["debug"]        = str_bool(scf.debug);
+  results["input"]["SCF"]["restart"]      = str_bool(scf.restart);
+  results["input"]["SCF"]["noscf"]        = str_bool(scf.noscf);
+  results["input"]["SCF"]["scf_type"]     = scf.scf_type;
+  results["input"]["SCF"]["direct_df"]    = str_bool(scf.direct_df);
   if(!scf.dfbasis.empty()) results["input"]["SCF"]["dfAO_tilesize"] = scf.dfAO_tilesize;
 
   if(!scf.xc_type.empty() || scf.snK) {
@@ -139,18 +169,17 @@ void ChemEnv::write_json_data(const std::string cmodule) {
 
   if(cmodule == "CCSD") {
     // CCSD options
-    results["input"][cmodule]["tilesize"]       = ccsd.tilesize;
-    results["input"][cmodule]["force_tilesize"] = str_bool(ccsd.force_tilesize);
-    results["input"][cmodule]["lshift"]         = ccsd.lshift;
-    results["input"][cmodule]["ndiis"]          = ccsd.ndiis;
-    results["input"][cmodule]["readt"]          = str_bool(ccsd.readt);
-    results["input"][cmodule]["writet"]         = str_bool(ccsd.writet);
-    results["input"][cmodule]["writet_iter"]    = ccsd.writet_iter;
-    results["input"][cmodule]["ccsd_maxiter"]   = ccsd.ccsd_maxiter;
-    results["input"][cmodule]["nactive"]        = ccsd.nactive;
-    results["input"][cmodule]["debug"]          = ccsd.debug;
-    results["input"][cmodule]["profile_ccsd"]   = ccsd.profile_ccsd;
-    results["input"][cmodule]["balance_tiles"]  = str_bool(ccsd.balance_tiles);
+    results["input"][cmodule]["tilesize"]      = ccsd.tilesize;
+    results["input"][cmodule]["lshift"]        = ccsd.lshift;
+    results["input"][cmodule]["ndiis"]         = ccsd.ndiis;
+    results["input"][cmodule]["readt"]         = str_bool(ccsd.readt);
+    results["input"][cmodule]["writet"]        = str_bool(ccsd.writet);
+    results["input"][cmodule]["writet_iter"]   = ccsd.writet_iter;
+    results["input"][cmodule]["ccsd_maxiter"]  = ccsd.ccsd_maxiter;
+    results["input"][cmodule]["nactive"]       = ccsd.nactive;
+    results["input"][cmodule]["debug"]         = ccsd.debug;
+    results["input"][cmodule]["profile_ccsd"]  = ccsd.profile_ccsd;
+    results["input"][cmodule]["balance_tiles"] = str_bool(ccsd.balance_tiles);
 
     results["input"][cmodule]["freeze"]["atomic"]  = ccsd.freeze_atomic;
     results["input"][cmodule]["freeze"]["core"]    = ccsd.freeze_core;

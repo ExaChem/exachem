@@ -64,68 +64,20 @@ std::string generate_fcidump(ChemEnv& chem_env, ExecutionContext& ec, const Tile
 
 void fci_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
+  // auto rank = ec.pg().rank();
 
-  auto rank = ec.pg().rank();
+  cholesky_2e::cholesky_2e_driver(ec, chem_env);
 
-  scf::scf_driver(ec, chem_env);
+  std::string files_prefix = chem_env.get_files_prefix();
 
-  // double              hf_energy      = chem_env.hf_energy;
-  libint2::BasisSet   shells         = chem_env.shells;
-  Tensor<T>           C_AO           = chem_env.C_AO;
-  Tensor<T>           C_beta_AO      = chem_env.C_beta_AO;
-  Tensor<T>           F_AO           = chem_env.F_AO;
-  Tensor<T>           F_beta_AO      = chem_env.F_beta_AO;
-  TiledIndexSpace     AO_opt         = chem_env.AO_opt;
-  TiledIndexSpace     AO_tis         = chem_env.AO_tis;
-  std::vector<size_t> shell_tile_map = chem_env.shell_tile_map;
+  CDContext& cd_context = chem_env.cd_context;
+  chem_env.cc_context.init_filenames(files_prefix);
 
-  SystemData   sys_data     = chem_env.sys_data;
-  CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
-  if(rank == 0) ccsd_options.print();
-
-  if(rank == 0)
-    cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
-
-  auto [MO, total_orbitals] = cholesky_2e::setupMOIS(ec, chem_env);
-
-  std::string out_fp       = chem_env.workspace_dir;
-  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
-  std::string f1file       = files_prefix + ".f1_mo";
-  std::string v2file       = files_prefix + ".cholv2";
-  std::string cholfile     = files_prefix + ".cholcount";
-
-  ExecutionHW ex_hw = ec.exhw();
-
-  bool ccsd_restart = ccsd_options.readt || (fs::exists(f1file) && fs::exists(v2file));
-
-  // deallocates F_AO, C_AO
-  auto [cholVpr, d_f1, lcao, chol_count, max_cvecs, CI] =
-    cholesky_2e::cholesky_2e_driver<T>(chem_env, ec, MO, AO_opt, C_AO, F_AO, C_beta_AO, F_beta_AO,
-                                       shells, shell_tile_map, ccsd_restart, cholfile);
-
-  TiledIndexSpace N = MO("all");
-
-  if(ccsd_restart) {
-    read_from_disk(d_f1, f1file);
-    read_from_disk(cholVpr, v2file);
-    ec.pg().barrier();
-  }
-
-  else if(ccsd_options.writet) {
-    // fs::remove_all(files_dir);
-    if(!fs::exists(files_dir)) fs::create_directories(files_dir);
-
-    write_to_disk(d_f1, f1file);
-    write_to_disk(cholVpr, v2file);
-
-    if(rank == 0) {
-      std::ofstream out(cholfile, std::ios::out);
-      if(!out) cerr << "Error opening file " << cholfile << endl;
-      out << chol_count << std::endl;
-      out.close();
-    }
-  }
+  TiledIndexSpace& MO      = chem_env.is_context.MSO;
+  TiledIndexSpace& CI      = chem_env.is_context.CI;
+  TiledIndexSpace  N       = MO("all");
+  Tensor<T>        d_f1    = cd_context.d_f1;
+  Tensor<T>        cholVpr = cd_context.cholV2;
 
   ec.pg().barrier();
 
@@ -135,12 +87,16 @@ void fci_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   Tensor<T> full_v2{N, N, N, N};
   Tensor<T>::allocate(&ec, full_v2);
 
+  ExecutionHW ex_hw = ec.exhw();
+
   // clang-format off
   Scheduler sch{ec};
   sch(full_v2(p, r, q, s)  = cholVpr(p, r, cindex) * cholVpr(q, s, cindex)).execute(ex_hw);
   // clang-format off
 
   free_tensors(cholVpr);
+
+  Tensor<T> lcao = cd_context.movecs_so;
 
   files_prefix = generate_fcidump(chem_env, ec, MO, lcao, d_f1, full_v2, ex_hw);
   #if defined(USE_MACIS)

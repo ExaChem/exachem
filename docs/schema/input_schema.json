@@ -93,9 +93,6 @@
         "diis_hist": {
           "type": "number"
         },
-        "force_tilesize": {
-          "type": "boolean"
-        },
         "tilesize": {
           "type": "number"
         },
@@ -286,9 +283,6 @@
       "properties": {
         "threshold": {
           "type": "number"
-        },
-        "force_tilesize": {
-          "type": "boolean"
         },
         "tilesize": {
           "type": "number"

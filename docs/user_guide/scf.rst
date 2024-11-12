@@ -28,7 +28,6 @@ The values listed below are the defaults where few options are automatically adj
    "conve": 1e-8,
    "convd": 1e-7,
    "diis_hist": 10,
-   "force_tilesize": false,
    "tilesize": 30,
    "damp": 100,
    "nnodes": 1,
@@ -97,10 +96,8 @@ The values listed below are the defaults where few options are automatically adj
 
 :diis_hist: ``[default=10]`` Specifies the number of DIIS history entries to store for the fock and error matrices.
 
-:force_tilesize: ``[default=false]``
-
-:tilesize: The tilesize for the AO dimension. An integer value that is automatically set to ``ceil(Nbf * 0.05)``. If **force_tilesize=true**, 
-   the value specified by the user is respected. It is recommended to let the SCF module automatically determine this value.
+:tilesize: The tilesize for the AO dimension. An integer value that is automatically set to ``ceil(Nbf * 0.05)``
+ if the user has not explicitly set it. It is recommended to let the SCF module automatically determine this value.
 
 :damp: damping (mixing) factor for the density matrix where :math:`0 \leq \alpha \leq 100`.  Specifies the percentage of the current iterations density mixed with the previous iterations density. ``default=100`` indicates no damping.
 

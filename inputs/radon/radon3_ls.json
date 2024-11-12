@@ -64,7 +64,6 @@
     "maxiter": 200
   },
   "SCF": {
-    "tilesize": 30,
     "restart": false,
     "diis_hist": 10,
     "tol_lindep": 1e-06,    
@@ -83,8 +82,6 @@
     "readt": false,
     "writet": true,
     "ndiis": 5,
-    "force_tilesize": true,
-    "tilesize": 60,
     "CCSD(T)": {
       "skip_ccsd": false,
       "ccsdt_tilesize": 40

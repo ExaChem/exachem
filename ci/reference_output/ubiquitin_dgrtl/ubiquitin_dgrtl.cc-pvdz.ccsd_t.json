@@ -295,7 +295,6 @@
       "convd": 1e-07,
       "diis_hist": 12,
       "AO_tilesize": 37,
-      "force_tilesize": "false",
       "scf_type": "restricted",
       "multiplicity": 1,
       "lambdas": [],

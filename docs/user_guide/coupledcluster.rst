@@ -19,7 +19,6 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
 
  "CC": {
    "threshold": 1e-6,
-   "force_tilesize": false,
    "tilesize": 50,
    "lshift": 0,
    "ndiis": 5,
@@ -45,11 +44,14 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
    }   
   }
 
+
 :threshold: ``[default=1e-6]`` Specifies the convergence threshold of iterative solutions of amplitude equations. The threshold refers to the norm of residual, namely, the deviation from the amplitude equations.
 
-:force_tilesize: ``[default=false]``
+:tilesize: ``[default=40]`` The tilesize for the MO or MSO space. An integer value that is automatically set unless specified explicitly by the user. It is recommended to let the CC module determine this value automatically.
 
-:tilesize: ``[default=40]`` The tilesize for the MO or MSO space. An integer value that is automatically set. If **force_tilesize=true**, the value specified by the user is respected. It is recommended to let the CC module automatically determine this value.
+   .. warning::
+
+      The automatically determined tilesize may vary depending on node count and the number of processes per node. When restarting a calculation with different node counts, the user is expected to explicitly set the tilesize to match the value used in the initial run.
 
 :lshift: ``[default=0]`` The level shift option that increases small orbital energy differences used in calculating the updates for cluster amplitudes. When calculating ground states with multi-configurational character or if convergence is slow, one may need to specify a typical values for lshift between 0.3 and 0.5.
 

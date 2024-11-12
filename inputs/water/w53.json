@@ -174,7 +174,6 @@
     "convd": 1e-08,
     "diis_hist": 12,
     "writem": 50,
-    "tilesize": 30,
     "restart": false,
     "noscf": false
   },

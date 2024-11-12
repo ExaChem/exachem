@@ -12,6 +12,7 @@ Release/
 cmake-build-debug/
 cmake-build-release/
 build/
+ebuild/
 debug*
 build*
 .xlsx

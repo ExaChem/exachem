@@ -94,7 +94,6 @@
     "conve": 1e-10,
     "convd": 1e-09,
     "diis_hist": 12,
-    "tilesize": 30,
     "charge": 1,
     "restart": false,
     "noscf": false

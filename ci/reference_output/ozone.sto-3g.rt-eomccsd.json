@@ -116,7 +116,6 @@
       "convd": 0.1,
       "diis_hist": 10,
       "AO_tilesize": 30,
-      "force_tilesize": "false",
       "scf_type": "unrestricted",
       "multiplicity": 2
     },

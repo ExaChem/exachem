@@ -35,5 +35,6 @@ using namespace exachem;
 #endif
 
 namespace exachem::task {
+void print_geometry(ExecutionContext& ec, ChemEnv& chem_env);
 void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2);
-}
+} // namespace exachem::task

@@ -14,7 +14,6 @@
     "basisset": "sto-3g"
   },
   "SCF": {
-    "tilesize": 30,
     "restart": false
   },
   "TASK": {

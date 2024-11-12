@@ -54,7 +54,6 @@ public:
   bool     restart{false}; // Read movecs from disk
   bool     noscf{false};   // only recompute energy from movecs
   bool     sad{true};
-  bool     force_tilesize{false};
   bool     direct_df{false};
   bool     snK{false};
   int  restart_size{2000}; // read/write orthogonalizer, schwarz, etc matrices when N>=restart_size
@@ -106,7 +105,6 @@ public:
   CCSDOptions(): CommonOptions() { initialize(); }
 
   int  tilesize;
-  bool force_tilesize;
   int  ndiis;
   int  writet_iter;
   bool readt, writet, writev, gf_restart, gf_ip, gf_ea, gf_os, gf_cs, gf_itriples, gf_profile,

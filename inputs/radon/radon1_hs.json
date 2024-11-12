@@ -34,7 +34,6 @@
     "maxiter": 200
   },
   "SCF": {
-    "tilesize": 30,
     "restart": false,
     "diis_hist": 10,
     "tol_lindep": 1e-06,    

@@ -38,9 +38,6 @@ void update_sysdata(ExecutionContext& ec, ChemEnv& chem_env, TiledIndexSpace& MO
 // reshape F/lcao after freezing
 Matrix reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat, bool is_lcao = false);
 
-template<typename TensorType>
-Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace& tMO,
-                               TiledIndexSpace& tAO, TAMM_SIZE& chol_count,
-                               const TAMM_GA_SIZE max_cvecs, libint2::BasisSet& shells,
-                               Tensor<TensorType>& lcao, bool is_mso = true);
+template<typename T>
+void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env);
 } // namespace exachem::cholesky_2e

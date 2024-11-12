@@ -40,8 +40,7 @@ public:
   compute_AO_tiles(const ExecutionContext& ec, ChemEnv& chem_env, libint2::BasisSet& shells,
                    const bool is_df = false);
 
-  void recompute_tilesize(tamm::Tile& tile_size, const int N, const bool force_ts,
-                          const bool rank0);
+  void recompute_tilesize(ExecutionContext& ec, ChemEnv& chem_env, bool is_df = false);
 
   template<typename TensorType>
   void compute_sdens_to_cdens(const libint2::BasisSet& shells, Matrix& Spherical, Matrix& Cartesian,

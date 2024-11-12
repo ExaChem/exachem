@@ -21,7 +21,7 @@ void ParseSCFOptions::operator()(ChemEnv& chem_env) {
 void ParseSCFOptions::parse_check(json& jinput) {
   // clang-format off
   const std::vector<std::string> valid_scf{"charge", "multiplicity", "lshift", "tol_int", "tol_sch",
-    "tol_lindep", "conve", "convd", "diis_hist","force_tilesize","tilesize","df_tilesize",
+    "tol_lindep", "conve", "convd", "diis_hist","tilesize","df_tilesize",
     "damp","writem","nnodes","restart","noscf", "molden", "moldenfile", "guess",
     "debug","scf_type", "n_lindep","restart_size","scalapack_nb",
     "scalapack_np_row", "scalapack_np_col", "ext_data_path", "PRINT",
@@ -57,7 +57,6 @@ void ParseSCFOptions::parse(ChemEnv& chem_env) {
   parse_option<double>(scf_options.conve, jscf, "conve");
   parse_option<double>(scf_options.convd, jscf, "convd");
   parse_option<int>(scf_options.diis_hist, jscf, "diis_hist");
-  parse_option<bool>(scf_options.force_tilesize, jscf, "force_tilesize");
   parse_option<uint32_t>(scf_options.AO_tilesize, jscf, "tilesize");
   parse_option<uint32_t>(scf_options.dfAO_tilesize, jscf, "df_tilesize");
   parse_option<int>(scf_options.damp, jscf, "damp");

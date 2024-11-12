@@ -69,11 +69,9 @@
     "maxiter": 100
   },
   "SCF": {
-    "tol_lindep": 1e-05,
     "conve": 1e-08,
     "convd": 1e-06,
-    "diis_hist": 12,
-    "tilesize": 30
+    "diis_hist": 12
   },
   "CD": {
     "diagtol": 1e-06,

@@ -14,7 +14,6 @@
     "file_prefix": "ozone"
   },  
   "SCF": {
-    "tilesize": 30,
     "restart": false,
     "conve": 1e-1,
     "convd": 1e-1,    

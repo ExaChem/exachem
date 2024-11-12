@@ -18,7 +18,6 @@
     "basisset": "cc-pvtz"
   },
   "SCF": {
-    "tilesize": 30,
     "restart": false
   },
   "CD": {

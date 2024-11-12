@@ -1236,17 +1236,13 @@
     "units": "angstrom"
   },
   "basis": {
-    "basisset": "sto-3g"
+    "basisset": "cc-pvdz"
   },
   "SCF": {
-    "tilesize": 30,
     "restart": false
   },
   "TASK": {
     "scf": true,
-    "mp2": false,
-    "cd_2e": false,
-    "ccsd": false,
-    "ccsd_t": false
-  }  
+    "mp2": false
+  }
 }

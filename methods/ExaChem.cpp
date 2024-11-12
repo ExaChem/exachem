@@ -87,9 +87,13 @@ int main(int argc, char* argv[]) {
       output_dir += "/";
       const auto    test_file = output_dir + "ec_test_file.tmp";
       std::ofstream ofs(test_file);
-      if(!ofs)
-        tamm_terminate("Path provided as output_dir [" +
-                       chem_env.ioptions.common_options.output_dir + "] is not writable!");
+      if(!ofs) {
+        tamm_terminate("[ERROR] Path provided as output_dir [" +
+                       chem_env.ioptions.common_options.output_dir +
+                       "] is not writable (or) does not exist");
+      }
+      ofs.close();
+      fs::remove(test_file);
     }
 
     chem_env.sys_data.output_file_prefix =
@@ -163,7 +167,11 @@ int main(int argc, char* argv[]) {
     chem_env.shells           = chem_env.ec_basis.shells;
     chem_env.sys_data.has_ecp = chem_env.ec_basis.has_ecp;
 
+    chem_env.read_run_context();
+
     exachem::task::execute_task(ec, chem_env, ec_arg2);
+
+    chem_env.write_run_context();
 
   } // loop over input files
 

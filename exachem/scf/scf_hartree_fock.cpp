@@ -55,7 +55,8 @@ void exachem::scf::SCFHartreeFock::initialize_variables(ExecutionContext& exc, C
   scf_vars.lshift = chem_env.ioptions.scf_options.lshift;
 
   if(!chem_env.ioptions.scf_options.dfbasis.empty()) do_density_fitting = true;
-  scf_vars.do_dens_fit = do_density_fitting;
+  scf_vars.do_dens_fit       = do_density_fitting;
+  chem_env.scf_context.do_df = do_density_fitting;
 
   if(!do_density_fitting || scf_vars.direct_df || chem_env.sys_data.is_ks ||
      chem_env.sys_data.do_snK) {
@@ -428,11 +429,10 @@ void exachem::scf::SCFHartreeFock::scf_final_io(ExecutionContext& ec, ChemEnv& c
 void exachem::scf::SCFHartreeFock::setup_tiled_index_space(ExecutionContext& exc,
                                                            ChemEnv&          chem_env) {
   // Setup tiled index spaces
-  auto      rank = exc.pg().rank();
-  const int N    = chem_env.shells.nbf();
-  AO             = {range(0, N)};
-  scf_compute.recompute_tilesize(chem_env.ioptions.scf_options.AO_tilesize, N,
-                                 chem_env.ioptions.scf_options.force_tilesize, rank == 0);
+  // auto      rank = exc.pg().rank();
+  const int N = chem_env.shells.nbf();
+  AO          = {range(0, N)};
+  scf_compute.recompute_tilesize(exc, chem_env);
   std::tie(scf_vars.shell_tile_map, scf_vars.AO_tiles, scf_vars.AO_opttiles) =
     scf_compute.compute_AO_tiles(exc, chem_env, chem_env.shells);
   scf_vars.tAO                                       = {AO, scf_vars.AO_opttiles};
@@ -543,9 +543,7 @@ void exachem::scf::SCFHartreeFock::setup_density_fitting(ExecutionContext& exc, 
 
     chem_env.sys_data.ndf = scf_vars.dfbs.nbf();
     scf_vars.dfAO         = IndexSpace{range(0, chem_env.sys_data.ndf)};
-    scf_compute.recompute_tilesize(chem_env.ioptions.scf_options.dfAO_tilesize,
-                                   chem_env.sys_data.ndf,
-                                   chem_env.ioptions.scf_options.force_tilesize, rank == 0);
+    scf_compute.recompute_tilesize(exc, chem_env, true);
     std::tie(scf_vars.df_shell_tile_map, scf_vars.dfAO_tiles, scf_vars.dfAO_opttiles) =
       scf_compute.compute_AO_tiles(exc, chem_env, scf_vars.dfbs, true);
 
@@ -1283,7 +1281,12 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 
   update_movecs(exc, chem_env);
 
-  chem_env.update(ehf, chem_env.shells, scf_vars.shell_tile_map, C_alpha_tamm, Fa_global,
-                  C_beta_tamm, Fb_global, scf_vars.tAO, scf_vars.tAOt, tAO_ortho,
-                  chem_env.ioptions.scf_options.noscf);
+  chem_env.is_context.AO_opt   = scf_vars.tAO;
+  chem_env.is_context.AO_tis   = scf_vars.tAOt;
+  chem_env.is_context.AO_ortho = tAO_ortho;
+
+  chem_env.scf_context.scf_converged = true;
+
+  chem_env.scf_context.update(ehf, scf_vars.shell_tile_map, C_alpha_tamm, Fa_global, C_beta_tamm,
+                              Fb_global, chem_env.ioptions.scf_options.noscf);
 } // END of scf_hf(ExecutionContext& exc, ChemEnv& chem_env)

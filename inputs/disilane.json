@@ -16,7 +16,6 @@
     "basisset": "cc-pvdz"
   },
   "SCF": {
-    "tilesize": 30,
     "restart": false
   },
   "TASK": {

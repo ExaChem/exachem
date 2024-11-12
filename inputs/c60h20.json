@@ -104,8 +104,6 @@
     "ndiis": 6,
     "writet": true,
     "writet_iter": 2,
-    "force_tilesize": true,
-    "tilesize": 90,
     "GFCCSD": {
       "gf_ip": false,
       "gf_ea": true,

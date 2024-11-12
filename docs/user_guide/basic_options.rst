@@ -52,7 +52,7 @@ Some common options supported are as follows:
 :file_prefix: A string indicating the prefix for the name of the workspace folder where the results of a run are stored.
    It also forms the prefix for the files written to the workspace folder. The *default prefix* is the name of the input file without the *.json* extension.
 
-:output_dir: A string indicating the path to the directory where the where the results of a run are stored. If not provided, the default is the current working directory.
+:output_dir: A string indicating the path to an existing directory where the where the results of a run are stored. If not provided, the default is the current working directory.
 
 .. _Basis:
 

@@ -1,0 +1,51 @@
+{
+    "geometry": {
+      "coordinates": [
+        "O            0.000000000000     0.000000000000    -0.065655108083",
+        "H            0.000000000000    -0.757365949175     0.520997104927",
+        "H            0.000000000000     0.757365949175     0.520997104927"
+      ],
+      "units": "angstrom"
+    },
+    "basis": {
+      "basisset": "cc-pvtz" 
+    },
+    "common": {
+      "maxiter": 100
+    },
+    "SCF": {
+      "charge": 0,
+      "multiplicity": 1,
+      "lshift": 0,      
+      "tol_int": 1e-20,
+      "tol_lindep": 1e-5,
+      "conve": 1e-9,
+      "convd": 1e-8,
+      "diis_hist": 10,
+      "scf_type": "restricted",
+      "writem": 10,
+      "qed_omegas" : [0.11024],
+      "qed_volumes": [],
+      "qed_lambdas": [0.1],
+      "qed_polvecs": [[0.0, 0.0, 1.0]]
+    },
+    "CD": {
+      "diagtol": 1e-12
+    },
+    "CC": {
+      "threshold": 1e-10,
+      "ndiis": 5,
+      "writet": false,
+      "ccsd_maxiter": 100,
+      "CCSD(T)": {
+        "ccsdt_tilesize": 28
+      },
+      "debug": false
+    },
+    "TASK": {
+      "mp2": false,
+      "cd_2e": false,
+      "ccsd": true,
+      "ccsd_t": false
+    }  
+}

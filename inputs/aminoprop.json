@@ -1,0 +1,91 @@
+
+{
+  "geometry": {
+    "coordinates": [
+    "H         0.00000000        0.00000000        0.00000000",
+    "C         0.00000000        1.09163906        0.00000000",
+    "C         1.26822472        1.80690645        0.00000000",
+    "N        -1.33404678        3.10992888        0.00000000",
+    "O         1.39279087        3.03379031        0.00000000",
+    "H        -0.48254004        3.66582880        0.00000000",
+    "H        -2.24599052        3.54003736        0.00000000",
+    "C        -1.19931821        1.76513995        0.00000000",
+    "H         2.18220599        1.16371496        0.00000000",    
+    "H        -2.14055701        1.20128576        0.00000000"               
+    ],
+
+    "units": "angstrom"
+  },
+
+
+  "common": {
+      "maxiter": 100
+  },
+
+  "basis": {
+      "basisset": "aug-cc-pvdz",
+      "df_basisset": "",
+      "atom_basis": {
+        "O": "aug-cc-pvdz",
+        "C": "aug-cc-pvdz",
+        "N": "aug-cc-pvdz",
+        "H": "aug-cc-pvdz"
+      }
+  },
+
+  "SCF": {
+    "charge": 0,
+    "multiplicity": 1,
+    "lshift": 0,
+    "conve": 1e-9,
+    "convd": 1e-8,
+    "diis_hist": 10,
+    "writem": 10,
+    "restart": false,
+    "noscf": false,
+    "scf_type": "restricted",
+    "debug": false,
+    "qed_omegas" : [0.293995],
+    "qed_volumes": [],
+    "qed_lambdas": [0.1],
+    "qed_polvecs": [[1.0, 0.0, 0.0]]
+  },
+
+  "CD": {
+    "debug": false,
+    "diagtol": 1e-12,
+    "itilesize": 1000
+  },
+
+  "CC": {
+    "threshold": 1e-8,
+    "lshift": 0.0,
+    "ndiis": 5,
+    "ccsd_maxiter": 100,
+    "nactive": 0,
+    "freeze":{
+      "atomic":false,
+      "core": 0,
+      "virtual": 0
+    }, 
+
+
+    "readt": false,
+    "writet": false,
+    "writet_iter": 5,
+
+    "CCSD(T)": {
+      "cache_size": 8,
+      "skip_ccsd": false,
+      "ccsdt_tilesize": 32
+    }
+  },
+
+  "TASK": {
+    "scf": false,
+    "ccsd": true,
+    "ccsd_t": false
+  }
+
+}
+

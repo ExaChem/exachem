@@ -77,15 +77,18 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ExecutionContext& ec, ChemEn
   const int rank         = ec.pg().rank().value();
   auto      ccsd_options = chem_env.ioptions.ccsd_options;
 
+  const std::string jkey    = "tilesize";
+  const bool        user_ts = chem_env.jinput["CC"].contains(jkey) ? true : false;
+
   Tile tce_tile = ccsd_options.tilesize;
   if(!triples) {
-    if(!ccsd_options.force_tilesize && ec.has_gpu()) {
+    if(!user_ts && ec.has_gpu()) {
       tce_tile = static_cast<Tile>(sys_data.nbf / 10);
       if(tce_tile < 50) tce_tile = 50;        // 50 is the default tilesize
       else if(tce_tile > 140) tce_tile = 140; // 140 is the max tilesize
       if(rank == 0)
         std::cout << std::endl
-                  << "Resetting tilesize for the MO space to: " << tce_tile << std::endl;
+                  << "**** Resetting tilesize for the MO space to: " << tce_tile << std::endl;
     }
   }
   else tce_tile = ccsd_options.ccsdt_tilesize;
@@ -125,17 +128,23 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& 
 
   Tile tce_tile      = ccsd_options.tilesize;
   bool balance_tiles = ccsd_options.balance_tiles;
+
+  const std::string jkey    = "tilesize";
+  const bool        user_ts = chem_env.jinput["CC"].contains(jkey) ? true : false;
+
   if(!triples) {
-    if(!ccsd_options.force_tilesize && ec.has_gpu()) {
+    if(!user_ts && ec.has_gpu()) {
       tce_tile = get_ts_recommendation(ec, chem_env);
       if(rank == 0)
         std::cout << std::endl
-                  << "Resetting tilesize for the MSO space to: " << tce_tile << std::endl;
+                  << "**** Resetting tilesize for the MSO space to: " << tce_tile << std::endl;
     }
+    chem_env.is_context.mso_tilesize = tce_tile;
   }
   else {
-    balance_tiles = false;
-    tce_tile      = ccsd_options.ccsdt_tilesize;
+    balance_tiles                            = false;
+    tce_tile                                 = ccsd_options.ccsdt_tilesize;
+    chem_env.is_context.mso_tilesize_triples = tce_tile;
   }
 
   TAMM_SIZE nmo         = sys_data.nmo;
@@ -325,14 +334,20 @@ Matrix reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat, bool is_lcao) {
 }
 
 template<typename TensorType>
-Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace& tMO,
-                               TiledIndexSpace& tAO, TAMM_SIZE& chol_count,
-                               const TAMM_GA_SIZE max_cvecs, libint2::BasisSet& shells,
-                               Tensor<TensorType>& lcao, bool is_mso) {
+void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
+  TiledIndexSpace& tMO = chem_env.is_context.MSO;
+  TiledIndexSpace& tAO = chem_env.is_context.AO_opt;
+
+  libint2::BasisSet&  shells = chem_env.shells;
+  Tensor<TensorType>& lcao   = chem_env.cd_context.movecs_so;
+  bool                is_mso = chem_env.cd_context.is_mso;
+
   using libint2::Atom;
   using libint2::Engine;
   using libint2::Operator;
   using libint2::Shell;
+
+  const int max_cvecs = chem_env.cd_context.max_cvecs;
 
   SystemData&      sys_data   = chem_env.sys_data;
   const auto       cd_options = chem_env.ioptions.cd_options;
@@ -1090,12 +1105,9 @@ Tensor<TensorType> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledInd
     cout << std::string(45, '-') << endl;
   }
 
-  chol_count = count;
-  return CholVpr_tamm;
+  chem_env.cd_context.num_chol_vecs = count;
+  chem_env.cd_context.cholV2        = CholVpr_tamm;
 }
 
-template Tensor<double> cholesky_2e(ChemEnv& chem_env, ExecutionContext& ec, TiledIndexSpace& tMO,
-                                    TiledIndexSpace& tAO, TAMM_SIZE& chol_count,
-                                    const TAMM_GA_SIZE max_cvecs, libint2::BasisSet& shells,
-                                    Tensor<double>& lcao, bool is_mso);
+template void cholesky_2e<double>(ExecutionContext& ec, ChemEnv& chem_env);
 } // namespace exachem::cholesky_2e

@@ -610,7 +610,7 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
   double    hl_gap           = 0;
 
 #if defined(USE_SCALAPACK)
-  if(scalapack_info.comm != MPI_COMM_NULL) {
+  if(scalapack_info.pg.is_valid()) {
     blacspp::Grid*                  blacs_grid       = scalapack_info.blacs_grid.get();
     scalapackpp::BlockCyclicDist2D* blockcyclic_dist = scalapack_info.blockcyclic_dist.get();
 
@@ -680,7 +680,7 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
       elpa_set(handle, "local_nrows", (int) na_rows, &error);
       elpa_set(handle, "local_ncols", (int) na_cols, &error);
       elpa_set(handle, "nblk", (int) mb, &error);
-      elpa_set(handle, "mpi_comm_parent", MPI_Comm_c2f(scalapack_info.comm), &error);
+      elpa_set(handle, "mpi_comm_parent", scalapack_info.pg.comm_c2f(), &error);
       elpa_set(handle, "process_row", (int) grid.ipr(), &error);
       elpa_set(handle, "process_col", (int) grid.ipc(), &error);
 #if defined(USE_CUDA)
@@ -772,7 +772,7 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
         elpa_set(handle, "local_nrows", (int) na_rows, &error);
         elpa_set(handle, "local_ncols", (int) na_cols, &error);
         elpa_set(handle, "nblk", (int) mb, &error);
-        elpa_set(handle, "mpi_comm_parent", MPI_Comm_c2f(scalapack_info.comm), &error);
+        elpa_set(handle, "mpi_comm_parent", scalapack_info.pg.comm_c2f(), &error);
         elpa_set(handle, "process_row", (int) grid.ipr(), &error);
         elpa_set(handle, "process_col", (int) grid.ipc(), &error);
 #if defined(USE_CUDA)

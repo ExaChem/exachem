@@ -10,29 +10,10 @@
 
 #if defined(USE_SCALAPACK)
 
-MPI_Comm get_scalapack_comm(tamm::ExecutionContext& ec, int sca_nranks) {
-  int       lranks[sca_nranks];
-  auto      gcomm = ec.pg().comm();
-  MPI_Group wgroup;
-  MPI_Comm_group(gcomm, &wgroup);
-
-  for(int i = 0; i < sca_nranks; i++) lranks[i] = i;
-  MPI_Group sca_group;
-  MPI_Group_incl(wgroup, sca_nranks, lranks, &sca_group);
-  MPI_Comm scacomm;
-  MPI_Comm_create(gcomm, sca_group, &scacomm);
-  MPI_Group_free(&wgroup);
-  MPI_Group_free(&sca_group);
-  return scacomm;
-}
-
 void setup_scalapack_info(tamm::ExecutionContext& ec, ChemEnv& chem_env,
                           ScalapackInfo& scalapack_info, ProcGroupData& pgdata) {
   SystemData& sys_data    = chem_env.sys_data;
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
-#if defined(USE_UPCXX)
-  abort(); // Not supported with UPC++
-#endif
 
   scalapack_info.npr = scf_options.scalapack_np_row;
   scalapack_info.npc = scf_options.scalapack_np_col;
@@ -59,12 +40,13 @@ void setup_scalapack_info(tamm::ExecutionContext& ec, ChemEnv& chem_env,
   scalapack_info.npr = std::sqrt(sca_nranks);
   scalapack_info.npc = scalapack_info.npr;
 
-  scalapack_info.comm = get_scalapack_comm(ec, sca_nranks);
-
-  if(scalapack_info.comm == MPI_COMM_NULL) return;
   // auto blacs_setup_st = std::chrono::high_resolution_clock::now();
 
-  scalapack_info.pg = ProcGroup::create_coll(scalapack_info.comm);
+  scalapack_info.pg = ProcGroup::create_subgroup(ec.pg(), sca_nranks);
+
+  // ranks not in scalapck subgroup should return
+  if(!scalapack_info.pg.is_valid()) return;
+
   scalapack_info.ec =
     ExecutionContext{scalapack_info.pg, DistributionKind::dense, MemoryManagerKind::ga};
 

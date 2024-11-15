@@ -419,17 +419,7 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
   }
 
 #if defined(CD_THROTTLE)
-  std::vector<int> ranks(cd_nranks);
-  for(int i = 0; i < cd_nranks; i++) ranks[i] = i;
-  MPI_Group wgroup;
-  MPI_Group cdgroup;
-  MPI_Comm  cd_comm;
-  auto      gcomm = ec.pg().comm();
-  MPI_Comm_group(gcomm, &wgroup);
-  MPI_Group_incl(wgroup, cd_nranks, ranks.data(), &cdgroup);
-  MPI_Comm_create(gcomm, cdgroup, &cd_comm);
-  MPI_Group_free(&wgroup);
-  MPI_Group_free(&cdgroup);
+  ProcGroup pg_cd = ProcGroup::create_subgroup(ec.pg(), cd_nranks);
 #endif
 
   Tensor<TensorType> g_d_tamm{tAO, tAO};
@@ -449,13 +439,11 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
   g_d_tamm.set_dense();
   g_chol_tamm.set_dense();
 
-  bool cd_throttle = true; // SCF_THROTTLE_RESOURCES flag
+  bool cd_throttle = true;
   if(rank >= cd_nranks) cd_throttle = false;
 
 #if defined(CD_THROTTLE)
   if(cd_throttle) {
-    EXPECTS(cd_comm != MPI_COMM_NULL);
-    ProcGroup        pg_cd = ProcGroup::create_coll(cd_comm);
     ExecutionContext ec_cd{pg_cd, DistributionKind::nw, MemoryManagerKind::ga};
 #else
   ExecutionContext& ec_cd = ec;
@@ -991,7 +979,6 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
     ec_cd.pg().destroy_coll();
   } // if(cd_throttle)
 
-  if(cd_comm != MPI_COMM_NULL) MPI_Comm_free(&cd_comm);
   ExecutionContext ec_dense{ec.pg(), DistributionKind::dense, MemoryManagerKind::ga};
 #endif
 

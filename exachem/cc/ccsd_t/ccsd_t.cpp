@@ -50,29 +50,12 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   if(nsranks < 1) nsranks = 1;
   int ga_cnn = ec.nnodes();
   if(nsranks > ga_cnn) nsranks = ga_cnn;
-  nsranks = nsranks * GA_Cluster_nprocs(0);
-  std::vector<int> subranks(nsranks);
-  for(int i = 0; i < nsranks; i++) subranks[i] = i;
+  nsranks = nsranks * ec.ppn();
 
-#if defined(USE_UPCXX)
-  upcxx::team subcomm = upcxx::world().split((rank < nsranks) ? 0 : upcxx::team::color_none, 0);
-#else
-  auto      world_comm = ec.pg().comm();
-  MPI_Group world_group;
-  MPI_Comm_group(world_comm, &world_group);
-  MPI_Group subgroup;
-  MPI_Group_incl(world_group, nsranks, subranks.data(), &subgroup);
-  MPI_Comm subcomm;
-  MPI_Comm_create(world_comm, subgroup, &subcomm);
-  MPI_Group_free(&world_group);
-  MPI_Group_free(&subgroup);
-#endif
-
-  ProcGroup         sub_pg;
+  ProcGroup         sub_pg = ProcGroup::create_subgroup(ec.pg(), nsranks);
   ExecutionContext* sub_ec = nullptr;
 
-  if(rank < nsranks) {
-    sub_pg = ProcGroup::create_coll(subcomm);
+  if(sub_pg.is_valid()) {
     sub_ec = new ExecutionContext(sub_pg, DistributionKind::nw, MemoryManagerKind::ga);
   }
 
@@ -156,8 +139,8 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
 
     if(is_rhf) {
       if(ccsd_restart) {
-        if(rank < nsranks) {
-          const int ppn = GA_Cluster_nprocs(0);
+        if(sub_pg.is_valid()) {
+          const int ppn = ec.ppn();
           if(rank == 0)
             std::cout << "Executing with " << nsranks << " ranks (" << nsranks / ppn << " nodes)"
                       << std::endl;
@@ -175,8 +158,8 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
     }
     else {
       if(ccsd_restart) {
-        if(rank < nsranks) {
-          const int ppn = GA_Cluster_nprocs(0);
+        if(sub_pg.is_valid()) {
+          const int ppn = ec.ppn();
           if(rank == 0)
             std::cout << "Executing with " << nsranks << " ranks (" << nsranks / ppn << " nodes)"
                       << std::endl;
@@ -214,15 +197,10 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
       }
     }
 
-    if(rank < nsranks) {
+    if(sub_pg.is_valid()) {
       (*sub_ec).flush_and_sync();
       sub_pg.destroy_coll();
       delete sub_ec;
-#ifdef USE_UPCXX
-      subcomm.destroy();
-#else
-      MPI_Comm_free(&subcomm);
-#endif
     }
 
     auto   cc_t2 = std::chrono::high_resolution_clock::now();
@@ -256,15 +234,10 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
     Tensor<T>::allocate(&ec, d_f1);
     if(rank == 0) sys_data.print();
 
-    if(rank < nsranks) {
+    if(sub_pg.is_valid()) {
       (*sub_ec).flush_and_sync();
       sub_pg.destroy_coll();
       delete sub_ec;
-#ifdef USE_UPCXX
-      subcomm.destroy();
-#else
-      MPI_Comm_free(&subcomm);
-#endif
     }
   }
 

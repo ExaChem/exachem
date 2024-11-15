@@ -10,19 +10,6 @@
 
 namespace exachem::task {
 
-void print_geometry(ExecutionContext& ec, ChemEnv& chem_env) {
-  if(ec.print()) {
-    std::cout << std::endl << std::string(60, '-') << std::endl;
-    for(auto ecatom: chem_env.ec_atoms) {
-      std::cout << std::setw(3) << std::left << ecatom.esymbol << " " << std::right << std::setw(14)
-                << std::fixed << std::setprecision(10) << ecatom.atom.x << " " << std::right
-                << std::setw(14) << std::fixed << std::setprecision(10) << ecatom.atom.y << " "
-                << std::right << std::setw(14) << std::fixed << std::setprecision(10)
-                << ecatom.atom.z << std::endl;
-    }
-  }
-}
-
 void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) {
   const auto task       = chem_env.ioptions.task_options;
   const auto input_file = chem_env.input_file;
@@ -46,7 +33,7 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
   else if(task.ccsd_lambda) cc::ccsd_lambda::ccsd_lambda_driver(ec, chem_env);
   else if(task.eom_ccsd) cc::eom::eom_ccsd_driver(ec, chem_env);
   else if(task.ducc) cc::ducc::ducc_driver(ec, chem_env);
-#if !defined(USE_UPCXX) and defined(EC_COMPLEX)
+#if defined(EC_COMPLEX)
   else if(task.fci || task.fcidump) fci::fci_driver(ec, chem_env);
   else if(task.gfccsd) cc::gfcc::gfccsd_driver(ec, chem_env);
   else if(task.rteom_ccsd) rteom_cc::ccsd::rt_eom_cd_ccsd_driver(ec, chem_env);

@@ -19,10 +19,6 @@
 #include "exachem/scf/scf_taskmap.hpp"
 #include <variant>
 
-#define SCF_THROTTLE_RESOURCES 1
-
-// using VarType = std::variant<TypeA, TypeB>;
-
 namespace exachem::scf {
 
 class SCFHartreeFock {
@@ -90,14 +86,7 @@ private:
   tamm::TiledIndexLabel mu, nu, ku;
   tamm::TiledIndexLabel mup, nup, kup;
 
-#if SCF_THROTTLE_RESOURCES
   ProcGroupData pgdata;
-  ProcGroup     pg;
-#endif
-
-#if defined(USE_SCALAPACK)
-  MPI_Comm scacomm;
-#endif
 
 #if defined(USE_GAUXC)
   std::shared_ptr<GauXC::XCIntegrator<Matrix>> gauxc_integrator_ptr;
@@ -107,17 +96,7 @@ private:
   const double xHF = 1.;
 #endif
 
-#if defined(USE_UPCXX)
-  bool         in_new_team;
-  upcxx::team *gcomm, hf_comm
-#else
-  MPI_Group    wgroup;
-  MPI_Group    hfgroup;
-  MPI_Comm     hf_comm;
-#endif
-
-    void
-       scf_hf(ExecutionContext&exc, ChemEnv&chem_env);
+  void scf_hf(ExecutionContext& exc, ChemEnv& chem_env);
   void initialize_variables(ExecutionContext& exc, ChemEnv& chem_env);
   void reset_tolerences(ExecutionContext& exc, ChemEnv& chem_env);
   void write_dplot_data(ExecutionContext& exc, ChemEnv& chem_env);

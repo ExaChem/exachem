@@ -26,7 +26,7 @@ if(NOT _cc_index EQUAL -1)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cc/lambda/lambda.cmake)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cc/ducc/ducc.cmake)
   
-  if(NOT USE_UPCXX AND EC_COMPLEX)
+  if(EC_COMPLEX)
     include(${CMAKE_CURRENT_SOURCE_DIR}/cc/gfcc/gfcc.cmake)
     include(${CMAKE_CURRENT_SOURCE_DIR}/cc/rteom/rteom.cmake)
   endif()

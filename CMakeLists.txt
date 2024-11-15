@@ -63,6 +63,10 @@ elseif(TAMM_ENABLE_DPCPP)
   set(EXACHEM_ENABLE_DPCPP ON)
 endif()
 
+if(TAMM_ENABLE_ELPA)
+  set(EXACHEM_ENABLE_ELPA ON)
+endif()
+
 set(CMSB_BASISSET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/exachem/basis)
 build_cmsb_module(${CMAKE_CURRENT_LIST_DIR})
 

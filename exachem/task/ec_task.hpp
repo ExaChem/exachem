@@ -21,6 +21,7 @@
 #include "exachem/cc/cc2/cd_cc2.hpp"
 #endif
 
+#include "exachem/task/geom_analysis.hpp"
 #include "exachem/common/chemenv.hpp"
 #include "exachem/common/options/parse_options.hpp"
 #include "exachem/scf/scf_main.hpp"
@@ -28,13 +29,12 @@
 // clang-format on
 using namespace exachem;
 
-#if !defined(USE_UPCXX) and defined(EC_COMPLEX) and defined(ENABLE_CC)
+#if defined(EC_COMPLEX) and defined(ENABLE_CC)
 #include "exachem/cc/gfcc/gfccsd.hpp"
 #include "exachem/cc/rteom/rt_eom_cd_ccsd.hpp"
 #include "exachem/fci/fci.hpp"
 #endif
 
 namespace exachem::task {
-void print_geometry(ExecutionContext& ec, ChemEnv& chem_env);
 void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2);
 } // namespace exachem::task

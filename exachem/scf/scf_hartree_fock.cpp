@@ -118,7 +118,7 @@ void exachem::scf::SCFHartreeFock::write_dplot_data(ExecutionContext& ec, ChemEn
   // else plot total density by default when cube=true
   /* else */ EC_DPLOT::write_dencube(ec, chem_env, etensors.D_alpha, etensors.D_beta, files_prefix);
 #if defined(USE_SCALAPACK)
-  if(scalapack_info.comm != MPI_COMM_NULL) {
+  if(scalapack_info.pg.is_valid()) {
     tamm::from_block_cyclic_tensor(ttensors.C_alpha_BC, ttensors.C_alpha);
     if(is_uhf) tamm::from_block_cyclic_tensor(ttensors.C_beta_BC, ttensors.C_beta);
   }
@@ -237,7 +237,7 @@ void exachem::scf::SCFHartreeFock::scf_orthogonalizer(ExecutionContext& ec, Chem
         chem_env.ioptions.scf_options.scalapack_nb; //(scalapack_info.blockcyclic_dist)->mb();
       scf_vars.tN_bc      = TiledIndexSpace{IndexSpace{range(chem_env.sys_data.nbf_orig)}, _mb};
       scf_vars.tNortho_bc = TiledIndexSpace{IndexSpace{range(chem_env.sys_data.nbf)}, _mb};
-      if(scacomm != MPI_COMM_NULL) {
+      if(scalapack_info.pg.is_valid()) {
         ttensors.X_alpha = {scf_vars.tN_bc, scf_vars.tNortho_bc};
         ttensors.X_alpha.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
         Tensor<TensorType>::allocate(&scalapack_info.ec, ttensors.X_alpha);
@@ -263,7 +263,7 @@ void exachem::scf::SCFHartreeFock::scf_orthogonalizer(ExecutionContext& ec, Chem
 
     if(N >= chem_env.ioptions.scf_options.restart_size) {
 #if defined(USE_SCALAPACK)
-      if(scacomm != MPI_COMM_NULL)
+      if(scalapack_info.pg.is_valid())
         scf_output.rw_mat_disk<TensorType>(ttensors.X_alpha, ortho_file,
                                            chem_env.ioptions.scf_options.debug);
 #else
@@ -274,7 +274,7 @@ void exachem::scf::SCFHartreeFock::scf_orthogonalizer(ExecutionContext& ec, Chem
   }
 
 #if defined(USE_SCALAPACK)
-  if(scacomm != MPI_COMM_NULL) {
+  if(scalapack_info.pg.is_valid()) {
     ttensors.F_BC = {scf_vars.tN_bc, scf_vars.tN_bc};
     ttensors.F_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
     ttensors.C_alpha_BC = {scf_vars.tN_bc, scf_vars.tNortho_bc};
@@ -742,29 +742,15 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 
   const int N = chem_env.shells.nbf();
 
-#if SCF_THROTTLE_RESOURCES
   pgdata = get_spg_data(exc, N, -1, 50, chem_env.ioptions.scf_options.nnodes);
   auto [hf_nnodes, ppn, hf_nranks] = pgdata.unpack();
   if(rank == 0) {
     std::cout << "\n Number of nodes, processes per node used for SCF calculation: " << hf_nnodes
               << ", " << ppn << std::endl;
   }
-#if defined(USE_UPCXX)
-  in_new_team = (rank < hf_nranks);
-  gcomm       = exc.pg().team();
-  hf_comm = new upcxx::team(gcomm->split(in_new_team ? 0 : upcxx::team::color_none, rank.value()));
-#else
-  std::vector<int> ranks(hf_nranks);
-  for(int i = 0; i < hf_nranks; i++) ranks[i] = i;
-  auto gcomm = exc.pg().comm();
-  MPI_Comm_group(gcomm, &wgroup);
-  MPI_Group_incl(wgroup, hf_nranks, ranks.data(), &hfgroup);
-  MPI_Comm_create(gcomm, hfgroup, &hf_comm);
-  MPI_Group_free(&wgroup);
-  MPI_Group_free(&hfgroup);
-#endif
 
-#endif
+  // pg is valid only for first hf_nranks
+  ProcGroup pg = ProcGroup::create_subgroup(exc.pg(), hf_nranks);
 
   if(rank == 0) {
     chem_env.ioptions.common_options.print();
@@ -846,26 +832,11 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   // This is originally scf_restart_test
   scf_restart(exc, chem_env, files_prefix);
 
-  bool STR_flag = true; // SCF_THROTTLE_RESOURCES flag
-  if(rank >= hf_nranks) STR_flag = false;
-#if SCF_THROTTLE_RESOURCES
-  if(STR_flag) {
-#if defined(USE_UPCXX)
-    pg = ProcGroup::create_coll(*hf_comm);
-#else
-    EXPECTS(hf_comm != MPI_COMM_NULL);
-    pg = ProcGroup::create_coll(hf_comm);
-#endif
+  if(pg.is_valid()) {
     ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
-
-#else
-  // TODO: Fix - create ec_m, when throttle is disabled
-  ExecutionContext& ec = exc;
-#endif
 
 #if defined(USE_SCALAPACK)
     setup_scalapack_info(ec, chem_env, scalapack_info, pgdata);
-    scacomm = scalapack_info.comm;
 #endif
 
 #if defined(USE_GAUXC)
@@ -1210,41 +1181,22 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
     scf_final_io(ec, chem_env);
     deallocate_main_tensors(ec, chem_env);
 
-#if SCF_THROTTLE_RESOURCES
     ec.flush_and_sync();
-#endif
 
 #if defined(USE_SCALAPACK)
-#if defined(USE_UPCXX)
-    abort(); // Not supported currently in UPC++
-#endif
-    if(scalapack_info.comm != MPI_COMM_NULL) {
+    if(scalapack_info.pg.is_valid()) {
       Tensor<TensorType>::deallocate(ttensors.F_BC, ttensors.X_alpha, ttensors.C_alpha_BC);
       if(chem_env.sys_data.is_unrestricted) Tensor<TensorType>::deallocate(ttensors.C_beta_BC);
       scalapack_info.ec.flush_and_sync();
-      MPI_Comm_free(&scacomm); // frees scalapack_info.comm
       scalapack_info.ec.pg().destroy_coll();
     }
-// Free created comms / groups
-// MPI_Comm_free( &scalapack_comm );
-// MPI_Group_free( &scalapack_group );
-// MPI_Group_free( &world_group );
 #else
-  sch.deallocate(ttensors.X_alpha);
-  sch.execute();
+    sch.deallocate(ttensors.X_alpha);
+    sch.execute();
 #endif
 
-#if SCF_THROTTLE_RESOURCES
     ec.pg().destroy_coll();
-  } // if(STR_flag)
-
-#if defined(USE_UPCXX)
-  hf_comm->destroy();
-#else
-  if(hf_comm != MPI_COMM_NULL) MPI_Comm_free(&hf_comm);
-#endif
-
-#endif
+  } // end scf subgroup
 
   // C,F1 is not allocated for ranks > hf_nranks
   exc.pg().barrier();

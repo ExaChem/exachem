@@ -386,7 +386,7 @@ void exachem::scf::SCFCompute::compute_density(ExecutionContext& ec, ChemEnv& ch
   const auto  is_uhf      = sys_data.is_unrestricted;
 
 #if defined(USE_SCALAPACK)
-  if(scalapack_info.comm != MPI_COMM_NULL) {
+  if(scalapack_info.pg.is_valid()) {
     Tensor<T> C_a   = from_block_cyclic_tensor(ttensors.C_alpha_BC);
     Tensor<T> C_o_a = tensor_block(C_a, {0, 0}, {sys_data.nbf_orig, sys_data.nelectrons_alpha});
     from_dense_tensor(C_o_a, ttensors.C_occ_a);

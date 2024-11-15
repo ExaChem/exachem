@@ -65,9 +65,7 @@ void exachem::scf::SCFIO::print_energies(ExecutionContext& ec, ChemEnv& chem_env
 #if defined(USE_SCALAPACK)
       X_a = {scf_vars.tAO, scf_vars.tAO_ortho};
       Tensor<double>::allocate(&ec, X_a);
-      if(scalapack_info.comm != MPI_COMM_NULL) {
-        tamm::from_block_cyclic_tensor(ttensors.X_alpha, X_a);
-      }
+      if(scalapack_info.pg.is_valid()) { tamm::from_block_cyclic_tensor(ttensors.X_alpha, X_a); }
 #else
       X_a = ttensors.X_alpha;
 #endif
@@ -226,7 +224,7 @@ void exachem::scf::SCFIO::print_mulliken(ChemEnv& chem_env, Matrix& D, Matrix& D
 template<typename T>
 void exachem::scf::SCFIO::rw_mat_disk(Tensor<T> tensor, std::string tfilename, bool profile,
                                       bool read) {
-#if !defined(USE_UPCXX)
+#if !defined(USE_SERIAL_IO)
   if(read) read_from_disk<T>(tensor, tfilename, true, {}, profile);
   else write_to_disk<T>(tensor, tfilename, true, profile);
 #else
@@ -259,7 +257,7 @@ void exachem::scf::SCFIO::rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_e
 
   if(!read) {
 #if defined(USE_SCALAPACK)
-    if(scalapack_info.comm != MPI_COMM_NULL) {
+    if(scalapack_info.pg.is_valid()) {
       tamm::from_block_cyclic_tensor(ttensors.C_alpha_BC, ttensors.C_alpha);
       if(is_uhf) tamm::from_block_cyclic_tensor(ttensors.C_beta_BC, ttensors.C_beta);
     }
@@ -279,7 +277,7 @@ void exachem::scf::SCFIO::rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_e
     tensor_fnames.insert(tensor_fnames.end(), {movecsfile_beta, densityfile_beta});
   }
 
-#if !defined(USE_UPCXX)
+#if !defined(USE_SERIAL_IO)
   if(read) {
     if(rank == 0) cout << "Reading movecs and density files from disk ... ";
     read_from_disk_group(ec, tensor_list, tensor_fnames, debug);

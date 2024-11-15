@@ -59,7 +59,7 @@ std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec
 
 #if defined(USE_SCALAPACK)
   Tensor<T> V_sca;
-  if(scalapack_info.comm != MPI_COMM_NULL) {
+  if(scalapack_info.pg.is_valid()) {
     blacspp::Grid*                  blacs_grid       = scalapack_info.blacs_grid.get();
     const auto&                     grid             = *blacs_grid;
     scalapackpp::BlockCyclicDist2D* blockcyclic_dist = scalapack_info.blockcyclic_dist.get();
@@ -103,7 +103,7 @@ std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec
       elpa_set(handle, "local_nrows", (int) na_rows, &error);
       elpa_set(handle, "local_ncols", (int) na_cols, &error);
       elpa_set(handle, "nblk", (int) mb, &error);
-      elpa_set(handle, "mpi_comm_parent", MPI_Comm_c2f(scalapack_info.comm), &error);
+      elpa_set(handle, "mpi_comm_parent", scalapack_info.pg.comm_c2f(), &error);
       elpa_set(handle, "process_row", (int) grid.ipr(), &error);
       elpa_set(handle, "process_col", (int) grid.ipc(), &error);
 #if defined(USE_CUDA)
@@ -200,7 +200,7 @@ std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec
   ec.pg().barrier();
 
 #if defined(USE_SCALAPACK)
-  if(scalapack_info.comm != MPI_COMM_NULL) {
+  if(scalapack_info.pg.is_valid()) {
     const tamm::Tile _mb = (scalapack_info.blockcyclic_dist.get())->mb();
     scf_vars.tNortho_bc  = TiledIndexSpace{IndexSpace{range(sys_data.nbf)}, _mb};
     ttensors.X_alpha     = {scf_vars.tN_bc, scf_vars.tNortho_bc};
@@ -213,7 +213,7 @@ std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec
 #endif
 
 #if defined(USE_SCALAPACK)
-  if(scalapack_info.comm != MPI_COMM_NULL) {
+  if(scalapack_info.pg.is_valid()) {
     Tensor<T> V_t = from_block_cyclic_tensor(V_sca);
     Tensor<T> X_t = tensor_block(V_t, {n_illcond, 0}, {N, N}, {1, 0});
     tamm::from_dense_tensor(X_t, X_tmp);
@@ -246,158 +246,12 @@ std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec
   sch(X_comp(mu, mu_o) = X_tmp(mu, mu_o) * eps_tamm(mu_o)).deallocate(X_tmp, eps_tamm).execute();
 
 #if defined(USE_SCALAPACK)
-  if(scalapack_info.comm != MPI_COMM_NULL) {
-    tamm::to_block_cyclic_tensor(X_comp, ttensors.X_alpha);
-  }
+  if(scalapack_info.pg.is_valid()) { tamm::to_block_cyclic_tensor(X_comp, ttensors.X_alpha); }
   sch.deallocate(X_comp).execute();
 #endif
 
   return std::make_tuple(size_t(n_cond), condition_number, result_condition_number);
 }
-
-// template<typename TensorType>
-// std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-// gather_task_vectors(ExecutionContext& ec, std::vector<int>& s1vec, std::vector<int>& s2vec,
-//                     std::vector<int>& ntask_vec) {
-//   const int rank   = ec.pg().rank().value();
-//   const int nranks = ec.pg().size().value();
-
-// #ifdef USE_UPCXX
-//   upcxx::global_ptr<int> s1_count = upcxx::new_array<int>(nranks);
-//   upcxx::global_ptr<int> s2_count = upcxx::new_array<int>(nranks);
-//   upcxx::global_ptr<int> nt_count = upcxx::new_array<int>(nranks);
-//   assert(s1_count && s2_count && nt_count);
-
-//   upcxx::dist_object<upcxx::global_ptr<int>> s1_count_dobj(s1_count, *ec.pg().team());
-//   upcxx::dist_object<upcxx::global_ptr<int>> s2_count_dobj(s2_count, *ec.pg().team());
-//   upcxx::dist_object<upcxx::global_ptr<int>> nt_count_dobj(nt_count, *ec.pg().team());
-// #else
-//   std::vector<int> s1_count(nranks);
-//   std::vector<int> s2_count(nranks);
-//   std::vector<int> nt_count(nranks);
-// #endif
-
-//   int s1vec_size = (int) s1vec.size();
-//   int s2vec_size = (int) s2vec.size();
-//   int ntvec_size = (int) ntask_vec.size();
-
-//   // Root gathers number of elements at each rank.
-// #ifdef USE_UPCXX
-//   ec.pg().gather(&s1vec_size, s1_count_dobj.fetch(0).wait());
-//   ec.pg().gather(&s2vec_size, s2_count_dobj.fetch(0).wait());
-//   ec.pg().gather(&ntvec_size, nt_count_dobj.fetch(0).wait());
-// #else
-//   ec.pg().gather(&s1vec_size, s1_count.data(), 0);
-//   ec.pg().gather(&s2vec_size, s2_count.data(), 0);
-//   ec.pg().gather(&ntvec_size, nt_count.data(), 0);
-// #endif
-
-//   // Displacements in the receive buffer for GATHERV
-// #ifdef USE_UPCXX
-//   upcxx::global_ptr<int>                     disps_s1 = upcxx::new_array<int>(nranks);
-//   upcxx::global_ptr<int>                     disps_s2 = upcxx::new_array<int>(nranks);
-//   upcxx::global_ptr<int>                     disps_nt = upcxx::new_array<int>(nranks);
-//   upcxx::dist_object<upcxx::global_ptr<int>> disps_s1_dobj(disps_s1, *ec.pg().team());
-//   upcxx::dist_object<upcxx::global_ptr<int>> disps_s2_dobj(disps_s2, *ec.pg().team());
-//   upcxx::dist_object<upcxx::global_ptr<int>> disps_nt_dobj(disps_nt, *ec.pg().team());
-// #else
-//   std::vector<int> disps_s1(nranks);
-//   std::vector<int> disps_s2(nranks);
-//   std::vector<int> disps_nt(nranks);
-// #endif
-//   for(int i = 0; i < nranks; i++) {
-// #ifdef USE_UPCXX
-//     disps_s1.local()[i] = (i > 0) ? (disps_s1.local()[i - 1] + s1_count.local()[i - 1]) : 0;
-//     disps_s2.local()[i] = (i > 0) ? (disps_s2.local()[i - 1] + s2_count.local()[i - 1]) : 0;
-//     disps_nt.local()[i] = (i > 0) ? (disps_nt.local()[i - 1] + nt_count.local()[i - 1]) : 0;
-// #else
-//     disps_s1[i] = (i > 0) ? (disps_s1[i - 1] + s1_count[i - 1]) : 0;
-//     disps_s2[i] = (i > 0) ? (disps_s2[i - 1] + s2_count[i - 1]) : 0;
-//     disps_nt[i] = (i > 0) ? (disps_nt[i - 1] + nt_count[i - 1]) : 0;
-// #endif
-//   }
-
-//   // Allocate vectors to gather data at root
-// #ifdef USE_UPCXX
-//   upcxx::global_ptr<int> s1_all;
-//   upcxx::global_ptr<int> s2_all;
-//   upcxx::global_ptr<int> ntasks_all;
-//   std::vector<int>       s1_all_v;
-//   std::vector<int>       s2_all_v;
-//   std::vector<int>       ntasks_all_v;
-// #else
-//   std::vector<int> s1_all;
-//   std::vector<int> s2_all;
-//   std::vector<int> ntasks_all;
-// #endif
-//   if(rank == 0) {
-// #ifdef USE_UPCXX
-//     s1_all     = upcxx::new_array<int>(disps_s1.local()[nranks - 1] + s1_count.local()[nranks -
-//     1]); s2_all     = upcxx::new_array<int>(disps_s2.local()[nranks - 1] +
-//     s2_count.local()[nranks - 1]); ntasks_all = upcxx::new_array<int>(disps_nt.local()[nranks -
-//     1] + nt_count.local()[nranks - 1]);
-
-//     s1_all_v.resize(disps_s1.local()[nranks - 1] + s1_count.local()[nranks - 1]);
-//     s2_all_v.resize(disps_s2.local()[nranks - 1] + s2_count.local()[nranks - 1]);
-//     ntasks_all_v.resize(disps_nt.local()[nranks - 1] + nt_count.local()[nranks - 1]);
-// #else
-//     s1_all.resize(disps_s1[nranks - 1] + s1_count[nranks - 1]);
-//     s2_all.resize(disps_s2[nranks - 1] + s2_count[nranks - 1]);
-//     ntasks_all.resize(disps_nt[nranks - 1] + nt_count[nranks - 1]);
-// #endif
-//   }
-
-// #ifdef USE_UPCXX
-//   upcxx::dist_object<upcxx::global_ptr<int>> s1_all_dobj(s1_all, *ec.pg().team());
-//   upcxx::dist_object<upcxx::global_ptr<int>> s2_all_dobj(s2_all, *ec.pg().team());
-//   upcxx::dist_object<upcxx::global_ptr<int>> ntasks_all_dobj(ntasks_all, *ec.pg().team());
-// #endif
-
-//   // Gather at root
-// #ifdef USE_UPCXX
-//   ec.pg().gatherv(s1vec.data(), s1vec_size, s1_all_dobj.fetch(0).wait(), s1_count.local(),
-//                   disps_s1_dobj.fetch(0).wait());
-//   ec.pg().gatherv(s2vec.data(), s2vec_size, s2_all_dobj.fetch(0).wait(), s2_count.local(),
-//                   disps_s2_dobj.fetch(0).wait());
-//   ec.pg().gatherv(ntask_vec.data(), ntvec_size, ntasks_all_dobj.fetch(0).wait(),
-//   nt_count.local(),
-//                   disps_nt_dobj.fetch(0).wait());
-// #else
-//   ec.pg().gatherv(s1vec.data(), s1vec_size, s1_all.data(), s1_count.data(), disps_s1.data(), 0);
-//   ec.pg().gatherv(s2vec.data(), s2vec_size, s2_all.data(), s2_count.data(), disps_s2.data(), 0);
-//   ec.pg().gatherv(ntask_vec.data(), ntvec_size, ntasks_all.data(), nt_count.data(),
-//   disps_nt.data(),
-//                   0);
-// #endif
-
-// #ifdef USE_UPCXX
-//   if(rank == 0) {
-//     memcpy(s1_all_v.data(), s1_all.local(),
-//            (disps_s1.local()[nranks - 1] + s1_count.local()[nranks - 1]) * sizeof(int));
-//     memcpy(s2_all_v.data(), s2_all.local(),
-//            (disps_s2.local()[nranks - 1] + s2_count.local()[nranks - 1]) * sizeof(int));
-//     memcpy(ntasks_all_v.data(), ntasks_all.local(),
-//            (disps_nt.local()[nranks - 1] + nt_count.local()[nranks - 1]) * sizeof(int));
-//   }
-
-//   upcxx::delete_array(s1_count);
-//   upcxx::delete_array(s2_count);
-//   upcxx::delete_array(nt_count);
-//   upcxx::delete_array(disps_s1);
-//   upcxx::delete_array(disps_s2);
-//   upcxx::delete_array(disps_nt);
-//   if(rank == 0) {
-//     upcxx::delete_array(s1_all);
-//     upcxx::delete_array(s2_all);
-//     upcxx::delete_array(ntasks_all);
-//   }
-//   return std::make_tuple(s1_all_v, s2_all_v, ntasks_all_v);
-// #else
-//   EXPECTS(s1_all.size() == s2_all.size());
-//   EXPECTS(s1_all.size() == ntasks_all.size());
-//   return std::make_tuple(s1_all, s2_all, ntasks_all);
-// #endif
-// }
 
 std::tuple<Matrix, size_t, double, double>
 exachem::scf::gensqrtinv_atscf(ExecutionContext& ec, ChemEnv& chem_env, SCFVars& scf_vars,
@@ -503,138 +357,48 @@ exachem::scf::gather_task_vectors(ExecutionContext& ec, std::vector<int>& s1vec,
   const int rank   = ec.pg().rank().value();
   const int nranks = ec.pg().size().value();
 
-#ifdef USE_UPCXX
-  upcxx::global_ptr<int> s1_count = upcxx::new_array<int>(nranks);
-  upcxx::global_ptr<int> s2_count = upcxx::new_array<int>(nranks);
-  upcxx::global_ptr<int> nt_count = upcxx::new_array<int>(nranks);
-  assert(s1_count && s2_count && nt_count);
-
-  upcxx::dist_object<upcxx::global_ptr<int>> s1_count_dobj(s1_count, *ec.pg().team());
-  upcxx::dist_object<upcxx::global_ptr<int>> s2_count_dobj(s2_count, *ec.pg().team());
-  upcxx::dist_object<upcxx::global_ptr<int>> nt_count_dobj(nt_count, *ec.pg().team());
-#else
   std::vector<int> s1_count(nranks);
   std::vector<int> s2_count(nranks);
   std::vector<int> nt_count(nranks);
-#endif
 
   int s1vec_size = (int) s1vec.size();
   int s2vec_size = (int) s2vec.size();
   int ntvec_size = (int) ntask_vec.size();
 
   // Root gathers number of elements at each rank.
-#ifdef USE_UPCXX
-  ec.pg().gather(&s1vec_size, s1_count_dobj.fetch(0).wait());
-  ec.pg().gather(&s2vec_size, s2_count_dobj.fetch(0).wait());
-  ec.pg().gather(&ntvec_size, nt_count_dobj.fetch(0).wait());
-#else
   ec.pg().gather(&s1vec_size, s1_count.data(), 0);
   ec.pg().gather(&s2vec_size, s2_count.data(), 0);
   ec.pg().gather(&ntvec_size, nt_count.data(), 0);
-#endif
 
   // Displacements in the receive buffer for GATHERV
-#ifdef USE_UPCXX
-  upcxx::global_ptr<int>                     disps_s1 = upcxx::new_array<int>(nranks);
-  upcxx::global_ptr<int>                     disps_s2 = upcxx::new_array<int>(nranks);
-  upcxx::global_ptr<int>                     disps_nt = upcxx::new_array<int>(nranks);
-  upcxx::dist_object<upcxx::global_ptr<int>> disps_s1_dobj(disps_s1, *ec.pg().team());
-  upcxx::dist_object<upcxx::global_ptr<int>> disps_s2_dobj(disps_s2, *ec.pg().team());
-  upcxx::dist_object<upcxx::global_ptr<int>> disps_nt_dobj(disps_nt, *ec.pg().team());
-#else
   std::vector<int> disps_s1(nranks);
   std::vector<int> disps_s2(nranks);
   std::vector<int> disps_nt(nranks);
-#endif
   for(int i = 0; i < nranks; i++) {
-#ifdef USE_UPCXX
-    disps_s1.local()[i] = (i > 0) ? (disps_s1.local()[i - 1] + s1_count.local()[i - 1]) : 0;
-    disps_s2.local()[i] = (i > 0) ? (disps_s2.local()[i - 1] + s2_count.local()[i - 1]) : 0;
-    disps_nt.local()[i] = (i > 0) ? (disps_nt.local()[i - 1] + nt_count.local()[i - 1]) : 0;
-#else
     disps_s1[i] = (i > 0) ? (disps_s1[i - 1] + s1_count[i - 1]) : 0;
     disps_s2[i] = (i > 0) ? (disps_s2[i - 1] + s2_count[i - 1]) : 0;
     disps_nt[i] = (i > 0) ? (disps_nt[i - 1] + nt_count[i - 1]) : 0;
-#endif
   }
 
   // Allocate vectors to gather data at root
-#ifdef USE_UPCXX
-  upcxx::global_ptr<int> s1_all;
-  upcxx::global_ptr<int> s2_all;
-  upcxx::global_ptr<int> ntasks_all;
-  std::vector<int>       s1_all_v;
-  std::vector<int>       s2_all_v;
-  std::vector<int>       ntasks_all_v;
-#else
   std::vector<int> s1_all;
   std::vector<int> s2_all;
   std::vector<int> ntasks_all;
-#endif
   if(rank == 0) {
-#ifdef USE_UPCXX
-    s1_all     = upcxx::new_array<int>(disps_s1.local()[nranks - 1] + s1_count.local()[nranks - 1]);
-    s2_all     = upcxx::new_array<int>(disps_s2.local()[nranks - 1] + s2_count.local()[nranks - 1]);
-    ntasks_all = upcxx::new_array<int>(disps_nt.local()[nranks - 1] + nt_count.local()[nranks - 1]);
-
-    s1_all_v.resize(disps_s1.local()[nranks - 1] + s1_count.local()[nranks - 1]);
-    s2_all_v.resize(disps_s2.local()[nranks - 1] + s2_count.local()[nranks - 1]);
-    ntasks_all_v.resize(disps_nt.local()[nranks - 1] + nt_count.local()[nranks - 1]);
-#else
     s1_all.resize(disps_s1[nranks - 1] + s1_count[nranks - 1]);
     s2_all.resize(disps_s2[nranks - 1] + s2_count[nranks - 1]);
     ntasks_all.resize(disps_nt[nranks - 1] + nt_count[nranks - 1]);
-#endif
   }
 
-#ifdef USE_UPCXX
-  upcxx::dist_object<upcxx::global_ptr<int>> s1_all_dobj(s1_all, *ec.pg().team());
-  upcxx::dist_object<upcxx::global_ptr<int>> s2_all_dobj(s2_all, *ec.pg().team());
-  upcxx::dist_object<upcxx::global_ptr<int>> ntasks_all_dobj(ntasks_all, *ec.pg().team());
-#endif
-
   // Gather at root
-#ifdef USE_UPCXX
-  ec.pg().gatherv(s1vec.data(), s1vec_size, s1_all_dobj.fetch(0).wait(), s1_count.local(),
-                  disps_s1_dobj.fetch(0).wait());
-  ec.pg().gatherv(s2vec.data(), s2vec_size, s2_all_dobj.fetch(0).wait(), s2_count.local(),
-                  disps_s2_dobj.fetch(0).wait());
-  ec.pg().gatherv(ntask_vec.data(), ntvec_size, ntasks_all_dobj.fetch(0).wait(), nt_count.local(),
-                  disps_nt_dobj.fetch(0).wait());
-#else
   ec.pg().gatherv(s1vec.data(), s1vec_size, s1_all.data(), s1_count.data(), disps_s1.data(), 0);
   ec.pg().gatherv(s2vec.data(), s2vec_size, s2_all.data(), s2_count.data(), disps_s2.data(), 0);
   ec.pg().gatherv(ntask_vec.data(), ntvec_size, ntasks_all.data(), nt_count.data(), disps_nt.data(),
                   0);
-#endif
 
-#ifdef USE_UPCXX
-  if(rank == 0) {
-    memcpy(s1_all_v.data(), s1_all.local(),
-           (disps_s1.local()[nranks - 1] + s1_count.local()[nranks - 1]) * sizeof(int));
-    memcpy(s2_all_v.data(), s2_all.local(),
-           (disps_s2.local()[nranks - 1] + s2_count.local()[nranks - 1]) * sizeof(int));
-    memcpy(ntasks_all_v.data(), ntasks_all.local(),
-           (disps_nt.local()[nranks - 1] + nt_count.local()[nranks - 1]) * sizeof(int));
-  }
-
-  upcxx::delete_array(s1_count);
-  upcxx::delete_array(s2_count);
-  upcxx::delete_array(nt_count);
-  upcxx::delete_array(disps_s1);
-  upcxx::delete_array(disps_s2);
-  upcxx::delete_array(disps_nt);
-  if(rank == 0) {
-    upcxx::delete_array(s1_all);
-    upcxx::delete_array(s2_all);
-    upcxx::delete_array(ntasks_all);
-  }
-  return std::make_tuple(s1_all_v, s2_all_v, ntasks_all_v);
-#else
   EXPECTS(s1_all.size() == s2_all.size());
   EXPECTS(s1_all.size() == ntasks_all.size());
   return std::make_tuple(s1_all, s2_all, ntasks_all);
-#endif
 }
 
 template std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>

@@ -169,6 +169,7 @@ int main(int argc, char* argv[]) {
 
     chem_env.read_run_context();
 
+    exachem::task::geometry_analysis(ec, chem_env);
     exachem::task::execute_task(ec, chem_env, ec_arg2);
 
     chem_env.write_run_context();

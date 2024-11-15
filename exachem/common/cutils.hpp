@@ -69,14 +69,11 @@ struct ProcGroupData {
 struct ScalapackInfo {
   int64_t                                         npr{}, npc{}, scalapack_nranks{};
   bool                                            use_scalapack{true};
-  MPI_Comm                                        comm;
   tamm::ProcGroup                                 pg;
   tamm::ExecutionContext                          ec;
   std::unique_ptr<blacspp::Grid>                  blacs_grid;
   std::unique_ptr<scalapackpp::BlockCyclicDist2D> blockcyclic_dist;
 };
-
-MPI_Comm get_scalapack_comm(tamm::ExecutionContext& ec, int sca_nranks);
 
 void setup_scalapack_info(tamm::ExecutionContext& ec, ChemEnv& chem_env,
                           ScalapackInfo& scalapack_info, ProcGroupData& pgdata);

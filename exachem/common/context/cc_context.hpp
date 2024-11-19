@@ -13,6 +13,14 @@ class CCContext {
 public:
   CCContext() = default;
 
+  // subgroups for CCSD restarts
+  // CCSD module intializes these, calling method is responsible for destroying it
+  ProcGroup         sub_pg;
+  ExecutionContext* sub_ec{nullptr};
+  bool              use_subgroup{false};
+
+  // CC2
+  bool   task_cc2{false};
   double cc2_correlation_energy{0};
   double cc2_total_energy{0};
 
@@ -21,6 +29,13 @@ public:
 
   double ccsdt_correlation_energy{0};
   double ccsdt_total_energy{0};
+
+  Tensor<double> d_t1;
+  Tensor<double> d_t2;
+  Tensor<double> d_t3; // always full for now
+
+  Tensor<double> d_t1_full;
+  Tensor<double> d_t2_full;
 
   // CCSD(T)
   double ccsd_pt_correction_energy{0};
@@ -35,15 +50,23 @@ public:
   // tensor files
   std::string t1file;
   std::string t2file;
+  std::string t3file;
   std::string t2_11file;
   std::string t2_21file;
   std::string t2_12file;
   std::string t2_22file;
+
+  std::string full_t1file;
+  std::string full_t2file;
   std::string ccsdstatus;
 
   void init_filenames(std::string files_prefix) {
     this->t1file = files_prefix + ".t1amp";
     this->t2file = files_prefix + ".t2amp";
+    this->t3file = files_prefix + ".t3amp";
+
+    this->full_t1file = files_prefix + ".full_t1amp";
+    this->full_t2file = files_prefix + ".full_t2amp";
 
     this->t2_11file = files_prefix + ".t2_11amp";
     this->t2_21file = files_prefix + ".t2_21amp";
@@ -51,5 +74,31 @@ public:
     this->t2_22file = files_prefix + ".t2_22amp";
 
     this->ccsdstatus = files_prefix + ".ccsdstatus";
+  }
+
+  struct Keep {
+    // bool fvt12 = false;
+    bool fvt12_full = false;
+  };
+
+  struct Compute {
+    bool fvt12_full = false;
+    bool v2_full    = false;
+    void set(bool ft, bool v2) {
+      fvt12_full = ft;
+      v2_full    = v2;
+    }
+  };
+
+  Keep    keep;
+  Compute compute;
+
+  void destroy_subgroup() {
+    if(sub_pg.is_valid()) {
+      (*sub_ec).flush_and_sync();
+      sub_pg.destroy_coll();
+      delete sub_ec;
+      // MemoryManagerGA::destroy_coll(sub_mgr);
+    }
   }
 };

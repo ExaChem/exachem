@@ -26,220 +26,41 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   using T   = double;
   auto rank = ec.pg().rank();
 
-  cholesky_2e::cholesky_2e_driver(ec, chem_env);
-
   SystemData& sys_data = chem_env.sys_data;
   const bool  is_rhf   = sys_data.is_restricted;
 
-  std::string files_prefix = chem_env.get_files_prefix();
-
-  CDContext& cd_context = chem_env.cd_context;
-  CCContext& cc_context = chem_env.cc_context;
-  cc_context.init_filenames(files_prefix);
-
-  // CCSDOptions& ccsd_options   = chem_env.ioptions.ccsd_options;
-  CCSDOptions& ccsd_options   = chem_env.ioptions.ccsd_options;
-  const int    ccsdt_tilesize = ccsd_options.ccsdt_tilesize;
+  const int ccsdt_tilesize = chem_env.ioptions.ccsd_options.ccsdt_tilesize;
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
   std::string t_errmsg = check_memory_req(ccsdt_tilesize, sys_data.nbf);
   if(!t_errmsg.empty()) tamm_terminate(t_errmsg);
 #endif
 
-  int nsranks = sys_data.nbf / 15;
-  if(nsranks < 1) nsranks = 1;
-  int ga_cnn = ec.nnodes();
-  if(nsranks > ga_cnn) nsranks = ga_cnn;
-  nsranks = nsranks * ec.ppn();
+  CCContext& cc_context      = chem_env.cc_context;
+  cc_context.use_subgroup    = true;
+  cc_context.keep.fvt12_full = true;
+  cc_context.compute.set(true, false); // compute ft12 in full, v2 is not required.
+  exachem::cc::ccsd::cd_ccsd_driver(ec, chem_env);
 
-  ProcGroup         sub_pg = ProcGroup::create_subgroup(ec.pg(), nsranks);
-  ExecutionContext* sub_ec = nullptr;
-
-  if(sub_pg.is_valid()) {
-    sub_ec = new ExecutionContext(sub_pg, DistributionKind::nw, MemoryManagerKind::ga);
-  }
-
-  Scheduler sub_sch{*sub_ec};
-
-  ccsd_options.computeTData = true;
-
-  auto debug     = ccsd_options.debug;
-  bool skip_ccsd = ccsd_options.skip_ccsd;
-  bool scf_conv  = chem_env.scf_context.no_scf;
-
-  if(rank == 0) ccsd_options.print();
-
-  if(rank == 0)
-    cout << endl << "#occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << endl;
-
-  std::string       t1file     = cc_context.t1file;
-  std::string       t2file     = cc_context.t2file;
-  const std::string ccsdstatus = cc_context.ccsdstatus;
-
-  bool ccsd_restart = ccsd_options.readt ||
-                      ((fs::exists(t1file) && fs::exists(t2file) && fs::exists(cd_context.f1file) &&
-                        fs::exists(cd_context.v2file)));
-
-  bool computeTData = ccsd_options.computeTData;
+  std::string files_dir    = chem_env.get_files_dir();
+  std::string files_prefix = chem_env.get_files_prefix();
 
   ExecutionHW ex_hw = ec.exhw();
 
-  TiledIndexSpace& MO      = chem_env.is_context.MSO;
-  TiledIndexSpace& CI      = chem_env.is_context.CI;
-  TiledIndexSpace  N       = MO("all");
-  Tensor<T>        d_f1    = chem_env.cd_context.d_f1;
-  Tensor<T>        cholVpr = chem_env.cd_context.cholV2;
+  TiledIndexSpace& MO           = chem_env.is_context.MSO;
+  TiledIndexSpace& CI           = chem_env.is_context.CI;
+  TiledIndexSpace  N            = MO("all");
+  Tensor<T>        d_f1         = chem_env.cd_context.d_f1;
+  Tensor<T>        cholVpr      = chem_env.cd_context.cholV2;
+  Tensor<T>        d_t1         = chem_env.cc_context.d_t1_full;
+  Tensor<T>        d_t2         = chem_env.cc_context.d_t2_full;
+  CCSDOptions&     ccsd_options = chem_env.ioptions.ccsd_options;
+  std::vector<T>&  p_evl_sorted = chem_env.cd_context.p_evl_sorted;
 
-  Tensor<T>      d_t1, d_t2;
-  std::vector<T> p_evl_sorted;
-  double         residual = 0, corr_energy = 0;
-  Tensor<T>      dt1_full, dt2_full;
-  double&        hf_energy = chem_env.scf_context.hf_energy;
+  bool skip_ccsd = ccsd_options.skip_ccsd;
 
-  if(!skip_ccsd) {
-    if(ccsd_options.writev) ccsd_options.writet = true;
-
-    Tensor<T>              d_r1, d_r2;
-    std::vector<Tensor<T>> d_r1s, d_r2s, d_t1s, d_t2s;
-
-    if(is_rhf)
-      std::tie(p_evl_sorted, d_t1, d_t2, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s) = setupTensors_cs(
-        ec, MO, d_f1, ccsd_options.ndiis, ccsd_restart && fs::exists(ccsdstatus) && scf_conv);
-    else
-      std::tie(p_evl_sorted, d_t1, d_t2, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s) = setupTensors(
-        ec, MO, d_f1, ccsd_options.ndiis, ccsd_restart && fs::exists(ccsdstatus) && scf_conv);
-
-    if(ccsd_restart) {
-      if(fs::exists(t1file) && fs::exists(t2file)) {
-        read_from_disk(d_t1, t1file);
-        read_from_disk(d_t2, t2file);
-      }
-      p_evl_sorted = tamm::diagonal(d_f1);
-    }
-
-    if(rank == 0 && debug) {
-      print_vector(p_evl_sorted, files_prefix + ".eigen_values.txt");
-      cout << "Eigen values written to file: " << files_prefix + ".eigen_values.txt" << endl
-           << endl;
-    }
-
-    ec.pg().barrier();
-
-    auto cc_t1 = std::chrono::high_resolution_clock::now();
-
-    ccsd_restart = ccsd_restart && fs::exists(ccsdstatus) && scf_conv;
-
-    t1file = files_prefix + ".fullT1amp";
-    t2file = files_prefix + ".fullT2amp";
-
-    if(ccsd_options.writev)
-      computeTData = computeTData && !fs::exists(t1file) && !fs::exists(t2file);
-
-    if(computeTData && is_rhf) setup_full_t1t2(ec, MO, dt1_full, dt2_full);
-
-    if(is_rhf) {
-      if(ccsd_restart) {
-        if(sub_pg.is_valid()) {
-          const int ppn = ec.ppn();
-          if(rank == 0)
-            std::cout << "Executing with " << nsranks << " ranks (" << nsranks / ppn << " nodes)"
-                      << std::endl;
-          std::tie(residual, corr_energy) = exachem::cc::ccsd::cd_ccsd_cs_driver<T>(
-            chem_env, *sub_ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
-            p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
-        }
-        ec.pg().barrier();
-      }
-      else {
-        std::tie(residual, corr_energy) = exachem::cc::ccsd::cd_ccsd_cs_driver<T>(
-          chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
-          p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
-      }
-    }
-    else {
-      if(ccsd_restart) {
-        if(sub_pg.is_valid()) {
-          const int ppn = ec.ppn();
-          if(rank == 0)
-            std::cout << "Executing with " << nsranks << " ranks (" << nsranks / ppn << " nodes)"
-                      << std::endl;
-          std::tie(residual, corr_energy) = cd_ccsd_os_driver<T>(
-            chem_env, *sub_ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
-            p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
-        }
-        ec.pg().barrier();
-      }
-      else {
-        std::tie(residual, corr_energy) = cd_ccsd_os_driver<T>(
-          chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
-          p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
-      }
-    }
-
-    if(computeTData && is_rhf) {
-      if(ccsd_options.writev) {
-        write_to_disk(dt1_full, t1file);
-        write_to_disk(dt2_full, t2file);
-        free_tensors(dt1_full, dt2_full);
-      }
-    }
-
-    ccsd_stats(ec, hf_energy, residual, corr_energy, ccsd_options.threshold);
-
-    if(ccsd_options.writet && !fs::exists(ccsdstatus)) {
-      // write_to_disk(d_t1,t1file);
-      // write_to_disk(d_t2,t2file);
-      if(rank == 0) {
-        std::ofstream out(ccsdstatus, std::ios::out);
-        if(!out) cerr << "Error opening file " << ccsdstatus << endl;
-        out << 1 << std::endl;
-        out.close();
-      }
-    }
-
-    if(sub_pg.is_valid()) {
-      (*sub_ec).flush_and_sync();
-      sub_pg.destroy_coll();
-      delete sub_ec;
-    }
-
-    auto   cc_t2 = std::chrono::high_resolution_clock::now();
-    double ccsd_time =
-      std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
-    if(rank == 0) {
-      if(is_rhf)
-        std::cout << std::endl
-                  << "Time taken for Closed Shell Cholesky CCSD: " << std::fixed
-                  << std::setprecision(2) << ccsd_time << " secs" << std::endl;
-      else
-        std::cout << std::endl
-                  << "Time taken for Open Shell Cholesky CCSD: " << std::fixed
-                  << std::setprecision(2) << ccsd_time << " secs" << std::endl;
-    }
-
-    cc_print(chem_env, d_t1, d_t2, files_prefix);
-
-    if(!ccsd_restart) {
-      free_tensors(d_r1, d_r2);
-      free_vec_tensors(d_r1s, d_r2s, d_t1s, d_t2s);
-    }
-
-    if(is_rhf) free_tensors(d_t1, d_t2);
-    ec.flush_and_sync();
-  }
-  else { // skip ccsd
-    cholesky_2e::update_sysdata(ec, chem_env, MO);
-    N    = MO("all");
-    d_f1 = {{N, N}, {1, 1}};
-    Tensor<T>::allocate(&ec, d_f1);
-    if(rank == 0) sys_data.print();
-
-    if(sub_pg.is_valid()) {
-      (*sub_ec).flush_and_sync();
-      sub_pg.destroy_coll();
-      delete sub_ec;
-    }
-  }
+  double& hf_energy   = chem_env.scf_context.hf_energy;
+  double  corr_energy = cc_context.ccsd_correlation_energy;
 
   auto [MO1, total_orbitals1] = cholesky_2e::setupMOIS(ec, chem_env, true);
   TiledIndexSpace N1          = MO1("all");
@@ -266,8 +87,7 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   if(!skip_ccsd) {
     // auto v2_setup_mem = sum_tensor_sizes(d_f1,t_d_v2,t_d_cv2);
     // auto cv2_retile = (Nsize*Nsize*cind_size*8)/gib + sum_tensor_sizes(d_f1,cholVpr,t_d_cv2);
-    if(is_rhf) ccsd_t_mem += sum_tensor_sizes(dt1_full, dt2_full);
-    else ccsd_t_mem += sum_tensor_sizes(d_t1, d_t2);
+    ccsd_t_mem += sum_tensor_sizes(d_t1, d_t2); // full t1,t2
 
     // retiling allocates full GA versions of the t1,t2 tensors.
     ccsd_t_mem += (Osize * Vsize + Vsize * Vsize * Osize * Osize) * 8 / gib;
@@ -339,19 +159,6 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
     check_memory_requirements(ec, total_ccsd_t_mem);
   }
 
-  if(computeTData && !skip_ccsd) {
-    Tensor<T>::allocate(&ec, t_d_cv2);
-    retile_tamm_tensor(cholVpr, t_d_cv2, "CholV2");
-    free_tensors(cholVpr);
-
-    v2tensors = cholesky_2e::setupV2Tensors<T>(ec, t_d_cv2, ex_hw, v2tensors.get_blocks());
-    if(ccsd_options.writev) {
-      v2tensors.write_to_disk(files_prefix);
-      v2tensors.deallocate();
-    }
-    free_tensors(t_d_cv2);
-  }
-
   double energy1 = 0, energy2 = 0;
 
   if(rank == 0) {
@@ -360,49 +167,51 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   }
 
   Tensor<T>::allocate(&ec, t_d_t1, t_d_t2);
-  if(skip_ccsd || !computeTData) v2tensors.allocate(ec, MO1);
 
-  bool ccsd_t_restart = fs::exists(t1file) && fs::exists(t2file) && fs::exists(cd_context.f1file) &&
+  bool ccsd_t_restart = (ccsd_options.writet || ccsd_options.readt) &&
+                        fs::exists(cc_context.full_t1file) && fs::exists(cc_context.full_t2file) &&
+                        fs::exists(chem_env.cd_context.f1file) &&
                         v2tensors.exist_on_disk(files_prefix);
 
-  if(!ccsd_t_restart && !skip_ccsd) {
-    if(!is_rhf) {
-      dt1_full = d_t1;
-      dt2_full = d_t2;
+  if(!skip_ccsd) {
+    if(!ccsd_t_restart) {
+      Tensor<T>::allocate(&ec, t_d_cv2);
+      retile_tamm_tensor(cholVpr, t_d_cv2, "CholV2");
+      free_tensors(cholVpr);
+
+      v2tensors = cholesky_2e::setupV2Tensors<T>(ec, t_d_cv2, ex_hw, v2tensors.get_blocks());
+      free_tensors(t_d_cv2);
+
+      if(rank == 0) { cout << endl << "Retile T1,T2 tensors ... " << endl; }
+
+      Scheduler{ec}(t_d_t1() = 0)(t_d_t2() = 0).execute();
+
+      // d_t1, d_t2 are the full tensors
+      retile_tamm_tensor(d_t1, t_d_t1);
+      retile_tamm_tensor(d_t2, t_d_t2);
+
+      // TODO: profile and re-enable as needed
+      //  if(ccsd_options.writet) {
+      //    ec.pg().barrier();
+      //    v2tensors.write_to_disk(files_prefix);
+      //    write_to_disk(t_d_t1, cc_context.full_t1file);
+      //    write_to_disk(t_d_t2, cc_context.full_t2file);
+      //  }
     }
-    if(rank == 0) { cout << endl << "Retile T1,T2 tensors ... " << endl; }
-
-    Scheduler{ec}(t_d_t1() = 0)(t_d_t2() = 0).execute();
-
-    TiledIndexSpace O = MO("occ");
-    TiledIndexSpace V = MO("virt");
-
-    if(ccsd_options.writev) {
-      Tensor<T> wd_t1{{V, O}, {1, 1}};
-      Tensor<T> wd_t2{{V, V, O, O}, {2, 2}};
-
-      read_from_disk(t_d_t1, t1file, false, wd_t1);
-      read_from_disk(t_d_t2, t2file, false, wd_t2);
-
-      ec.pg().barrier();
-      write_to_disk(t_d_t1, t1file);
-      write_to_disk(t_d_t2, t2file);
-    }
-
     else {
-      retile_tamm_tensor(dt1_full, t_d_t1);
-      retile_tamm_tensor(dt2_full, t_d_t2);
-      if(is_rhf) free_tensors(dt1_full, dt2_full);
+      free_tensors(cholVpr);
+      v2tensors.allocate(ec, MO1);
+      // read_from_disk(t_d_f1,f1file);
+      read_from_disk(t_d_t1, cc_context.full_t1file);
+      read_from_disk(t_d_t2, cc_context.full_t2file);
+      v2tensors.read_from_disk(files_prefix);
     }
+    free_tensors(d_t1, d_t2);
   }
-  else if(ccsd_options.writev && !skip_ccsd) {
-    // read_from_disk(t_d_f1,f1file);
-    read_from_disk(t_d_t1, t1file);
-    read_from_disk(t_d_t2, t2file);
-    v2tensors.read_from_disk(files_prefix);
+  else { // skip ccsd
+    // t1,t2,cholVpr are never allocated
+    v2tensors.allocate(ec, MO1);
   }
-
-  if(!is_rhf && !skip_ccsd) free_tensors(d_t1, d_t2);
 
   p_evl_sorted = tamm::diagonal(d_f1);
 
@@ -560,5 +369,5 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   v2tensors.deallocate();
 
   ec.flush_and_sync();
-  // delete ec;
+  if(!skip_ccsd) cc_context.destroy_subgroup();
 }

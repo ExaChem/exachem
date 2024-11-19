@@ -376,8 +376,9 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // TiledIndexSpace tAOt{tAO.index_space(), AO_tiles};
 
-  TAMM_GA_SIZE    N = tMO("all").max_num_indices();
-  IndexSpace      CI{range(0, max_cvecs)};
+  TAMM_GA_SIZE N = tMO("all").max_num_indices();
+  IndexSpace   CI{range(0, max_cvecs)};
+  // need CI dim to be a single tile for cholesky
   TiledIndexSpace tCI{CI, static_cast<Tile>(max_cvecs)};
 
   Matrix lcao_eig(nao, N);

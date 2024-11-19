@@ -348,19 +348,47 @@ void gfccsd_driver_ip_a(
     return;
   }
   EXPECTS(num_pi_remain == pi_tbp.size());
-  // if(num_pi_remain == 0) num_pi_remain = 1;
-  int        subranks = std::floor(nranks / num_pi_remain);
-  const bool no_pg    = (subranks == 0 || subranks == 1);
-  if(no_pg) subranks = nranks;
-  if(gf_nprocs_poi > 0) subranks = gf_nprocs_poi;
+  const int  ppn       = gec.ppn();
+  const int  nnodes    = gec.nnodes();
+  int        subranks  = std::floor(nranks / num_pi_remain);
+  const bool no_pg     = (subranks == 0 || subranks == 1);
+  int        sub_nodes = 0;
 
-  // Figure out how many orbitals in pi_tbp can be processed with subranks
-  // TODO: gf_nprocs_pi must be a multiple of total #ranks for best performance.
-  size_t num_oi_can_bp = std::ceil(nranks / (1.0 * subranks));
-  if(num_pi_remain < num_oi_can_bp) {
-    num_oi_can_bp = num_pi_remain;
-    subranks      = std::floor(nranks / num_pi_remain);
-    if(no_pg) subranks = nranks;
+  if(no_pg) {
+    subranks  = nranks;
+    sub_nodes = nnodes;
+  }
+  else {
+    int sub_nodes = subranks / ppn;
+    if(subranks % ppn > 0 || sub_nodes == 0) sub_nodes++;
+    if(sub_nodes > nnodes) sub_nodes = nnodes;
+    subranks = sub_nodes * ppn;
+  }
+
+  if(gf_nprocs_poi > 0) {
+    if(nnodes > 1 && gf_nprocs_poi % ppn != 0)
+      tamm_terminate("[ERROR] gf_nprocs_poi should be a muliple of user mpi ranks per node");
+    if(nnodes == 1) {
+      // TODO: This applies only when using GA's PR runtime
+      int ga_num_pr = 1;
+      if(const char* ga_npr = std::getenv("GA_NUM_PROGRESS_RANKS_PER_NODE")) {
+        ga_num_pr = std::atoi(ga_npr);
+      }
+      if(ga_num_pr > 1)
+        tamm_terminate("[ERROR] use of multiple GA progress ranks for a single node gfccsd "
+                       "calculation is not allowed");
+    }
+    subranks  = gf_nprocs_poi;
+    sub_nodes = subranks / ppn;
+    if(sub_nodes == 0) sub_nodes++;
+  }
+
+  int num_oi_can_bp = nnodes / sub_nodes;
+  if(nnodes % sub_nodes > 0) num_oi_can_bp++;
+  // when using 1 node
+  if(gf_nprocs_poi > 0 && nnodes == 1) {
+    num_oi_can_bp = ppn / gf_nprocs_poi;
+    if(ppn % gf_nprocs_poi > 0) num_oi_can_bp++;
   }
 
   if(rank == 0) {
@@ -2461,193 +2489,38 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   auto restart_time_start = std::chrono::high_resolution_clock::now();
 
   // force writet on
-  chem_env.ioptions.ccsd_options.writet       = true;
-  chem_env.ioptions.ccsd_options.computeTData = true;
+  chem_env.ioptions.ccsd_options.writet = true;
 
-  cholesky_2e::cholesky_2e_driver(ec, chem_env);
+  CCContext& cc_context      = chem_env.cc_context;
+  cc_context.use_subgroup    = true;
+  cc_context.keep.fvt12_full = true;
+  cc_context.compute.set(true, false); // compute ft12 in full, v2 is not required.
+  exachem::cc::ccsd::cd_ccsd_driver(ec, chem_env);
 
-  SystemData& sys_data = chem_env.sys_data;
+  ProcGroup& sub_pg = cc_context.sub_pg;
+  Scheduler  sub_sch{*(cc_context.sub_ec)};
 
-  int nsranks = sys_data.nbf / 15;
-  if(nsranks < 1) nsranks = 1;
-  int ga_cnn = ec.nnodes();
-  if(nsranks > ga_cnn) nsranks = ga_cnn;
-  nsranks = nsranks * ec.ppn();
+  SystemData& sys_data     = chem_env.sys_data;
+  std::string files_dir    = chem_env.get_files_dir("", "gfcc");
+  std::string files_prefix = chem_env.get_files_prefix("", "gfcc");
 
-  ProcGroup         sub_pg = ProcGroup::create_subgroup(ec.pg(), nsranks);
-  ExecutionContext* sub_ec = nullptr;
-
-  if(sub_pg.is_valid()) {
-    sub_ec = new ExecutionContext(sub_pg, DistributionKind::nw, MemoryManagerKind::ga);
-  }
-
-  Scheduler sub_sch{*sub_ec};
-
-  const bool is_rhf = chem_env.sys_data.is_restricted;
-
-  std::string files_dir    = chem_env.get_files_dir();
-  std::string files_prefix = chem_env.get_files_prefix();
-
-  CDContext& cd_context = chem_env.cd_context;
-  CCContext& cc_context = chem_env.cc_context;
-  cc_context.init_filenames(files_prefix);
-  CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
-
-  auto              debug      = ccsd_options.debug;
-  bool              scf_conv   = chem_env.scf_context.no_scf;
-  std::string       t1file     = cc_context.t1file;
-  std::string       t2file     = cc_context.t2file;
-  const std::string ccsdstatus = cc_context.ccsdstatus;
-
-  bool ccsd_restart = ccsd_options.readt ||
-                      ((fs::exists(t1file) && fs::exists(t2file) && fs::exists(cd_context.f1file) &&
-                        fs::exists(cd_context.v2file)));
-
-  if(ccsd_options.writev) ccsd_options.writet = true;
-
-  TiledIndexSpace& MO      = chem_env.is_context.MSO;
-  TiledIndexSpace& CI      = chem_env.is_context.CI;
-  TiledIndexSpace  N       = MO("all");
-  Tensor<T>        d_f1    = chem_env.cd_context.d_f1;
-  Tensor<T>        cholVpr = chem_env.cd_context.cholV2;
-
-  TAMM_SIZE              total_orbitals = sys_data.nmo;
-  std::vector<T>         p_evl_sorted;
-  Tensor<T>              d_r1, d_r2, d_t1, d_t2;
-  std::vector<Tensor<T>> d_r1s, d_r2s, d_t1s, d_t2s;
-
-  if(is_rhf)
-    std::tie(p_evl_sorted, d_t1, d_t2, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s) = setupTensors_cs(
-      ec, MO, d_f1, ccsd_options.ndiis, ccsd_restart && fs::exists(ccsdstatus) && scf_conv);
-  else
-    std::tie(p_evl_sorted, d_t1, d_t2, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s) = setupTensors(
-      ec, MO, d_f1, ccsd_options.ndiis, ccsd_restart && fs::exists(ccsdstatus) && scf_conv);
-
-  if(ccsd_restart) {
-    if(fs::exists(t1file) && fs::exists(t2file)) {
-      read_from_disk(d_t1, t1file);
-      read_from_disk(d_t2, t2file);
-    }
-    p_evl_sorted = tamm::diagonal(d_f1);
-  }
-
-  if(rank == 0 && debug) {
-    print_vector(p_evl_sorted, files_prefix + ".eigen_values.txt");
-    cout << "Eigen values written to file: " << files_prefix + ".eigen_values.txt" << endl << endl;
-  }
-
-  ec.pg().barrier();
-
-  auto cc_t1 = std::chrono::high_resolution_clock::now();
-
-  ccsd_restart = ccsd_restart && fs::exists(ccsdstatus) && scf_conv;
-
-  // std::string fullV2file = files_prefix+".fullV2";
-  // t1file = files_prefix+".fullT1amp";
-  // t2file = files_prefix+".fullT2amp";
-
-  bool computeTData = true;
-  // if(ccsd_options.writev)
-  //     computeTData = computeTData && !fs::exists(fullV2file)
-  //             && !fs::exists(t1file) && !fs::exists(t2file);
-
-  Tensor<T> dt1_full, dt2_full;
-  if(computeTData && is_rhf) setup_full_t1t2(ec, MO, dt1_full, dt2_full);
-
-  double residual = 0, corr_energy = 0;
-
-  if(is_rhf) {
-    if(ccsd_restart) {
-      if(sub_pg.is_valid()) {
-        const int ppn = ec.ppn();
-        if(rank == 0)
-          std::cout << "Executing with " << nsranks << " ranks (" << nsranks / ppn << " nodes)"
-                    << std::endl;
-        std::tie(residual, corr_energy) = exachem::cc::ccsd::cd_ccsd_cs_driver<T>(
-          chem_env, *sub_ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
-          p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
-      }
-      ec.pg().barrier();
-    }
-    else {
-      std::tie(residual, corr_energy) = exachem::cc::ccsd::cd_ccsd_cs_driver<T>(
-        chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
-        p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
-    }
-  }
-  else {
-    if(ccsd_restart) {
-      if(sub_pg.is_valid()) {
-        const int ppn = ec.ppn();
-        if(rank == 0)
-          std::cout << "Executing with " << nsranks << " ranks (" << nsranks / ppn << " nodes)"
-                    << std::endl;
-        std::tie(residual, corr_energy) = cd_ccsd_os_driver<T>(
-          chem_env, *sub_ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
-          p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
-      }
-      ec.pg().barrier();
-    }
-    else {
-      std::tie(residual, corr_energy) = cd_ccsd_os_driver<T>(
-        chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
-        p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
-    }
-  }
-
-  if(computeTData && is_rhf) {
-    // if(ccsd_options.writev) {
-    //     write_to_disk(dt1_full,t1file);
-    //     write_to_disk(dt2_full,t2file);
-    //     free_tensors(dt1_full, dt2_full);
-    // }
-    free_tensors(d_t1, d_t2); // free t1_aa, t2_abab
-    d_t1 = dt1_full;          // GFCC uses full T1,T2
-    d_t2 = dt2_full;          // GFCC uses full T1,T2
-  }
-
-  ccsd_stats(ec, chem_env.scf_context.hf_energy, residual, corr_energy, ccsd_options.threshold);
-
-  if(ccsd_options.writet && !fs::exists(ccsdstatus)) {
-    // write_to_disk(d_t1,t1file);
-    // write_to_disk(d_t2,t2file);
-    if(rank == 0) {
-      std::ofstream out(ccsdstatus, std::ios::out);
-      if(!out) cerr << "Error opening file " << ccsdstatus << endl;
-      out << 1 << std::endl;
-      out.close();
-    }
-  }
-
-  auto   cc_t2 = std::chrono::high_resolution_clock::now();
-  double ccsd_time =
-    std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
-  if(rank == 0) {
-    if(is_rhf)
-      std::cout << std::endl
-                << "Time taken for Closed Shell Cholesky CCSD: " << std::fixed
-                << std::setprecision(2) << ccsd_time << " secs" << std::endl;
-    else
-      std::cout << std::endl
-                << "Time taken for Open Shell Cholesky CCSD: " << std::fixed << std::setprecision(2)
-                << ccsd_time << " secs" << std::endl;
-  }
-
-  cc_print(chem_env, d_t1, d_t2, files_prefix);
-
-  if(!ccsd_restart) {
-    free_tensors(d_r1, d_r2);
-    free_vec_tensors(d_r1s, d_r2s, d_t1s, d_t2s);
-  }
-
-  ec.flush_and_sync();
+  TiledIndexSpace& MO           = chem_env.is_context.MSO;
+  TiledIndexSpace& CI           = chem_env.is_context.CI;
+  TiledIndexSpace  N            = MO("all");
+  Tensor<T>        d_f1         = chem_env.cd_context.d_f1;
+  Tensor<T>        cholVpr      = chem_env.cd_context.cholV2;
+  Tensor<T>        d_t1         = chem_env.cc_context.d_t1_full;
+  Tensor<T>        d_t2         = chem_env.cc_context.d_t2_full;
+  CCSDOptions&     ccsd_options = chem_env.ioptions.ccsd_options;
+  auto             debug        = ccsd_options.debug;
+  std::vector<T>&  p_evl_sorted = chem_env.cd_context.p_evl_sorted;
 
   //////////////////////////
   //                      //
   // Start GFCCSD Routine //
   //                      //
   //////////////////////////
-  cc_t1 = std::chrono::high_resolution_clock::now();
+  auto cc_t1 = std::chrono::high_resolution_clock::now();
 
   const TAMM_SIZE nocc = sys_data.nocc;
   const TAMM_SIZE nvir = sys_data.nvir;
@@ -3374,14 +3247,14 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           gf_omega = x;
           if(!gf_restart) {
             gfccsd_driver_ip_a<T>(
-              ec, ccsd_options, *sub_ec, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, d_f1,
-              t2v2_o, lt12_o_a, lt12_o_b, ix1_1_1_a, ix1_1_1_b, ix2_1_aaaa, ix2_1_abab, ix2_1_bbbb,
-              ix2_1_baba, ix2_2_a, ix2_2_b, ix2_3_a, ix2_3_b, ix2_4_aaaa, ix2_4_abab, ix2_4_bbbb,
-              ix2_5_aaaa, ix2_5_abba, ix2_5_abab, ix2_5_bbbb, ix2_5_baab, ix2_5_baba, ix2_6_2_a,
-              ix2_6_2_b, ix2_6_3_aaaa, ix2_6_3_abba, ix2_6_3_abab, ix2_6_3_bbbb, ix2_6_3_baab,
-              ix2_6_3_baba, v2ijab_aaaa, v2ijab_abab, v2ijab_bbbb, p_evl_sorted_occ,
-              p_evl_sorted_virt, total_orbitals, nocc, nvir, nptsi, unit_tis, files_prefix,
-              levelstr, noa);
+              ec, ccsd_options, *(cc_context.sub_ec), MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
+              d_t2_abab, d_f1, t2v2_o, lt12_o_a, lt12_o_b, ix1_1_1_a, ix1_1_1_b, ix2_1_aaaa,
+              ix2_1_abab, ix2_1_bbbb, ix2_1_baba, ix2_2_a, ix2_2_b, ix2_3_a, ix2_3_b, ix2_4_aaaa,
+              ix2_4_abab, ix2_4_bbbb, ix2_5_aaaa, ix2_5_abba, ix2_5_abab, ix2_5_bbbb, ix2_5_baab,
+              ix2_5_baba, ix2_6_2_a, ix2_6_2_b, ix2_6_3_aaaa, ix2_6_3_abba, ix2_6_3_abab,
+              ix2_6_3_bbbb, ix2_6_3_baab, ix2_6_3_baba, v2ijab_aaaa, v2ijab_abab, v2ijab_bbbb,
+              p_evl_sorted_occ, p_evl_sorted_virt, sys_data.nmo, nocc, nvir, nptsi, unit_tis,
+              files_prefix, levelstr, noa);
           }
           else if(rank == 0) cout << endl << "Restarting freq: " << gf_omega << endl;
           auto ni             = std::round((x - omega_min_ip) / omega_delta);
@@ -4294,7 +4167,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         gf_omega = x;
 
         if(!gf_restart) {
-          gfccsd_driver_ip_b<T>(ec, *sub_ec, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
+          gfccsd_driver_ip_b<T>(ec, *(cc_context.sub_ec), MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
                                 d_t2_abab, d_f1, t2v2_o, lt12_o_a, lt12_o_b, ix1_1_1_a, ix1_1_1_b,
                                 ix2_1_aaaa, ix2_1_abab, ix2_1_bbbb, ix2_1_baba, ix2_2_a, ix2_2_b,
                                 ix2_3_a, ix2_3_b, ix2_4_aaaa, ix2_4_abab, ix2_4_bbbb, ix2_5_aaaa,
@@ -5200,7 +5073,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
         if(!gf_restart) {
           gfccsd_driver_ea_a<T>(
-            ec, *sub_ec, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, d_f1, t2v2_v,
+            ec, *(cc_context.sub_ec), MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, d_f1, t2v2_v,
             lt12_v_a, lt12_v_b, iy1_1_a, iy1_1_b, iy1_2_1_a, iy1_2_1_b, iy1_a, iy1_b, iy2_a, iy2_b,
             iy3_1_aaaa, iy3_1_bbbb, iy3_1_abab, iy3_1_baba, iy3_1_baab, iy3_1_abba, iy3_1_2_a,
             iy3_1_2_b, iy3_aaaa, iy3_bbbb, iy3_abab, iy3_baba, iy3_baab, iy3_abba, iy4_1_aaaa,
@@ -5780,7 +5653,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
         if(!gf_restart) {
           gfccsd_driver_ea_b<T>(
-            ec, *sub_ec, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, d_f1, t2v2_v,
+            ec, *(cc_context.sub_ec), MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, d_f1, t2v2_v,
             lt12_v_a, lt12_v_b, iy1_1_a, iy1_1_b, iy1_2_1_a, iy1_2_1_b, iy1_a, iy1_b, iy2_a, iy2_b,
             iy3_1_aaaa, iy3_1_bbbb, iy3_1_abab, iy3_1_baba, iy3_1_baab, iy3_1_abba, iy3_1_2_a,
             iy3_1_2_b, iy3_aaaa, iy3_bbbb, iy3_abab, iy3_baba, iy3_baab, iy3_abba, iy4_1_aaaa,
@@ -6312,9 +6185,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   }
 #endif
 
-    cc_t2 = std::chrono::high_resolution_clock::now();
+    auto cc_t2 = std::chrono::high_resolution_clock::now();
 
-    ccsd_time = std::chrono::duration_cast<std::chrono::duration<T>>((cc_t2 - cc_t1)).count();
+    auto ccsd_time = std::chrono::duration_cast<std::chrono::duration<T>>((cc_t2 - cc_t1)).count();
     if(rank == 0)
       cout << std::endl
            << "Time taken for GF-CCSD: " << std::fixed << std::setprecision(2) << ccsd_time
@@ -6325,16 +6198,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     // --------- END GF CCSD -----------
     // GA_Summarize(0);
     ec.flush_and_sync();
-    // MemoryManagerGA::destroy_coll(mgr);
     // ec.pg().destroy_coll(); // handled by exachem main
     ec_l.flush_and_sync();
-    // MemoryManagerLocal::destroy_coll(mgr_l);
     pg_l.destroy_coll();
-    if(sub_pg.is_valid()) {
-      (*sub_ec).flush_and_sync();
-      sub_pg.destroy_coll();
-      delete sub_ec;
-      // MemoryManagerGA::destroy_coll(sub_mgr);
-    }
+    cc_context.destroy_subgroup();
   }
 } // namespace exachem::cc::gfcc

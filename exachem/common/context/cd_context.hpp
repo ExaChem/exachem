@@ -7,18 +7,20 @@
  */
 
 #pragma once
-#include "tamm/tamm.hpp"
+#include "exachem/cholesky/v2tensors.hpp"
 
 class CDContext {
 public:
   CDContext() = default;
 
-  int            num_chol_vecs{0};
-  int            max_cvecs{0};
-  Tensor<double> movecs_so; // spin-orbital movecs
-  Tensor<double> d_f1;      // Fock in MO
-  Tensor<double> cholV2;    // 2e ints in MO
-  Tensor<double> d_v2;      // full V2 in MO
+  int                                     num_chol_vecs{0};
+  int                                     max_cvecs{0};
+  Tensor<double>                          movecs_so; // spin-orbital movecs
+  Tensor<double>                          d_f1;      // Fock in MO
+  Tensor<double>                          cholV2;    // 2e ints in MO
+  Tensor<double>                          d_v2;      // full V2 in MO
+  std::vector<double>                     p_evl_sorted;
+  exachem::cholesky_2e::V2Tensors<double> v2tensors; // v2 tensor blocks in MO
 
   std::string movecs_so_file;
   std::string f1file;

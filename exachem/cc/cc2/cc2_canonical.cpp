@@ -344,8 +344,6 @@ void cc2_canonical_driver(ExecutionContext& ec, ChemEnv& chem_env) {
                                                 cholfile);
   free_tensors(lcao);
 
-  if(ccsd_options.writev) ccsd_options.writet = true;
-
   TiledIndexSpace N = MO("all");
 
   std::vector<T>         p_evl_sorted;

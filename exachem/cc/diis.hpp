@@ -95,6 +95,54 @@ inline void jacobi(ExecutionContext& ec, Tensor<T>& d_r, Tensor<T>& d_t, T shift
       }
       d_t.add(blockid, tbuf);
     }
+    else if(d_r.num_modes() == 6) {
+      auto rblock_offset = d_r.block_offsets(blockid);
+
+      std::vector<size_t> ioff;
+      for(auto x: rblock_offset) { ioff.push_back(x); }
+      std::vector<size_t> isize;
+      for(auto x: rblock_dims) { isize.push_back(x); }
+
+      if(!transpose) {
+        for(auto i0 = 0U, c = 0U; i0 < isize[0]; i0++) {
+          for(auto i1 = 0U; i1 < isize[1]; i1++) {
+            for(auto i2 = 0U; i2 < isize[2]; i2++) {
+              for(auto i3 = 0U; i3 < isize[3]; i3++) {
+                for(auto i4 = 0U; i4 < isize[4]; i4++) {
+                  for(auto i5 = 0U; i5 < isize[5]; i5++, c++) {
+                    tbuf[c] =
+                      rbuf[c] /
+                      (-p_evl_sorted_virt[ioff[0] + i0] - p_evl_sorted_virt[ioff[1] + i1] -
+                       p_evl_sorted_virt[ioff[2] + i2] + p_evl_sorted_occ[ioff[3] + i3] +
+                       p_evl_sorted_occ[ioff[4] + i4] + p_evl_sorted_occ[ioff[5] + i5] + shift);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      else {
+        for(auto i0 = 0U, c = 0U; i0 < isize[0]; i0++) {
+          for(auto i1 = 0U; i1 < isize[1]; i1++) {
+            for(auto i2 = 0U; i2 < isize[2]; i2++) {
+              for(auto i3 = 0U; i3 < isize[3]; i3++) {
+                for(auto i4 = 0U; i4 < isize[4]; i4++) {
+                  for(auto i5 = 0U; i5 < isize[5]; i5++, c++) {
+                    tbuf[c] =
+                      rbuf[c] /
+                      (p_evl_sorted_occ[ioff[0] + i0] + p_evl_sorted_occ[ioff[1] + i1] +
+                       p_evl_sorted_occ[ioff[2] + i2] - p_evl_sorted_virt[ioff[3] + i3] -
+                       p_evl_sorted_virt[ioff[4] + i4] - p_evl_sorted_virt[ioff[5] + i5] + shift);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      d_t.add(blockid, tbuf);
+    }
     else {
       assert(0); // @todo implement
     }

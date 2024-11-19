@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include "exachem/cc/ccse_tensors.hpp"
-#include <string>
-#include <vector>
+#include "tamm/tamm.hpp"
 using T = double;
+using namespace tamm;
+
 namespace exachem::cholesky_2e {
 
 template<typename T>
@@ -187,7 +187,7 @@ T exachem::cholesky_2e::V2Tensors<T>::tensor_sizes(const TiledIndexSpace& MO) {
   set_map(MO);
   T v2_sizes{};
   for(auto iter = tmap.begin(); iter != tmap.end(); ++iter)
-    v2_sizes += sum_tensor_sizes(iter->second);
+    v2_sizes += (compute_tensor_size(iter->second) * 8) / (1024 * 1024 * 1024.0);
   return v2_sizes;
 }
 
@@ -222,6 +222,6 @@ template<typename T>
 bool exachem::cholesky_2e::V2Tensors<T>::exist_on_disk(const std::string& fprefix) {
   auto tensor_files = get_tensor_files(fprefix);
   bool tfiles_exist = std::all_of(tensor_files.begin(), tensor_files.end(),
-                                  [](std::string x) { return fs::exists(x); });
+                                  [](std::string x) { return std::filesystem::exists(x); });
   return tfiles_exist;
 }

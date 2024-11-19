@@ -107,8 +107,8 @@ public:
   int  tilesize;
   int  ndiis;
   int  writet_iter;
-  bool readt, writet, writev, gf_restart, gf_ip, gf_ea, gf_os, gf_cs, gf_itriples, gf_profile,
-    balance_tiles, computeTData;
+  bool readt, writet, gf_restart, gf_ip, gf_ea, gf_os, gf_cs, gf_itriples, gf_profile,
+    balance_tiles;
   bool                    profile_ccsd;
   double                  lshift;
   double                  threshold;

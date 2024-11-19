@@ -57,17 +57,17 @@ public:
 
   Matrix compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A);
 
-  std::string get_files_dir(std::string scf_type = "") {
+  std::string get_files_dir(std::string scf_type = "", std::string mname = "") {
     if(scf_type.empty()) scf_type = ioptions.scf_options.scf_type;
-    const std::string files_dir = workspace_dir + scf_type;
+    if(!mname.empty()) mname = "/" + mname;
+    const std::string files_dir = workspace_dir + scf_type + mname;
     return files_dir;
   }
 
-  std::string get_files_prefix(std::string scf_type = "") {
+  std::string get_files_prefix(std::string scf_type = "", std::string mname = "") {
     if(scf_type.empty()) scf_type = ioptions.scf_options.scf_type;
-
-    const std::string out_fp       = workspace_dir;
-    const std::string files_dir    = out_fp + scf_type;
+    if(!mname.empty()) mname = "/" + mname;
+    const std::string files_dir    = workspace_dir + scf_type + mname;
     const std::string files_prefix = files_dir + "/" + sys_data.output_file_prefix;
     return files_prefix;
   }

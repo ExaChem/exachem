@@ -15,7 +15,7 @@ using namespace tamm;
 
 namespace exachem::cc::ccsd {
 
-void cd_ccsd(ExecutionContext& ec, ChemEnv& chem_env);
+void cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
 template<typename T>
 void ccsd_e_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI, Tensor<T>& de,

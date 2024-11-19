@@ -1126,10 +1126,10 @@ cd_ccsd_os_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace
     if(writet) {
       write_to_disk(d_t1, t1file);
       write_to_disk(d_t2, t2file);
-      if(computeTData && chem_env.ioptions.ccsd_options.writev) {
-        fs::copy_file(t1file, ccsd_fp + ".fullT1amp", fs::copy_options::update_existing);
-        fs::copy_file(t2file, ccsd_fp + ".fullT2amp", fs::copy_options::update_existing);
-      }
+      // if(computeTData && chem_env.ioptions.ccsd_options.writev) {
+      //   fs::copy_file(t1file, ccsd_fp + ".full_t1amp", fs::copy_options::update_existing);
+      //   fs::copy_file(t2file, ccsd_fp + ".full_t2amp", fs::copy_options::update_existing);
+      // }
     }
 
     if(profile && ec.print()) {

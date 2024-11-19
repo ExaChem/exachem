@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "exachem/cc/ccsd/cd_ccsd.hpp"
 #include "exachem/cc/ccsd/cd_ccsd_cs_ann.hpp"
 
 template<typename T>

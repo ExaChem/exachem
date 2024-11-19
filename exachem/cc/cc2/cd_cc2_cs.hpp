@@ -12,7 +12,7 @@
 
 using namespace tamm;
 
-namespace cc2_cs {
+namespace exachem::cc2::cc2_cs {
 
 template<typename T>
 void cc2_e_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI, Tensor<T>& de,
@@ -38,4 +38,4 @@ std::tuple<double, double> cd_cc2_cs_driver(
   std::vector<Tensor<T>>& d_t2s, std::vector<T>& p_evl_sorted, Tensor<T>& cv3d, Tensor<T> dt1_full,
   Tensor<T> dt2_full, bool cc2_restart = false, std::string out_fp = "", bool computeTData = false);
 
-}; // namespace cc2_cs
+}; // namespace exachem::cc2::cc2_cs

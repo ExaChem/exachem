@@ -63,7 +63,7 @@ setupTensors_cs(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int n
                 bool ccsd_restart = false);
 
 void ccsd_stats(ExecutionContext& ec, double hf_energy, double residual, double energy,
-                double thresh);
+                double thresh, std::string task_str = "CCSD");
 
 template<typename T>
 void cc_print(ChemEnv& chem_env, Tensor<T> d_t1, Tensor<T> d_t2, std::string files_prefix);

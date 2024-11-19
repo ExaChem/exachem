@@ -293,7 +293,7 @@ setupTensors_cs(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int n
 }
 
 void ccsd_stats(ExecutionContext& ec, double hf_energy, double residual, double energy,
-                double thresh) {
+                double thresh, std::string task_str) {
   auto rank      = ec.pg().rank();
   bool ccsd_conv = residual < thresh;
   if(rank == 0) {
@@ -301,15 +301,16 @@ void ccsd_stats(ExecutionContext& ec, double hf_energy, double residual, double 
     if(ccsd_conv) {
       std::cout << " Iterations converged" << std::endl;
       std::cout.precision(15);
-      std::cout << " CCSD correlation energy / hartree =" << std::setw(26) << std::right << energy
-                << std::endl;
-      std::cout << " CCSD total energy / hartree       =" << std::setw(26) << std::right
-                << energy + hf_energy << std::endl;
+      std::cout << " " << task_str << " correlation energy / hartree =" << std::setw(26)
+                << std::right << energy << std::endl;
+      std::cout << " " << task_str << " total energy / hartree       =" << std::setw(26)
+                << std::right << energy + hf_energy << std::endl;
     }
   }
   if(!ccsd_conv) {
     ec.pg().barrier();
-    tamm_terminate("ERROR: CCSD calculation does not converge!");
+    std::string err_msg = "[ERROR] " + task_str + " calculation does not converge!";
+    tamm_terminate(err_msg);
   }
 }
 

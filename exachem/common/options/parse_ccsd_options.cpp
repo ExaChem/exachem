@@ -22,9 +22,9 @@ void ParseCCSDOptions::parse_check(json& jinput) {
   // clang-format off
     const std::vector<string> valid_cc{
       "CCSD(T)",  "DLPNO",        "EOMCCSD",        "RT-EOMCC",     "GFCCSD",
-      "comments", "threshold",    "tilesize",     "computeTData",
+      "comments", "threshold",    "tilesize",     
       "lshift",   "ndiis",        "ccsd_maxiter",   "freeze",       "PRINT",
-      "readt",    "writet",       "writev",         "writet_iter",  "debug",
+      "readt",    "writet",        "writet_iter",  "debug",
       "nactive",  "profile_ccsd", "balance_tiles",  "ext_data_path"};
   // clang-format on
   for(auto& el: jinput["CC"].items()) {
@@ -47,12 +47,10 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(cc_options.debug, jcc, "debug");
   parse_option<bool>(cc_options.readt, jcc, "readt");
   parse_option<bool>(cc_options.writet, jcc, "writet");
-  parse_option<bool>(cc_options.writev, jcc, "writev");
   parse_option<int>(cc_options.writet_iter, jcc, "writet_iter");
   parse_option<bool>(cc_options.balance_tiles, jcc, "balance_tiles");
   parse_option<bool>(cc_options.profile_ccsd, jcc, "profile_ccsd");
   parse_option<string>(cc_options.ext_data_path, jcc, "ext_data_path");
-  parse_option<bool>(cc_options.computeTData, jcc, "computeTData");
 
   json jcc_print = jcc["PRINT"];
   parse_option<bool>(cc_options.ccsd_diagnostics, jcc_print, "ccsd_diagnostics");

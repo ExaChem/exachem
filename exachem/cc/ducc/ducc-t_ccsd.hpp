@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "exachem/cholesky/cholesky_2e.hpp"
 #include "exachem/cholesky/v2tensors.hpp"
 
 namespace exachem::cc::ducc {

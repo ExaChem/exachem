@@ -10,7 +10,7 @@
 
 #include "exachem/cc/cc2/cd_cc2_cs.hpp"
 
-namespace cc2_os {
+namespace exachem::cc2::cc2_os {
 
 template<typename T>
 void cc2_e_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI, Tensor<T>& de,
@@ -37,4 +37,4 @@ cd_cc2_os_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace&
                  std::vector<Tensor<T>>& d_t2s, std::vector<T>& p_evl_sorted, Tensor<T>& cv3d,
                  bool cc2_restart = false, std::string out_fp = "", bool computeTData = false);
 
-}; // namespace cc2_os
+}; // namespace exachem::cc2::cc2_os

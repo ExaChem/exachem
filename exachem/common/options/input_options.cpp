@@ -136,8 +136,6 @@ void CCSDOptions::print() {
   if(gf_nprocs_poi > 0) std::cout << " gf_nprocs_poi        = " << gf_nprocs_poi << std::endl;
   txt_utils::print_bool(" readt               ", readt);
   txt_utils::print_bool(" writet              ", writet);
-  txt_utils::print_bool(" writev              ", writev);
-  // txt_utils::print_bool(" computeTData        ", computeTData);
   std::cout << " writet_iter          = " << writet_iter << std::endl;
   txt_utils::print_bool(" profile_ccsd        ", profile_ccsd);
   txt_utils::print_bool(" balance_tiles       ", balance_tiles);
@@ -235,11 +233,9 @@ void CCSDOptions::initialize() {
   balance_tiles  = true;
   profile_ccsd   = false;
 
-  writet       = false;
-  writev       = false;
-  writet_iter  = ndiis;
-  readt        = false;
-  computeTData = false;
+  writet      = false;
+  writet_iter = ndiis;
+  readt       = false;
 
   localize      = false;
   skip_dlpno    = false;

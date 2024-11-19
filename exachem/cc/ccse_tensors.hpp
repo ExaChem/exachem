@@ -108,7 +108,7 @@ public:
 
     const auto  ndims   = tis.size();
     std::string err_msg = "Error in tensor [" + tname + "] declaration";
-    if(ndims < 2 || ndims > 4) tamm_terminate(err_msg + ": Only 2,3,4D tensors are allowed");
+    if(ndims < 2 || ndims > 6) tamm_terminate(err_msg + ": Only 2,3,4,6D tensors are allowed");
 
     is_mo_3d                 = true;
     const TiledIndexSpace& O = MO("occ");
@@ -123,6 +123,7 @@ public:
     std::vector<std::string> allowed_blocks = {"aa", "bb"};
     if(ndims == 3 && is_mo_3d) allowed_blocks = {"aaa", "baa", "abb", "bbb"};
     else if(ndims == 4) allowed_blocks = {"aaaa", "abab", "bbbb", "abba", "baab", "baba"};
+    else if(ndims == 6) allowed_blocks = {"aaaaaa", "aabaab", "abbabb", "bbbbbb"};
 
     if(blocks.size() == 0)
       tamm_terminate(err_msg + ": Please specify the tensor blocks to be allocated");
@@ -135,9 +136,13 @@ public:
         else if(ndims == 3 && is_mo_3d)
           tamm_terminate(err_msg + ": Invalid block [" + x +
                          "] specified, allowed blocks are [aaa|baa|abb|bbb]");
-        else
+        else if(ndims == 4)
           tamm_terminate(err_msg + ": Invalid block [" + x +
                          "] specified, allowed blocks are [aaaa|abab|bbbb|abba|baab|baba]");
+
+        else
+          tamm_terminate(err_msg + ": Invalid block [" + x +
+                         "] specified, allowed blocks are [aaaaaa|aabaab|abbabb|bbbbbb]");
       }
     }
 
@@ -176,7 +181,7 @@ public:
         allocated_tensors.push_back(bbb);
       }
     }
-    else {
+    else if(ndims == 4) {
       if(std::find(blocks.begin(), blocks.end(), "aaaa") != blocks.end()) {
         Tensor<T> aaaa{construct_tis(MO, tis, {0, 0, 0, 0})};
         tmap["aaaa"] = aaaa;
@@ -206,6 +211,31 @@ public:
         Tensor<T> baba{construct_tis(MO, tis, {1, 0, 1, 0})};
         tmap["baba"] = baba;
         allocated_tensors.push_back(baba);
+      }
+    }
+    else { // 6D [aaaaaa|aabaab|abbabb|bbbbbb]
+      if(std::find(blocks.begin(), blocks.end(), "aaaaaa") != blocks.end()) {
+        Tensor<T> aaaaaa{construct_tis(MO, tis, {0, 0, 0, 0, 0, 0})};
+        tmap["aaaaaa"] = aaaaaa;
+        allocated_tensors.push_back(aaaaaa);
+      }
+
+      if(std::find(blocks.begin(), blocks.end(), "aabaab") != blocks.end()) {
+        Tensor<T> aabaab{construct_tis(MO, tis, {0, 0, 1, 0, 0, 1})};
+        tmap["aabaab"] = aabaab;
+        allocated_tensors.push_back(aabaab);
+      }
+
+      if(std::find(blocks.begin(), blocks.end(), "abbabb") != blocks.end()) {
+        Tensor<T> abbabb{construct_tis(MO, tis, {0, 1, 1, 0, 1, 1})};
+        tmap["abbabb"] = abbabb;
+        allocated_tensors.push_back(abbabb);
+      }
+
+      if(std::find(blocks.begin(), blocks.end(), "bbbbbb") != blocks.end()) {
+        Tensor<T> bbbbbb{construct_tis(MO, tis, {1, 1, 1, 1, 1, 1})};
+        tmap["bbbbbb"] = bbbbbb;
+        allocated_tensors.push_back(bbbbbb);
       }
     }
   }

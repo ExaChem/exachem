@@ -13,9 +13,9 @@
 void exachem::scf::SCFRestart::operator()(const ExecutionContext& ec, ChemEnv& chem_env,
                                           std::string files_prefix) {
   const bool restart = chem_env.ioptions.scf_options.restart || chem_env.ioptions.scf_options.noscf;
+  const auto rank    = ec.pg().rank();
 
   if(restart) {
-    const auto rank   = ec.pg().rank();
     const bool is_uhf = (chem_env.sys_data.is_unrestricted);
 
     std::string movecsfile_alpha  = files_prefix + ".alpha.movecs";
@@ -48,7 +48,8 @@ void exachem::scf::SCFRestart::operator()(const ExecutionContext& ec, ChemEnv& c
     chem_env.run_context["ao_tilesize"] = chem_env.is_context.ao_tilesize;
     if(chem_env.scf_context.do_df)
       chem_env.run_context["dfao_tilesize"] = chem_env.is_context.dfao_tilesize;
-    chem_env.write_run_context(); // write here as well in case we kill an SCF run midway
+    if(rank == 0)
+      chem_env.write_run_context(); // write here as well in case we kill an SCF run midway
   }
 }
 

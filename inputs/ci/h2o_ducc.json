@@ -21,6 +21,7 @@
     "diis_hist": 10,
     "charge": 0,
     "multiplicity": 1,
+    "restart": false,
     "scf_type": "restricted",
     "writem": 10
   },
@@ -37,7 +38,8 @@
       "ccsdt_tilesize": 28
     },
     "debug": false,
-    "nactive": 2
+    "nactive": 2,
+    "ducc_lvl": 2
   },
   "TASK": {
     "ducc": true  

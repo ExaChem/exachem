@@ -17,6 +17,5 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env);
 template<typename T>
 void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                         Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1,
-                        cholesky_2e::V2Tensors<T>& v2tensors, size_t nactv,
-                        ExecutionHW ex_hw = ExecutionHW::CPU);
+                        cholesky_2e::V2Tensors<T>& v2tensors);
 } // namespace exachem::cc::ducc

@@ -96,7 +96,8 @@ void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& che
       // not used currently, triples can be restarted with a different tilesize.
       chem_env.run_context["mso_tilesize_triples"] = chem_env.is_context.mso_tilesize_triples;
     }
-    chem_env.write_run_context(); // write here as well in case a run gets killed midway.
+    if(rank == 0)
+      chem_env.write_run_context(); // write here as well in case a run gets killed midway.
   }
 
   if(rank == 0) {

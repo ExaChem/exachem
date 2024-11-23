@@ -172,7 +172,7 @@ int main(int argc, char* argv[]) {
     exachem::task::geometry_analysis(ec, chem_env);
     exachem::task::execute_task(ec, chem_env, ec_arg2);
 
-    chem_env.write_run_context();
+    if(ec.print()) chem_env.write_run_context();
 
   } // loop over input files
 

@@ -23,8 +23,6 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   cc_context.compute.set(true, true); // compute ft12 and v2 in full
   exachem::cc::ccsd::cd_ccsd_driver(ec, chem_env);
 
-  ExecutionHW ex_hw = ec.exhw();
-
   TiledIndexSpace&           MO        = chem_env.is_context.MSO;
   Tensor<T>                  d_f1      = chem_env.cd_context.d_f1;
   Tensor<T>                  cholVpr   = chem_env.cd_context.cholV2;
@@ -34,8 +32,7 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   free_tensors(cholVpr);
 
-  DUCC_T_CCSD_Driver<T>(chem_env, ec, MO, d_t1, d_t2, d_f1, v2tensors,
-                        chem_env.ioptions.ccsd_options.nactive, ex_hw);
+  DUCC_T_CCSD_Driver<T>(chem_env, ec, MO, d_t1, d_t2, d_f1, v2tensors);
 
   v2tensors.deallocate();
   free_tensors(d_t1, d_t2, d_f1);

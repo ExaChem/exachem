@@ -110,6 +110,29 @@ The (T) implementation and additional optimizations on various GPU architectures
 
 :skip_ccsd: ``[default=false]`` Mostly used for performance benchmarking for the (T) calculation. When enabled, the cholesky decomposition and CCSD iterations are skipped.
 
+
+DUCC
+~~~~
+
+The double unitary CC formalism (DUCC) is described in the following paper. 
+
+- Nicholas P. Bauman, Eric J. Bylaska, Sriram Krishnamoorthy, Guang Hao Low, Nathan Wiebe, Christopher E. Granade, Martin Roetteler, Matthias Troyer, Karol Kowalski. **Downfolding of many-body Hamiltonians using active-space models: Extension of the sub-system embedding sub-algebras approach to unitary coupled cluster formalisms.** *The Journal of Chemical Physics (JCP)*, July 2019. https://doi.org/10.1063/1.5094643
+
+.. code-block:: json
+
+ "CC": {
+   "nactive"  : 0,
+   "ducc_lvl" : 2
+ }
+
+:nactive: ``[default=0]`` An integer that specifies the size of the active space (or) equivalently the number of active virtual orbitals included in the Hamiltonian H.
+
+:ducc_lvl: ``[default=2]`` An integer that specifies the level of DUCC theory.
+
+   * :strong:`0`: Only computes the bare hamiltonian.
+   * :strong:`1`: Computes level 0 plus the Single Commutator and Double Commutator of F.
+   * :strong:`2`: Computes level 1 plus the Double Commutator and Triple Commutator of F.
+
 EOMCCSD
 ~~~~~~~
 

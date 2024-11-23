@@ -22,9 +22,9 @@ void ParseCCSDOptions::parse_check(json& jinput) {
   // clang-format off
     const std::vector<string> valid_cc{
       "CCSD(T)",  "DLPNO",        "EOMCCSD",        "RT-EOMCC",     "GFCCSD",
-      "comments", "threshold",    "tilesize",     
+      "comments", "threshold",    "tilesize",     "ducc_lvl",
       "lshift",   "ndiis",        "ccsd_maxiter",   "freeze",       "PRINT",
-      "readt",    "writet",        "writet_iter",  "debug",
+      "readt",    "writet",       "writet_iter",  "debug",
       "nactive",  "profile_ccsd", "balance_tiles",  "ext_data_path"};
   // clang-format on
   for(auto& el: jinput["CC"].items()) {
@@ -40,6 +40,7 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
 
   parse_option<int>(cc_options.ndiis, jcc, "ndiis");
   parse_option<int>(cc_options.nactive, jcc, "nactive");
+  parse_option<int>(cc_options.ducc_lvl, jcc, "ducc_lvl");
   parse_option<int>(cc_options.ccsd_maxiter, jcc, "ccsd_maxiter");
   parse_option<double>(cc_options.lshift, jcc, "lshift");
   parse_option<double>(cc_options.threshold, jcc, "threshold");

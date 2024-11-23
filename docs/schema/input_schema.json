@@ -299,6 +299,9 @@
         "nactive": {
           "type": "number"
         },
+        "ducc_lvl": {
+          "type": "number"
+        },        
         "freeze": {
           "atomic": {
             "type": "boolean"

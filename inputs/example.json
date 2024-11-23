@@ -134,6 +134,7 @@
         "ndiis": 5,
         "ccsd_maxiter": 50,
         "nactive": 0,
+        "ducc_lvl": 2,
         "freeze": {
           "atomic": false,
           "core": 0,

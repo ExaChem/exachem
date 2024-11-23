@@ -117,6 +117,7 @@ public:
   std::vector<int>        cc_rdm{};
 
   int  nactive;
+  int  ducc_lvl;
   int  ccsd_maxiter;
   bool freeze_atomic{false};
   int  freeze_core;

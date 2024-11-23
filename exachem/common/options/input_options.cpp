@@ -227,6 +227,7 @@ void CCSDOptions::initialize() {
   ndiis          = 5;
   lshift         = 0;
   nactive        = 0;
+  ducc_lvl       = 2;
   ccsd_maxiter   = 50;
   freeze_core    = 0;
   freeze_virtual = 0;

@@ -1614,31 +1614,38 @@ op_exec.execute(vtaijb, true, ex_hw);
 
 template<typename T>
 bool ducc_tensors_exist(std::vector<Tensor<T>>& rwtensors, std::vector<std::string> tfiles,
-                        std::string comp, bool do_io = false) {
+                        bool do_io = false) {
   if(!do_io) return false;
 
-  std::transform(tfiles.begin(), tfiles.end(), tfiles.begin(),
-                 [&](string tname) -> std::string { return tname + "_" + comp; });
 
   return (std::all_of(tfiles.begin(), tfiles.end(), [](std::string x) { return fs::exists(x); }));
 }
 
+void reset_ducc_runcontext(ExecutionContext& ec, ChemEnv& chem_env) {
+  CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
+  chem_env.run_context["ducc"]["nactive"]  = ccsd_options.nactive;
+  chem_env.run_context["ducc"]["ducc_lvl"] = ccsd_options.ducc_lvl;
+  chem_env.run_context["ducc"]["level0"]   = false;
+  chem_env.run_context["ducc"]["level1"]   = false;
+  chem_env.run_context["ducc"]["level2"]   = false;
+  if(ec.print()) chem_env.write_run_context();
+}
+
 template<typename T>
-void ducc_tensors_io(ExecutionContext& ec, std::vector<Tensor<T>>& rwtensors,
-                     std::vector<std::string> tfiles, std::string comp, bool writet = false,
+void ducc_tensors_io(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Tensor<T>>& rwtensors,
+                     std::vector<std::string> tfiles, int dlvl, bool writet = false,
                      bool read = false) {
   if(!writet) return;
   // read only if writet is enabled
-  std::transform(tfiles.begin(), tfiles.end(), tfiles.begin(),
-                 [&](string tname) -> std::string { return tname + "_" + comp; });
+
   if(read) {
     if(ec.pg().rank() == 0)
-      std::cout << std::endl << "Reading " << comp << " tensors from disk..." << std::endl;
+      std::cout << std::endl << "DUCC: [Level " << dlvl << "] Reading ducc tensors from disk..." << std::endl;
     read_from_disk_group(ec, rwtensors, tfiles);
   }
   else {
     if(ec.pg().rank() == 0)
-      std::cout << std::endl << "Writing " << comp << " tensors to disk..." << std::endl;
+      std::cout << std::endl << "DUCC: [Level " << dlvl << "] Writing ducc tensors to disk..." << std::endl;
     write_to_disk_group(ec, rwtensors, tfiles);
   }
 }
@@ -1646,9 +1653,12 @@ namespace exachem::cc::ducc {
 template<typename T>
 void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
                         Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1,
-                        cholesky_2e::V2Tensors<T>& v2tensors, size_t nactv, ExecutionHW ex_hw) {
+                        cholesky_2e::V2Tensors<T>& v2tensors) {
   Scheduler   sch{ec};
+  ExecutionHW ex_hw = ec.exhw();
+
   SystemData& sys_data = chem_env.sys_data;
+  const size_t nactv = chem_env.ioptions.ccsd_options.nactive;
 
   const TiledIndexSpace& O = MO("occ");
   // const TiledIndexSpace& V  = MO("virt");
@@ -1669,9 +1679,8 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
   const auto rank = ec.pg().rank();
   std::cout.precision(15);
 
-  std::string out_fp       = chem_env.workspace_dir;
-  std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type + "/ducc";
-  std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
+  std::string files_dir    = chem_env.get_files_dir("","ducc");
+  std::string files_prefix = chem_env.get_files_prefix("","ducc");
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
   std::string ftij_file   = files_prefix + ".ftij";
   std::string ftia_file   = files_prefix + ".ftia";
@@ -1682,7 +1691,6 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
   std::string vtijab_file = files_prefix + ".vtijab";
   std::string vtiabc_file = files_prefix + ".vtiabc";
   std::string vtabcd_file = files_prefix + ".vtabcd";
-  const bool  drestart    = chem_env.ioptions.ccsd_options.writet;
 
   // COMPUTE <H>
   Tensor<T> deltaoo{{O, O}, {1, 1}};
@@ -1750,15 +1758,42 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
                                            vtijkl_file, vtijka_file, vtaijb_file,
                                            vtijab_file, vtiabc_file, vtabcd_file};
 
-  std::string ctype = "bareH";
-  auto        cc_t1 = std::chrono::high_resolution_clock::now();
+  const int ducc_lvl       = chem_env.ioptions.ccsd_options.ducc_lvl;
+  bool      drestart       = chem_env.ioptions.ccsd_options.writet;
+  bool      dtensors_exist = ducc_tensors_exist(ducc_tensors, dt_files, drestart);
+
+  if(drestart && dtensors_exist) {
+    const size_t orig_nactv = chem_env.run_context["ducc"]["nactive"];
+    if(orig_nactv != nactv) { dtensors_exist = false; }
+    const int orig_ducc_lvl = chem_env.run_context["ducc"]["ducc_lvl"];
+    if(orig_ducc_lvl > ducc_lvl) { dtensors_exist = false; }
+    if(!(drestart && dtensors_exist)) { reset_ducc_runcontext(ec, chem_env); }
+  }
+  else { reset_ducc_runcontext(ec, chem_env); }
+
+  chem_env.run_context["ducc"]["ducc_lvl"] = ducc_lvl;
+
+  const bool is_l0_done = chem_env.run_context["ducc"]["level0"];
+  const bool is_l1_done = chem_env.run_context["ducc"]["level1"];
+  const bool is_l2_done = chem_env.run_context["ducc"]["level2"];
+
+  auto cc_t1 = std::chrono::high_resolution_clock::now();
   // Bare Hamiltonian
-  if(ducc_tensors_exist(ducc_tensors, dt_files, ctype, drestart))
-    ducc_tensors_io(ec, ducc_tensors, dt_files, ctype, drestart, true);
+  if(drestart && dtensors_exist && is_l0_done) {
+    if(!is_l1_done && !is_l2_done) {
+      ducc_tensors_io(ec, chem_env, ducc_tensors, dt_files, 0, drestart, true);
+      sch(total_shift() = chem_env.run_context["ducc"]["total_shift"]).execute();
+    }
+  }
   else {
     H_0(sch, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd, f1, v2tensors,
         nactv, ex_hw);
-    ducc_tensors_io(ec, ducc_tensors, dt_files, ctype, drestart);
+    ducc_tensors_io(ec, chem_env, ducc_tensors, dt_files, 0, drestart);
+    chem_env.run_context["ducc"]["level0"]      = true;
+    chem_env.run_context["ducc"]["level1"]      = false;
+    chem_env.run_context["ducc"]["level2"]      = false;
+    chem_env.run_context["ducc"]["total_shift"] = get_scalar(total_shift);
+    if(ec.print()) chem_env.write_run_context();
   }
   // TODO Setup a print statement here.
   auto   cc_t2 = std::chrono::high_resolution_clock::now();
@@ -1771,93 +1806,102 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
 
   double ducc_total_time = ducc_time;
 
-  cc_t1 = std::chrono::high_resolution_clock::now();
-  // Single Commutator
-  ctype = "singleC";
-  if(ducc_tensors_exist(ducc_tensors, dt_files, ctype, drestart))
-    ducc_tensors_io(ec, ducc_tensors, dt_files, ctype, drestart, true);
-  else {
-    F_1(sch, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd, f1, t1, t2,
-        nactv, ex_hw);
+  // Level 1
+  if(ducc_lvl > 0) {
+    cc_t1 = std::chrono::high_resolution_clock::now();
 
-    sch(adj_scalar() = 0.0)(adj_scalar() += 1.0 * f1(h1, p2) * t1(p2, h1))(
-      adj_scalar() += 1.0 * t1(p2, h1) * f1(h1, p2))(total_shift() += adj_scalar())
-      .execute();
+    if(dtensors_exist && is_l1_done) {
+      if(!is_l2_done) {
+        ducc_tensors_io(ec, chem_env, ducc_tensors, dt_files, 1, drestart, true);
+        sch(total_shift() = chem_env.run_context["ducc"]["total_shift"]).execute();
+      }
+    }
+    else {
+      F_1(sch, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd, f1, t1, t2,
+          nactv, ex_hw);
 
-    V_1(sch, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd, v2tensors, t1,
-        t2, nactv, ex_hw);
+      // clang-format off
+      sch(adj_scalar() = 0.0)
+         (adj_scalar() += 1.0 * f1(h1, p2) * t1(p2, h1))
+         (adj_scalar() += 1.0 * t1(p2, h1) * f1(h1, p2))
+         (total_shift() += adj_scalar())
+         .execute();
+      // clang-format on
 
-    sch(adj_scalar() = 0.0)(adj_scalar() +=
-                            (1.0 / 4.0) * v2tensors.v2ijab(h1, h3, p2, p4) * t2(p2, p4, h1, h3))(
-      adj_scalar() += (1.0 / 4.0) * t2(p4, p2, h3, h1) *
-                      v2tensors.v2ijab(h1, h3, p2, p4))(total_shift() += adj_scalar())
-      .execute();
+      V_1(sch, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd, v2tensors, t1,
+          t2, nactv, ex_hw);
 
-    ducc_tensors_io(ec, ducc_tensors, dt_files, ctype, drestart);
+      // clang-format off
+      sch(adj_scalar() = 0.0)
+         (adj_scalar() += (1.0 / 4.0) * v2tensors.v2ijab(h1, h3, p2, p4) * t2(p2, p4, h1, h3))
+         (adj_scalar() += (1.0 / 4.0) * t2(p4, p2, h3, h1) * v2tensors.v2ijab(h1, h3, p2, p4))
+         (total_shift() += adj_scalar())
+         .execute();
+      // clang-format on
+
+      sch(adj_scalar() = 0.0).execute();
+      F_2(sch, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd, f1, t1, t2,
+          nactv, adj_scalar, ex_hw);
+      sch(total_shift() += adj_scalar()).execute();
+
+      // energy = get_scalar(adj_scalar);
+      // if(rank == 0)std::cout << "FC F2: " << std::setprecision(12) << energy << std::endl;
+      ducc_tensors_io(ec, chem_env, ducc_tensors, dt_files, 1, drestart);
+
+      chem_env.run_context["ducc"]["level1"]      = true;
+      chem_env.run_context["ducc"]["level2"]      = false;
+      chem_env.run_context["ducc"]["total_shift"] = get_scalar(total_shift);
+      if(ec.print()) chem_env.write_run_context();
+    }
+    cc_t2     = std::chrono::high_resolution_clock::now();
+    ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
+    ducc_total_time += ducc_time;
+    if(rank == 0)
+      std::cout << std::endl
+                << "DUCC: Time taken to compute Single Commutator and Double Commutator of F: "
+                << std::fixed << std::setprecision(2) << ducc_time << " secs" << std::endl;
   }
-  cc_t2     = std::chrono::high_resolution_clock::now();
-  ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
-  ducc_total_time += ducc_time;
-  if(rank == 0)
-    std::cout << std::endl
-              << "DUCC: Time taken to compute Single Commutator: " << std::fixed
-              << std::setprecision(2) << ducc_time << " secs" << std::endl;
 
-  cc_t1 = std::chrono::high_resolution_clock::now();
-  // Double Commutator
-  ctype = "doubleC";
-  if(ducc_tensors_exist(ducc_tensors, dt_files, ctype, drestart))
-    ducc_tensors_io(ec, ducc_tensors, dt_files, ctype, drestart, true);
-  else {
-    sch(adj_scalar() = 0.0).execute();
-    F_2(sch, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd, f1, t1, t2,
-        nactv, adj_scalar, ex_hw);
-    sch(total_shift() += adj_scalar()).execute();
+  // Level 2
+  if(ducc_lvl > 1) {
+    cc_t1 = std::chrono::high_resolution_clock::now();
+    if(drestart && dtensors_exist && is_l2_done) {
+      ducc_tensors_io(ec, chem_env, ducc_tensors, dt_files, 2, drestart, true);
+      sch(total_shift() = chem_env.run_context["ducc"]["total_shift"]).execute();
+    }
+    else {
+      sch(adj_scalar() = 0.0).execute();
+      V_2(sch, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd, v2tensors, t1,
+          t2, nactv, adj_scalar, ex_hw);
+      sch(total_shift() += adj_scalar()).execute();
 
-    // energy = get_scalar(adj_scalar);
-    // if(rank == 0)std::cout << "FC F2: " << std::setprecision(12) << energy << std::endl;
+      // energy = get_scalar(adj_scalar);
+      // if(rank == 0)std::cout << "FC V2: " << std::setprecision(12) << energy << std::endl;
 
-    sch(adj_scalar() = 0.0).execute();
-    V_2(sch, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd, v2tensors, t1,
-        t2, nactv, adj_scalar, ex_hw);
-    sch(total_shift() += adj_scalar()).execute();
+      // TODO: Enable when we want to do partial restarts within this level
+      // ducc_tensors_io(ec, chem_env, ducc_tensors, dt_files, 2, drestart);
 
-    // energy = get_scalar(adj_scalar);
-    // if(rank == 0)std::cout << "FC V2: " << std::setprecision(12) << energy << std::endl;
+      sch(adj_scalar() = 0.0).execute();
+      F_3(sch, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd, f1, t1, t2,
+          nactv, adj_scalar, ex_hw);
+      sch(total_shift() += adj_scalar()).execute();
 
-    ducc_tensors_io(ec, ducc_tensors, dt_files, ctype, drestart);
+      // energy = get_scalar(adj_scalar);
+      // if(rank == 0)std::cout << "FC F3: " << std::setprecision(12) << energy << std::endl;
+
+      ducc_tensors_io(ec, chem_env, ducc_tensors, dt_files, 2, drestart);
+      chem_env.run_context["ducc"]["level2"]      = true;
+      chem_env.run_context["ducc"]["total_shift"] = get_scalar(total_shift);
+      if(ec.print()) chem_env.write_run_context();
+    }
+    cc_t2     = std::chrono::high_resolution_clock::now();
+    ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
+    ducc_total_time += ducc_time;
+    if(rank == 0)
+      std::cout << std::endl
+                << "DUCC: Time taken to compute Double Commutator and Triple Commutator of F: "
+                << std::fixed << std::setprecision(2) << ducc_time << " secs" << std::endl;
   }
-  cc_t2     = std::chrono::high_resolution_clock::now();
-  ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
-  ducc_total_time += ducc_time;
-  if(rank == 0)
-    std::cout << std::endl
-              << "DUCC: Time taken to compute Double Commutator: " << std::fixed
-              << std::setprecision(2) << ducc_time << " secs" << std::endl;
-
-  cc_t1 = std::chrono::high_resolution_clock::now();
-  // Triple Commutator
-  ctype = "tripleC";
-  if(ducc_tensors_exist(ducc_tensors, dt_files, ctype, drestart))
-    ducc_tensors_io(ec, ducc_tensors, dt_files, ctype, drestart, true);
-  else {
-    sch(adj_scalar() = 0.0).execute();
-    F_3(sch, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd, f1, t1, t2,
-        nactv, adj_scalar, ex_hw);
-    sch(total_shift() += adj_scalar()).execute();
-
-    // energy = get_scalar(adj_scalar);
-    // if(rank == 0)std::cout << "FC F3: " << std::setprecision(12) << energy << std::endl;
-
-    ducc_tensors_io(ec, ducc_tensors, dt_files, ctype, drestart);
-  }
-  cc_t2     = std::chrono::high_resolution_clock::now();
-  ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
-  ducc_total_time += ducc_time;
-  if(rank == 0)
-    std::cout << std::endl
-              << "DUCC: Time taken to compute Triple Commutator: " << std::fixed
-              << std::setprecision(2) << ducc_time << " secs" << std::endl;
 
   // Transform ft from Fock operator to one-electron operator.
   // clang-format off
@@ -1884,21 +1928,26 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
   Tensor<T> eob_temp{{O, O}, {1, 1}};
   sch.allocate(eob_temp).execute();
 
-  sch(adj_scalar() = 0.0)(adj_scalar() += 1.0 * deltaoo(h1, h2) * ftij(h1, h2))(
-    eob_temp(h1, h2) = 1.0 * deltaoo(h3, h4) * vtijkl(h3, h1, h4, h2))(
-    adj_scalar() += 0.25 * deltaoo(h1, h2) * eob_temp(h1, h2))(
-    eob_temp(h1, h2) = 1.0 * deltaoo(h3, h4) * vtijkl(h3, h1, h2, h4))(
-    adj_scalar() += -0.25 * deltaoo(h1, h2) * eob_temp(h1, h2))(total_shift() -= adj_scalar())
+  // clang-format off
+  sch(adj_scalar() = 0.0)
+    (adj_scalar() += 1.0 * deltaoo(h1, h2) * ftij(h1, h2))
+    (eob_temp(h1, h2) = 1.0 * deltaoo(h3, h4) * vtijkl(h3, h1, h4, h2))
+    (adj_scalar() += 0.25 * deltaoo(h1, h2) * eob_temp(h1, h2))
+    (eob_temp(h1, h2) = 1.0 * deltaoo(h3, h4) * vtijkl(h3, h1, h2, h4))
+    (adj_scalar() += -0.25 * deltaoo(h1, h2) * eob_temp(h1, h2))
+    (total_shift() -= adj_scalar())
     .deallocate(deltaoo)
     .execute(ex_hw);
+  // clang-format on
 
   auto new_energy = get_scalar(adj_scalar);
   auto shift      = get_scalar(total_shift);
 
-  if(rank == 0)
+  if(rank == 0 && ducc_lvl > 0) {
     std::cout << std::endl
               << "NEW SCF energy: " << std::setprecision(12) << new_energy << std::endl;
-  if(rank == 0) std::cout << "SHIFT: " << std::setprecision(12) << shift << std::endl;
+    std::cout << "SHIFT: " << std::setprecision(12) << shift << std::endl;
+  }
 
   if(rank == 0) {
     sys_data.results["output"]["DUCC"]["performance"]["total_time"] = ducc_total_time;
@@ -2114,6 +2163,5 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
 using T = double;
 template void DUCC_T_CCSD_Driver<T>(ChemEnv& chem_env, ExecutionContext& ec,
                                     const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
-                                    Tensor<T>& f1, cholesky_2e::V2Tensors<T>& v2tensors,
-                                    size_t nactv, ExecutionHW ex_hw);
+                                    Tensor<T>& f1, cholesky_2e::V2Tensors<T>& v2tensors);
 } // namespace exachem::cc::ducc

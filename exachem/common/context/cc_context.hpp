@@ -7,7 +7,7 @@
  */
 
 #pragma once
-// #include "tamm/tamm.hpp"
+#include "tamm/tamm.hpp"
 
 class CCContext {
 public:
@@ -58,7 +58,11 @@ public:
 
   std::string full_t1file;
   std::string full_t2file;
-  std::string ccsdstatus;
+
+  bool is_converged(nlohmann::ordered_json& j, std::string task_str) {
+    if(j.contains(task_str)) { return j[task_str]["converged"].get<bool>(); }
+    return false;
+  }
 
   void init_filenames(std::string files_prefix) {
     this->t1file = files_prefix + ".t1amp";
@@ -72,8 +76,6 @@ public:
     this->t2_21file = files_prefix + ".t2_21amp";
     this->t2_12file = files_prefix + ".t2_12amp";
     this->t2_22file = files_prefix + ".t2_22amp";
-
-    this->ccsdstatus = files_prefix + ".ccsdstatus";
   }
 
   struct Keep {

@@ -311,11 +311,11 @@ void cc2_canonical_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   cc_context.init_filenames(files_prefix);
   CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
 
-  auto              debug      = ccsd_options.debug;
-  bool              scf_conv   = chem_env.scf_context.no_scf;
-  std::string       t1file     = cc_context.t1file;
-  std::string       t2file     = cc_context.t2file;
-  const std::string ccsdstatus = cc_context.ccsdstatus;
+  auto        debug      = ccsd_options.debug;
+  bool        scf_conv   = chem_env.scf_context.no_scf;
+  std::string t1file     = cc_context.t1file;
+  std::string t2file     = cc_context.t2file;
+  const bool  ccsdstatus = cc_context.is_converged(chem_env.run_context, "ccsd");
 
   bool ccsd_restart = ccsd_options.readt ||
                       ((fs::exists(t1file) && fs::exists(t2file) && fs::exists(cd_context.f1file) &&
@@ -331,8 +331,8 @@ void cc2_canonical_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   Tensor<T>              d_r1, d_r2, d_t1, d_t2;
   std::vector<Tensor<T>> d_r1s, d_r2s, d_t1s, d_t2s;
 
-  std::tie(p_evl_sorted, d_t1, d_t2, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s) = setupTensors(
-    ec, MO, d_f1, ccsd_options.ndiis, ccsd_restart && fs::exists(ccsdstatus) && scf_conv);
+  std::tie(p_evl_sorted, d_t1, d_t2, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s) =
+    setupTensors(ec, MO, d_f1, ccsd_options.ndiis, ccsd_restart && ccsdstatus && scf_conv);
 
   if(ccsd_restart) {
     if(fs::exists(t1file) && fs::exists(t2file)) {
@@ -351,7 +351,7 @@ void cc2_canonical_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   auto cc_t1 = std::chrono::high_resolution_clock::now();
 
-  ccsd_restart = ccsd_restart && fs::exists(ccsdstatus) && scf_conv;
+  ccsd_restart = ccsd_restart && ccsdstatus && scf_conv;
 
   std::string fullV2file = files_prefix + ".fullV2";
 
@@ -379,16 +379,13 @@ void cc2_canonical_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   ccsd_stats(ec, chem_env.scf_context.hf_energy, residual, corr_energy, ccsd_options.threshold,
              "CC2");
 
-  if(ccsd_options.writet && !fs::exists(ccsdstatus)) {
+  if(ccsd_options.writet && !ccsdstatus) {
     // write_to_disk(d_t1,t1file);
     // write_to_disk(d_t2,t2file);
-    if(rank == 0) {
-      std::ofstream out(ccsdstatus, std::ios::out);
-      if(!out) cerr << "Error opening file " << ccsdstatus << endl;
-      out << 1 << std::endl;
-      out.close();
-    }
+    chem_env.run_context["ccsd"]["converged"] = true;
   }
+  else if(!ccsdstatus) chem_env.run_context["ccsd"]["converged"] = false;
+  if(rank == 0) chem_env.write_run_context();
 
   auto   cc_t2 = std::chrono::high_resolution_clock::now();
   double cc2_time =

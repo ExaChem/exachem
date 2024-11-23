@@ -25,7 +25,6 @@ public:
   std::string movecs_so_file;
   std::string f1file;
   std::string v2file;
-  std::string cv_count_file;
   std::string fullV2file;
 
   bool readv2      = false;
@@ -38,7 +37,6 @@ public:
     this->f1file         = files_prefix + ".f1_mo";
     this->v2file         = files_prefix + ".cholv2";
     this->fullV2file     = files_prefix + ".fullV2";
-    this->cv_count_file  = files_prefix + ".cholcount";
     this->movecs_so_file = files_prefix + ".movecs_so";
   }
 

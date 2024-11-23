@@ -400,12 +400,11 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
   const auto nbf   = nao;
   int64_t    count = 0; // Initialize cholesky vector count
 
-  std::string out_fp        = chem_env.workspace_dir;
-  const auto  files_dir     = out_fp + chem_env.ioptions.scf_options.scf_type;
-  const auto  files_prefix  = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
-  const auto  chol_ao_file  = files_prefix + ".chol_ao";
-  const auto  diag_ao_file  = files_prefix + ".diag_ao";
-  const auto  cv_count_file = files_prefix + ".cholcount";
+  std::string out_fp       = chem_env.workspace_dir;
+  const auto  files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type;
+  const auto  files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
+  const auto  chol_ao_file = files_prefix + ".chol_ao";
+  const auto  diag_ao_file = files_prefix + ".diag_ao";
 
   int64_t cd_nranks = /* std::abs(std::log10(diagtol)) */ nbf / 2; // max cores
   auto    nnodes    = ec.nnodes();
@@ -467,12 +466,9 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
       write_to_disk(g_d_tamm, diag_ao_file);
       write_to_disk(g_chol_tamm, chol_ao_file);
       if(rank == 0) {
-        std::ofstream out(cv_count_file, std::ios::out);
-        if(!out) cerr << "Error opening file " << cv_count_file << endl;
-        out << count << std::endl;
-        out.close();
-        if(rank == 0)
-          cout << endl << "- Number of cholesky vectors written to disk = " << count << endl;
+        chem_env.run_context["cholesky_2e"]["num_chol_vecs"] = count;
+        chem_env.write_run_context();
+        cout << endl << "- Number of cholesky vectors written to disk = " << count << endl;
       }
     };
 
@@ -518,8 +514,7 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
     engine.set_precision(0.0);
     const auto& buf = engine.results();
 
-    bool cd_restart = write_cv.first && fs::exists(diag_ao_file) && fs::exists(chol_ao_file) &&
-                      fs::exists(cv_count_file);
+    bool cd_restart = write_cv.first && fs::exists(diag_ao_file) && fs::exists(chol_ao_file);
 
     auto compute_diagonals = [&](const IndexVector& blockid) {
       auto bi0 = blockid[0];
@@ -601,11 +596,7 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
       read_from_disk(g_d_tamm, diag_ao_file);
       read_from_disk(g_chol_tamm, chol_ao_file);
 
-      std::ifstream in(cv_count_file, std::ios::in);
-      int           rstatus = 0;
-      if(in.is_open()) rstatus = 1;
-      if(rstatus == 1) in >> count;
-      else tamm_terminate("Error reading " + cv_count_file);
+      count = chem_env.run_context["cholesky_2e"]["num_chol_vecs"];
 
       if(rank == 0)
         cout << endl << "- [CD restart] Number of cholesky vectors read = " << count << endl;

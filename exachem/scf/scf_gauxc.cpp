@@ -113,7 +113,7 @@ exachem::scf::gauxc::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
   std::vector<std::string>       xc_vector = scf_options.xc_type;
   std::vector<ExchCXX::XCKernel> kernels   = {};
   std::vector<double>            params(2049, 0.0);
-  int                            kernel_id = -1;
+  // int                            kernel_id = -1;
 
   // TODO: Refactor DFT code path when we eventually enable GauXC by default.
   // is_ks=false, so we setup, but do not run DFT.
@@ -170,8 +170,9 @@ exachem::scf::gauxc::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
       if(txt_utils::strequal_case(xcfunc, "HYB_GGA_X_QED") ||
          txt_utils::strequal_case(xcfunc, "HYB_GGA_XC_QED") ||
          txt_utils::strequal_case(xcfunc, "HYB_MGGA_XC_QED") ||
-         txt_utils::strequal_case(xcfunc, "HYB_MGGA_X_QED"))
-        kernel_id = kernels.size() - 1;
+         txt_utils::strequal_case(xcfunc, "HYB_MGGA_X_QED")) {
+        // kernel_id = kernels.size() - 1;
+      }
     }
   }
 

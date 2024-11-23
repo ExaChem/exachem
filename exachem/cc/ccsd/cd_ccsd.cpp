@@ -22,6 +22,9 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
 
   const bool is_rhf = chem_env.sys_data.is_restricted;
 
+  chem_env.run_context["ccsd"]["converged"] = false;
+  if(rank == 0) chem_env.write_run_context();
+
   std::string files_prefix = chem_env.get_files_prefix();
 
   CDContext& cd_context = chem_env.cd_context;

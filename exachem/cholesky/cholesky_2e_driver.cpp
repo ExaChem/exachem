@@ -43,9 +43,8 @@ void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& che
   CDContext& cd_context = chem_env.cd_context;
   cd_context.init_filenames(files_prefix);
 
-  const std::string cholfile    = cd_context.cv_count_file;
-  const bool        is_mso      = cd_context.is_mso;
-  const bool        do_cholesky = cd_context.do_cholesky;
+  const bool is_mso      = cd_context.is_mso;
+  const bool do_cholesky = cd_context.do_cholesky;
 
   // TODO: MO here is MSO, rename MO to MSO
   TiledIndexSpace MO;
@@ -149,23 +148,13 @@ void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& che
       write_to_disk<TensorType>(movecs_so, cd_context.movecs_so_file);
       write_to_disk(cd_context.d_f1, cd_context.f1file);
       write_to_disk(cholVpr, cd_context.v2file);
-
-      if(rank == 0) {
-        std::ofstream out(cholfile, std::ios::out);
-        if(!out) cerr << "Error opening file " << cholfile << std::endl;
-        out << chol_count << std::endl;
-        out.close();
-      }
+      chem_env.run_context["cholesky_2e"]["num_chol_vecs"] = chol_count;
+      if(rank == 0) { chem_env.write_run_context(); }
     }
   }
   else {
     if(!skip_cd.first) {
-      std::ifstream in(cholfile, std::ios::in);
-      int           rstatus = 0;
-      if(in.is_open()) rstatus = 1;
-      if(rstatus == 1) in >> chol_count;
-      else tamm_terminate("Error reading " + cholfile);
-
+      chol_count = chem_env.run_context["cholesky_2e"]["num_chol_vecs"];
       if(rank == 0)
         cout << "Number of cholesky vectors to be read from disk = " << chol_count << endl;
     }

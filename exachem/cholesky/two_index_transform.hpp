@@ -90,10 +90,17 @@ void print_mo_vectors_analysis(ChemEnv& chem_env, Matrix& C_alpha_eig, Matrix& C
 }
 
 template<typename TensorType>
-void two_index_transform(ChemEnv& chem_env, ExecutionContext& ec, Tensor<TensorType> C_alpha_AO,
-                         Tensor<TensorType> F_alpha_AO, Tensor<TensorType> C_beta_AO,
-                         Tensor<TensorType> F_beta_AO, Tensor<TensorType> F_MO,
-                         libint2::BasisSet& shells, Tensor<TensorType> lcao, bool isdlpno = false) {
+void two_index_transform(ExecutionContext& ec, ChemEnv& chem_env) {
+  // libint2::BasisSet& shells    = chem_env.shells;
+  Tensor<TensorType> C_alpha_AO = chem_env.scf_context.C_AO;
+  Tensor<TensorType> C_beta_AO  = chem_env.scf_context.C_beta_AO;
+  Tensor<TensorType> F_alpha_AO = chem_env.scf_context.F_AO;
+  Tensor<TensorType> F_beta_AO  = chem_env.scf_context.F_beta_AO;
+  Tensor<TensorType> F_MO       = chem_env.cd_context.d_f1;
+  Tensor<TensorType> lcao       = chem_env.cd_context.movecs_so;
+
+  const bool is_mso = chem_env.cd_context.is_mso;
+
   SystemData&        sys_data    = chem_env.sys_data;
   SCFOptions         scf_options = chem_env.ioptions.scf_options;
   const TAMM_GA_SIZE n_occ_alpha = sys_data.n_occ_alpha;
@@ -131,7 +138,7 @@ void two_index_transform(ChemEnv& chem_env, ExecutionContext& ec, Tensor<TensorT
          << "nAO, nMO, nelectrons = " << nao << ", " << N << ", " << n_occ_alpha + n_occ_beta
          << endl;
 
-    if(!isdlpno) {
+    if(is_mso) {
       Matrix C_alpha_eig;
       Matrix C_beta_eig;
       C_alpha_eig.setZero(nao, northo);

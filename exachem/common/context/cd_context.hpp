@@ -28,9 +28,9 @@ public:
   std::string cv_count_file;
   std::string fullV2file;
 
-  bool readv2   = false;
-  bool is_dlpno = false;
-  bool is_mso   = true;
+  bool readv2      = false;
+  bool is_mso      = true;
+  bool do_cholesky = true;
 
   bool keep_movecs_so{false};
 

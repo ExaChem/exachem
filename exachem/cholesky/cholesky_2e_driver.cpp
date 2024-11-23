@@ -16,11 +16,10 @@ void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& che
 
   if(!chem_env.scf_context.scf_converged) scf::scf_driver(ec, chem_env);
 
-  libint2::BasisSet& shells    = chem_env.shells;
-  Tensor<T>          C_AO      = chem_env.scf_context.C_AO;
-  Tensor<T>          C_beta_AO = chem_env.scf_context.C_beta_AO;
-  Tensor<T>          F_AO      = chem_env.scf_context.F_AO;
-  Tensor<T>          F_beta_AO = chem_env.scf_context.F_beta_AO;
+  Tensor<T> C_AO      = chem_env.scf_context.C_AO;
+  Tensor<T> C_beta_AO = chem_env.scf_context.C_beta_AO;
+  Tensor<T> F_AO      = chem_env.scf_context.F_AO;
+  Tensor<T> F_beta_AO = chem_env.scf_context.F_beta_AO;
 
   TiledIndexSpace& AO = chem_env.is_context.AO_opt;
 
@@ -44,9 +43,9 @@ void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& che
   CDContext& cd_context = chem_env.cd_context;
   cd_context.init_filenames(files_prefix);
 
-  const std::string cholfile = cd_context.cv_count_file;
-  bool              is_dlpno = cd_context.is_dlpno;
-  bool              is_mso   = cd_context.is_mso;
+  const std::string cholfile    = cd_context.cv_count_file;
+  const bool        is_mso      = cd_context.is_mso;
+  const bool        do_cholesky = cd_context.do_cholesky;
 
   // TODO: MO here is MSO, rename MO to MSO
   TiledIndexSpace MO;
@@ -126,10 +125,8 @@ void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& che
     Tensor<T>& movecs_so = cd_context.movecs_so;
     Tensor<T>::allocate(&ec, cd_context.d_f1, movecs_so);
 
-    exachem::cholesky_2e::two_index_transform(chem_env, ec, C_AO, F_AO, C_beta_AO, F_beta_AO,
-                                              cd_context.d_f1, shells, movecs_so,
-                                              is_dlpno || !is_mso);
-    if(!is_dlpno) exachem::cholesky_2e::cholesky_2e<T>(ec, chem_env);
+    exachem::cholesky_2e::two_index_transform<T>(ec, chem_env);
+    if(do_cholesky) exachem::cholesky_2e::cholesky_2e<T>(ec, chem_env);
 
     MO = chem_env.is_context.MSO; // modified if freezing
     if(do_freeze) {
@@ -181,7 +178,7 @@ void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& che
              << endl;
     }
 
-    if(!is_dlpno) exachem::cholesky_2e::update_sysdata(ec, chem_env, MO, is_mso);
+    if(do_cholesky) exachem::cholesky_2e::update_sysdata(ec, chem_env, MO, is_mso);
     chem_env.is_context.MSO = MO; // modified if freezing
 
     IndexSpace      chol_is{range(0, chol_count)};
@@ -193,13 +190,13 @@ void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& che
     cd_context.d_f1      = Tensor<T>{{N, N}, {1, 1}};
     cd_context.movecs_so = Tensor<T>{AO, N};
     cholVpr = {{N, N, CI}, {SpinPosition::upper, SpinPosition::lower, SpinPosition::ignore}};
-    if(!is_dlpno) Tensor<TensorType>::allocate(&ec, cholVpr);
+    if(do_cholesky) Tensor<TensorType>::allocate(&ec, cholVpr);
     Tensor<TensorType>::allocate(&ec, cd_context.d_f1, cd_context.movecs_so);
 
     if(readv2) {
       if(!fmv_exist) {
         std::string fnf = cd_context.f1file + "; " + cd_context.movecs_so_file;
-        if(!is_dlpno) fnf = fnf + "; " + cd_context.v2file;
+        if(do_cholesky) fnf = fnf + "; " + cd_context.v2file;
         tamm_terminate("\n [Cholesky restart] Error reading one or all of the files: [" + fnf +
                        "]");
       }
@@ -208,7 +205,7 @@ void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& che
       }
       read_from_disk(cd_context.movecs_so, cd_context.movecs_so_file);
       read_from_disk(cd_context.d_f1, cd_context.f1file);
-      if(!is_dlpno) read_from_disk(cholVpr, cd_context.v2file);
+      if(do_cholesky) read_from_disk(cholVpr, cd_context.v2file);
       ec.pg().barrier();
     }
   }

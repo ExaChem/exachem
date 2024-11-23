@@ -125,13 +125,13 @@ The double unitary CC formalism (DUCC) is described in the following paper.
    "ducc_lvl" : 2
  }
 
-:nactive: ``[default=0]`` An integer that specifies the size of the active space (or) equivalently the number of active virtual orbitals included in the Hamiltonian H.
+:nactive: ``[default=0]`` An integer that specifies the number of active virtual orbitals included in the Hamiltonian H. All occupied orbitals are included.
 
 :ducc_lvl: ``[default=2]`` An integer that specifies the level of DUCC theory.
 
-   * :strong:`0`: Only computes the bare hamiltonian.
-   * :strong:`1`: Computes level 0 plus the Single Commutator and Double Commutator of F.
-   * :strong:`2`: Computes level 1 plus the Double Commutator and Triple Commutator of F.
+   * :strong:`0`: Only computes the bare Hamiltonian.
+   * :strong:`1`: Computes level 0 plus the single commutator of F and V and double commutator of F.
+   * :strong:`2`: Computes level 1 plus the double commutator of V and triple commutator of F.
 
 EOMCCSD
 ~~~~~~~

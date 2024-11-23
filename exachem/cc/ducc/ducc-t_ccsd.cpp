@@ -1658,7 +1658,9 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
   ExecutionHW ex_hw = ec.exhw();
 
   SystemData& sys_data = chem_env.sys_data;
+  const size_t nelectrons_alpha = sys_data.nelectrons_alpha;
   const size_t nactv = chem_env.ioptions.ccsd_options.nactive;
+  const int ducc_lvl       = chem_env.ioptions.ccsd_options.ducc_lvl;
 
   const TiledIndexSpace& O = MO("occ");
   // const TiledIndexSpace& V  = MO("virt");
@@ -1692,6 +1694,8 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
   std::string vtiabc_file = files_prefix + ".vtiabc";
   std::string vtabcd_file = files_prefix + ".vtabcd";
 
+  if(rank == 0)
+    std::cout << "Executing DUCC routine" << std::endl;
   // COMPUTE <H>
   Tensor<T> deltaoo{{O, O}, {1, 1}};
   sch.allocate(deltaoo).execute();
@@ -1703,22 +1707,31 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
   Tensor<T> oei{{O, O}, {1, 1}};
   sch.allocate(adj_scalar, total_shift, oei).execute();
 
-  sch(oei(h1, h2) = f1(h1, h2))(oei(h1, h2) +=
-                                -0.25 * deltaoo(h3, h4) * v2tensors.v2ijkl(h3, h1, h4, h2))(
-    oei(h1, h2) += -0.25 * deltaoo(h3, h4) * v2tensors.v2ijkl(h1, h3, h2, h4))(
-    oei(h1, h2) += 0.25 * deltaoo(h3, h4) * v2tensors.v2ijkl(h1, h3, h4, h2))(
-    oei(h1, h2) += 0.25 * deltaoo(h3, h4) * v2tensors.v2ijkl(h1, h3, h4, h2))
-    .execute(ex_hw);
+  // clang-format off
+  sch(oei(h1, h2)  = f1(h1, h2))
+     (oei(h1, h2) += -0.25 * deltaoo(h3, h4) * v2tensors.v2ijkl(h3, h1, h4, h2))
+     (oei(h1, h2) += -0.25 * deltaoo(h3, h4) * v2tensors.v2ijkl(h1, h3, h2, h4))
+     (oei(h1, h2) += 0.25 * deltaoo(h3, h4) * v2tensors.v2ijkl(h1, h3, h4, h2))
+     (oei(h1, h2) += 0.25 * deltaoo(h3, h4) * v2tensors.v2ijkl(h1, h3, h4, h2))
+     .execute(ex_hw);
+  // clang-format on
 
-  sch(oei(h1, h2) += 0.25 * deltaoo(h3, h4) * v2tensors.v2ijkl(h3, h1, h4, h2))(
-    oei(h1, h2) += -0.25 * deltaoo(h3, h4) * v2tensors.v2ijkl(h1, h3, h4, h2))(
-    adj_scalar() = deltaoo(h1, h2) * oei(h1, h2))(total_shift() = adj_scalar())
-    .execute(ex_hw);
+  // clang-format off
+  sch(oei(h1, h2) += 0.25 * deltaoo(h3, h4) * v2tensors.v2ijkl(h3, h1, h4, h2))
+     (oei(h1, h2) += -0.25 * deltaoo(h3, h4) * v2tensors.v2ijkl(h1, h3, h4, h2))
+     (adj_scalar() = deltaoo(h1, h2) * oei(h1, h2))
+     (total_shift() = adj_scalar())
+     .execute(ex_hw);
+  // clang-format on
 
   auto bare_energy = get_scalar(adj_scalar);
 
   if(rank == 0)
-    std::cout << "Bare SCF Energy: " << std::setprecision(12) << bare_energy << std::endl;
+    std::cout << "Number of active orbitals = " << nactv + nelectrons_alpha << std::endl;
+  if(rank == 0) std::cout << "ducc_lvl = " << ducc_lvl << std::endl;
+  if(rank == 0)
+    std::cout << std::endl
+              << "Bare SCF energy: " << std::setprecision(12) << bare_energy << std::endl;
 
   // Allocate the transformed arrays
   Tensor<T> ftij{{O, O}, {1, 1}};
@@ -1749,7 +1762,10 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
 
   // Zero T_int components
   // This means that T1 and T2 are no longer the full T1 and T2.
-  sch(t1(p1i, h1) = 0)(t2(p1i, p2i, h1, h2) = 0).execute();
+  // clang-format off
+  sch(t1(p1i, h1) = 0)
+     (t2(p1i, p2i, h1, h2) = 0).execute();
+  // clang-format off
 
   // Tensors to read/write from/to disk
   std::vector<Tensor<T>>   ducc_tensors = {ftij,   ftia,   ftab,   vtijkl, vtijka,
@@ -1758,7 +1774,6 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
                                            vtijkl_file, vtijka_file, vtaijb_file,
                                            vtijab_file, vtiabc_file, vtabcd_file};
 
-  const int ducc_lvl       = chem_env.ioptions.ccsd_options.ducc_lvl;
   bool      drestart       = chem_env.ioptions.ccsd_options.writet;
   bool      dtensors_exist = ducc_tensors_exist(ducc_tensors, dt_files, drestart);
 
@@ -1857,9 +1872,10 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
     ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
     ducc_total_time += ducc_time;
     if(rank == 0)
-      std::cout << std::endl
-                << "DUCC: Time taken to compute Single Commutator and Double Commutator of F: "
-                << std::fixed << std::setprecision(2) << ducc_time << " secs" << std::endl;
+      std::cout
+        << std::endl
+        << "DUCC: Time taken to compute single commutator of F and V and double commutator of F: "
+        << std::fixed << std::setprecision(2) << ducc_time << " secs" << std::endl;
   }
 
   // Level 2
@@ -1899,7 +1915,7 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
     ducc_total_time += ducc_time;
     if(rank == 0)
       std::cout << std::endl
-                << "DUCC: Time taken to compute Double Commutator and Triple Commutator of F: "
+                << "DUCC: Time taken to compute double commutator of V and triple commutator of F: "
                 << std::fixed << std::setprecision(2) << ducc_time << " secs" << std::endl;
   }
 
@@ -1945,14 +1961,14 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
 
   if(rank == 0 && ducc_lvl > 0) {
     std::cout << std::endl
-              << "NEW SCF energy: " << std::setprecision(12) << new_energy << std::endl;
-    std::cout << "SHIFT: " << std::setprecision(12) << shift << std::endl;
+              << "DUCC SCF energy: " << std::setprecision(12) << new_energy << std::endl;
+    std::cout << "Energy shift: " << std::setprecision(12) << shift << std::endl;
   }
 
   if(rank == 0) {
     sys_data.results["output"]["DUCC"]["performance"]["total_time"] = ducc_total_time;
     std::cout << std::endl
-              << "DUCC: Total Compute Time: " << std::fixed << std::setprecision(2)
+              << "DUCC: Total compute time: " << std::fixed << std::setprecision(2)
               << ducc_total_time << " secs" << std::endl
               << std::endl;
   }
@@ -1964,8 +1980,7 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
   ExecutionContext ec_dense{ec.pg(), DistributionKind::dense,
                             MemoryManagerKind::ga}; // create ec_dense once
   // const auto       nelectrons       = sys_data.nelectrons;
-  const size_t nelectrons_alpha = sys_data.nelectrons_alpha;
-  auto         print_blockstr   = [](std::string filename, std::string val, bool append = false) {
+  auto print_blockstr = [](std::string filename, std::string val, bool append = false) {
     if(!filename.empty()) {
       std::ofstream tos;
       if(append) tos.open(filename + ".txt", std::ios::app);
@@ -1978,8 +1993,6 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
   const std::string results_file = files_prefix + ".ducc.results";
 
   if(rank == 0) {
-    std::cout << "Number of active orbitals = " << nactv + nelectrons_alpha << std::endl
-              << std::endl;
     print_blockstr(results_file, "Begin IJ Block");
     // std::cout << "Begin IJ Block" << std::endl;
   }
@@ -2150,8 +2163,7 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
   cc_t2     = std::chrono::high_resolution_clock::now();
   ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
   if(rank == 0)
-    std::cout << std::endl
-              << "DUCC: Time to write results: " << std::fixed << std::setprecision(2) << ducc_time
+    std::cout << "DUCC: Time to write results: " << std::fixed << std::setprecision(2) << ducc_time
               << " secs" << std::endl;
 
   free_tensors(ftij, vtijkl);

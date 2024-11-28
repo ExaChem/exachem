@@ -156,7 +156,7 @@ void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& che
     if(!skip_cd.first) {
       chol_count = chem_env.run_context["cholesky_2e"]["num_chol_vecs"];
       if(rank == 0)
-        cout << "Number of cholesky vectors to be read from disk = " << chol_count << endl;
+        cout << endl << "Number of cholesky vectors to be read from disk = " << chol_count << endl;
     }
     else {
       chol_count = skip_cd.second;

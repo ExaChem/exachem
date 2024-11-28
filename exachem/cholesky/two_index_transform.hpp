@@ -201,7 +201,7 @@ void two_index_transform(ExecutionContext& ec, ChemEnv& chem_env) {
         std::string out_fp       = chem_env.workspace_dir;
         const auto  files_prefix = out_fp + "restricted/" + sys_data.output_file_prefix;
         const auto  f1file       = files_prefix + ".td.f1_mo";
-        const auto  lcaofile     = files_prefix + ".td.lcao";
+        const auto  lcaofile     = files_prefix + ".td.movecs_so";
         if(is_rhf) {
           scf_output.write_scf_mat<TensorType>(F, f1file);
           scf_output.write_scf_mat<TensorType>(CTiled, lcaofile);

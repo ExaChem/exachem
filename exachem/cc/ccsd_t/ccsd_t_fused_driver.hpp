@@ -319,17 +319,30 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   //   }      // parallel h3b loop
   //   else { // seq h3b loop
 
-#if 1
-  if(rank == 0) {
-    std::cout << "14256-seq3 loop variant" << std::endl << std::endl;
-    // std::cout << "tile142563,kernel,memcpy,data,total" << std::endl;
+  size_t total_tasks = 0;
+  for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) {
+    for(size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
+      for(size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
+        for(size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
+          for(size_t t_p6b = t_p5b; t_p6b < noab + nvab; t_p6b++) { total_tasks++; }
+        }
+      }
+    }
   }
+
+  if(rank == 0) {
+    // std::cout << "14256-seq3 loop variant" << std::endl << std::endl;
+    std::cout << "total number of tasks = " << total_tasks << std::endl << std::endl;
+  }
+
+  size_t current_task             = 0;
+  size_t last_reported_percentage = 0;
+
   for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) { //
     for(size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
       for(size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
         for(size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
           for(size_t t_p6b = t_p5b; t_p6b < noab + nvab; t_p6b++) {
-#endif
             // #if 0
             //     for (size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
             //     for (size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
@@ -337,6 +350,7 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
             //     for (size_t t_h1b = 0; t_h1b < noab; t_h1b++) {
             //     for (size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
             // #endif
+            current_task++;
             if(next == taskcount) {
               for(size_t t_h3b = t_h2b; t_h3b < noab; t_h3b++) {
                 if((k_spin[t_p4b] + k_spin[t_p5b] + k_spin[t_p6b]) ==
@@ -389,30 +403,51 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
                       //
                       done_compute, done_copy);
 #else
-          total_fused_ccsd_t_cpu<T>(
-            is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2, d_v2,
-            k_evl_sorted,
-            //
-            df_host_pinned_s1_t1, df_host_pinned_s1_v2, df_host_pinned_d1_t2, df_host_pinned_d1_v2,
-            df_host_pinned_d2_t2, df_host_pinned_d2_v2, df_host_energies, host_d1_size,
-            host_d2_size,
-            //
-            df_simple_s1_size, df_simple_d1_size, df_simple_d2_size, df_simple_s1_exec,
-            df_simple_d1_exec, df_simple_d2_exec,
-            //
-            t_h1b, t_h2b, t_h3b, t_p4b, t_p5b, t_p6b, factor, taskcount, max_d1_kernels_pertask,
-            max_d2_kernels_pertask,
-            //
-            size_T_s1_t1, size_T_s1_v2, size_T_d1_t2, size_T_d1_v2, size_T_d2_t2, size_T_d2_v2,
-            //
-            energy_l, cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v);
+                    total_fused_ccsd_t_cpu<T>(
+                      is_restricted, noab, nvab, rank, k_spin, k_range, k_offset, d_t1, d_t2, d_v2,
+                      k_evl_sorted,
+                      //
+                      df_host_pinned_s1_t1, df_host_pinned_s1_v2, df_host_pinned_d1_t2,
+                      df_host_pinned_d1_v2, df_host_pinned_d2_t2, df_host_pinned_d2_v2,
+                      df_host_energies, host_d1_size, host_d2_size,
+                      //
+                      df_simple_s1_size, df_simple_d1_size, df_simple_d2_size, df_simple_s1_exec,
+                      df_simple_d1_exec, df_simple_d2_exec,
+                      //
+                      t_h1b, t_h2b, t_h3b, t_p4b, t_p5b, t_p6b, factor, taskcount,
+                      max_d1_kernels_pertask, max_d2_kernels_pertask,
+                      //
+                      size_T_s1_t1, size_T_s1_v2, size_T_d1_t2, size_T_d1_v2, size_T_d2_t2,
+                      size_T_d2_v2,
+                      //
+                      energy_l, cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v);
 #endif
                   }
                 }
               } // h3b
 
               next = ac->fetch_add(0, 1);
+            } // next == taskcount
+
+            if(current_task % 1000 == 0 || current_task == total_tasks) {
+              size_t percentage = (current_task * 100) / total_tasks;
+
+              if(rank == 0 && percentage != last_reported_percentage) {
+                last_reported_percentage = percentage;
+
+                const int bar_width = 50;
+                std::cout << "\r Progress [";
+                int pos = (bar_width * percentage) / 100;
+                for(int i = 0; i < bar_width; ++i) {
+                  if(i < pos) std::cout << "=";
+                  else if(i == pos) std::cout << ">";
+                  else std::cout << " ";
+                }
+                std::cout << "] " << percentage << "%";
+                std::flush(std::cout);
+              }
             }
+
             taskcount++;
           }
         }
@@ -420,6 +455,8 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
     }
   }
   // } // end seq h3b
+
+  if(rank == 0) std::cout << std::endl << std::endl;
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
   gpuDeviceSynchronize();
@@ -456,13 +493,13 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   tamm::freePinnedMem(df_host_energies);
 
 #else // cpu
-operator delete[](df_host_pinned_s1_t1);
-operator delete[](df_host_pinned_s1_v2);
-operator delete[](df_host_pinned_d1_t2);
-operator delete[](df_host_pinned_d1_v2);
-operator delete[](df_host_pinned_d2_t2);
-operator delete[](df_host_pinned_d2_v2);
-operator delete[](df_host_energies);
+  operator delete[](df_host_pinned_s1_t1);
+  operator delete[](df_host_pinned_s1_v2);
+  operator delete[](df_host_pinned_d1_t2);
+  operator delete[](df_host_pinned_d1_v2);
+  operator delete[](df_host_pinned_d2_t2);
+  operator delete[](df_host_pinned_d2_v2);
+  operator delete[](df_host_energies);
 #endif
 
   auto cc_t2 = std::chrono::high_resolution_clock::now();

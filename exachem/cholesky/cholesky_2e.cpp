@@ -35,13 +35,20 @@ int get_ts_recommendation(ExecutionContext& ec, ChemEnv& chem_env) {
   int           max_ts = 180; // gpu_mem=64
   tamm::meminfo minfo  = ec.mem_info();
   if(ec.has_gpu()) {
-    const auto gpu_mem = minfo.gpu_mem_per_device;
+    const auto ranks_per_gpu = ec.ppn() / ec.gpn();
+    const auto gpu_mem       = minfo.gpu_mem_per_device;
     if(gpu_mem <= 8) max_ts = 100;
     else if(gpu_mem <= 12) max_ts = 120;
     else if(gpu_mem <= 16) max_ts = 130;
     else if(gpu_mem <= 24) max_ts = 145;
     else if(gpu_mem <= 32) max_ts = 155;
+    else if(gpu_mem <= 40) max_ts = 160;
     else if(gpu_mem <= 48) max_ts = 170;
+
+    while((6 * (std::pow(max_ts, 4) * 8 / (1024 * 1024 * 1024.0)) * ranks_per_gpu) >=
+          0.95 * gpu_mem) {
+      max_ts -= 5;
+    }
   }
 
   std::vector<int> tilesizes;

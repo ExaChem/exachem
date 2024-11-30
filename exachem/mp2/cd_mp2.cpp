@@ -165,11 +165,17 @@ void cd_mp2(ExecutionContext& ec, ChemEnv& chem_env) {
   double mp2_time =
     std::chrono::duration_cast<std::chrono::duration<double>>((mp_t2 - mp_t1)).count();
 
+  chem_env.mp2_context.mp2_correlation_energy = mp2_energy;
+  chem_env.mp2_context.mp2_total_energy       = chem_env.scf_context.hf_energy + mp2_energy;
+
   if(rank == 0) {
     if(is_rhf) std::cout << "Closed-Shell ";
     else std::cout << "Open-Shell ";
-    std::cout << "MP2 energy / hartree: " << std::fixed << std::setprecision(15) << mp2_energy
-              << std::endl;
+    std::cout << "MP2 correlation energy / hartree: " << std::fixed << std::setprecision(15)
+              << mp2_energy << std::endl;
+    std::cout << "MP2 total energy / hartree: " << std::fixed << std::setprecision(15)
+              << chem_env.mp2_context.mp2_total_energy << std::endl;
+
     std::cout << "Time to compute MP2 energy: " << std::fixed << std::setprecision(2) << mp2_time
               << " secs" << std::endl
               << std::endl;

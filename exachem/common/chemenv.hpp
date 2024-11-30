@@ -15,6 +15,7 @@
 #include "exachem/common/context/cc_context.hpp"
 #include "exachem/common/context/cd_context.hpp"
 #include "exachem/common/context/is_context.hpp"
+#include "exachem/common/context/mp2_context.hpp"
 #include "exachem/common/context/scf_context.hpp"
 #include "exachem/common/txt_utils.hpp"
 
@@ -43,10 +44,12 @@ public:
   std::vector<Atom>   atoms;
   std::vector<ECAtom> ec_atoms;
   libint2::BasisSet   shells;
+  std::string         task_string;
 
   std::string workspace_dir{};
 
   SCFContext scf_context;
+  MP2Context mp2_context;
   CDContext  cd_context;
   CCContext  cc_context;
   ISContext  is_context; // IndexSpaces

@@ -15,9 +15,9 @@ ParseTaskOptions::ParseTaskOptions(ChemEnv& chem_env) {
 
 void ParseTaskOptions::parse_check(json& jinput) {
   const std::vector<string> valid_tasks{
-    "sinfo", "scf",        "fci",          "fcidump",  "mp2",       "gw",         "cd_2e",
-    "cc2",   "dlpno_ccsd", "dlpno_ccsd_t", "ducc",     "ccsd",      "ccsd_sf",    "ccsd_t",
-    "ccsdt", "gfccsd",     "ccsd_lambda",  "eom_ccsd", "rteom_cc2", "rteom_ccsd", "comments"};
+    "sinfo",  "scf",       "fci",        "fcidump",    "mp2",          "gw",          "cd_2e",
+    "cc2",    "ducc",      "ccsd",       "ccsdt",      "ccsd_t",       "ccsd_lambda", "eom_ccsd",
+    "gfccsd", "rteom_cc2", "rteom_ccsd", "dlpno_ccsd", "dlpno_ccsd_t", "comments",    "operation"};
 
   for(auto& el: jinput["TASK"].items()) {
     if(std::find(valid_tasks.begin(), valid_tasks.end(), el.key()) == valid_tasks.end())
@@ -52,7 +52,10 @@ void ParseTaskOptions::parse(ChemEnv& chem_env) {
 
   parse_option<std::pair<bool, std::string>>(task_options.dlpno_ccsd, jtask, "dlpno_ccsd");
   parse_option<std::pair<bool, std::string>>(task_options.dlpno_ccsd_t, jtask, "dlpno_ccsd_t");
-  // clang-format on
+
+  parse_option<std::vector<std::string>>(task_options.operation, jtask, "operation");
+
+  // clang-format on   
 }
 
 void ParseTaskOptions::update_common_options(ChemEnv& chem_env) {

@@ -270,6 +270,7 @@ public:
   bool                         gfccsd{false};
   std::pair<bool, std::string> dlpno_ccsd{false, ""};
   std::pair<bool, std::string> dlpno_ccsd_t{false, ""};
+  std::vector<std::string>     operation{"energy"};
   void                         print();
 };
 

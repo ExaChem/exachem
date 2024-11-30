@@ -7,7 +7,8 @@
  */
 
 #include <exachem/exachem_git.hpp>
-#include <exachem/task/ec_task.hpp>
+// #include <exachem/task/ec_task.hpp>
+#include <exachem/task/numerical_gradients.hpp>
 #include <tamm/tamm_git.hpp>
 
 int main(int argc, char* argv[]) {
@@ -128,27 +129,7 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    const auto              task = ioptions.task_options;
-    const std::vector<bool> tvec = {task.sinfo,
-                                    task.scf,
-                                    task.mp2,
-                                    task.gw,
-                                    task.fci,
-                                    task.cd_2e,
-                                    task.ducc,
-                                    task.ccsd,
-                                    task.ccsdt,
-                                    task.ccsd_t,
-                                    task.ccsd_lambda,
-                                    task.eom_ccsd,
-                                    task.fcidump,
-                                    task.rteom_cc2,
-                                    task.rteom_ccsd,
-                                    task.gfccsd,
-                                    task.dlpno_ccsd.first,
-                                    task.dlpno_ccsd_t.first};
-    if(std::count(tvec.begin(), tvec.end(), true) > 1)
-      tamm_terminate("[INPUT FILE ERROR] only a single task can be enabled at once!");
+    const auto task = ioptions.task_options;
 
     std::string ec_arg2{};
     if(argc == 3) {
@@ -157,20 +138,18 @@ int main(int argc, char* argv[]) {
         tamm_terminate("Input file provided [" + ec_arg2 + "] does not exist!");
     }
 
-#if !defined(USE_MACIS)
-    if(task.fci) tamm_terminate("Full CI integration not enabled!");
-#endif
-
-    SCFOptions& scf_options   = chem_env.ioptions.scf_options;
-    chem_env.ec_basis         = ECBasis(ec, scf_options.basis, scf_options.basisfile,
-                                        scf_options.gaussian_type, chem_env.atoms, chem_env.ec_atoms);
-    chem_env.shells           = chem_env.ec_basis.shells;
-    chem_env.sys_data.has_ecp = chem_env.ec_basis.has_ecp;
-
     chem_env.read_run_context();
 
     exachem::task::geometry_analysis(ec, chem_env);
-    exachem::task::execute_task(ec, chem_env, ec_arg2);
+    exachem::task::compute_energy(ec, chem_env, ec_arg2);
+
+    const auto          task_op  = task.operation;
+    std::vector<Atom>   atoms    = chem_env.atoms;
+    std::vector<ECAtom> ec_atoms = chem_env.ec_atoms;
+
+    if(task_op[0] == "gradient") {
+      exachem::task::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
+    }
 
     if(ec.print()) chem_env.write_run_context();
 

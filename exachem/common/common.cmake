@@ -17,6 +17,7 @@ set(COMMON_INCLUDES
     ${COMMON_SRCDIR}/context/is_context.hpp
     ${COMMON_SRCDIR}/context/cd_context.hpp
     ${COMMON_SRCDIR}/context/cc_context.hpp
+    ${COMMON_SRCDIR}/context/mp2_context.hpp
     ${COMMON_SRCDIR}/context/scf_context.hpp
     ${COMMON_SRCDIR}/options/parse_options.hpp
     ${COMMON_SRCDIR}/options/parse_common_options.hpp

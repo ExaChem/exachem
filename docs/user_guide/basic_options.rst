@@ -104,10 +104,17 @@ The **TASK** block of the input file specifies the method to run. Only a single 
    "ccsd_lambda": false,
    "eom_ccsd": false,
    "rteom_ccsd": false,
-   "gfccsd": false
+   "gfccsd": false,
+   "operation": ["energy"]
  }
 
 A task automatically runs the tasks it depends on. For e.g. if **ccsd** is enabled, it automatically runs the tasks **scf** (hartree fock) and **cd_2e** (cholesky decomposition of the 2e integrals).
+
+:operation: ``[default=energy]`` Specifies the calculation that will be performed in the task.
+
+   * :strong:`energy`  : Computes the single point energy.
+   * :strong:`gradient`: Computes numerical gradients for the level of theory specified.
+
 
 .. _DPLOT:
 

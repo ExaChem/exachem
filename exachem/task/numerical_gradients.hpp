@@ -11,10 +11,10 @@
 namespace exachem::task {
 
 Matrix compute_numerical_gradients(ExecutionContext& ec, ChemEnv& chem_env,
-                                   std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
-                                   std::string ec_arg2);
-void   compute_gradients(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Atom>& atoms,
-                         std::vector<ECAtom>& ec_atoms, std::string ec_arg2);
+                                   const std::vector<Atom>&   atoms,
+                                   const std::vector<ECAtom>& ec_atoms, const std::string ec_arg2);
+Matrix compute_gradients(ExecutionContext& ec, ChemEnv& chem_env, const std::vector<Atom>& atoms,
+                         const std::vector<ECAtom>& ec_atoms, const std::string ec_arg2);
 
 double compute_energy(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2);
 

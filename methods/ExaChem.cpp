@@ -8,7 +8,7 @@
 
 #include <exachem/exachem_git.hpp>
 // #include <exachem/task/ec_task.hpp>
-#include <exachem/task/numerical_gradients.hpp>
+#include <exachem/task/geometry_optimizer.hpp>
 #include <tamm/tamm_git.hpp>
 
 int main(int argc, char* argv[]) {
@@ -141,7 +141,6 @@ int main(int argc, char* argv[]) {
     chem_env.read_run_context();
 
     exachem::task::geometry_analysis(ec, chem_env);
-    exachem::task::compute_energy(ec, chem_env, ec_arg2);
 
     const auto          task_op  = task.operation;
     std::vector<Atom>   atoms    = chem_env.atoms;
@@ -150,6 +149,10 @@ int main(int argc, char* argv[]) {
     if(task_op[0] == "gradient") {
       exachem::task::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
     }
+    else if(task_op[0] == "optimize") {
+      exachem::task::geometry_optimizer(ec, chem_env, atoms, ec_atoms, ec_arg2);
+    }
+    else exachem::task::compute_energy(ec, chem_env, ec_arg2);
 
     if(ec.print()) chem_env.write_run_context();
 

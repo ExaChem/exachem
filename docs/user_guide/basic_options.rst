@@ -114,6 +114,7 @@ A task automatically runs the tasks it depends on. For e.g. if **ccsd** is enabl
 
    * :strong:`energy`  : Computes the single point energy.
    * :strong:`gradient`: Computes numerical gradients for the level of theory specified.
+   * :strong:`optimize`: Minimize the energy by varying the molecular structure.
 
 
 .. _DPLOT:

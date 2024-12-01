@@ -248,6 +248,9 @@ void ChemEnv::write_json_data(const std::string cmodule) {
     results["input"][cmodule]["gf_extrapolate_level"] = ccsd.gf_extrapolate_level;
   }
 
+  results["input"]["task"][task_string] = "true";
+  results["input"]["task"]["operation"] = ioptions.task_options.operation;
+
   std::string l_module = cmodule;
   txt_utils::to_lower(l_module);
 

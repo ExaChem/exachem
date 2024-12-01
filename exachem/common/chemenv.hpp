@@ -45,6 +45,7 @@ public:
   std::vector<ECAtom> ec_atoms;
   libint2::BasisSet   shells;
   std::string         task_string;
+  double              task_energy{0.0};
 
   std::string workspace_dir{};
 

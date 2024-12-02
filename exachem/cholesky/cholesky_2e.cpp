@@ -281,7 +281,14 @@ void update_sysdata(ExecutionContext& ec, ChemEnv& chem_env, TiledIndexSpace& MO
     }
     sys_data.update();
     if(!is_mso) std::tie(MO, total_orbitals) = setup_mo_red(ec, chem_env);
-    else std::tie(MO, total_orbitals) = cholesky_2e::setupMOIS(ec, chem_env);
+    else {
+      const int nactive = chem_env.ioptions.ccsd_options.nactive;
+      if(nactive > 0) {
+        // Only DUCC uses this right now
+        std::tie(MO, total_orbitals) = cholesky_2e::setupMOIS(ec, chem_env, false, nactive);
+      }
+      else std::tie(MO, total_orbitals) = cholesky_2e::setupMOIS(ec, chem_env);
+    }
   }
 }
 

@@ -36,6 +36,9 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   v2tensors.deallocate();
   free_tensors(d_t1, d_t2, d_f1);
+
+  print_memory_usage<T>(ec.pg().rank().value(), "DUCC Memory Stats");
+
   ec.flush_and_sync();
 }
 

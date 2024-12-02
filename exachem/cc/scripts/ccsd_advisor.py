@@ -3,7 +3,7 @@ import math
 from argparse import ArgumentParser
 from argparse import ArgumentDefaultsHelpFormatter
 
-#python ccsd_advisor.py -oa 99 -ob 94 -va 394 -vb 399 -cv 4027 -ppn 4 -ram 512 -ctype uhf -diis 5 -nranks 10 -cache 8 -ts 32
+#python ccsd_advisor.py -oa 99 -ob 94 -va 394 -vb 399 -cv 4027 -ppn 4 -ram 512 -gpn 4 -gram 40 -ctype uhf -diis 5 -nranks 10 -cache 8 -ts 32
 
 def get_mo_tiles(noa,nob,nva,nvb,ts):
     est_nt = math.ceil(1.0 * noa / ts)
@@ -43,15 +43,22 @@ def parseargs(argv=None):
     parser.add_argument('-vb',  '--v_beta' ,    type=int, required=True, help='#virtual beta')
     parser.add_argument('-cv',  '--cv_count',   type=int, required=True, help='#cholesky vectors')
     parser.add_argument('-ppn', '--ppn',        type=int, required=True, help='mpi ranks per node')
+    parser.add_argument('-gpn', '--gpn',        type=int, default =None, help='number of GPUs per node')
     parser.add_argument('-ram', '--cpu_memory', type=int, required=True, help='CPU Memory per node in GiB')
+    parser.add_argument('-gram','--gpu_memory', type=int, required=True, help='Memory per GPU in GiB')
 
     parser.add_argument('-ctype',  '--scf_type',   type=str, default="rhf", help='RHF/UHF')
     parser.add_argument('-diis',   '--diis'    ,   type=int, default=5,  help='#diis')
     parser.add_argument('-cache',  '--cache_size', type=int, default=8,  help='(T) cache size')
     parser.add_argument('-ts', '--ccsdt_tilesize', type=int, default=32, help='(T) tilesize')
-    
+
     # Process arguments
     args = parser.parse_args()
+
+    # Post-process to set default
+    if args.gpn is None:
+        args.gpn = args.ppn
+    
     return args
 
 cc_args = parseargs()
@@ -62,7 +69,9 @@ v_alpha=cc_args.v_alpha
 v_beta =cc_args.v_beta
 CI     =cc_args.cv_count
 ppn    =cc_args.ppn #ppn=num-gpus per node
+gpn    =cc_args.gpn #gpn=ppn if not specified
 cpu_mem=cc_args.cpu_memory
+gpu_mem=cc_args.gpu_memory #memory per GPU
 
 
 ndiis = cc_args.diis
@@ -229,12 +238,28 @@ print("\nTotal CPU memory required for CCSD calculation: " + str(ccsd_mem) + " G
 VabOab = v_alpha*o_beta*v_beta*o_alpha
 ts_guess=40
 ts_max=ts_guess
-tilesizes = list(range(ts_guess, 181, 10))
 
-def get_ts_recommendation(tilesizes,nranks):
-    ts_guess_ = tilesizes[0]
-    ts_max_    = tilesizes[0]
+def get_ts_recommendation(nranks):
+
+    ts_max_    = 180
+    ranks_per_gpu = ppn / gpn
+    if(gpu_mem <= 8): ts_max_ = 100
+    elif(gpu_mem <= 12): ts_max_ = 120
+    elif(gpu_mem <= 16): ts_max_ = 130
+    elif(gpu_mem <= 24): ts_max_ = 145
+    elif(gpu_mem <= 32): ts_max_ = 155
+    elif(gpu_mem <= 40): ts_max_ = 160
+    elif(gpu_mem <= 48): ts_max_ = 170
+
+    while( (6 * (math.pow(ts_max_, 4) * 8 / (1024 * 1024 * 1024.0)) * ranks_per_gpu) >=
+          0.95 * gpu_mem):
+      ts_max_ -= 5
+
+
+    ts_guess_ = 40
     nblocks_  = 10
+    tilesizes = list(range(ts_guess, ts_max_+1, 5))
+
     for ts in tilesizes:
         nblocks = math.ceil(v_alpha/ts) * math.ceil(o_alpha/ts) * math.ceil(v_beta/ts) * math.ceil(o_beta/ts)
         # print ("  --> MO Tiles for tilesize %s, nblocks=%s: %s" %(ts, nblocks, get_mo_tiles(o_alpha,o_beta,v_alpha,v_beta,ts)))
@@ -248,14 +273,14 @@ def get_ts_recommendation(tilesizes,nranks):
 
     return [ts_max_,nblocks_]
 
-[ts_max,nblocks] = get_ts_recommendation(tilesizes,nranks)
+[ts_max,nblocks] = get_ts_recommendation(nranks)
 print("Min #nodes required = %s, nranks = %s, nblocks = %s, max tilesize = %s" %(nnodes, nranks, nblocks, ts_max))
 # print ("  --> MO Tiles = %s" %(get_mo_tiles(o_alpha,o_beta,v_alpha,v_beta,ts_max)))
 
 nodecounts = list(range(nnodes+10, nnodes*10+1, 10))
 for nc in nodecounts:
     # print ("-----------------------------------------------------------------------")
-    [ts_max,nblocks] = get_ts_recommendation(tilesizes,nc*ppn)
+    [ts_max,nblocks] = get_ts_recommendation(nc*ppn)
     # if nblocks <= nc*ppn: break
     if (nblocks*1.0/nc*ppn) < 0.31 or ts_max >= v_alpha+10 or nblocks==1: break
     print("For node count = %s, nranks = %s, nblocks = %s, max tilesize = %s" %(nc, nc*ppn, nblocks, ts_max))

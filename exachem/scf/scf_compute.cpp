@@ -402,7 +402,23 @@ void exachem::scf::SCFCompute::compute_density(ExecutionContext& ec, ChemEnv& ch
 #else
   Matrix& C_alpha = etensors.C_alpha;
   Matrix& C_beta  = etensors.C_beta;
+
   if(rank == 0) {
+    // Fix Phase of the Orbitals
+    Eigen::VectorXd max = etensors.C_alpha.colwise().maxCoeff();
+    Eigen::VectorXd abs = etensors.C_alpha.cwiseAbs().colwise().maxCoeff();
+    for(int imo = 0; imo < etensors.C_alpha.cols(); imo++) {
+      if(max(imo) != abs(imo)) etensors.C_alpha.col(imo) *= -1.0;
+    }
+
+    if(is_uhf) {
+      max = etensors.C_beta.colwise().maxCoeff();
+      abs = etensors.C_beta.cwiseAbs().colwise().maxCoeff();
+      for(int imo = 0; imo < etensors.C_beta.cols(); imo++) {
+        if(max(imo) != abs(imo)) etensors.C_beta.col(imo) *= -1.0;
+      }
+    }
+
     Matrix& C_occ = etensors.C_occ;
     C_occ         = C_alpha.leftCols(sys_data.nelectrons_alpha);
     eigen_to_tamm_tensor(ttensors.C_occ_a, C_occ);

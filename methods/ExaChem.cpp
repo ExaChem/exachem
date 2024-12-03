@@ -140,8 +140,6 @@ int main(int argc, char* argv[]) {
 
     chem_env.read_run_context();
 
-    exachem::task::geometry_analysis(ec, chem_env);
-
     const auto          task_op  = task.operation;
     std::vector<Atom>   atoms    = chem_env.atoms;
     std::vector<ECAtom> ec_atoms = chem_env.ec_atoms;

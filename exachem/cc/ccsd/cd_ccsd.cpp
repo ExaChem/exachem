@@ -44,7 +44,7 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
   std::string t2file     = cc_context.t2file;
   const bool  ccsdstatus = cc_context.is_converged(chem_env.run_context, "ccsd");
 
-  bool ccsd_restart = ccsd_options.readt ||
+  bool ccsd_restart = ccsd_options.readt || ccsd_options.writet ||
                       ((fs::exists(t1file) && fs::exists(t2file) && fs::exists(cd_context.f1file) &&
                         fs::exists(cd_context.v2file)));
 

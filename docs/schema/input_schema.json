@@ -319,9 +319,6 @@
         "writet": {
           "type": "boolean"
         },
-        "writev": {
-          "type": "boolean"
-        },
         "writet_iter": {
           "type": "number"
         },

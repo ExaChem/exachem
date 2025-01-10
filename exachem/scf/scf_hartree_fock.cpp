@@ -1237,7 +1237,7 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
   chem_env.is_context.AO_tis   = scf_vars.tAOt;
   chem_env.is_context.AO_ortho = tAO_ortho;
 
-  chem_env.scf_context.scf_converged = true;
+  // chem_env.scf_context.scf_converged = true;
 
   chem_env.scf_context.update(ehf, scf_vars.shell_tile_map, C_alpha_tamm, Fa_global, C_beta_tamm,
                               Fb_global, chem_env.ioptions.scf_options.noscf);

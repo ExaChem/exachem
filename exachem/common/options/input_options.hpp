@@ -116,7 +116,7 @@ public:
   std::pair<bool, double> tamplitudes{false, 0.05};
   std::vector<int>        cc_rdm{};
 
-  int  nactive;
+  int  nactive_oa, nactive_ob, nactive_va, nactive_vb;
   int  ducc_lvl;
   int  ccsd_maxiter;
   bool freeze_atomic{false};

@@ -23,7 +23,8 @@ public:
   bool                     no_scf;
   bool                     do_df;
 
-  bool scf_converged{false};
+  // bool scf_converged{false};
+  bool skip_scf{false};
 
   void update(double hf_energy, std::vector<size_t> shell_tile_map, tamm::Tensor<TensorType> C_AO,
               tamm::Tensor<TensorType> F_AO, tamm::Tensor<TensorType> C_beta_AO,

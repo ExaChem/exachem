@@ -67,7 +67,7 @@
     "lshift": 0.0,
     "ndiis": 5,
     "ccsd_maxiter": 100,
-    "nactive": 0,
+    "nactive_va": 0,
     "freeze":{
       "atomic":false,
       "core": 0,

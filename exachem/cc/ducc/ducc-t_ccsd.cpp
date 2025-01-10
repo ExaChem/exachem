@@ -1623,7 +1623,10 @@ bool ducc_tensors_exist(std::vector<Tensor<T>>& rwtensors, std::vector<std::stri
 
 void reset_ducc_runcontext(ExecutionContext& ec, ChemEnv& chem_env) {
   CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
-  chem_env.run_context["ducc"]["nactive"]  = ccsd_options.nactive;
+  chem_env.run_context["ducc"]["nactive_oa"]  = ccsd_options.nactive_oa;
+  chem_env.run_context["ducc"]["nactive_ob"]  = ccsd_options.nactive_ob;
+  chem_env.run_context["ducc"]["nactive_va"]  = ccsd_options.nactive_va;
+  chem_env.run_context["ducc"]["nactive_vb"]  = ccsd_options.nactive_vb;
   chem_env.run_context["ducc"]["ducc_lvl"] = ccsd_options.ducc_lvl;
   chem_env.run_context["ducc"]["level0"]   = false;
   chem_env.run_context["ducc"]["level1"]   = false;
@@ -1659,7 +1662,7 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
 
   SystemData& sys_data = chem_env.sys_data;
   const size_t nelectrons_alpha = sys_data.nelectrons_alpha;
-  const size_t nactv = chem_env.ioptions.ccsd_options.nactive;
+  const size_t nactv = chem_env.ioptions.ccsd_options.nactive_va;
   const int ducc_lvl       = chem_env.ioptions.ccsd_options.ducc_lvl;
 
   const TiledIndexSpace& O = MO("occ");
@@ -1778,7 +1781,7 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
   bool      dtensors_exist = ducc_tensors_exist(ducc_tensors, dt_files, drestart);
 
   if(drestart && dtensors_exist) {
-    const size_t orig_nactv = chem_env.run_context["ducc"]["nactive"];
+    const size_t orig_nactv = chem_env.run_context["ducc"]["nactive_va"];
     if(orig_nactv != nactv) { dtensors_exist = false; }
     const int orig_ducc_lvl = chem_env.run_context["ducc"]["ducc_lvl"];
     if(orig_ducc_lvl > ducc_lvl) { dtensors_exist = false; }
@@ -2146,7 +2149,7 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
   // TODO: FCIDUMP
   // if(sys_data.nbf_orig <= 20) {
   //   int              nfrzc = 0;
-  //   std::vector<int> symvec(chem_env.ioptions.ccsd_options.nactive);
+  //   std::vector<int> symvec(chem_env.ioptions.ccsd_options.nactive_va);
   //   std::fill(symvec.begin(), symvec.end(), 1);
 
   //   double            enuc = sys_data.results["output"]["SCF"]["nucl_rep_energy"];

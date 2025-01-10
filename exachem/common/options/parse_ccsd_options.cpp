@@ -25,7 +25,8 @@ void ParseCCSDOptions::parse_check(json& jinput) {
       "comments", "threshold",    "tilesize",     "ducc_lvl",
       "lshift",   "ndiis",        "ccsd_maxiter",   "freeze",       "PRINT",
       "readt",    "writet",       "writet_iter",  "debug",
-      "nactive",  "profile_ccsd", "balance_tiles",  "ext_data_path"};
+      "nactive_oa", "nactive_ob", "nactive_va", "nactive_vb", 
+      "profile_ccsd", "balance_tiles",  "ext_data_path"};
   // clang-format on
   for(auto& el: jinput["CC"].items()) {
     if(std::find(valid_cc.begin(), valid_cc.end(), el.key()) == valid_cc.end())
@@ -39,7 +40,10 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
   update_common_options(chem_env);
 
   parse_option<int>(cc_options.ndiis, jcc, "ndiis");
-  parse_option<int>(cc_options.nactive, jcc, "nactive");
+  parse_option<int>(cc_options.nactive_oa, jcc, "nactive_oa");
+  parse_option<int>(cc_options.nactive_ob, jcc, "nactive_ob");
+  parse_option<int>(cc_options.nactive_va, jcc, "nactive_va");
+  parse_option<int>(cc_options.nactive_vb, jcc, "nactive_vb");
   parse_option<int>(cc_options.ducc_lvl, jcc, "ducc_lvl");
   parse_option<int>(cc_options.ccsd_maxiter, jcc, "ccsd_maxiter");
   parse_option<double>(cc_options.lshift, jcc, "lshift");

@@ -45,7 +45,7 @@
   },
   "CC": {
     "threshold": 1e-6,
-    "nactive": 36,
+    "nactive_va": 36,
     "CCSD(T)": {
       "ccsdt_tilesize": 28
     },

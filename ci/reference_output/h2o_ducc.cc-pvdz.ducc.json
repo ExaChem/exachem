@@ -272,7 +272,7 @@
       "balance_tiles": "true"
     },
     "DUCC": {
-      "nactive": 2
+      "nactive_va": 2
     }
   }
 }

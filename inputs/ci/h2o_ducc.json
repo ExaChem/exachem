@@ -38,8 +38,13 @@
       "ccsdt_tilesize": 28
     },
     "debug": false,
-    "nactive": 2,
-    "ducc_lvl": 2
+    "nactive_va": 2,
+    "ducc_lvl": 2,
+    "freeze": {
+      "atomic": false,
+      "core": 0,
+      "virtual": 0
+    }    
   },
   "TASK": {
     "ducc": true  

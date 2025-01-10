@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright 2023-2025 Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -25,8 +25,8 @@ double get_task_energy(ExecutionContext& ec, ChemEnv& chem_env) {
 }
 
 double compute_energy(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) {
+  // std::cout << "computing energy" << std::endl;
   execute_task(ec, chem_env, ec_arg2);
-  chem_env.scf_context.scf_converged = false;
   return get_task_energy(ec, chem_env);
 }
 

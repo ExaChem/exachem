@@ -14,7 +14,7 @@ using namespace exachem::scf;
 void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
 
-  if(!chem_env.scf_context.scf_converged) scf::scf_driver(ec, chem_env);
+  if(!chem_env.scf_context.skip_scf) scf::scf_driver(ec, chem_env);
 
   Tensor<T> C_AO      = chem_env.scf_context.C_AO;
   Tensor<T> C_beta_AO = chem_env.scf_context.C_beta_AO;
@@ -49,16 +49,8 @@ void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& che
   // TODO: MO here is MSO, rename MO to MSO
   TiledIndexSpace MO;
   TAMM_SIZE       total_orbitals;
-  if(ccsd_options.nactive > 0) {
-    // Only DUCC uses this right now
-    std::tie(MO, total_orbitals) =
-      cholesky_2e::setupMOIS(ec, chem_env, false, ccsd_options.nactive);
-    // TODO: Implement check for UHF
-    if(ccsd_options.nactive > sys_data.n_vir_alpha && sys_data.is_restricted)
-      tamm_terminate("[DUCC ERROR]: nactive > n_vir_alpha");
-  }
-  else std::tie(MO, total_orbitals) = cholesky_2e::setupMOIS(ec, chem_env);
-  chem_env.is_context.MSO = MO;
+  std::tie(MO, total_orbitals) = cholesky_2e::setupMOIS(ec, chem_env);
+  chem_env.is_context.MSO      = MO;
 
   if(ccsd_options.skip_ccsd) {
     Tensor<T>::deallocate(C_AO, F_AO);

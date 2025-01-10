@@ -125,7 +125,7 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ExecutionContext& ec, ChemEn
 }
 
 std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& chem_env,
-                                                 bool triples, int nactv) {
+                                                 bool triples) {
   SystemData& sys_data    = chem_env.sys_data;
   TAMM_SIZE   n_occ_alpha = sys_data.n_occ_alpha;
   TAMM_SIZE   n_occ_beta  = sys_data.n_occ_beta;
@@ -133,8 +133,14 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& 
   const int rank         = ec.pg().rank().value();
   auto      ccsd_options = chem_env.ioptions.ccsd_options;
 
+  const int nactv = chem_env.ioptions.ccsd_options.nactive_va;
+
   Tile tce_tile      = ccsd_options.tilesize;
   bool balance_tiles = ccsd_options.balance_tiles;
+
+  // TODO: Implement check for UHF
+  if(nactv > sys_data.n_vir_alpha && sys_data.is_restricted)
+    tamm_terminate("[DUCC ERROR]: nactive_va > n_vir_alpha");
 
   const std::string jkey    = "tilesize";
   const bool        user_ts = chem_env.jinput["CC"].contains(jkey) ? true : false;
@@ -281,14 +287,7 @@ void update_sysdata(ExecutionContext& ec, ChemEnv& chem_env, TiledIndexSpace& MO
     }
     sys_data.update();
     if(!is_mso) std::tie(MO, total_orbitals) = setup_mo_red(ec, chem_env);
-    else {
-      const int nactive = chem_env.ioptions.ccsd_options.nactive;
-      if(nactive > 0) {
-        // Only DUCC uses this right now
-        std::tie(MO, total_orbitals) = cholesky_2e::setupMOIS(ec, chem_env, false, nactive);
-      }
-      else std::tie(MO, total_orbitals) = cholesky_2e::setupMOIS(ec, chem_env);
-    }
+    else { std::tie(MO, total_orbitals) = cholesky_2e::setupMOIS(ec, chem_env); }
   }
 }
 

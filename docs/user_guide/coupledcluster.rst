@@ -121,11 +121,17 @@ The double unitary CC formalism (DUCC) is described in the following paper.
 .. code-block:: json
 
  "CC": {
-   "nactive"  : 0,
+   "nactive_oa"  : 0,
+   "nactive_ob"  : 0,
+   "nactive_va"  : 0,
+   "nactive_vb"  : 0,
    "ducc_lvl" : 2
  }
 
-:nactive: ``[default=0]`` An integer that specifies the number of active virtual orbitals included in the Hamiltonian H. All occupied orbitals are included.
+:nactive_oa: ``[default=0]`` An integer that specifies the number of active occupied alpha orbitals included in the Hamiltonian H.
+:nactive_ob: ``[default=0]`` An integer that specifies the number of active occupied beta orbitals included in the Hamiltonian H.
+:nactive_va: ``[default=0]`` An integer that specifies the number of active virtual alpha orbitals included in the Hamiltonian H.
+:nactive_vb: ``[default=0]`` An integer that specifies the number of active virtual beta orbitals included in the Hamiltonian H.
 
 :ducc_lvl: ``[default=2]`` An integer that specifies the level of DUCC theory.
 

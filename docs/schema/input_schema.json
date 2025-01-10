@@ -296,7 +296,16 @@
         "ccsd_maxiter": {
           "type": "number"
         },
-        "nactive": {
+        "nactive_oa": {
+          "type": "number"
+        },
+        "nactive_ob": {
+          "type": "number"
+        },
+        "nactive_va": {
+          "type": "number"
+        },
+        "nactive_vb": {
           "type": "number"
         },
         "ducc_lvl": {

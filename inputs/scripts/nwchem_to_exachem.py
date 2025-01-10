@@ -115,6 +115,7 @@ def parse_nwchem_input(input_file):
   scf_opt["conve"] = 1e-8
   scf_opt["convd"] = 1e-7
   scf_opt["diis_hist"] = 10
+  scf_opt["charge"] = 0
   scf_opt["multiplicity"] = 1
   scf_opt["lshift"] = 0
   scf_opt["damp"] = 100
@@ -235,7 +236,7 @@ def parse_nwchem_input(input_file):
           conve = float(get_next_word(line,"thresh"))
           scf_opt["conve"] = conve
           #TODO: no convd in nwchem ?
-          scf_opt["convd"] = "{:.1e}".format(conve * 10.0)
+          scf_opt["convd"] = float("{:.1e}".format(conve * 10.0))
         if 'tol2e' in line:
           scf_opt["tol_int"] = float(get_next_word(line,"tol2e"))
         if 'uhf' in line:

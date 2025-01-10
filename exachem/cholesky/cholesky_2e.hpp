@@ -30,7 +30,7 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ExecutionContext& ec, ChemEn
                                                     bool triples = false);
 
 std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& chem_env,
-                                                 bool triples = false, int nactv = 0);
+                                                 bool triples = false);
 
 void update_sysdata(ExecutionContext& ec, ChemEnv& chem_env, TiledIndexSpace& MO,
                     bool is_mso = true);

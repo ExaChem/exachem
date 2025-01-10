@@ -126,7 +126,7 @@ void CCSDOptions::print() {
   std::cout << " ndiis                = " << ndiis << std::endl;
   std::cout << " threshold            = " << threshold << std::endl;
   std::cout << " tilesize             = " << tilesize << std::endl;
-  if(nactive > 0) std::cout << " nactive              = " << nactive << std::endl;
+  // if(nactive > 0) std::cout << " nactive              = " << nactive << std::endl;
   if(pcore > 0) std::cout << " pcore                = " << pcore << std::endl;
   std::cout << " ccsd_maxiter         = " << ccsd_maxiter << std::endl;
   txt_utils::print_bool(" freeze_atomic       ", freeze_atomic);
@@ -226,7 +226,10 @@ void CCSDOptions::initialize() {
   tilesize       = 40;
   ndiis          = 5;
   lshift         = 0;
-  nactive        = 0;
+  nactive_oa     = 0;
+  nactive_ob     = 0;
+  nactive_va     = 0;
+  nactive_vb     = 0;
   ducc_lvl       = 2;
   ccsd_maxiter   = 50;
   freeze_core    = 0;

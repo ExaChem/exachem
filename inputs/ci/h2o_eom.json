@@ -37,7 +37,7 @@
       "ccsdt_tilesize": 28
     },
     "debug": false,
-    "nactive": 0,
+    "nactive_va": 0,
     "EOMCCSD": {
       "eom_nroots": 4
     }

@@ -540,7 +540,6 @@
       "writet": "true",
       "writet_iter": 5,
       "ccsd_maxiter": 50,
-      "nactive": 0,
       "debug": false,
       "profile_ccsd": false,
       "balance_tiles": "true",

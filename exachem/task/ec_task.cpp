@@ -91,7 +91,8 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
   chem_env.shells           = chem_env.ec_basis.shells;
   chem_env.sys_data.has_ecp = chem_env.ec_basis.has_ecp;
 
-  if(chem_env.atoms.size() <= 30) exachem::task::geometry_analysis(ec, chem_env);
+  if(chem_env.atoms.size() > 1 && chem_env.atoms.size() <= 30)
+    exachem::task::geometry_analysis(ec, chem_env);
 
   print_geometry(ec, chem_env);
 

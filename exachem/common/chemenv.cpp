@@ -176,7 +176,10 @@ void ChemEnv::write_json_data(const std::string cmodule) {
     results["input"][cmodule]["writet"]        = str_bool(ccsd.writet);
     results["input"][cmodule]["writet_iter"]   = ccsd.writet_iter;
     results["input"][cmodule]["ccsd_maxiter"]  = ccsd.ccsd_maxiter;
-    results["input"][cmodule]["nactive"]       = ccsd.nactive;
+    results["input"][cmodule]["nactive_oa"]    = ccsd.nactive_oa;
+    results["input"][cmodule]["nactive_ob"]    = ccsd.nactive_ob;
+    results["input"][cmodule]["nactive_va"]    = ccsd.nactive_va;
+    results["input"][cmodule]["nactive_vb"]    = ccsd.nactive_vb;
     results["input"][cmodule]["debug"]         = ccsd.debug;
     results["input"][cmodule]["profile_ccsd"]  = ccsd.profile_ccsd;
     results["input"][cmodule]["balance_tiles"] = str_bool(ccsd.balance_tiles);
@@ -212,7 +215,10 @@ void ChemEnv::write_json_data(const std::string cmodule) {
 
   if(cmodule == "DUCC") {
     // DUCC options
-    results["input"]["DUCC"]["nactive"] = ccsd.nactive;
+    results["input"]["DUCC"]["nactive_oa"] = ccsd.nactive_oa;
+    results["input"]["DUCC"]["nactive_ob"] = ccsd.nactive_ob;
+    results["input"]["DUCC"]["nactive_va"] = ccsd.nactive_va;
+    results["input"]["DUCC"]["nactive_vb"] = ccsd.nactive_vb;
   }
 
   if(cmodule == "EOMCCSD") {

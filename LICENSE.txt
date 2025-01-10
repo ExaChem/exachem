@@ -11,3 +11,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
+Exceptions
+----------
+
+This project includes code derived from third-party software, which are governed by their respective licenses:
+
+1. Code derived from the PyBerny project (https://github.com/jhrmnn/pyberny), licensed under 
+the Mozilla Public License, Version 2.0 (MPL-2.0). 
+- Files in exachem/task directory: [internal_coordinates.cpp,internal_coordinates.hpp,pyberny_impl.cpp,pyberny_impl.hpp]
+- These files remain under the MPL-2.0 license. You may obtain a copy of the MPL-2.0 at http://mozilla.org/MPL/2.0
+

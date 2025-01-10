@@ -1,12 +1,13 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright 2023-2025 Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
 
 #include "exachem/task/geometry_optimizer.hpp"
+#include <tuple>
 
 namespace exachem::task {
 
@@ -48,6 +49,9 @@ void geometry_optimizer(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Ato
   double curr_energy = chem_env.task_energy; // original task energy
   double prev_energy = curr_energy;
 
+  // initializing optimizer object
+  exachem::task::Pyberny pyberny_instance(ec, chem_env);
+
   for(int iter = 1; iter < max_steps; iter++) {
     if(ec.print()) {
       std::cout << std::endl
@@ -67,30 +71,13 @@ void geometry_optimizer(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Ato
       return;
     }
 
-    // Initial Hessian approximation
-    Matrix H = Matrix::Identity(natoms3, natoms3);
-
-    RowVectorXd search_direction = -H * gradients;
-
-    const double step_length  = 1.0; // TODO: implement line search
-    RowVectorXd  new_geometry = geometry + step_length * search_direction;
+    auto new_geometry = pyberny_instance.step(ec, chem_env, curr_energy, gradients);
 
     update_geometry(atoms, ec_atoms, new_geometry);
 
     gradient_matrix = compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
     RowVectorXd new_gradients =
       Eigen::Map<RowVectorXd>(gradient_matrix.data(), gradient_matrix.size());
-
-    RowVectorXd s = new_geometry - geometry;   // Step vector
-    RowVectorXd y = new_gradients - gradients; // Gradient difference
-
-    // Update Hessian approximation using BFGS formula
-    double s_dot_y = s.dot(y);
-    if(s_dot_y > 1e-10) { // Avoid division by zero or instability
-      RowVectorXd Hy = H * y;
-      // H += (s * s.transpose()) / s_dot_y - (Hy * Hy.transpose()) / (y.transpose() * Hy);
-      H += (s.transpose() * s) / s_dot_y - (Hy.transpose() * Hy) / (Hy * y.transpose());
-    }
 
     // Update for next iteration
     geometry  = new_geometry;

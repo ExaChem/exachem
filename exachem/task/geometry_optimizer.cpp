@@ -52,6 +52,9 @@ void geometry_optimizer(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Ato
   // initializing optimizer object
   exachem::task::Pyberny pyberny_instance(ec, chem_env);
 
+  // printing internal coordaintres
+  pyberny_instance.int_coords.print(ec);
+
   for(int iter = 1; iter < max_steps; iter++) {
     if(ec.print()) {
       std::cout << std::endl

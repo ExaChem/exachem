@@ -25,7 +25,7 @@ Build instructions are available [here](https://exachem.readthedocs.io/en/latest
 ## ExaChem Citation
 #### Please cite the following reference when publishing results obtained with ExaChem. 
 
-Panyala, Ajay; Bauman, Nicholas; Pathak, Himadri; Mejia Rodriguez, Daniel; Peng, Bo; Mutlu, Erdal; Xantheas, Sotiris; Govind, Niranjan; Kowalski, Karol; Krishnamoorthy, Sriram. **ExaChem: Open Source Exascale Computational Chemistry Software.** https://github.com/ExaChem/exachem  (June 2023) [DOI:10.11578/dc.20230628.1](https://doi.org/10.11578/dc.20230628.1)
+Panyala, Ajay; Bauman, Nicholas; Mejia Rodriguez, Daniel; Pathak, Himadri; Peng, Bo; Mutlu, Erdal; Murphy, David; Nandipati, Giridhar; Krishnamoorthy, Sriram; Xantheas, Sotiris; Govind, Niranjan; Kowalski, Karol. **ExaChem: Open Source Exascale Computational Chemistry Software.** https://github.com/ExaChem/exachem [DOI:10.11578/dc.20230628.1](https://doi.org/10.11578/dc.20230628.1)
 
 #### Please cite the following reference in addition if using the ground-state closed-shell CCSD and CCSD(T) capabilities.
 

@@ -6,6 +6,9 @@
  * See LICENSE.txt for details
  */
 
+// contains functions used for calculating geometry
+// internal_coordinates.cpp contains the actual print function
+
 #include "exachem/task/geometry_analysis.hpp"
 #include <algorithm>
 
@@ -60,39 +63,12 @@ void print_geometry(ExecutionContext& ec, ChemEnv& chem_env) {
   if(ec.print()) {
     std::stringstream ss;
     ss << std::endl << std::string(70, '-') << std::endl;
+    ss << std::setw(40) << "Geometry in bohr " << std::endl << std::endl;
     int i = 1;
     for(auto ecatom: chem_env.ec_atoms) {
       ss << std::setw(6) << std::left << i++ << std::setw(4) << ecatom.esymbol << std::right
          << std::fixed << std::setprecision(10) << std::setw(16) << ecatom.atom.x << std::setw(16)
          << ecatom.atom.y << std::setw(16) << ecatom.atom.z << std::endl;
-    }
-    std::cout << ss.str();
-  }
-}
-
-void print_bond_lengths(ExecutionContext& ec, ChemEnv& chem_env,
-                        std::vector<std::vector<double>>& bonds, int& num_atoms) {
-  if(ec.print()) {
-    std::stringstream ss;
-    ss << std::endl << std::string(60, '-') << std::endl;
-    ss << std::setw(25) << "Bond Lengths" << std::endl << std::endl;
-
-    ss << std::setw(3) << std::left << "i"
-       << " " << std::right << std::setw(14) << std::setw(3) << std::left << "j"
-       << " " << std::right << std::setw(20) << std::setw(3) << std::left << "Length (Angstroms)"
-       << " " << std::right << std::setw(20) << std::setw(3) << std::left << "Length (Bohr)"
-       << " " << std::right << std::setw(20) << std::endl;
-
-    for(int i = 0; i < num_atoms; i++) {
-      for(int j = i; j < num_atoms; j++) {
-        if(i != j && bonds[j][i] != 0.0) {
-          ss << std::setw(3) << std::left << i << " " << std::right << std::setw(14) << std::setw(3)
-             << std::left << j << " " << std::right << std::setw(12) << std::fixed
-             << std::setprecision(10) << bonds[i][j] * bohr_to_ang << " " << std::right
-             << std::setw(18) << std::fixed << std::setprecision(10) << bonds[j][i] << " "
-             << std::right << std::setw(12) << std::endl;
-        }
-      }
     }
     std::cout << ss.str();
   }
@@ -134,43 +110,6 @@ void print_oop_angles(ExecutionContext& ec, ChemEnv& chem_env,
   }
 }
 
-void print_torsional_angles(
-  ExecutionContext& ec, ChemEnv& chem_env,
-  std::vector<std::vector<std::vector<std::vector<double>>>>& torsional_angles, int& num_atoms) {
-  if(ec.print()) {
-    std::stringstream ss;
-    ss << std::endl << std::string(60, '-') << std::endl;
-    ss << std::setw(20) << "Torsional Angles" << std::endl << std::endl;
-
-    ss << std::setw(3) << std::left << "i"
-       << " " << std::right << std::setw(14) << std::setw(3) << std::left << "j"
-       << " " << std::right << std::setw(14) << std::setw(3) << std::left << "k"
-       << " " << std::right << std::setw(14) << std::setw(3) << std::left << "l"
-       << " " << std::right << std::setw(14) << std::setw(3) << std::left << "Angle (degrees)"
-       << " " << std::right << std::setw(14) << std::endl;
-
-    for(int i = 0; i < num_atoms; i++) {
-      for(int j = i; j < num_atoms; j++) {
-        for(int k = j; k < num_atoms; k++) {
-          for(int l = k; l < num_atoms; l++) {
-            if(i != j && i != k && i != l && j != k && j != l && k != l &&
-               torsional_angles[i][j][k][l] != 0.0) {
-              ss << std::setw(3) << std::left << i << " " << std::right << std::setw(14)
-                 << std::setw(3) << std::left << j << " " << std::right << std::setw(14)
-                 << std::setw(3) << std::left << k << " " << std::right << std::setw(14)
-                 << std::setw(3) << std::left << l << " " << std::right << std::setw(14)
-                 << std::fixed << std::setprecision(10)
-                 << torsional_angles[i][j][k][l] * 180 / acos(-1.0) << " " << std::right
-                 << std::setw(14) << std::endl; // j center, i0, j1
-            }
-          }
-        }
-      }
-    }
-    std::cout << ss.str();
-  }
-}
-
 void print_com(ExecutionContext& ec, std::vector<double>& com) {
   if(ec.print()) {
     std::stringstream ss;
@@ -191,7 +130,7 @@ void print_mot(ExecutionContext& ec, const std::vector<std::vector<double>>& mot
   if(ec.print()) {
     std::stringstream ss;
     ss << std::endl << std::string(70, '-') << std::endl;
-    ss << std::setw(40) << "Moments of Inertia Tensor" << std::endl << std::endl;
+    ss << std::setw(40) << "Moment of Inertia Tensor" << std::endl << std::endl;
 
     for(int i = 0; i < 3; i++) {
       ss << std::setw(18) << std::right << mot[i][0] << std::setw(18) << mot[i][1] << std::setw(18)
@@ -205,7 +144,7 @@ void print_pmots(ExecutionContext& ec, std::vector<double>& pmots, const int& nu
   if(ec.print()) {
     std::stringstream ss;
     ss << std::endl << std::string(70, '-') << std::endl;
-    ss << std::setw(50) << "Principle Moments of Inertia" << std::endl << std::endl;
+    ss << std::setw(50) << "Principal Moments of Inertia" << std::endl << std::endl;
     ss << std::right << std::setw(12) << "x" << std::setw(18) << "y" << std::setw(18) << "z"
        << std::setw(20) << "Unit" << std::endl;
     ss << std::right << std::setw(18) << std::setprecision(10)
@@ -487,6 +426,15 @@ std::vector<double> cross_product(std::vector<double>& atom0, std::vector<double
   return product;
 }
 
+Eigen::Vector3d cross_product(Eigen::Vector3d atom0, Eigen::Vector3d atom1) {
+  Eigen::Vector3d product(3, 0);
+  product[0] = atom0[1] * atom1[2] - atom0[2] * atom1[1];
+  product[1] = -(atom0[0] * atom1[2] - atom0[2] * atom1[0]);
+  product[2] = atom0[0] * atom1[1] - atom0[1] * atom1[0];
+  auto obj   = product;
+  return obj;
+}
+
 // auto out_of_plane_angles(ExecutionContext& ec, std::vector<std::vector<double>>& data,
 //                          int& num_atoms, std::vector<std::vector<double>>& bonds,
 //                          std::vector<std::vector<std::vector<double>>>& angles,
@@ -562,167 +510,28 @@ auto bond_angle(const ExecutionContext& ec, const int& num_atoms,
   return angle;
 }
 
-auto single_torsional_angle(const ExecutionContext&                 ec,
-                            const std::vector<std::vector<double>>& data, const int& num_atoms,
-                            const std::vector<std::vector<double>>& bonds, const int& i,
-                            const int& j, const int& k, const int& l) {
-  std::vector<double> e_ij      = single_apuv(data, bonds, num_atoms, i, j); // ij
-  std::vector<double> e_jk      = single_apuv(data, bonds, num_atoms, j, k); // jk
-  std::vector<double> e_kl      = single_apuv(data, bonds, num_atoms, k, l); // kl
-  auto                cproduct0 = cross_product(e_ij, e_jk);
-  auto                cproduct1 = cross_product(e_jk, e_kl);
-  double              numerator = dot_product(cproduct0, cproduct1);
-  double              divisor0  = sin(specific_bond_angles(ec, num_atoms, data, bonds, i, j, k));
-  double              divisor1  = sin(specific_bond_angles(ec, num_atoms, data, bonds, j, k, l));
+double single_torsional_angle(const ExecutionContext&                 ec,
+                              const std::vector<std::vector<double>>& data, const int& num_atoms,
+                              const std::vector<std::vector<double>>& bonds, const int& i,
+                              const int& j, const int& k, const int& l) {
+  Eigen::Vector3d point0(data[i][1], data[i][2], data[i][3]);
+  Eigen::Vector3d point1(data[j][1], data[j][2], data[j][3]);
+  Eigen::Vector3d point2(data[k][1], data[k][2], data[k][3]);
+  Eigen::Vector3d point3(data[l][1], data[l][2], data[l][3]);
+  auto            v1 = -1.0 * (point1 - point0);
+  auto            v2 = point2 - point1;
+  auto            v3 = point3 - point2;
 
-  double divisor   = divisor0 * divisor1;
-  double cos_value = numerator / divisor;
-  double value;
-  if(cos_value < -1.0) value = acos(-1.0);
-  else if(cos_value > 1.0) value = acos(1);
-  else value = acos(cos_value);
+  auto v2n = v2 / v2.norm();
 
-  // Compute the sign of the torsion
+  Eigen::Vector3d v = v1 - v1.dot(v2n) * v2n;
+  Eigen::Vector3d w = v3 - v3.dot(v2n) * v2n;
 
-  double cross_x = cproduct0[1] * cproduct1[2] - cproduct0[2] * cproduct1[1];
-  double cross_y = cproduct0[2] * cproduct1[0] - cproduct0[0] * cproduct1[2];
-  double cross_z = cproduct0[0] * cproduct1[1] - cproduct0[1] * cproduct1[0];
-  double norm    = cross_x * cross_x + cross_y * cross_y + cross_z * cross_z;
-  cross_x /= norm;
-  cross_y /= norm;
-  cross_z /= norm;
-  double sign = 1.0;
-  double dot  = cross_x * e_jk[0] + cross_y * e_jk[1] + cross_z * e_jk[2];
-  if(dot < 0.0) sign = -1.0;
+  double          x   = v.dot(w);
+  Eigen::Vector3d v2v = cross_product(v2n, v);
+  double          y   = v2v.dot(w);
 
-  return sign * value * 180 / acos(-1.0);
-}
-
-void print_bond_angles(ExecutionContext& ec, ChemEnv& chem_env, int& num_atoms,
-                       std::vector<std::vector<double>>&                   data,
-                       const std::vector<std::vector<double>>&             bonds,
-                       const std::vector<std::vector<std::vector<double>>> apuv) {
-  if(ec.print()) {
-    std::stringstream ss;
-
-    ss << std::endl << std::string(60, '-') << std::endl;
-    ss << std::setw(18) << "Bond Angles" << std::endl << std::endl;
-
-    ss << std::setw(3) << std::left << "i"
-       << " " << std::right << std::setw(14) << std::setw(3) << std::left << "j"
-       << " " << std::right << std::setw(14) << std::setw(3) << std::left << "k"
-       << " " << std::right << std::setw(13) << std::setw(3) << std::left << "Angle (degrees)"
-       << " " << std::right << std::setw(14) << std::endl;
-
-    int num_bonds = 0;
-
-    for(int i = 0; i < num_atoms; i++) {     // center atom
-      for(int j = 0; j < num_atoms; j++) {   // atom 1
-        for(int k = i; k < num_atoms; k++) { // atom 2
-          if(i != j && i != k && j != k && bonds[i][j] != 0.0 && bonds[j][k] != 0.0 &&
-             specific_bond_angles(ec, num_atoms, data, bonds, i, j, k) != 0.0) {
-            ss << std::setw(3) << std::left << i << " " << std::right << std::setw(14)
-               << std::setw(3) << std::left << j << " " << std::right << std::setw(14)
-               << std::setw(3) << std::left << k << " " << std::left << std::setw(14) << std::fixed
-               << std::setprecision(10)
-               << specific_bond_angles(ec, num_atoms, data, bonds, i, j, k) * 180 / acos(-1.0)
-               << " " << std::right << std::setw(14) << std::endl; // j center, i0, j1
-            num_bonds++;
-          }
-        }
-      }
-    }
-    ss << std::endl << " - Number of angles printed: " << num_bonds << std::endl;
-    std::cout << ss.str();
-  }
-}
-
-// this function computs the angle then prints it
-auto torsional_angle(ExecutionContext& ec, const std::vector<std::vector<double>>& data,
-                     const int& num_atoms, const std::vector<std::vector<double>>& bonds,
-                     const std::vector<std::vector<std::vector<double>>>& apuv) {
-  std::stringstream ss;
-  if(ec.print()) {
-    ss << std::endl << std::string(60, '-') << std::endl;
-    ss << std::setw(20) << "Torsional Angles" << std::endl << std::endl;
-
-    ss << std::setw(3) << std::left << "i"
-       << " " << std::right << std::setw(14) << std::setw(3) << std::left << "j"
-       << " " << std::right << std::setw(14) << std::setw(3) << std::left << "k"
-       << " " << std::right << std::setw(14) << std::setw(3) << std::left << "l"
-       << " " << std::right << std::setw(13) << std::setw(3) << std::left << "Angle (degrees)"
-       << " " << std::right << std::setw(14) << std::endl;
-
-    int printed = 0;
-
-    std::set<std::vector<int>> used_indices;
-
-    for(int i = 0; i < num_atoms; i++) {
-      for(int j = 0; j < num_atoms; j++) {
-        if(i != j && bonds[i][j] != 0) {
-          for(int k = 0; k < num_atoms; k++) {
-            if(i != k && j != k && bonds[j][k] != 0.0 && bonds[i][j] != 0.0 && bonds[j][k] != 0.0 &&
-               specific_bond_angles(ec, num_atoms, data, bonds, i, j, k) != acos(-1.0)) {
-              for(int l = 0; l < num_atoms; l++) {
-                std::vector<int> current = {i, j, k, l};
-                used_indices.insert(current);
-                std::vector<int> reverse = {l, k, j, i};
-
-                if(i != l && j != l && k != l && bonds[k][l] != 0.0 &&
-                   specific_bond_angles(ec, num_atoms, data, bonds, j, k, l) != acos(-1.0) &&
-                   used_indices.find(reverse) != used_indices.end()) {
-                  std::vector<double> e_ij      = apuv[i][j];
-                  std::vector<double> e_jk      = apuv[j][k];
-                  std::vector<double> e_kl      = apuv[k][l];
-                  auto                cproduct0 = cross_product(e_ij, e_jk);
-                  auto                cproduct1 = cross_product(e_jk, e_kl);
-                  double              numerator = dot_product(cproduct0, cproduct1);
-                  double divisor0 = sin(specific_bond_angles(ec, num_atoms, data, bonds, i, j, k));
-                  double divisor1 = sin(specific_bond_angles(ec, num_atoms, data, bonds, j, k, l));
-
-                  double divisor   = divisor0 * divisor1;
-                  double cos_value = numerator / divisor;
-                  double value;
-                  if(cos_value < -1.0) value = acos(-1.0);
-                  else if(cos_value > 1.0) value = acos(1);
-                  else value = acos(cos_value);
-
-                  double cross_x = cproduct0[1] * cproduct1[2] - cproduct0[2] * cproduct1[1];
-                  double cross_y = cproduct0[2] * cproduct1[0] - cproduct0[0] * cproduct1[2];
-                  double cross_z = cproduct0[0] * cproduct1[1] - cproduct0[1] * cproduct1[0];
-                  double norm    = cross_x * cross_x + cross_y * cross_y + cross_z * cross_z;
-                  cross_x /= norm;
-                  cross_y /= norm;
-                  cross_z /= norm;
-                  double sign = 1.0;
-                  double dot  = cross_x * e_jk[0] + cross_y * e_jk[1] + cross_z * e_jk[2];
-                  if(dot < 0.0) sign = -1.0;
-
-                  double current_torsional_angle = value * sign;
-
-                  if(current_torsional_angle != 0.0 && current_torsional_angle != acos(-1.0)) {
-                    ss << std::setw(3) << std::left << i << " " << std::right << std::setw(14)
-                       << std::setw(3) << std::left << j << " " << std::right << std::setw(14)
-                       << std::setw(3) << std::left << k << " " << std::right << std::setw(14)
-                       << std::setw(3) << std::left << l << " " << std::left << std::setw(14)
-                       << std::fixed << std::setprecision(10)
-                       << current_torsional_angle * 180 / acos(-1.0) << " " << std::right
-                       << std::setw(14) << std::endl; // j center, i0, j1
-                    printed++;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    if(ec.print()) {
-      ss << std::endl << " - Number of torsional angles printed: " << printed << std::endl;
-      std::cout << ss.str();
-    }
-  }
+  return atan2(y, x);
 }
 
 std::vector<double> center_of_mass(ExecutionContext&                       ec,
@@ -793,7 +602,7 @@ double bond_length(const std::vector<double>& atom0, const std::vector<double>& 
   return length;
 }
 
-auto z_matrix(ExecutionContext& ec, ChemEnv& chem_env) {
+std::vector<std::vector<double>> z_matrix(ExecutionContext& ec, ChemEnv& chem_env) {
   std::stringstream ss;
   auto              atoms     = process_geometry(ec, chem_env);
   int               num_atoms = atoms.size();
@@ -861,8 +670,8 @@ auto z_matrix(ExecutionContext& ec, ChemEnv& chem_env) {
   std::vector<std::vector<double>> zmatrix(num_atoms, std::vector<double>(7));
 
   if(ec.print()) {
-    ss << std::endl << std::string(60, '-') << std::endl << std::endl;
-    ss << std::setw(20) << "Z-Matrix" << std::endl;
+    ss << std::endl << std::string(70, '-') << std::endl << std::endl;
+    ss << std::setw(40) << "Z-Matrix" << std::endl;
   }
 
   // vector to store atomic numbers based on position
@@ -873,7 +682,9 @@ auto z_matrix(ExecutionContext& ec, ChemEnv& chem_env) {
 
   for(int i = 0; i < num_atoms; i++) {
     if(i == 0) {
-      if(ec.print()) { ss << std::fixed << chem_env.ec_atoms[i].esymbol << std::endl; }
+      if(ec.print()) {
+        ss << std::left << std::setw(4) << chem_env.ec_atoms[i].esymbol << std::endl;
+      }
       zmatrix[i][0] = atomic_numbers[i];
       zmatrix[i][1] = -1;
       zmatrix[i][2] = -1;
@@ -892,8 +703,9 @@ auto z_matrix(ExecutionContext& ec, ChemEnv& chem_env) {
       zmatrix[i][6] = -1;
 
       if(ec.print()) {
-        ss << std::fixed << chem_env.ec_atoms[i].esymbol << " " << connectivity[i] + 1 << " "
-           << zmatrix[i][2] << std::endl;
+        ss << std::left << std::setw(4) << chem_env.ec_atoms[i].esymbol << std::right
+           << std::setw(6) << connectivity[i] + 1 << std::right << std::setprecision(8)
+           << std::setw(16) << zmatrix[i][2] << std::endl;
       }
     }
     else if(i == 2) {
@@ -914,8 +726,11 @@ auto z_matrix(ExecutionContext& ec, ChemEnv& chem_env) {
       zmatrix[i][6] = -1;
 
       if(ec.print()) {
-        ss << std::fixed << chem_env.ec_atoms[i].esymbol << " " << connectivity[i] + 1 << " "
-           << zmatrix[i][2] << " " << zmat_idx[i - temp] + 1 << " " << zmatrix[i][4] << std::endl;
+        ss << std::left << std::setw(4) << chem_env.ec_atoms[i].esymbol << std::right
+           << std::setw(6) << connectivity[i] + 1 << std::right << std::setw(16)
+           << std::setprecision(8) << zmatrix[i][2] << std::right << std::setw(6)
+           << zmat_idx[i - temp] + 1 << std::right << std::setw(16)
+           << zmatrix[i][4] * 180 / acos(-1.0) << std::endl;
       }
     }
     else {
@@ -938,10 +753,7 @@ auto z_matrix(ExecutionContext& ec, ChemEnv& chem_env) {
       zmatrix[i][3] = zmat_idx[i - temp];
       zmatrix[i][4] = bond_angle(ec, num_atoms, atoms, bonds, zmat_idx[i], connectivity[i],
                                  zmat_idx[i - temp]); //  init, center, alt
-      // zmatrix[i][4] = bond_angle(ec, atoms, zmat_idx[i], zmat_idx[i-temp], connectivity[i]);
       zmatrix[i][5] = zmat_idx[i - temp - temp2];
-      // i suspect torsional angles are off
-      // hmm how can i test it
       // angle ijk
       // torsion ijkl
       zmatrix[i][6] = single_torsional_angle(ec, atoms, num_atoms, bonds, zmat_idx[i],
@@ -949,9 +761,12 @@ auto z_matrix(ExecutionContext& ec, ChemEnv& chem_env) {
                                              zmat_idx[i - temp - temp2]);
 
       if(ec.print()) {
-        ss << std::fixed << chem_env.ec_atoms[i].esymbol << " " << connectivity[i] + 1 << " "
-           << zmatrix[i][2] << " " << zmat_idx[i - temp] + 1 << " " << zmatrix[i][4] << " "
-           << zmat_idx[i - temp - temp2] + 1 << " " << zmatrix[i][6] << std::endl;
+        ss << std::left << std::setw(4) << chem_env.ec_atoms[i].esymbol << std::fixed << std::right
+           << std::setw(6) << connectivity[i] + 1 << std::right << std::setprecision(8)
+           << std::setw(16) << zmatrix[i][2] << std::right << std::setw(6) << zmat_idx[i - temp] + 1
+           << std::right << std::setw(16) << zmatrix[i][4] * 180 / acos(-1.0) << std::right
+           << std::setw(6) << zmat_idx[i - temp - temp2] + 1 << std::right << std::setw(16)
+           << std::setprecision(4) << zmatrix[i][6] * 180 / acos(-1.0) << std::endl;
       }
     }
   }
@@ -989,7 +804,7 @@ Eigen::Vector3d nerf(const Eigen::Vector3d& a, const Eigen::Vector3d& b, const E
   return c + M * d2;
 }
 
-auto cartesian_from_z_matrix(ExecutionContext& ec, const ChemEnv& chem_env,
+void cartesian_from_z_matrix(ExecutionContext& ec, const ChemEnv& chem_env,
                              const std::vector<std::vector<double>> zmatrix) {
   // takes a z matrix
   // computes cartesian coordinates from z-matrix
@@ -1037,44 +852,15 @@ auto cartesian_from_z_matrix(ExecutionContext& ec, const ChemEnv& chem_env,
   }
 
   if(ec.print()) {
-    ss << std::endl << std::string(60, '-') << std::endl << std::endl;
-    ss << std::setw(20) << "Converted back to Cartesian" << std::endl;
+    ss << std::endl << std::string(70, '-') << std::endl << std::endl;
+    ss << std::setw(40) << "Converted back to Cartesian" << std::endl << std::endl;
     for(size_t i = 0; i < cartesian.size(); i++) {
-      ss << std::setprecision(0) << cartesian[i][0] << std::setprecision(10) << " "
-         << cartesian[i][1] << " " << cartesian[i][2] << " " << cartesian[i][3] << std::endl;
+      ss << std::fixed << std::left << std::setw(3) << ECAtom::get_symbol(int(cartesian[i][0]))
+         << std::right << std::setw(14) << cartesian[i][1] << std::setw(14) << cartesian[i][2]
+         << std::setw(14) << cartesian[i][3] << std::endl;
     }
     std::cout << ss.str();
   }
-}
-
-void geometry_analysis(ExecutionContext& ec, ChemEnv& chem_env) {
-  auto data_mat     = process_geometry(ec, chem_env);
-  int  num_atoms    = data_mat.size();
-  auto bond_lengths = process_bond_lengths(ec, num_atoms, data_mat);
-  auto apuv         = calculate_atom_pair_unit_vector(data_mat, bond_lengths, num_atoms);
-  // auto oop_angles       = out_of_plane_angles(ec, data_mat, num_atoms, bond_lengths, angles,
-  // apuv);
-  auto com   = center_of_mass(ec, data_mat, num_atoms);
-  auto mot   = moment_of_inertia(ec, data_mat, num_atoms, com);
-  auto pmots = principle_moments_of_inertia(ec, mot);
-  print_bond_lengths(ec, chem_env, bond_lengths, num_atoms);
-  ec.pg().barrier();
-  print_bond_angles(ec, chem_env, num_atoms, data_mat, bond_lengths, apuv);
-  ec.pg().barrier();
-  torsional_angle(ec, data_mat, num_atoms, bond_lengths, apuv);
-  ec.pg().barrier();
-  // print_oop_angles(ec, chem_env, oop_angles, num_atoms);
-  print_com(ec, com);
-  ec.pg().barrier();
-  print_mot(ec, mot);
-  ec.pg().barrier();
-  print_pmots(ec, pmots, num_atoms);
-  ec.pg().barrier();
-  auto zmatrix = z_matrix(ec, chem_env);
-  cartesian_from_z_matrix(ec, chem_env, zmatrix);
-
-  std::cout.flags(std::ios::fmtflags());
-  ec.pg().barrier();
 }
 
 } // namespace exachem::task

@@ -70,7 +70,7 @@ public:
 
   // constructor
   Pyberny(ExecutionContext& ec, ChemEnv& chem_env) {
-    int_coords = exachem::task::InternalCoords(ec, chem_env);
+    int_coords = exachem::task::InternalCoords(ec, chem_env, false);
   }
 
   // optimizer function, returns next geometry

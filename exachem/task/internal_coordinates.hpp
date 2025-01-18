@@ -46,8 +46,9 @@ public:
   InternalCoordinate operator[](int idx);
   int                size();
   void               push_back(InternalCoordinate coord);
+  void               print(ExecutionContext& ec);
 };
 
-InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env);
+InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool torsions);
 
 } // namespace exachem::task

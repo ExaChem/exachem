@@ -863,4 +863,44 @@ optimizer_berny(ExecutionContext& ec, ChemEnv& chem_env, double energy, Eigen::M
   return resultant;
 }
 
+std::stringstream print_bond_heading(std::stringstream ss) {
+  ss << std::endl << std::string(60, '-') << std::endl;
+  ss << std::setw(25) << "Bond Lengths" << std::endl << std::endl;
+
+  ss << std::setw(3) << std::left << "i"
+     << " " << std::right << std::setw(14) << std::setw(3) << std::left << "j"
+     << " " << std::right << std::setw(20) << std::setw(3) << std::left << "Length (Angstroms)"
+     << " " << std::right << std::setw(20) << std::setw(3) << std::left << "Length (Bohr)"
+     << " " << std::right << std::setw(20) << std::endl;
+
+  return ss;
+}
+
+std::stringstream print_angle_heading(std::stringstream ss) {
+  ss << std::endl << std::string(60, '-') << std::endl;
+  ss << std::setw(18) << "Bond Angles" << std::endl << std::endl;
+
+  ss << std::setw(3) << std::left << "i"
+     << " " << std::right << std::setw(14) << std::setw(3) << std::left << "j"
+     << " " << std::right << std::setw(14) << std::setw(3) << std::left << "k"
+     << " " << std::right << std::setw(13) << std::setw(3) << std::left << "Angle (degrees)"
+     << " " << std::right << std::setw(14) << std::endl;
+
+  return ss;
+}
+
+std::stringstream print_torsion_heading(std::stringstream ss) {
+  ss << std::endl << std::string(60, '-') << std::endl;
+  ss << std::setw(20) << "Torsional Angles" << std::endl << std::endl;
+
+  ss << std::setw(3) << std::left << "i"
+     << " " << std::right << std::setw(14) << std::setw(3) << std::left << "j"
+     << " " << std::right << std::setw(14) << std::setw(3) << std::left << "k"
+     << " " << std::right << std::setw(14) << std::setw(3) << std::left << "l"
+     << " " << std::right << std::setw(14) << std::setw(3) << std::left << "Angle (degrees)"
+     << " " << std::right << std::setw(14) << std::endl;
+
+  return ss;
+}
+
 } // namespace exachem::task

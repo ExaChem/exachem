@@ -81,6 +81,94 @@ int InternalCoordinates::size() { return coords.size(); }
 
 void InternalCoordinates::push_back(InternalCoordinate coord) { coords.push_back(coord); }
 
+// function to print all internal coordinates
+void InternalCoordinates::print(ExecutionContext& ec) {
+  // bonds, angles, and torsions are computed in blocks
+  // meaning that a while loop checking the type can be used
+
+  if(ec.print()) {
+    double ang_to_bohr = 1.8897259878858;
+    // double            bohr_to_ang = 1 / ang_to_bohr;
+    std::stringstream ss;
+
+    ss << "Printing Internal Coordinates" << std::endl;
+
+    // bond lengths
+    bool print_bond    = false;
+    bool print_angle   = false;
+    bool print_torsion = false;
+
+    int num_bonds    = 0;
+    int num_angles   = 0;
+    int num_torsions = 0;
+
+    for(size_t i = 0; i < coords.size(); i++) {
+      if(coords[i].type == "Bond") {
+        if(print_bond == false) {
+          ss << std::endl << std::string(60, '-') << std::endl;
+          ss << std::setw(28) << "Bond Lengths" << std::endl << std::endl;
+
+          ss << std::setw(6) << std::left << "i"
+             << " " << std::setw(6) << std::left << "j"
+             << " " << std::right << std::setw(20) << "Length (Angstroms)"
+             << " " << std::right << std::setw(17) << "Length (Bohr)" << std::endl;
+          print_bond = true;
+        }
+        ss << std::setw(6) << std::left << coords[i].i << " " << std::setw(6) << std::left
+           << coords[i].j << " " << std::right << std::setw(16) << std::fixed
+           << std::setprecision(10) << coords[i].value << " " << std::right << std::setw(20)
+           << coords[i].value * ang_to_bohr << std::endl;
+        num_bonds++;
+      }
+      else if(coords[i].type == "Angle") {
+        if(print_angle == false) {
+          ss << std::endl << "Number of Bonds: " << num_bonds << std::endl;
+          ss << std::endl << std::string(60, '-') << std::endl;
+          ss << std::setw(22) << "Bond Angles" << std::endl << std::endl;
+
+          ss << std::setw(6) << std::left << "i"
+             << " " << std::setw(6) << std::left << "j"
+             << " " << std::setw(6) << std::left << "k"
+             << " " << std::right << std::setw(12) << "Angle (degrees)" << std::endl;
+          print_angle = true;
+        }
+        ss << std::setw(6) << std::left << coords[i].i << " " << std::setw(6) << std::left
+           << coords[i].j << " " << std::setw(6) << std::left << coords[i].k << " " << std::fixed
+           << std::setw(10) << std::setprecision(4) << std::right
+           << coords[i].value * 180 / acos(-1.0) << " " << std::endl; // j center, i0, j1
+        num_angles++;
+      }
+      else if(coords[i].type == "Torsion") {
+        if(print_torsion == false) {
+          ss << std::endl << "Number of Angles: " << num_angles << std::endl;
+          ss << std::endl << std::string(60, '-') << std::endl;
+          ss << std::setw(30) << "Torsional Angles" << std::endl << std::endl;
+
+          ss << std::setw(6) << std::left << "i"
+             << " " << std::setw(6) << std::left << "j"
+             << " " << std::setw(6) << std::left << "k"
+             << " " << std::setw(6) << std::left << "l"
+             << " " << std::right << std::setw(12) << "Angle (degrees)" << std::endl;
+          print_torsion = true;
+        }
+        ss << std::setw(6) << std::left << coords[i].i << " " << std::setw(6) << std::left
+           << coords[i].j << " " << std::setw(6) << std::left << coords[i].k << " " << std::setw(6)
+           << std::left << coords[i].l << " " << std::fixed << std::setw(10) << std::setprecision(4)
+           << std::right << coords[i].value * 180 / acos(-1.0) << " "
+           << std::endl; // j center, i0, j1
+        num_torsions++;
+      }
+    }
+
+    ss << std::endl;
+    if(!print_torsion) { ss << "Number of Angles: " << num_angles << std::endl; }
+
+    ss << "Number of Torsional Angles: " << num_torsions << std::endl;
+
+    std::cout << ss.str() << std::endl;
+  }
+}
+
 double angle_eval(Eigen::MatrixXd coords, bool _, int i, int j, int k) {
   Eigen::RowVectorXd v1 = (coords.row(i) - coords.row(j)) * angstrom_int;
   Eigen::RowVectorXd v2 = (coords.row(k) - coords.row(j)) * angstrom_int;
@@ -143,7 +231,11 @@ std::tuple<std::vector<std::vector<int>>, Eigen::MatrixXd> get_clusters(const Ei
   return std::make_pair(clusters, cluster_matrix);
 }
 
-InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env) {
+// give the InternalCoordinates object a print function
+// derived from the printing functions in geometry_analysis
+// add a flag to include torsional angles
+// look into why pyberny wasn't calculating them
+InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool torsions) {
   InternalCoordinates coords;
   auto                data_mat  = exachem::task::process_geometry(ec, chem_env);
   int                 num_atoms = data_mat.size();
@@ -235,67 +327,72 @@ InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env) {
   }
 
   // calculating torsions
-  std::set<std::vector<int>> used_indices;
+  if(torsions) {
+    std::set<std::vector<int>> used_indices;
 
-  for(int i = 0; i < num_atoms; i++) {
-    for(int j = 0; j < num_atoms; j++) {
-      if(i != j && bonds[i][j] != 0) {
-        for(int k = 0; k < num_atoms; k++) {
-          if(i != k && j != k && bonds[j][k] != 0.0 && bonds[i][j] != 0.0 && bonds[j][k] != 0.0 &&
-             exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k) !=
-               acos(-1.0)) {
-            for(int l = 0; l < num_atoms; l++) {
-              std::vector<int> current = {i, j, k, l};
-              used_indices.insert(current);
-              std::vector<int> reverse = {l, k, j, i};
+    for(int i = 0; i < num_atoms; i++) {
+      for(int j = 0; j < num_atoms; j++) {
+        if(i != j && bonds[i][j] != 0) {
+          for(int k = 0; k < num_atoms; k++) {
+            if(i != k && j != k && bonds[j][k] != 0.0 && bonds[i][j] != 0.0 && bonds[j][k] != 0.0 &&
+               exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k) !=
+                 acos(-1.0)) {
+              for(int l = 0; l < num_atoms; l++) {
+                std::vector<int> current = {i, j, k, l};
+                used_indices.insert(current);
+                std::vector<int> reverse = {l, k, j, i};
 
-              if(i != l && j != l && k != l && bonds[k][l] != 0.0 &&
-                 exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, j, k, l) !=
-                   acos(-1.0) &&
-                 used_indices.find(reverse) != used_indices.end()) {
-                std::vector<double> e_ij      = apuv[i][j];
-                std::vector<double> e_jk      = apuv[j][k];
-                std::vector<double> e_kl      = apuv[k][l];
-                auto                cproduct0 = exachem::task::cross_product(e_ij, e_jk);
-                auto                cproduct1 = exachem::task::cross_product(e_jk, e_kl);
-                double              numerator = exachem::task::dot_product(cproduct0, cproduct1);
-                double              divisor0 =
-                  sin(exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k));
-                double divisor1 =
-                  sin(exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, j, k, l));
+                if(i != l && j != l && k != l && bonds[k][l] != 0.0 &&
+                   exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, j, k, l) !=
+                     acos(-1.0) &&
+                   used_indices.find(reverse) != used_indices.end()) {
+                  // std::vector<double> e_ij      = apuv[i][j];
+                  // std::vector<double> e_jk      = apuv[j][k];
+                  // std::vector<double> e_kl      = apuv[k][l];
+                  // auto                cproduct0 = exachem::task::cross_product(e_ij, e_jk);
+                  // auto                cproduct1 = exachem::task::cross_product(e_jk, e_kl);
+                  // double              numerator = exachem::task::dot_product(cproduct0,
+                  // cproduct1); double              divisor0 =
+                  //   sin(exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k));
+                  // double divisor1 =
+                  //   sin(exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, j, k, l));
 
-                double divisor   = divisor0 * divisor1;
-                double cos_value = numerator / divisor;
-                double value;
-                if(cos_value < -1.0) value = acos(-1.0);
-                else if(cos_value > 1.0) value = acos(1);
-                else value = acos(cos_value);
+                  // double divisor   = divisor0 * divisor1;
+                  // double cos_value = numerator / divisor;
+                  // double value;
+                  // if(cos_value < -1.0) value = acos(-1.0);
+                  // else if(cos_value > 1.0) value = acos(1);
+                  // else value = acos(cos_value);
 
-                double cross_x = cproduct0[1] * cproduct1[2] - cproduct0[2] * cproduct1[1];
-                double cross_y = cproduct0[2] * cproduct1[0] - cproduct0[0] * cproduct1[2];
-                double cross_z = cproduct0[0] * cproduct1[1] - cproduct0[1] * cproduct1[0];
-                double norm    = cross_x * cross_x + cross_y * cross_y + cross_z * cross_z;
-                cross_x /= norm;
-                cross_y /= norm;
-                cross_z /= norm;
-                double sign = 1.0;
-                double dot  = cross_x * e_jk[0] + cross_y * e_jk[1] + cross_z * e_jk[2];
-                if(dot < 0.0) sign = -1.0;
+                  // double cross_x = cproduct0[1] * cproduct1[2] - cproduct0[2] * cproduct1[1];
+                  // double cross_y = cproduct0[2] * cproduct1[0] - cproduct0[0] * cproduct1[2];
+                  // double cross_z = cproduct0[0] * cproduct1[1] - cproduct0[1] * cproduct1[0];
+                  // double norm    = cross_x * cross_x + cross_y * cross_y + cross_z * cross_z;
+                  // cross_x /= norm;
+                  // cross_y /= norm;
+                  // cross_z /= norm;
+                  // double sign = 1.0;
+                  // double dot  = cross_x * e_jk[0] + cross_y * e_jk[1] + cross_z * e_jk[2];
+                  // if(dot < 0.0) sign = -1.0;
 
-                double current_torsional_angle = value * sign;
+                  // double current_torsional_angle = value * sign;
 
-                if(current_torsional_angle != 0.0 && current_torsional_angle != acos(-1.0)) {
-                  InternalCoordinate coord1(
-                    i, j, k,
-                    exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k));
-                  InternalCoordinate coord2(
-                    j, k, l,
-                    exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, j, k, l));
+                  double current_torsional_angle = exachem::task::single_torsional_angle(
+                    ec, data_mat, num_atoms, bonds, i, j, k, l);
 
-                  // dihedral angles are disabled because they are not computed with pyberny
+                  if(current_torsional_angle != 0.0 && current_torsional_angle != acos(-1.0)) {
+                    InternalCoordinate coord1(
+                      i, j, k,
+                      exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k));
+                    InternalCoordinate coord2(
+                      j, k, l,
+                      exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, j, k, l));
 
-                  // coords.push_back(
-                  //   InternalCoordinate(i, j, k, l, current_torsional_angle, &coord1, &coord2));
+                    // dihedral angles are disabled because they are not computed with pyberny
+
+                    coords.push_back(
+                      InternalCoordinate(i, j, k, l, current_torsional_angle, &coord1, &coord2));
+                  }
                 }
               }
             }

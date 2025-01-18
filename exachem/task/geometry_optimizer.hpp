@@ -7,7 +7,6 @@
  */
 
 #include "exachem/task/numerical_gradients.hpp"
-#include "exachem/task/pyberny_impl.hpp"
 
 namespace exachem::task {
 

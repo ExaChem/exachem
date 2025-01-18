@@ -80,11 +80,33 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
 #endif
 }
 
+void print_internal(ExecutionContext& ec, ChemEnv& chem_env) {
+  exachem::task::InternalCoordinates coords = exachem::task::InternalCoords(ec, chem_env, true);
+  coords.print(ec); // prints bonds, angles, and torsions
+  ec.pg().barrier();
+  auto data_mat  = exachem::task::process_geometry(ec, chem_env);
+  int  num_atoms = data_mat.size();
+  auto com       = exachem::task::center_of_mass(ec, data_mat, num_atoms);
+  auto mot       = exachem::task::moment_of_inertia(ec, data_mat, num_atoms, com);
+  auto pmots     = exachem::task::principle_moments_of_inertia(ec, mot);
+  exachem::task::print_com(ec, com);
+  ec.pg().barrier();
+  exachem::task::print_mot(ec, mot);
+  ec.pg().barrier();
+  exachem::task::print_pmots(ec, pmots, num_atoms);
+  ec.pg().barrier();
+  auto zmatrix = exachem::task::z_matrix(ec, chem_env);
+  exachem::task::cartesian_from_z_matrix(ec, chem_env, zmatrix);
+
+  std::cout.flags(std::ios::fmtflags());
+  ec.pg().barrier();
+}
+
 void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) {
   const auto task       = chem_env.ioptions.task_options;
   const auto input_file = chem_env.input_file;
-
   // TODO: This is redundant if multiple tasks for same geometry are executed.
+
   SCFOptions& scf_options   = chem_env.ioptions.scf_options;
   chem_env.ec_basis         = ECBasis(ec, scf_options.basis, scf_options.basisfile,
                                       scf_options.gaussian_type, chem_env.atoms, chem_env.ec_atoms);
@@ -93,8 +115,7 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
 
   if(chem_env.atoms.size() > 1 &&
      chem_env.atoms.size() <= (size_t) chem_env.ioptions.common_options.natoms_max)
-    exachem::task::geometry_analysis(ec, chem_env);
-
+    print_internal(ec, chem_env);
   print_geometry(ec, chem_env);
 
   // Check task options. Needed when multiple tasks are supported

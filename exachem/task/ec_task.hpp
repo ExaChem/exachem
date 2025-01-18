@@ -21,7 +21,7 @@
 #include "exachem/cc/cc2/cd_cc2.hpp"
 #endif
 
-#include "exachem/task/geometry_analysis.hpp"
+#include "exachem/task/pyberny_impl.hpp"
 #include "exachem/common/chemenv.hpp"
 #include "exachem/common/options/parse_options.hpp"
 #include "exachem/scf/scf_main.hpp"

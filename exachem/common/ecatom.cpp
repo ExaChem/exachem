@@ -25,3 +25,11 @@ int ECAtom::get_atomic_number(std::string element_symbol) {
 
   return Z;
 }
+
+// Function to get the symbol given an atomic number
+std::string ECAtom::get_symbol(const int atomic_number) {
+  for(const auto& elem: libint2::chemistry::get_element_info()) {
+    if(elem.Z == atomic_number) { return elem.symbol; }
+  }
+  return "NOSYM";
+}

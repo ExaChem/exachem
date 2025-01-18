@@ -45,7 +45,7 @@ Some common options supported are as follows:
    :lines: 16-23
 
 :maxiter: An integer used to specify the maximum number of iterations for all sections below.
-   This value can be changed on a per section basis. ``[default: 50]``
+   This value can be changed on a per section basis. ``[default: 100]``
 
 :debug: A boolean used to turn on debugging mode. ``[default: false]``
 

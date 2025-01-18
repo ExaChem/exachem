@@ -1213,6 +1213,7 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
     chem_env.sys_data.nbf_orig - chem_env.sys_data.n_occ_beta - chem_env.sys_data.n_lindep;
 
   exc.pg().broadcast(&ehf, 0);
+  exc.pg().broadcast(&enuc, 0);
   exc.pg().broadcast(&chem_env.sys_data.nbf, 0);
   exc.pg().broadcast(&chem_env.sys_data.n_lindep, 0);
   exc.pg().broadcast(&chem_env.sys_data.n_occ_alpha, 0);
@@ -1239,6 +1240,6 @@ void exachem::scf::SCFHartreeFock::scf_hf(ExecutionContext& exc, ChemEnv& chem_e
 
   // chem_env.scf_context.scf_converged = true;
 
-  chem_env.scf_context.update(ehf, scf_vars.shell_tile_map, C_alpha_tamm, Fa_global, C_beta_tamm,
-                              Fb_global, chem_env.ioptions.scf_options.noscf);
+  chem_env.scf_context.update(ehf, enuc, scf_vars.shell_tile_map, C_alpha_tamm, Fa_global,
+                              C_beta_tamm, Fb_global, chem_env.ioptions.scf_options.noscf);
 } // END of scf_hf(ExecutionContext& exc, ChemEnv& chem_env)

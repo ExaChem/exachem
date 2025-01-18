@@ -19,12 +19,13 @@
 class CommonOptions {
 public:
   bool        debug{false};
-  int         maxiter{50};
+  int         maxiter{100};
   std::string basis{"sto-3g"};
   std::string dfbasis{};
   std::string basisfile{}; // supports only ECPs for now
   std::string gaussian_type{"spherical"};
   std::string geom_units{"angstrom"};
+  int         natoms_max{30}; // max natoms for geometry analysis
   std::string file_prefix{};
   std::string output_dir{};
   std::string ext_data_path{};

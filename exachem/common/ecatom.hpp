@@ -16,6 +16,7 @@
 #include "tamm/tamm.hpp"
 using namespace tamm;
 using libint2::Atom;
+
 class ECAtom: public AtomInfo {
 public:
   Atom                atom;
@@ -28,4 +29,5 @@ public:
   std::vector<int>    ecp_ams{};
   std::vector<int>    ecp_ns{};
   static int          get_atomic_number(std::string element_symbol);
+  static std::string  get_symbol(const int atomic_number);
 };

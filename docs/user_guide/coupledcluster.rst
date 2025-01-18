@@ -22,7 +22,7 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
    "tilesize": 50,
    "lshift": 0,
    "ndiis": 5,
-   "ccsd_maxiter": 50,
+   "ccsd_maxiter": 100,
  
    "readt": false,
    "writet": false,
@@ -57,7 +57,7 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
 
 :ndiis: ``[default=5]`` The number iterations in which a DIIS extrapolation is performed to accelerate the convergence of excitation amplitudes. The default value is 5, which means in every five iteration, one DIIS extrapolation is performed (and in the rest of the iterations, Jacobi rotation is used). When zero or negative value is specified, the DIIS is turned off. It is not recommended to perform DIIS every iteration, whereas setting a large value for this parameter necessitates a large memory space to keep the excitation amplitudes of previous iterations.
 
-:ccsd_maxiter: ``[default=50]`` The maximum number of iterations performed during the iterative solutions of amplitude equations.
+:ccsd_maxiter: ``[default=100]`` The maximum number of iterations performed during the iterative solutions of amplitude equations.
 
 :writet: ``[default=false]`` Writes the T1,T2 amplitude tensors and the 2e integral tensor to disk to be used later for restarting a CC calculation. Currently, the cholesky decomposition module uses this option as well to write the 2e integral tensor to disk. Enabling this option implies restart. 
 

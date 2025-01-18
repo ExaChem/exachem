@@ -17,6 +17,7 @@ void ParseCommonOptions::parse(ChemEnv& chem_env) {
   CommonOptions& common_options = chem_env.ioptions.common_options;
 
   parse_option<std::string>(common_options.geom_units, jinput["geometry"], "units");
+  parse_option<int>(common_options.natoms_max, jinput["geometry"]["analysis"], "natoms_max");
 
   // basis
 

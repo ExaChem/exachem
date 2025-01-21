@@ -60,8 +60,8 @@ void ECOptionParser::initialize(ChemEnv& chem_env) {
 
   std::vector<string> geometry;
   // std::vector<string> geom_bohr;
-  const double angstrom_to_bohr = 1.8897259878858;
-  std::string  geom_units{"angstrom"};
+  constexpr double ang2bohr = exachem::constants::ang2bohr;
+  std::string      geom_units{"angstrom"};
 
   parse_option<string>(geom_units, jinput["geometry"], "units");
   parse_option<std::vector<string>>(geometry, jinput["geometry"], "coordinates", false);
@@ -71,7 +71,7 @@ void ECOptionParser::initialize(ChemEnv& chem_env) {
   chem_env.atoms.resize(natom);
   // geom_bohr.resize(natom);
 
-  double convert_units = (geom_units == "angstrom") ? angstrom_to_bohr : 1.0;
+  double convert_units = (geom_units == "angstrom") ? ang2bohr : 1.0;
 
   for(size_t i = 0; i < natom; i++) {
     std::istringstream iss(geometry[i]);

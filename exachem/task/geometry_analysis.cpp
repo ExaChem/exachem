@@ -14,8 +14,8 @@
 
 namespace exachem::task {
 
-double ang_to_bohr = 1.8897259878858;
-double bohr_to_ang = 1 / ang_to_bohr;
+constexpr double ang2bohr = exachem::constants::ang2bohr;
+constexpr double bohr2ang = exachem::constants::bohr2ang;
 
 std::vector<double> atom_mass = {
   1.007825, 4.0026,    7.016,    9.01218,  11.00931, 12.0,     14.00307, 15.99491, 18.9984,
@@ -117,9 +117,9 @@ void print_com(ExecutionContext& ec, std::vector<double>& com) {
     ss << std::setw(40) << "Center of Mass" << std::endl << std::endl;
     ss << std::right << std::setw(10) << "x" << std::setw(16) << "y" << std::setw(16) << "z"
        << std::right << std::setw(18) << "Unit" << std::endl;
-    ss << std::right << std::setprecision(10) << std::setw(16) << com[0] * bohr_to_ang
-       << std::setw(16) << com[1] * bohr_to_ang << std::setw(16) << com[2] * bohr_to_ang
-       << std::setw(14) << "Angstrom" << std::endl;
+    ss << std::right << std::setprecision(10) << std::setw(16) << com[0] * bohr2ang << std::setw(16)
+       << com[1] * bohr2ang << std::setw(16) << com[2] * bohr2ang << std::setw(14) << "Angstrom"
+       << std::endl;
     ss << std::right << std::setprecision(10) << std::setw(16) << com[0] << std::setw(16) << com[1]
        << std::setw(16) << com[2] << std::setw(14) << "Bohr" << std::endl;
     std::cout << ss.str();
@@ -141,23 +141,23 @@ void print_mot(ExecutionContext& ec, const std::vector<std::vector<double>>& mot
 }
 
 void print_pmots(ExecutionContext& ec, std::vector<double>& pmots, const int& num_atoms) {
+  constexpr double bohr2ang = exachem::constants::bohr2ang;
   if(ec.print()) {
     std::stringstream ss;
     ss << std::endl << std::string(70, '-') << std::endl;
     ss << std::setw(50) << "Principal Moments of Inertia" << std::endl << std::endl;
     ss << std::right << std::setw(12) << "x" << std::setw(18) << "y" << std::setw(18) << "z"
        << std::setw(20) << "Unit" << std::endl;
-    ss << std::right << std::setw(18) << std::setprecision(10)
-       << pmots[0] * bohr_to_ang * bohr_to_ang << std::setw(18)
-       << pmots[1] * bohr_to_ang * bohr_to_ang << std::setw(18)
-       << pmots[2] * bohr_to_ang * bohr_to_ang << std::setw(18) << "amu * ang^2" << std::endl;
+    ss << std::right << std::setw(18) << std::setprecision(10) << pmots[0] * bohr2ang * bohr2ang
+       << std::setw(18) << pmots[1] * bohr2ang * bohr2ang << std::setw(18)
+       << pmots[2] * bohr2ang * bohr2ang << std::setw(18) << "amu * ang^2" << std::endl;
     ss << std::right << std::setw(18) << std::setprecision(10) << pmots[0] << std::setw(18)
        << pmots[1] << std::setw(18) << pmots[2] << std::setw(18) << "amu * bohr^2" << std::endl;
     ss << std::right << std::setw(18) << std::scientific << std::setprecision(10)
-       << pmots[0] * 1.6605402E-24 * 0.529177249E-8 * 0.529177249E-8 << std::setw(18)
-       << pmots[1] * 1.6605402E-24 * 0.529177249E-8 * 0.529177249E-8 << std::setw(18)
-       << pmots[2] * 1.6605402E-24 * 0.529177249E-8 * 0.529177249E-8 << std::setw(18) << "g * cm^2"
-       << std::endl;
+       << pmots[0] * 1.6605402E-24 * bohr2ang * 1e-8 * bohr2ang * 1e-8 << std::setw(18)
+       << pmots[1] * 1.6605402E-24 * bohr2ang * 1e-8 * bohr2ang * 1e-8 << std::setw(18)
+       << pmots[2] * 1.6605402E-24 * bohr2ang * 1e-8 * bohr2ang * 1e-8 << std::setw(18)
+       << "g * cm^2" << std::endl;
     ss << std::endl;
 
     ss << " - ";
@@ -173,7 +173,7 @@ void print_pmots(ExecutionContext& ec, std::vector<double>& pmots, const int& nu
 
     double _pi  = acos(-1.0);
     double conv = 6.6260755E-34 / (8.0 * _pi * _pi);
-    conv /= 1.6605402E-27 * 0.529177249E-10 * 0.529177249E-10;
+    conv /= 1.6605402E-27 * bohr2ang * 1e-10 * bohr2ang * 1e-10;
     conv *= 1e-6;
     ss << std::endl << std::string(70, '-') << std::endl;
     ss << std::endl << std::setw(35) << "Rotational constants (MHz)" << std::endl << std::endl;
@@ -181,7 +181,7 @@ void print_pmots(ExecutionContext& ec, std::vector<double>& pmots, const int& nu
        << "B = " << conv / pmots[1] << std::setw(12) << "C = " << conv / pmots[2] << std::endl;
 
     conv = 6.6260755E-34 / (8.0 * _pi * _pi);
-    conv /= 1.6605402E-27 * 0.529177249E-10 * 0.529177249E-10;
+    conv /= 1.6605402E-27 * bohr2ang * 1e-10 * bohr2ang * 1e-10;
     conv /= 2.99792458E10;
     ss << std::endl << std::string(70, '-') << std::endl;
     ss << std::endl << std::setw(35) << "Rotational constants (cm-1)" << std::endl << std::endl;

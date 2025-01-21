@@ -7,10 +7,11 @@
  */
 
 #pragma once
+#include "exachem/common/constants.hpp"
 #include "exachem/common/ec_basis.hpp"
 #include "exachem/common/ecatom.hpp"
+#include "exachem/common/options/input_options.hpp"
 #include "exachem/common/system_data.hpp"
-#include "options/input_options.hpp"
 // #include "libint2_includes.hpp"
 #include "exachem/common/context/cc_context.hpp"
 #include "exachem/common/context/cd_context.hpp"

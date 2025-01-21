@@ -50,11 +50,11 @@ void ECMolden::write_molden(ChemEnv& chem_env, Matrix& C_a, std::vector<double>&
 
   std::vector<std::string> symmetry_labels;
   std::vector<bool>        spincases;
-  double                   b2a                 = libint2::constants::codata_2018::bohr_to_angstrom;
+  constexpr double         bohr2ang            = exachem::constants::bohr2ang;
   double                   coefficient_epsilon = 0.0;
 
   libint2::molden::Export molden_export(chem_env.atoms, mshells, C_copy, occs, eps_a,
-                                        symmetry_labels, spincases, b2a, coefficient_epsilon);
+                                        symmetry_labels, spincases, bohr2ang, coefficient_epsilon);
   std::ofstream           molden_file(files_prefix + ".molden");
   molden_export.write(molden_file);
 }

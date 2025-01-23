@@ -66,6 +66,7 @@ void fci_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
   // auto rank = ec.pg().rank();
 
+  chem_env.cd_context.keep_movecs_so = true;
   cholesky_2e::cholesky_2e_driver(ec, chem_env);
 
   std::string files_prefix = chem_env.get_files_prefix();
@@ -92,18 +93,17 @@ void fci_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   // clang-format off
   Scheduler sch{ec};
   sch(full_v2(p, r, q, s)  = cholVpr(p, r, cindex) * cholVpr(q, s, cindex)).execute(ex_hw);
-  // clang-format off
+  // clang-format on
 
   free_tensors(cholVpr);
 
   Tensor<T> lcao = cd_context.movecs_so;
 
   files_prefix = generate_fcidump(chem_env, ec, MO, lcao, d_f1, full_v2, ex_hw);
-  #if defined(USE_MACIS)
-  if(options_map.task_options.fci)
-    macis_driver(ec, sys_data, files_prefix);
-  #endif
-  
+#if defined(USE_MACIS)
+  if(options_map.task_options.fci) macis_driver(ec, sys_data, files_prefix);
+#endif
+
   free_tensors(lcao, d_f1, full_v2);
 
   ec.flush_and_sync();

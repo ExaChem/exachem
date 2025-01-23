@@ -11,7 +11,7 @@ Parses a single xyz file or a folder with multiple xyz files and returns ExaChem
 
 Args:
   input_file: The path to a single xyz file (OR) path to a folder contatining xyz files.
-  optional_args: task-name
+  optional_args: units, task-name, operation
 
 Returns:
   json input file(s) for ExaChem.
@@ -46,12 +46,13 @@ def parse_xyz_file(input_file):
   charge = 0
   mult = 1
   cline = (lines[1]).lower()
-  cline_exists = True
+  cline_exists = False
 
+  if "charge" in cline or "mult" in cline: cline_exists = True
   clist = cline.split(" ")
   clist = [i for i in clist if i]
   
-  if len(clist) == 4:
+  if len(clist) == 4 and cline_exists:
     clist = clist[1:]
     clist = [x.replace(".", "") for x in clist]
     clist = [x.replace("-", "") for x in clist]
@@ -84,8 +85,18 @@ def dict_to_json(dictname):
 
 if __name__ == '__main__':
   input_fpath = sys.argv[1]
+  input_fpath = os.path.abspath(input_fpath)
+
+  if not os.path.exists(input_fpath): 
+      print("ERROR: [" + input_fpath + "] does not exist!")
+      sys.exit(1)
+
   taskname = "sinfo"
-  if len(sys.argv) == 3: taskname = sys.argv[2]
+  units = "angstrom"
+  if len(sys.argv) >= 3: units = sys.argv[2]
+  if len(sys.argv) >= 4: taskname = sys.argv[3]
+  if len(sys.argv) == 5: operation = sys.argv[4]
+  else: operation = ["energy"]
 
   input_files = []
 
@@ -99,7 +110,7 @@ if __name__ == '__main__':
         if file.endswith(".xyz"): input_files.append(file) 
 
   elif os.path.isfile(input_fpath):
-    cwd = os.path.dirname(os.path.abspath(input_fpath))
+    cwd = os.path.dirname(input_fpath)
     jwd = cwd    
     input_files.append(input_fpath)
   
@@ -115,7 +126,7 @@ if __name__ == '__main__':
 
     exachem_opt = {}
 
-    exachem_opt["geometry"] = { "coordinates": geometry, "units": "angstrom"}
+    exachem_opt["geometry"] = { "coordinates": geometry, "units": units}
 
     exachem_opt["common"] = {}
     exachem_opt["common"]["maxiter"] = 50
@@ -154,6 +165,7 @@ if __name__ == '__main__':
 
     exachem_opt["TASK"] = {}
     exachem_opt["TASK"][taskname] = True
+    exachem_opt["TASK"]["operation"] = [operation]
 
     exachem_opt = dict_to_json(exachem_opt)
 

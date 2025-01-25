@@ -2,21 +2,29 @@
 #
 # Produced 4 files:
 # info - Contains information about the extracted Hamiltonian
-# FCIDUMP - Not the normal FCIDUMP, but one for an internal FCI code
+# FCIDUMP - Not the normal FCIDUMP, but one for DMRG calculations
 # yaml - YAML file based on Broombridge version 0.3
 # xacc - format needed for the XACC program
 #
+# Usage:
+# python3 ExtractDUCC.py <output> <integralpath> <frzncore>
+# <output> is the output file from the DUCC calculation
+# <integralpath> is the path to the integral file
+# <frzncore> is the number of additional frozen core orbitals 
+#            beyond those dropped in the DUCC calculation.
+
+# Example:
+# python3 ExtractDUCC.py h2o_ducc.out h2o_ducc.cc-pvdz_files/restricted/ducc/h2o_ducc.cc-pvdz.ducc.results.txt 0
 # ---------------------------------------------------------------------------------------
 import sys
 import numpy as np
 from numpy import linalg as LA
 np.set_printoptions(threshold=sys.maxsize)
 
-preamble=""" "$schema": https://raw.githubusercontent.com/Microsoft/Quantum/master/Chemistry/Schema/broombridge-0.3.schema.json \n"""
+preamble=""""$schema": https://raw.githubusercontent.com/Microsoft/Quantum/master/Chemistry/Schema/broombridge-0.3.schema.json \n"""
 
 emitter_yaml = False
 emitter_ruamel = False
-import sys
 try:
     try:
         import ruamel.yaml as ruamel
@@ -26,6 +34,10 @@ try:
 except ImportError:
     import yaml
     emitter_yaml = True
+
+if len(sys.argv) < 4:
+    print("Insufficient arguments provided.")
+    sys.exit(1)
 
 output = sys.argv[1]
 integralpath = sys.argv[2]
@@ -79,19 +91,24 @@ def extract_fields():
                         'units' : 'hartree',
                         'value' : float(ln_segments[5])
                     }
-                elif ln_segments[:2] == ["n_occ_alpha", "="]:
-                    n_occ_alpha = int(ln_segments[2])
-                elif ln_segments[:2] == ["n_occ_beta", "="]:
-                    n_occ_beta = int(ln_segments[2])
+                elif ln_segments[:6] == ["Number", "of", "active", "occupied", "alpha", "="]:
+                    n_occ_alpha = int(ln_segments[6])
+                elif ln_segments[:6] == ["Number", "of", "active", "occupied", "beta", "="]:
+                    n_occ_beta = int(ln_segments[6])
+                elif ln_segments[:6] == ["Number", "of", "active", "virtual", "alpha", "="]:
+                    n_virt_alpha = int(ln_segments[6])
+                elif ln_segments[:6] == ["Number", "of", "active", "virtual", "beta", "="]:
+                    n_virt_beta = int(ln_segments[6])
                 elif ln_segments[:2] == ["n_frozen_core", "="]:
                     n_frozen_core = int(ln_segments[2])
                 elif ln_segments[:6] == ['CCSD', 'total', 'energy', '/', 'hartree', '=']:
                     note = "Full CCSD energy = " + ln_segments[6]
-                elif ln_segments[:5] == ['Number', 'of', 'active', 'orbitals', '=']:
-                    n_orbitals = int(ln_segments[5])
+                elif ln_segments[:3] == ['Total', 'Energy', 'Shift:']:
+                    Energy_shift = float(ln_segments[3])
+                elif ln_segments[:1] == ['ducc_lvl']:
+                    n_orbitals = n_occ_alpha + n_virt_alpha
                     assert n_occ_alpha - frzncore > 0, "Freezing too many orbitals"
-                    assert n_orbitals  is not None, "n_orbitals is missing from output. Required to extract YAML"
-                    n_virt = n_orbitals - n_occ_alpha
+                    assert n_occ_beta - frzncore > 0, "Freezing too many orbitals"
                     one_body = np.zeros((n_orbitals,n_orbitals))
                     two_body = np.zeros((n_orbitals,n_orbitals,n_orbitals,n_orbitals))
             if reader_mode == "cartesian_geometry":
@@ -181,9 +198,9 @@ def extract_fields():
                 elif ln_segments[0] != "Begin":
                     assert len(ln_segments) == 5
                     a = int(ln_segments[0])-1+n_occ_alpha
-                    b = int(ln_segments[1])-1-n_virt+n_occ_alpha
+                    b = int(ln_segments[1])-1-n_virt_alpha+n_occ_alpha
                     c = int(ln_segments[2])-1+n_occ_alpha
-                    d = int(ln_segments[3])-1-n_virt+n_occ_alpha
+                    d = int(ln_segments[3])-1-n_virt_alpha+n_occ_alpha
                     two_body[a,c,b,d] = float(ln_segments[4])
             if reader_mode == "Read IJAB":
                 if ln_segments[0] == "End":
@@ -193,7 +210,7 @@ def extract_fields():
                     i = int(ln_segments[0])-1
                     j = int(ln_segments[1])-1-n_occ_alpha
                     a = int(ln_segments[2])-1+n_occ_alpha
-                    b = int(ln_segments[3])-1-n_virt+n_occ_alpha
+                    b = int(ln_segments[3])-1-n_virt_alpha+n_occ_alpha
                     two_body[i,a,j,b] = float(ln_segments[4])
                     two_body[a,i,b,j] = float(ln_segments[4])
             if reader_mode == "Read AIJB":
@@ -212,7 +229,7 @@ def extract_fields():
                         a = int(ln_segments[0])-1+n_occ_alpha
                         i = int(ln_segments[1])-1-n_occ_alpha
                         j = int(ln_segments[2])-1
-                        b = int(ln_segments[3])-1-n_virt+n_occ_alpha
+                        b = int(ln_segments[3])-1-n_virt_alpha+n_occ_alpha
                         two_body[a,j,i,b] = float(ln_segments[4])
                         two_body[j,a,b,i] = float(ln_segments[4])
             if reader_mode == "Read IJKA":
@@ -223,7 +240,7 @@ def extract_fields():
                     i = int(ln_segments[0])-1
                     j = int(ln_segments[1])-1-n_occ_alpha
                     k = int(ln_segments[2])-1
-                    a = int(ln_segments[3])-1-n_virt+n_occ_alpha
+                    a = int(ln_segments[3])-1-n_virt_alpha+n_occ_alpha
                     two_body[i,k,j,a] = float(ln_segments[4])
                     two_body[j,a,i,k] = float(ln_segments[4])
                     two_body[k,i,a,j] = float(ln_segments[4])
@@ -234,16 +251,16 @@ def extract_fields():
                 elif ln_segments[0] != "Begin":
                     assert len(ln_segments) == 5
                     i = int(ln_segments[0])-1
-                    a = int(ln_segments[1])-1-n_virt+n_occ_alpha
+                    a = int(ln_segments[1])-1-n_virt_alpha+n_occ_alpha
                     b = int(ln_segments[2])-1+n_occ_alpha
-                    c = int(ln_segments[3])-1-n_virt+n_occ_alpha
+                    c = int(ln_segments[3])-1-n_virt_alpha+n_occ_alpha
                     two_body[i,b,a,c] = float(ln_segments[4])
                     two_body[b,i,c,a] = float(ln_segments[4])
                     two_body[a,c,i,b] = float(ln_segments[4])
                     two_body[c,a,b,i] = float(ln_segments[4])
 
     # Compute the Hartree--Fock energy
-    Energy = coulomb_repulsion['value']
+    Energy = coulomb_repulsion['value'] + Energy_shift
     for x in range(n_occ_alpha):
         Energy += 2*one_body[x,x]
         for y in range(n_occ_alpha):
@@ -277,13 +294,17 @@ def extract_fields():
     infopath.write("**************************************************************\n")
     infopath.write("File = {}\n\n".format(output))
     infopath.write("Nuclear Repulsion E = {}\n".format(coulomb_repulsion['value']))
+    infopath.write("DUCC Energy Shift = {}\n".format(Energy_shift))
+    infopath.write("Total Energy Shift = {}\n".format(coulomb_repulsion['value'] + Energy_shift))
     infopath.write("# Active Orbitals = {}\n".format(n_orbitals))
     infopath.write("# Frozen Core = {}\n".format(frzncore))
-    infopath.write("# Occupied Orbitals = {}\n".format(n_occ_alpha))
-    infopath.write("# Virtual Orbitals = {}\n\n".format(n_virt))
+    infopath.write("# Occupied Alpha Orbitals = {}\n".format(n_occ_alpha))
+    infopath.write("# Occupied Beta Orbitals = {}\n".format(n_occ_beta))
+    infopath.write("# Virtual Alpha Orbitals = {}\n".format(n_virt_alpha))
+    infopath.write("# Virtual Alpha Orbitals = {}\n\n".format(n_virt_beta))
     infopath.write("Original SCF Energy = {}\n".format(Energy))
     infopath.write("Core Energy ={}\n\n".format(Core_Energy))
-    infopath.write("New Repulsion Energy (Core+Repulsion)= {}\n\n".format(Core_Energy + coulomb_repulsion['value']))
+    infopath.write("New Repulsion Energy (Core+Repulsion)= {}\n\n".format(Core_Energy + coulomb_repulsion['value'] + Energy_shift))
 
     infopath.write("New orbital energies after downfolding\n")
     infopath.write("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
@@ -393,41 +414,6 @@ def extract_fields():
                                                     str(y-2*frzncore+n_orbitals)+"^ "+
                                                     str(x-frzncore)+" "+
                                                     str(z-2*frzncore+n_orbitals)+" +")
-                                                 # xacc_hamiltonian.append("("+str(two_body[w,x,y,z]*0.25)+",0)"+
-                                                 #                             str(w-2*frzncore+n_orbitals)+"^ "+
-                                                 #                             str(y-frzncore)+"^ "+
-                                                 #                             str(z-frzncore)+" "+
-                                                 #                             str(x-2*frzncore+n_orbitals)+" +")
-                                                 # xacc_hamiltonian.append("("+str(two_body[w,x,y,z]*-0.25)+",0)"+
-                                                 #                             str(w-2*frzncore+n_orbitals)+"^ "+
-                                                 #                             str(y-frzncore)+"^ "+
-                                                 #                             str(z-2*frzncore+n_orbitals)+" "+
-                                                 #                             str(x-frzncore)+" +")
-                                                 # xacc_hamiltonian.append("("+str(two_body[w,x,y,z]*-0.25)+",0)"+
-                                                 #                             str(w-frzncore)+"^ "+
-                                                 #                             str(y-2*frzncore+n_orbitals)+"^ "+
-                                                 #                             str(z-frzncore)+" "+
-                                                 #                             str(x-2*frzncore+n_orbitals)+" +")
-                        # xacc_hamiltonian.append("("+str(two_body[w,x,y,z]*0.25)+",0)"+
-                        #                             str(w-frzncore)+"^ "+
-                        #                             str(x-frzncore)+" "+
-                        #                             str(y-2*frzncore+n_orbitals)+"^ "+
-                        #                             str(z-2*frzncore+n_orbitals)+" +")
-                        # xacc_hamiltonian.append("("+str(two_body[w,x,y,z]*0.25)+",0)"+
-                        #                             str(w-2*frzncore+n_orbitals)+"^ "+
-                        #                             str(x-2*frzncore+n_orbitals)+" "+
-                        #                             str(y-frzncore)+"^ "+
-                        #                             str(z-frzncore)+" +")
-                        # xacc_hamiltonian.append("("+str(two_body[w,x,y,z]*-0.25)+",0)"+
-                        #                             str(w-2*frzncore+n_orbitals)+"^ "+
-                        #                             str(x-frzncore)+" "+
-                        #                             str(y-frzncore)+"^ "+
-                        #                             str(z-2*frzncore+n_orbitals)+" +")
-                        # xacc_hamiltonian.append("("+str(two_body[w,x,y,z]*-0.25)+",0)"+
-                        #                             str(w-frzncore)+"^ "+
-                        #                             str(x-2*frzncore+n_orbitals)+" "+
-                        #                             str(y-2*frzncore+n_orbitals)+"^ "+
-                        #                             str(z-frzncore)+" +")
     fcidumppath.write("0.0 0 0 0 0\n")
 
     #AA
@@ -454,8 +440,8 @@ def extract_fields():
                 xacc_hamiltonian.append("("+str(Fock[w,x])+",0)"+
                                             str(w-2*frzncore+n_orbitals)+"^ "+
                                             str(x-2*frzncore+n_orbitals)+" +")
-    fcidumppath.write("%12.10f 0 0 0 0\n" % ((Core_Energy + coulomb_repulsion['value'])))
-    xacc_hamiltonian.append("("+str((Core_Energy + coulomb_repulsion['value']))+",0)")
+    fcidumppath.write("%12.10f 0 0 0 0\n" % ((Core_Energy + coulomb_repulsion['value'] + Energy_shift)))
+    xacc_hamiltonian.append("("+str((Core_Energy + coulomb_repulsion['value'] + Energy_shift))+",0)")
 
     xaccpath = open(output+"-xacc", 'w')
     for term in xacc_hamiltonian:
@@ -477,7 +463,7 @@ def extract_fields():
     assert energy_offset is not None, "energy_offset was not computed. Required to extract YAML"
     assert fci_energy is not None, "fci_energy is missing. Required to extract YAML"
 
-    coulomb_repulsion['value'] = float(Core_Energy + coulomb_repulsion['value'])
+    coulomb_repulsion['value'] = float(Core_Energy + coulomb_repulsion['value'] + Energy_shift)
     
     hamiltonian = {'one_electron_integrals' : one_electron_integrals,
                    'two_electron_integrals' : two_electron_integrals}
@@ -509,6 +495,11 @@ def emitter_yaml_func():
     yamlpath.write(yaml.dump(data, default_flow_style=None))
 
 def main():
+    """
+    ExtractDUCC: parses integral data and outputs relevant CC information.
+    Usage: python ExtractDUCC.py <output> <integralpath> <frzncore>
+    """
+
     assert emitter_yaml or emitter_ruamel, "Extraction failed: could not import YAML or RUAMEL packages."
     if emitter_yaml:
         emitter_yaml_func()

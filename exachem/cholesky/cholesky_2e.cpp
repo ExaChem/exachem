@@ -127,21 +127,59 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ExecutionContext& ec, ChemEn
 
 std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& chem_env,
                                                  bool triples) {
-  SystemData& sys_data    = chem_env.sys_data;
-  TAMM_SIZE   n_occ_alpha = sys_data.n_occ_alpha;
-  TAMM_SIZE   n_occ_beta  = sys_data.n_occ_beta;
+  const int   rank         = ec.pg().rank().value();
+  SystemData& sys_data     = chem_env.sys_data;
+  auto        ccsd_options = chem_env.ioptions.ccsd_options;
+  auto        task_options = chem_env.ioptions.task_options;
 
-  const int rank         = ec.pg().rank().value();
-  auto      ccsd_options = chem_env.ioptions.ccsd_options;
+  TAMM_SIZE total_orbitals = sys_data.nmo;
+  TAMM_SIZE nocc           = sys_data.nocc;
+  TAMM_SIZE n_occ_alpha    = sys_data.n_occ_alpha;
+  TAMM_SIZE n_occ_beta     = sys_data.n_occ_beta;
+  TAMM_SIZE n_vir_alpha    = sys_data.n_vir_alpha;
+  TAMM_SIZE n_vir_beta     = sys_data.n_vir_beta;
 
-  const int nactv = chem_env.ioptions.ccsd_options.nactive_va;
+  // Active space sizes
+  // 'int' (internal) are orbitals in the active space
+  // 'ext' (internal) are orbitals outside the active space
+  // xxx_int + xxx_ext = xxx
+  TAMM_SIZE occ_alpha_int = 0;
+  TAMM_SIZE occ_beta_int  = 0;
+  TAMM_SIZE vir_alpha_int = 0;
+  TAMM_SIZE vir_beta_int  = 0;
+  if(task_options.ducc) {
+    occ_alpha_int = ccsd_options.nactive_oa;
+    occ_beta_int  = ccsd_options.nactive_ob;
+    vir_alpha_int = ccsd_options.nactive_va;
+    vir_beta_int  = ccsd_options.nactive_vb;
+  }
+  else {
+    if(ccsd_options.nactive_oa > 0 || ccsd_options.nactive_ob > 0 || ccsd_options.nactive_va > 0 ||
+       ccsd_options.nactive_vb > 0) {
+      if(rank == 0) std::cout << std::endl << "**** Ignoring nactive options" << std::endl;
+    }
+  }
+  TAMM_SIZE occ_alpha_ext = n_occ_alpha - occ_alpha_int;
+  TAMM_SIZE occ_beta_ext  = n_occ_beta - occ_beta_int;
+  TAMM_SIZE vir_alpha_ext = n_vir_alpha - vir_alpha_int;
+  TAMM_SIZE vir_beta_ext  = n_vir_beta - vir_beta_int;
 
   Tile tce_tile      = ccsd_options.tilesize;
   bool balance_tiles = ccsd_options.balance_tiles;
 
-  // TODO: Implement check for UHF
-  if(nactv > sys_data.n_vir_alpha && sys_data.is_restricted)
-    tamm_terminate("[DUCC ERROR]: nactive_va > n_vir_alpha");
+  // Check if active space is allowed:
+  if(task_options.ducc) {
+    if(n_occ_alpha != n_occ_beta)
+      tamm_terminate("[DUCC ERROR]: DUCC is only for closed-shell calculations");
+    if(occ_alpha_int > n_occ_alpha) tamm_terminate("[DUCC ERROR]: nactive_oa > n_occ_alpha");
+    if(occ_beta_int > n_occ_beta) tamm_terminate("[DUCC ERROR]: nactive_ob > n_occ_beta");
+    if(vir_alpha_int > n_vir_alpha) tamm_terminate("[DUCC ERROR]: nactive_va > n_vir_alpha");
+    if(vir_beta_int > n_vir_beta) tamm_terminate("[DUCC ERROR]: nactive_vb > n_vir_beta");
+    if(occ_alpha_int == 0 || occ_beta_int == 0)
+      tamm_terminate("[DUCC ERROR]: nactive_oa/nactive_ob cannot be 0");
+    if(occ_alpha_int != occ_beta_int) tamm_terminate("[DUCC ERROR]: nactive_oa != nactive_ob");
+    if(vir_alpha_int != vir_beta_int) tamm_terminate("[DUCC ERROR]: nactive_va != nactive_vb");
+  }
 
   const std::string jkey = "tilesize";
   bool              user_ts{false};
@@ -162,18 +200,9 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& 
     chem_env.is_context.mso_tilesize_triples = tce_tile;
   }
 
-  TAMM_SIZE nmo         = sys_data.nmo;
-  TAMM_SIZE n_vir_alpha = sys_data.n_vir_alpha;
-  // TAMM_SIZE n_vir_beta  = sys_data.n_vir_beta;
-  TAMM_SIZE nocc = sys_data.nocc;
-
-  const TAMM_SIZE total_orbitals = nmo;
-
-  // Construction of tiled index space MO
-  TAMM_SIZE  virt_alpha_int = nactv;
-  TAMM_SIZE  virt_beta_int  = virt_alpha_int;
-  TAMM_SIZE  virt_alpha_ext = n_vir_alpha - nactv;
-  TAMM_SIZE  virt_beta_ext  = total_orbitals - (nocc + nactv + n_vir_alpha);
+  // | occ_alpha | occ_beta | virt_alpha | virt_beta |
+  // | occ_alpha_ext | occ_alpha_int | occ_beta_ext | occ_beta_int | --> (cont.)
+  //    --> | vir_alpha_int | vir_alpha_ext | vir_beta_int |vir_beta_ext |
   IndexSpace MO_IS{
     range(0, total_orbitals),
     {
@@ -183,17 +212,26 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& 
       {"virt", {range(nocc, total_orbitals)}},
       {"virt_alpha", {range(nocc, nocc + n_vir_alpha)}},
       {"virt_beta", {range(nocc + n_vir_alpha, total_orbitals)}},
+      // Active-space index spaces
+      {"occ_alpha_ext", {range(0, occ_alpha_ext)}},
+      {"occ_beta_ext", {range(n_occ_alpha, n_occ_alpha + occ_beta_ext)}},
+      {"occ_ext", {range(0, occ_alpha_ext), range(n_occ_alpha, n_occ_alpha + occ_beta_ext)}},
+      {"occ_alpha_int", {range(occ_alpha_ext, n_occ_alpha)}},
+      {"occ_beta_int", {range(n_occ_alpha + occ_beta_ext, nocc)}},
+      {"occ_int", {range(occ_alpha_ext, n_occ_alpha), range(n_occ_alpha + occ_beta_ext, nocc)}},
+      {"virt_alpha_int", {range(nocc, nocc + vir_alpha_int)}},
+      {"virt_beta_int", {range(nocc + n_vir_alpha, nocc + n_vir_alpha + vir_beta_int)}},
+      {"virt_int",
+       {range(nocc, nocc + vir_alpha_int),
+        range(nocc + n_vir_alpha, nocc + n_vir_alpha + vir_beta_int)}},
+      {"virt_alpha_ext", {range(nocc + vir_alpha_int, nocc + n_vir_alpha)}},
+      {"virt_beta_ext", {range(nocc + n_vir_alpha + vir_beta_int, total_orbitals)}},
+      {"virt_ext",
+       {range(nocc + vir_alpha_int, nocc + n_vir_alpha),
+        range(nocc + n_vir_alpha + vir_beta_int, total_orbitals)}},
+      // All spin index spaces
       {"all_alpha", {range(0, n_occ_alpha), range(nocc, nocc + n_vir_alpha)}},
       {"all_beta", {range(n_occ_alpha, nocc), range(nocc + n_vir_alpha, total_orbitals)}},
-      {"virt_alpha_int", {range(nocc, nocc + nactv)}},
-      {"virt_beta_int", {range(nocc + n_vir_alpha, nocc + nactv + n_vir_alpha)}},
-      {"virt_int",
-       {range(nocc, nocc + nactv), range(nocc + n_vir_alpha, nocc + nactv + n_vir_alpha)}},
-      {"virt_alpha_ext", {range(nocc + nactv, nocc + n_vir_alpha)}},
-      {"virt_beta_ext", {range(nocc + nactv + n_vir_alpha, total_orbitals)}},
-      {"virt_ext",
-       {range(nocc + nactv, nocc + n_vir_alpha),
-        range(nocc + nactv + n_vir_alpha, total_orbitals)}},
     },
     {{Spin{1}, {range(0, n_occ_alpha), range(nocc, nocc + n_vir_alpha)}},
      {Spin{2}, {range(n_occ_alpha, nocc), range(nocc + n_vir_alpha, total_orbitals)}}}};
@@ -201,71 +239,103 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& 
   std::vector<Tile> mo_tiles;
 
   if(!balance_tiles) {
-    tamm::Tile est_nt    = n_occ_alpha / tce_tile;
-    tamm::Tile last_tile = n_occ_alpha % tce_tile;
+    // tamm::Tile est_nt    = n_occ_alpha / tce_tile;
+    // tamm::Tile last_tile = n_occ_alpha % tce_tile;
+    // for(tamm::Tile x = 0; x < est_nt; x++) mo_tiles.push_back(tce_tile);
+    // if(last_tile > 0) mo_tiles.push_back(last_tile);
+    tamm::Tile est_nt    = occ_alpha_ext / tce_tile;
+    tamm::Tile last_tile = occ_alpha_ext % tce_tile;
     for(tamm::Tile x = 0; x < est_nt; x++) mo_tiles.push_back(tce_tile);
     if(last_tile > 0) mo_tiles.push_back(last_tile);
-    est_nt    = n_occ_beta / tce_tile;
-    last_tile = n_occ_beta % tce_tile;
+    est_nt    = occ_alpha_int / tce_tile;
+    last_tile = occ_alpha_int % tce_tile;
+    for(tamm::Tile x = 0; x < est_nt; x++) mo_tiles.push_back(tce_tile);
+    if(last_tile > 0) mo_tiles.push_back(last_tile);
+    // est_nt    = n_occ_beta / tce_tile;
+    // last_tile = n_occ_beta % tce_tile;
+    // for(tamm::Tile x = 0; x < est_nt; x++) mo_tiles.push_back(tce_tile);
+    // if(last_tile > 0) mo_tiles.push_back(last_tile);
+    est_nt    = occ_beta_ext / tce_tile;
+    last_tile = occ_beta_ext % tce_tile;
+    for(tamm::Tile x = 0; x < est_nt; x++) mo_tiles.push_back(tce_tile);
+    if(last_tile > 0) mo_tiles.push_back(last_tile);
+    est_nt    = occ_beta_int / tce_tile;
+    last_tile = occ_beta_int % tce_tile;
     for(tamm::Tile x = 0; x < est_nt; x++) mo_tiles.push_back(tce_tile);
     if(last_tile > 0) mo_tiles.push_back(last_tile);
     // est_nt = n_vir_alpha/tce_tile;
     // last_tile = n_vir_alpha%tce_tile;
     // for (tamm::Tile x=0;x<est_nt;x++) mo_tiles.push_back(tce_tile);
     // if(last_tile>0) mo_tiles.push_back(last_tile);
-    est_nt    = virt_alpha_int / tce_tile;
-    last_tile = virt_alpha_int % tce_tile;
+    est_nt    = vir_alpha_int / tce_tile;
+    last_tile = vir_alpha_int % tce_tile;
     for(tamm::Tile x = 0; x < est_nt; x++) mo_tiles.push_back(tce_tile);
     if(last_tile > 0) mo_tiles.push_back(last_tile);
-    est_nt    = virt_alpha_ext / tce_tile;
-    last_tile = virt_alpha_ext % tce_tile;
+    est_nt    = vir_alpha_ext / tce_tile;
+    last_tile = vir_alpha_ext % tce_tile;
     for(tamm::Tile x = 0; x < est_nt; x++) mo_tiles.push_back(tce_tile);
     if(last_tile > 0) mo_tiles.push_back(last_tile);
     // est_nt = n_vir_beta/tce_tile;
     // last_tile = n_vir_beta%tce_tile;
     // for (tamm::Tile x=0;x<est_nt;x++) mo_tiles.push_back(tce_tile);
     // if(last_tile>0) mo_tiles.push_back(last_tile);
-    est_nt    = virt_beta_int / tce_tile;
-    last_tile = virt_beta_int % tce_tile;
+    est_nt    = vir_beta_int / tce_tile;
+    last_tile = vir_beta_int % tce_tile;
     for(tamm::Tile x = 0; x < est_nt; x++) mo_tiles.push_back(tce_tile);
     if(last_tile > 0) mo_tiles.push_back(last_tile);
-    est_nt    = virt_beta_ext / tce_tile;
-    last_tile = virt_beta_ext % tce_tile;
+    est_nt    = vir_beta_ext / tce_tile;
+    last_tile = vir_beta_ext % tce_tile;
     for(tamm::Tile x = 0; x < est_nt; x++) mo_tiles.push_back(tce_tile);
     if(last_tile > 0) mo_tiles.push_back(last_tile);
   }
   else {
-    tamm::Tile est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * n_occ_alpha / tce_tile));
-    for(tamm::Tile x = 0; x < est_nt; x++)
-      mo_tiles.push_back(n_occ_alpha / est_nt + (x < (n_occ_alpha % est_nt)));
+    // tamm::Tile est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * n_occ_alpha / tce_tile));
+    // for(tamm::Tile x = 0; x < est_nt; x++)
+    //   mo_tiles.push_back(n_occ_alpha / est_nt + (x < (n_occ_alpha % est_nt)));
 
-    est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * n_occ_beta / tce_tile));
+    tamm::Tile est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * occ_alpha_ext / tce_tile));
     for(tamm::Tile x = 0; x < est_nt; x++)
-      mo_tiles.push_back(n_occ_beta / est_nt + (x < (n_occ_beta % est_nt)));
+      mo_tiles.push_back(occ_alpha_ext / est_nt + (x < (occ_alpha_ext % est_nt)));
+
+    est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * occ_alpha_int / tce_tile));
+    for(tamm::Tile x = 0; x < est_nt; x++)
+      mo_tiles.push_back(occ_alpha_int / est_nt + (x < (occ_alpha_int % est_nt)));
+
+    // est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * n_occ_beta / tce_tile));
+    // for(tamm::Tile x = 0; x < est_nt; x++)
+    //   mo_tiles.push_back(n_occ_beta / est_nt + (x < (n_occ_beta % est_nt)));
+
+    est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * occ_beta_ext / tce_tile));
+    for(tamm::Tile x = 0; x < est_nt; x++)
+      mo_tiles.push_back(occ_beta_ext / est_nt + (x < (occ_beta_ext % est_nt)));
+
+    est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * occ_beta_int / tce_tile));
+    for(tamm::Tile x = 0; x < est_nt; x++)
+      mo_tiles.push_back(occ_beta_int / est_nt + (x < (occ_beta_int % est_nt)));
 
     // est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * n_vir_alpha / tce_tile));
     // for (tamm::Tile x=0;x<est_nt;x++) mo_tiles.push_back(n_vir_alpha / est_nt + (x<(n_vir_alpha %
     // est_nt)));
 
-    est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * virt_alpha_int / tce_tile));
+    est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * vir_alpha_int / tce_tile));
     for(tamm::Tile x = 0; x < est_nt; x++)
-      mo_tiles.push_back(virt_alpha_int / est_nt + (x < (virt_alpha_int % est_nt)));
+      mo_tiles.push_back(vir_alpha_int / est_nt + (x < (vir_alpha_int % est_nt)));
 
-    est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * virt_alpha_ext / tce_tile));
+    est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * vir_alpha_ext / tce_tile));
     for(tamm::Tile x = 0; x < est_nt; x++)
-      mo_tiles.push_back(virt_alpha_ext / est_nt + (x < (virt_alpha_ext % est_nt)));
+      mo_tiles.push_back(vir_alpha_ext / est_nt + (x < (vir_alpha_ext % est_nt)));
 
     // est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * n_vir_beta / tce_tile));
     // for (tamm::Tile x=0;x<est_nt;x++) mo_tiles.push_back(n_vir_beta / est_nt + (x<(n_vir_beta %
     // est_nt)));
 
-    est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * virt_beta_int / tce_tile));
+    est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * vir_beta_int / tce_tile));
     for(tamm::Tile x = 0; x < est_nt; x++)
-      mo_tiles.push_back(virt_beta_int / est_nt + (x < (virt_beta_int % est_nt)));
+      mo_tiles.push_back(vir_beta_int / est_nt + (x < (vir_beta_int % est_nt)));
 
-    est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * virt_beta_ext / tce_tile));
+    est_nt = static_cast<tamm::Tile>(std::ceil(1.0 * vir_beta_ext / tce_tile));
     for(tamm::Tile x = 0; x < est_nt; x++)
-      mo_tiles.push_back(virt_beta_ext / est_nt + (x < (virt_beta_ext % est_nt)));
+      mo_tiles.push_back(vir_beta_ext / est_nt + (x < (vir_beta_ext % est_nt)));
   }
 
   TiledIndexSpace MO{MO_IS, mo_tiles}; //{ova,ova,ovb,ovb}};

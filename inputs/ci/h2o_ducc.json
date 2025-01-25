@@ -39,6 +39,9 @@
     },
     "debug": false,
     "nactive_va": 2,
+    "nactive_vb": 2,
+    "nactive_oa": 5,
+    "nactive_ob": 5,    
     "ducc_lvl": 2,
     "freeze": {
       "atomic": false,

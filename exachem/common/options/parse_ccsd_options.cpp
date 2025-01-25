@@ -152,6 +152,12 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
     if(cc_options.gf_p_oi_range != 1 && cc_options.gf_p_oi_range != 2)
       tamm_terminate("gf_p_oi_range can only be one of 1 or 2");
   }
+
+  if(cc_options.nactive_oa < 0 || cc_options.nactive_ob < 0 || cc_options.nactive_va < 0 ||
+     cc_options.nactive_vb < 0) {
+    tamm_terminate(
+      "[INPUT FILE ERROR]: nactive_oa/nactive_ob/nactive_va/nactive_vb cannot be negative");
+  }
 }
 
 void ParseCCSDOptions::update_common_options(ChemEnv& chem_env) {

@@ -11,11 +11,12 @@
 ParseGWOptions::ParseGWOptions(ChemEnv& chem_env) { parse(chem_env); }
 
 void ParseGWOptions::parse(ChemEnv& chem_env) {
-  // clang-format off
-  json jgw = chem_env.jinput["GW"];
+  if(!chem_env.jinput.contains("GW")) return;
+  json       jgw        = chem_env.jinput["GW"];
   GWOptions& gw_options = chem_env.ioptions.gw_options;
   update_common_options(chem_env);
 
+  // clang-format off
   parse_option<bool>  (gw_options.debug,     jgw, "debug");
   parse_option<int>   (gw_options.ngl,       jgw, "ngl");
   parse_option<int>   (gw_options.noqpa,     jgw, "noqpa");

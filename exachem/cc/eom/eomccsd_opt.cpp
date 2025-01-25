@@ -714,7 +714,7 @@ void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIn
         std::cout << std::fixed << std::setprecision(2) << iter_time << " secs" << std::endl;
         sys_data.results["output"]["EOMCCSD"]["iter"][std::to_string(iter + 1)]["performance"]
                         ["total_time"] = iter_time;
-        chem_env.write_json_data("EOMCCSD");
+        chem_env.write_json_data();
       }
 
       //################################################################################

@@ -953,7 +953,7 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
   } // end timestep loop
 
   if(ec.print()) {
-    if(ts_start < ntimesteps) chem_env.write_json_data("RT-EOMCCSD");
+    if(ts_start < ntimesteps) chem_env.write_json_data();
 
     if(profile) {
       std::string   profile_csv = rt_eom_fp + "_profile.csv";

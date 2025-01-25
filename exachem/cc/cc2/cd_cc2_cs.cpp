@@ -547,7 +547,7 @@ std::tuple<double, double> exachem::cc2::cc2_cs::cd_cc2_cs_driver(
     sys_data.results["output"]["CC2"]["final_energy"]["correlation"] = energy;
     sys_data.results["output"]["CC2"]["final_energy"]["total"] =
       chem_env.cc_context.cc2_total_energy;
-    chem_env.write_json_data("CC2");
+    chem_env.write_json_data();
   }
 
   sch.deallocate(d_e, i0_temp, t2_aaaa_temp, _a01V);

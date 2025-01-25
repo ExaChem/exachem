@@ -833,7 +833,7 @@ std::tuple<double, double> exachem::cc::ccsd::cd_ccsd_cs_driver(
     sys_data.results["output"]["CCSD"]["final_energy"]["total"] =
       chem_env.cc_context.ccsd_total_energy;
     sys_data.results["output"]["CCSD"]["performance"]["total_time"] = ccsd_time;
-    chem_env.write_json_data("CCSD");
+    chem_env.write_json_data();
   }
 
   sch.deallocate(d_e, i0_temp, t2_aaaa_temp, _a01V);

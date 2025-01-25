@@ -261,7 +261,7 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
     sys_data.results["output"]["CCSD_Lambda"]["dipole"]["Z"]     = dmz;
     sys_data.results["output"]["CCSD_Lambda"]["dipole"]["Total"] = total_dip_val;
     sys_data.results["output"]["CCSD_Lambda"]["dipole"]["performance"]["total_time"] = dip_ttime;
-    chem_env.write_json_data("CCSD_Lambda");
+    chem_env.write_json_data();
   }
 
   if(!ccsd_options.cc_rdm.empty()) {

@@ -33,7 +33,7 @@ void scf(ExecutionContext& ec, ChemEnv& chem_env) {
 
   if(rank == 0) {
     chem_env.sys_data.results["output"]["SCF"]["performance"] = {{"total_time", hf_time}};
-    if(chem_env.ioptions.task_options.scf) chem_env.write_json_data("SCF");
+    if(chem_env.ioptions.task_options.scf) chem_env.write_json_data();
     std::cout << std::endl
               << "Total Time taken for Hartree-Fock: " << std::fixed << std::setprecision(2)
               << hf_time << " secs" << std::endl;

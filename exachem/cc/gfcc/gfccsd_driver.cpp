@@ -121,7 +121,7 @@ void write_results_to_json(ExecutionContext& ec, ChemEnv& chem_env, int level,
       chem_env.sys_data.results["output"]["GFCCSD"][gfcc_type][lvl_str][std::to_string(ni)]["A_a"] =
         ni_A[ni];
     }
-    chem_env.write_json_data("GFCCSD");
+    chem_env.write_json_data();
   }
 }
 
@@ -4083,7 +4083,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           write_string_to_disk(ec, spfe.str(), extrap_file);
           if(rank == 0) {
             sys_data.results["output"]["GFCCSD"]["retarded_alpha"]["nlevels"] = level;
-            chem_env.write_json_data("GFCCSD");
+            chem_env.write_json_data();
           }
           sch.deallocate(xsub_local_a, o_local_a, Cp_local_a, hsub_tamm_a, bsub_tamm_a, Cp_a)
             .execute();

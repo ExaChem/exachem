@@ -348,7 +348,7 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
     sys_data.results["output"]["CCSD(T)"]["performance"]["gflops"]         = n_gflops;
     sys_data.results["output"]["CCSD(T)"]["performance"]["total_num_ops"]  = total_num_ops;
     sys_data.results["output"]["CCSD(T)"]["performance"]["load_imbalance"] = load_imb;
-    chem_env.write_json_data("CCSD_T");
+    chem_env.write_json_data();
   }
 
   comm_stats("S1-T1 GetTime", ccsdt_s1_t1_GetTime);

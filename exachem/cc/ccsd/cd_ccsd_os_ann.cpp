@@ -1180,7 +1180,7 @@ cd_ccsd_os_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace
       chem_env.cc_context.ccsd_total_energy;
     sys_data.results["output"]["CCSD"]["performance"]["total_time"] = ccsd_time;
 
-    chem_env.write_json_data("CCSD");
+    chem_env.write_json_data();
   }
 
   CCSE_Tensors<T>::deallocate_list(sch, _a02_os, _a03_os);

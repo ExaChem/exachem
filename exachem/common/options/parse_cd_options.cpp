@@ -19,6 +19,7 @@ ParseCDOptions::ParseCDOptions(ChemEnv& chem_env) {
 }
 
 void ParseCDOptions::parse_check(json& jinput) {
+  if(!jinput.contains("CD")) return;
   const std::vector<string> valid_cd{"comments", "debug",   "itilesize", "diagtol",
                                      "write_cv", "skip_cd", "max_cvecs", "ext_data_path"};
   for(auto& el: jinput["CD"].items()) {
@@ -28,6 +29,7 @@ void ParseCDOptions::parse_check(json& jinput) {
 }
 
 void ParseCDOptions::parse(ChemEnv& chem_env) {
+  if(!chem_env.jinput.contains("CD")) return;
   json jcd = chem_env.jinput["CD"];
   parse_option<bool>(chem_env.ioptions.cd_options.debug, jcd, "debug");
   parse_option<int>(chem_env.ioptions.cd_options.itilesize, jcd, "itilesize");

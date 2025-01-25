@@ -84,8 +84,9 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ExecutionContext& ec, ChemEn
   const int rank         = ec.pg().rank().value();
   auto      ccsd_options = chem_env.ioptions.ccsd_options;
 
-  const std::string jkey    = "tilesize";
-  const bool        user_ts = chem_env.jinput["CC"].contains(jkey) ? true : false;
+  const std::string jkey = "tilesize";
+  bool              user_ts{false};
+  if(chem_env.jinput.contains("CC")) user_ts = chem_env.jinput["CC"].contains(jkey) ? true : false;
 
   Tile tce_tile = ccsd_options.tilesize;
   if(!triples) {
@@ -142,8 +143,9 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& 
   if(nactv > sys_data.n_vir_alpha && sys_data.is_restricted)
     tamm_terminate("[DUCC ERROR]: nactive_va > n_vir_alpha");
 
-  const std::string jkey    = "tilesize";
-  const bool        user_ts = chem_env.jinput["CC"].contains(jkey) ? true : false;
+  const std::string jkey = "tilesize";
+  bool              user_ts{false};
+  if(chem_env.jinput.contains("CC")) user_ts = chem_env.jinput["CC"].contains(jkey) ? true : false;
 
   if(!triples) {
     if(!user_ts && ec.has_gpu()) {

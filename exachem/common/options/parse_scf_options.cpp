@@ -19,6 +19,7 @@ void ParseSCFOptions::operator()(ChemEnv& chem_env) {
 }
 
 void ParseSCFOptions::parse_check(json& jinput) {
+  if(!jinput.contains("SCF")) return;
   // clang-format off
   const std::vector<std::string> valid_scf{"charge", "multiplicity", "lshift", "tol_int", "tol_sch",
     "tol_lindep", "conve", "convd", "diis_hist","tilesize","df_tilesize",
@@ -37,13 +38,16 @@ void ParseSCFOptions::parse_check(json& jinput) {
     if(std::find(valid_scf.begin(), valid_scf.end(), el.key()) == valid_scf.end())
       tamm_terminate("INPUT FILE ERROR: Invalid SCF option [" + el.key() + "] in the input file");
   }
-  for(auto& el: jinput["SCF"]["DFT"].items()) {
-    if(std::find(valid_dft.begin(), valid_dft.end(), el.key()) == valid_dft.end())
-      tamm_terminate("INPUT FILE ERROR: Invalid DFT option in SCF block [" + el.key() + "]");
+  if(jinput["SCF"].contains("DFT")) {
+    for(auto& el: jinput["SCF"]["DFT"].items()) {
+      if(std::find(valid_dft.begin(), valid_dft.end(), el.key()) == valid_dft.end())
+        tamm_terminate("INPUT FILE ERROR: Invalid DFT option in SCF block [" + el.key() + "]");
+    }
   }
 }
 
 void ParseSCFOptions::parse(ChemEnv& chem_env) {
+  if(!chem_env.jinput.contains("SCF")) return;
   json        jscf        = chem_env.jinput["SCF"];
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
   update_common_options(chem_env);
@@ -70,24 +74,26 @@ void ParseSCFOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(scf_options.molden, jscf, "molden");
   parse_option<std::string>(scf_options.moldenfile, jscf, "moldenfile");
 
-  json jdft = jscf["DFT"];
-  parse_option<bool>(scf_options.snK, jdft, "snK");
-  parse_option<std::string>(scf_options.xc_grid_type, jdft, "xc_grid_type");
-  parse_option<std::string>(scf_options.xc_pruning_scheme, jdft, "xc_pruning_scheme");
-  parse_option<std::string>(scf_options.xc_rad_quad, jdft, "xc_rad_quad");
-  parse_option<std::string>(scf_options.xc_weight_scheme, jdft, "xc_weight_scheme");
-  parse_option<std::string>(scf_options.xc_exec_space, jdft, "xc_exec_space");
-  parse_option<std::string>(scf_options.xc_lb_kernel, jdft, "xc_lb_kernel");
-  parse_option<std::string>(scf_options.xc_mw_kernel, jdft, "xc_mw_kernel");
-  parse_option<std::string>(scf_options.xc_int_kernel, jdft, "xc_int_kernel");
-  parse_option<std::string>(scf_options.xc_red_kernel, jdft, "xc_red_kernel");
-  parse_option<std::string>(scf_options.xc_lwd_kernel, jdft, "xc_lwd_kernel");
-  parse_option<std::vector<std::string>>(scf_options.xc_type, jdft, "xc_type");
-  parse_option<std::pair<int, int>>(scf_options.xc_radang_size, jdft, "xc_radang_size");
-  parse_option<int>(scf_options.xc_batch_size, jdft, "xc_batch_size");
-  parse_option<double>(scf_options.xc_basis_tol, jdft, "xc_basis_tol");
-  parse_option<double>(scf_options.xc_snK_etol, jdft, "xc_snK_etol");
-  parse_option<double>(scf_options.xc_snK_ktol, jdft, "xc_snK_ktol");
+  if(jscf.contains("DFT")) {
+    json jdft = jscf["DFT"];
+    parse_option<bool>(scf_options.snK, jdft, "snK");
+    parse_option<std::string>(scf_options.xc_grid_type, jdft, "xc_grid_type");
+    parse_option<std::string>(scf_options.xc_pruning_scheme, jdft, "xc_pruning_scheme");
+    parse_option<std::string>(scf_options.xc_rad_quad, jdft, "xc_rad_quad");
+    parse_option<std::string>(scf_options.xc_weight_scheme, jdft, "xc_weight_scheme");
+    parse_option<std::string>(scf_options.xc_exec_space, jdft, "xc_exec_space");
+    parse_option<std::string>(scf_options.xc_lb_kernel, jdft, "xc_lb_kernel");
+    parse_option<std::string>(scf_options.xc_mw_kernel, jdft, "xc_mw_kernel");
+    parse_option<std::string>(scf_options.xc_int_kernel, jdft, "xc_int_kernel");
+    parse_option<std::string>(scf_options.xc_red_kernel, jdft, "xc_red_kernel");
+    parse_option<std::string>(scf_options.xc_lwd_kernel, jdft, "xc_lwd_kernel");
+    parse_option<std::vector<std::string>>(scf_options.xc_type, jdft, "xc_type");
+    parse_option<std::pair<int, int>>(scf_options.xc_radang_size, jdft, "xc_radang_size");
+    parse_option<int>(scf_options.xc_batch_size, jdft, "xc_batch_size");
+    parse_option<double>(scf_options.xc_basis_tol, jdft, "xc_basis_tol");
+    parse_option<double>(scf_options.xc_snK_etol, jdft, "xc_snK_etol");
+    parse_option<double>(scf_options.xc_snK_ktol, jdft, "xc_snK_ktol");
+  }
 
   parse_option<int>(scf_options.n_lindep, jscf, "n_lindep");
   parse_option<int>(scf_options.restart_size, jscf, "restart_size");
@@ -108,11 +114,13 @@ void ParseSCFOptions::parse(ChemEnv& chem_env) {
     scf_options.guess_atom_options[element_symbol] = atom_opt;
   }
 
-  json jscf_analysis = jscf["PRINT"];
-  parse_option<bool>(scf_options.mos_txt, jscf_analysis, "mos_txt");
-  parse_option<bool>(scf_options.mulliken_analysis, jscf_analysis, "mulliken");
-  parse_option<std::pair<bool, double>>(scf_options.mo_vectors_analysis, jscf_analysis,
-                                        "mo_vectors");
+  if(jscf.contains("PRINT")) {
+    json jscf_analysis = jscf["PRINT"];
+    parse_option<bool>(scf_options.mos_txt, jscf_analysis, "mos_txt");
+    parse_option<bool>(scf_options.mulliken_analysis, jscf_analysis, "mulliken");
+    parse_option<std::pair<bool, double>>(scf_options.mo_vectors_analysis, jscf_analysis,
+                                          "mo_vectors");
+  }
 
   if(scf_options.nnodes < 1 || scf_options.nnodes > 100) {
     tamm_terminate("INPUT FILE ERROR: SCF option nnodes should be a number between 1 and 100");

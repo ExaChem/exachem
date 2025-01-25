@@ -19,6 +19,7 @@ void ParseFCIOptions::operator()(ChemEnv& chem_env) {
 }
 
 void ParseFCIOptions::parse_check(json& jinput) {
+  if(!jinput.contains("FCI")) return;
   // clang-format off
     const std::vector<std::string> valid_fci{"nalpha",   "nbeta", "nactive",   "ninactive",
                                              "comments", "job",   "expansion", "FCIDUMP",
@@ -32,6 +33,7 @@ void ParseFCIOptions::parse_check(json& jinput) {
 }
 
 void ParseFCIOptions::parse(ChemEnv& chem_env){
+  if(!chem_env.jinput.contains("FCI")) return;
   json jfci = chem_env.jinput["FCI"];
   FCIOptions& fci_options = chem_env.ioptions.fci_options;
   update_common_options(chem_env);

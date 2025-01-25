@@ -132,6 +132,7 @@ Matrix compute_gradients(ExecutionContext& ec, ChemEnv& chem_env, const std::vec
               << std::setw(16) << std::string(9, ' ') + "y" << std::setw(16)
               << std::string(9, ' ') + "z" << std::endl;
 
+    std::vector<string> grad_vec;
     for(size_t i = 0; i < chem_env.ec_atoms.size(); i++) {
       auto ecatom = chem_env.ec_atoms[i];
       std::cout << std::setw(6) << std::left << i + 1 << std::setw(4) << ecatom.esymbol
@@ -139,7 +140,16 @@ Matrix compute_gradients(ExecutionContext& ec, ChemEnv& chem_env, const std::vec
                 << ecatom.atom.x << std::setw(16) << ecatom.atom.y << std::setw(16) << ecatom.atom.z
                 << std::setw(16) << gradients(i, 0) << std::setw(16) << gradients(i, 1)
                 << std::setw(16) << gradients(i, 2) << std::endl;
+
+      std::ostringstream grad_i;
+      grad_i << std::left << std::setw(4) << ecatom.esymbol << std::right << std::fixed
+             << std::setprecision(10) << gradients(i, 0) << std::setw(16) << gradients(i, 1)
+             << std::setw(16) << gradients(i, 2);
+      grad_vec.push_back(grad_i.str());
     }
+
+    chem_env.sys_data.results["output"]["gradients"][chem_env.task_string] = grad_vec;
+    chem_env.write_json_data();
   }
 
   return gradients;

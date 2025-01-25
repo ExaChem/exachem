@@ -2172,7 +2172,7 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
   free_tensors(ftij, vtijkl);
   if(nactv > 0) { free_tensors(ftia, ftab, vtijka, vtaijb, vtijab, vtiabc, vtabcd); }
 
-  if(rank == 0) chem_env.write_json_data("DUCC");
+  if(rank == 0) chem_env.write_json_data();
 }
 
 using T = double;

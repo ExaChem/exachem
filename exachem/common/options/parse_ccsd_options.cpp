@@ -19,6 +19,7 @@ void ParseCCSDOptions::operator()(ChemEnv& chem_env) {
 }
 
 void ParseCCSDOptions::parse_check(json& jinput) {
+  if(!jinput.contains("CC")) return;
   // clang-format off
     const std::vector<string> valid_cc{
       "CCSD(T)",  "DLPNO",        "EOMCCSD",        "RT-EOMCC",     "GFCCSD",
@@ -35,6 +36,7 @@ void ParseCCSDOptions::parse_check(json& jinput) {
 }
 
 void ParseCCSDOptions::parse(ChemEnv& chem_env) {
+  if(!chem_env.jinput.contains("CC")) return;
   json         jcc        = chem_env.jinput["CC"];
   CCSDOptions& cc_options = chem_env.ioptions.ccsd_options;
   update_common_options(chem_env);

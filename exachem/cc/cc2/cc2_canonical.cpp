@@ -289,7 +289,7 @@ cc2_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO
     sys_data.results["output"]["CC2"]["final_energy"]["total"] =
       chem_env.cc_context.cc2_total_energy;
 
-    chem_env.write_json_data("CC2");
+    chem_env.write_json_data();
   }
 
   return std::make_tuple(residual, energy);

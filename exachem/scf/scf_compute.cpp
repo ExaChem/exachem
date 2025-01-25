@@ -251,11 +251,13 @@ std::tuple<int, double> exachem::scf::SCFCompute::compute_NRE(const ExecutionCon
 void exachem::scf::SCFCompute::recompute_tilesize(ExecutionContext& ec, ChemEnv& chem_env,
                                                   bool is_df) {
   // heuristic to set tilesize to atleast 5% of nbf if user has not provided a tilesize
-  const auto        N         = is_df ? chem_env.sys_data.ndf : chem_env.shells.nbf();
-  const std::string jkey      = is_df ? "df_tilesize" : "tilesize";
-  const bool        user_ts   = chem_env.jinput["SCF"].contains(jkey) ? true : false;
-  tamm::Tile&       tile_size = is_df ? chem_env.ioptions.scf_options.dfAO_tilesize
-                                      : chem_env.ioptions.scf_options.AO_tilesize;
+  const auto        N       = is_df ? chem_env.sys_data.ndf : chem_env.shells.nbf();
+  const std::string jkey    = is_df ? "df_tilesize" : "tilesize";
+  bool              user_ts = false;
+  if(chem_env.jinput.contains("SCF"))
+    user_ts = chem_env.jinput["SCF"].contains(jkey) ? true : false;
+  tamm::Tile& tile_size = is_df ? chem_env.ioptions.scf_options.dfAO_tilesize
+                                : chem_env.ioptions.scf_options.AO_tilesize;
 
   if(tile_size < N * 0.05 && !user_ts) {
     tile_size = std::ceil(N * 0.05);

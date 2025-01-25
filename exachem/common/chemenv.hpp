@@ -58,7 +58,7 @@ public:
 
   void read_run_context();
   void write_run_context();
-  void write_json_data(const std::string cmodule);
+  void write_json_data();
 
   Matrix compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A);
 

@@ -732,7 +732,7 @@ std::tuple<double, double> exachem::cc2::cc2_os::cd_cc2_os_driver(
     sys_data.results["output"]["CC2"]["final_energy"]["total"] =
       chem_env.cc_context.cc2_total_energy;
 
-    chem_env.write_json_data("CC2");
+    chem_env.write_json_data();
   }
 
   CCSE_Tensors<T>::deallocate_list(sch, _a02_os, _a03_os);

@@ -444,9 +444,6 @@
             "gf_profile": {
               "type": "boolean"
             },
-            "gf_itriples": {
-              "type": "boolean"
-            },
             "gf_restart": {
               "type": "boolean"
             },

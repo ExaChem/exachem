@@ -27,9 +27,9 @@ void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vecto
     tamm_terminate(bfnf_msg);
   }
 
-  int         nelec = 0;
-  int         iatom = -1;
-  std::string amlabel;
+  int              nelec = 0;
+  std::string      amlabel;
+  std::vector<int> atomlist;
 
   while(std::getline(is, line)) {
     if(line.find("END") != std::string::npos) break;
@@ -53,15 +53,18 @@ void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vecto
     if(is_es && count == 3) {
       std::string nelec_str;
       iss_ >> nelec_str >> nelec;
+      atomlist.clear();
 
       for(size_t i = 0; i < ec_atoms.size(); i++) {
         if(elemsymbol == ec_atoms[i].esymbol) {
+          if(ec_atoms[i].has_ecp) continue;
           has_ecp               = true;
           ec_atoms[i].has_ecp   = true;
           ec_atoms[i].ecp_nelec = nelec;
           atoms[i].atomic_number -= nelec;
-          iatom = i;
-          break;
+          atomlist.push_back(i);
+          // iatom = i;
+          // break;
         }
       }
       continue;
@@ -79,10 +82,12 @@ void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vecto
       double _exp;
       double _coef;
       iss_ >> _exp >> _coef;
-      ec_atoms[iatom].ecp_ams.push_back(am);
-      ec_atoms[iatom].ecp_ns.push_back(ns);
-      ec_atoms[iatom].ecp_exps.push_back(_exp);
-      ec_atoms[iatom].ecp_coeffs.push_back(_coef);
+      for(auto& iatom: atomlist) {
+        ec_atoms[iatom].ecp_ams.push_back(am);
+        ec_atoms[iatom].ecp_ns.push_back(ns);
+        ec_atoms[iatom].ecp_exps.push_back(_exp);
+        ec_atoms[iatom].ecp_coeffs.push_back(_coef);
+      }
     }
   }
   while(std::getline(is, line))

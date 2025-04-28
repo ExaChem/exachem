@@ -340,7 +340,6 @@
       "gf_cs": true,
       "gf_ngmres": 40,
       "gf_maxiter": 200,
-      "gf_itriples": false,
       "gf_p_oi_range": 1,
       "gf_nprocs_poi": 100,
       "gf_preconditioning": true,

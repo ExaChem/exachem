@@ -193,23 +193,22 @@
       "gf_cs": true,
       "gf_ngmres": 30,
       "gf_maxiter": 200,
-      "gf_itriples": false,
       "gf_p_oi_range": 1,
       "gf_nprocs_poi": 40,
       "gf_preconditioning": true,
       "gf_eta": 0.01,
       "gf_threshold": 0.01,
       "gf_omega_min_ip": -20.00,
-      "gf_omega_max_ip": -19.91,
-      "gf_omega_min_ip_e": -21.50,
-      "gf_omega_max_ip_e": -18.50,
+      "gf_omega_max_ip": -19.87,
+      "gf_omega_min_ip_e": -21.15,
+      "gf_omega_max_ip_e": -19.72,
       "gf_omega_delta": 0.01,
       "gf_omega_delta_e": 0.001,
       "gf_omega_min_ea": 0.0,
       "gf_omega_max_ea": 0.1,
       "gf_omega_min_ea_e": 0.0,
       "gf_omega_max_ea_e": 0.1
-    }
+    }    
   },
   "TASK": {
     "scf": true,

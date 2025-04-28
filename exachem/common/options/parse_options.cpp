@@ -21,7 +21,9 @@ void ECOptionParser::parse_n_check(std::string_view filename, json& jinput) {
 
   auto is = std::ifstream(std::string(filename));
 
-  auto jsax         = nlohmann::detail::json_sax_dom_parser<json>(jinput, false);
+  auto jsax =
+    nlohmann::detail::json_sax_dom_parser<json, nlohmann::detail::string_input_adapter_type>(jinput,
+                                                                                             false);
   bool parse_result = json::sax_parse(is, &jsax);
   if(!parse_result) tamm_terminate("Error parsing input file");
 

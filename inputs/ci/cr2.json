@@ -34,30 +34,7 @@
   },
   "CC": {
     "threshold": 1e-06,
-    "writet": true,
-    "GFCCSD": {
-      "gf_ip": true,
-      "gf_ea": false,
-      "gf_os": false,
-      "gf_cs": false,
-      "gf_ngmres": 10,
-      "gf_itriples": false,
-      "gf_maxiter": 100,
-      "gf_damping_factor": 1.0,
-      "gf_p_oi_range": 1,
-      "gf_eta": 0.01,
-      "gf_threshold": 0.01,
-      "gf_omega_min_ip": -0.4,
-      "gf_omega_max_ip": -0.2,
-      "gf_omega_min_ip_e": -2.0,
-      "gf_omega_max_ip_e": 0.0,
-      "gf_omega_delta": 0.01,
-      "gf_omega_delta_e": 0.01,
-      "gf_omega_min_ea": 0.0,
-      "gf_omega_max_ea": 0.1,
-      "gf_omega_min_ea_e": 0.0,
-      "gf_omega_max_ea_e": 0.1
-    }
+    "writet": true
   },
   "TASK": {
     "scf": true,

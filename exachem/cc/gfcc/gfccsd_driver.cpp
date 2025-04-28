@@ -178,25 +178,31 @@ void write_string_to_disk(ExecutionContext& ec, const std::string& tstring,
 
 template<typename T>
 void gfccsd_driver_ip_a(
-  ExecutionContext& gec, CCSDOptions& ccsd_options, ExecutionContext& sub_ec,
-  const TiledIndexSpace& MO, Tensor<T>& t1_a, Tensor<T>& t1_b, Tensor<T>& t2_aaaa,
-  Tensor<T>& t2_bbbb, Tensor<T>& t2_abab, Tensor<T>& f1, Tensor<T>& t2v2_o, Tensor<T>& lt12_o_a,
-  Tensor<T>& lt12_o_b, Tensor<T>& ix1_1_1_a, Tensor<T>& ix1_1_1_b, Tensor<T>& ix2_1_aaaa,
-  Tensor<T>& ix2_1_abab, Tensor<T>& ix2_1_bbbb, Tensor<T>& ix2_1_baba, Tensor<T>& ix2_2_a,
-  Tensor<T>& ix2_2_b, Tensor<T>& ix2_3_a, Tensor<T>& ix2_3_b, Tensor<T>& ix2_4_aaaa,
-  Tensor<T>& ix2_4_abab, Tensor<T>& ix2_4_bbbb, Tensor<T>& ix2_5_aaaa, Tensor<T>& ix2_5_abba,
-  Tensor<T>& ix2_5_abab, Tensor<T>& ix2_5_bbbb, Tensor<T>& ix2_5_baab, Tensor<T>& ix2_5_baba,
-  Tensor<T>& ix2_6_2_a, Tensor<T>& ix2_6_2_b, Tensor<T>& ix2_6_3_aaaa, Tensor<T>& ix2_6_3_abba,
-  Tensor<T>& ix2_6_3_abab, Tensor<T>& ix2_6_3_bbbb, Tensor<T>& ix2_6_3_baab,
-  Tensor<T>& ix2_6_3_baba, Tensor<T>& v2ijab_aaaa, Tensor<T>& v2ijab_abab, Tensor<T>& v2ijab_bbbb,
-  std::vector<T>& p_evl_sorted_occ, std::vector<T>& p_evl_sorted_virt, long int total_orbitals,
-  const TAMM_SIZE nocc, const TAMM_SIZE nvir, size_t& nptsi, const TiledIndexSpace& unit_tis,
-  string files_prefix, string levelstr, int noa) {
+  ExecutionContext& gec, ChemEnv& chem_env, const TiledIndexSpace& MO, Tensor<T>& t1_a,
+  Tensor<T>& t1_b, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb, Tensor<T>& t2_abab, Tensor<T>& f1,
+  Tensor<T>& t2v2_o, Tensor<T>& lt12_o_a, Tensor<T>& lt12_o_b, Tensor<T>& ix1_1_1_a,
+  Tensor<T>& ix1_1_1_b, Tensor<T>& ix2_1_aaaa, Tensor<T>& ix2_1_abab, Tensor<T>& ix2_1_bbbb,
+  Tensor<T>& ix2_1_baba, Tensor<T>& ix2_2_a, Tensor<T>& ix2_2_b, Tensor<T>& ix2_3_a,
+  Tensor<T>& ix2_3_b, Tensor<T>& ix2_4_aaaa, Tensor<T>& ix2_4_abab, Tensor<T>& ix2_4_bbbb,
+  Tensor<T>& ix2_5_aaaa, Tensor<T>& ix2_5_abba, Tensor<T>& ix2_5_abab, Tensor<T>& ix2_5_bbbb,
+  Tensor<T>& ix2_5_baab, Tensor<T>& ix2_5_baba, Tensor<T>& ix2_6_2_a, Tensor<T>& ix2_6_2_b,
+  Tensor<T>& ix2_6_3_aaaa, Tensor<T>& ix2_6_3_abba, Tensor<T>& ix2_6_3_abab,
+  Tensor<T>& ix2_6_3_bbbb, Tensor<T>& ix2_6_3_baab, Tensor<T>& ix2_6_3_baba, Tensor<T>& v2ijab_aaaa,
+  Tensor<T>& v2ijab_abab, Tensor<T>& v2ijab_bbbb, std::vector<T>& p_evl_sorted_occ,
+  std::vector<T>& p_evl_sorted_virt, const TAMM_SIZE nocc, const TAMM_SIZE nvir, size_t& nptsi,
+  const TiledIndexSpace& unit_tis, string files_prefix, string levelstr) {
   using ComplexTensor  = Tensor<std::complex<T>>;
   using VComplexTensor = std::vector<Tensor<std::complex<T>>>;
   using CMatrix = Eigen::Matrix<std::complex<T>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
-  auto debug = ccsd_options.debug;
+  const CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
+  auto               debug        = ccsd_options.debug;
+
+  ProcGroup&        sub_pg = chem_env.cc_context.sub_pg;
+  ExecutionContext& sub_ec = (*chem_env.cc_context.sub_ec);
+
+  const int noa = chem_env.sys_data.n_occ_alpha;
+  // const int total_orbitals = chem_env.sys_data.nmo;
 
   const TiledIndexSpace& O = MO("occ");
   const TiledIndexSpace& V = MO("virt");
@@ -300,7 +306,7 @@ void gfccsd_driver_ip_a(
 
     gsch.allocate(DEArr_IP1).execute();
     gsch.allocate(DEArr_IP2).execute();
-    if(sub_ec.pg().is_valid()) {
+    if(sub_pg.is_valid()) {
       Scheduler sub_sch{sub_ec};
       sub_sch(DEArr_IP1() = 0).execute();
       sub_sch(DEArr_IP2() = 0).execute();
@@ -380,8 +386,8 @@ void gfccsd_driver_ip_a(
     }
     subranks  = gf_nprocs_poi;
     sub_nodes = subranks / ppn;
-    if(sub_nodes == 0) sub_nodes++;
   }
+  if(sub_nodes == 0) sub_nodes++;
 
   int num_oi_can_bp = nnodes / sub_nodes;
   if(nnodes % sub_nodes > 0) num_oi_can_bp++;
@@ -945,7 +951,7 @@ void gfccsd_driver_ip_a(
 #if 0
 template<typename T>
 void gfccsd_driver_ip_b(
-  ExecutionContext& gec, ExecutionContext& sub_ec, const TiledIndexSpace& MO,
+  ExecutionContext& gec, ChemEnv& chem_env, const TiledIndexSpace& MO,
   Tensor<T>& t1_a, Tensor<T>& t1_b, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb, Tensor<T>& t2_abab,
   Tensor<T>& f1, Tensor<T>& t2v2_o, Tensor<T>& lt12_o_a, Tensor<T>& lt12_o_b, Tensor<T>& ix1_1_1_a,
   Tensor<T>& ix1_1_1_b, Tensor<T>& ix2_1_aaaa, Tensor<T>& ix2_1_abab, Tensor<T>& ix2_1_bbbb,
@@ -956,10 +962,20 @@ void gfccsd_driver_ip_b(
   Tensor<T>& ix2_6_3_aaaa, Tensor<T>& ix2_6_3_abba, Tensor<T>& ix2_6_3_abab,
   Tensor<T>& ix2_6_3_bbbb, Tensor<T>& ix2_6_3_baab, Tensor<T>& ix2_6_3_baba, Tensor<T>& v2ijab_aaaa,
   Tensor<T>& v2ijab_abab, Tensor<T>& v2ijab_bbbb, std::vector<T>& p_evl_sorted_occ,
-  std::vector<T>& p_evl_sorted_virt, long int total_orbitals, const TAMM_SIZE nocc,
+  std::vector<T>& p_evl_sorted_virt, const TAMM_SIZE nocc,
   const TAMM_SIZE nvir, size_t& nptsi, const TiledIndexSpace& unit_tis, string files_prefix,
-  string levelstr, int noa, int nob) {
+  string levelstr) {
   using ComplexTensor = Tensor<std::complex<T>>;
+
+  const CCSDOptions&     ccsd_options = chem_env.ioptions.ccsd_options;
+  auto debug = ccsd_options.debug;
+
+  ProcGroup& sub_pg = chem_env.cc_context.sub_pg;
+  ExecutionContext& sub_ec = (*chem_env.cc_context.sub_ec);
+
+  const int noa = chem_env.sys_data.n_occ_alpha;
+  const int nob = chem_env.sys_data.n_occ_beta;
+  const int total_orbitals = chem_env.sys_data.nmo;
 
   const TiledIndexSpace& O = MO("occ");
   const TiledIndexSpace& V = MO("virt");
@@ -972,6 +988,8 @@ void gfccsd_driver_ip_b(
   // const int obtiles = MO("occ_beta").num_tiles();
   const int vatiles = MO("virt_alpha").num_tiles();
   // const int vbtiles = MO("virt_beta").num_tiles();
+
+  TiledIndexSpace o_alpha, v_alpha, o_beta, v_beta;
 
   o_alpha = {MO("occ"), range(oatiles)};
   v_alpha = {MO("virt"), range(vatiles)};
@@ -1045,7 +1063,7 @@ void gfccsd_driver_ip_b(
     };
 
     gsch.allocate(DEArr_IP).execute();
-    if(sub_ec.pg().is_valid()) {
+    if(sub_pg.is_valid()) {
       Scheduler sub_sch{sub_ec};
       sub_sch(DEArr_IP() = 0).execute();
       block_for(sub_ec, DEArr_IP(), DEArr_lambda);
@@ -1085,23 +1103,53 @@ void gfccsd_driver_ip_b(
     gsch.deallocate(dtmp_bbb, dtmp_aba).execute();
     return;
   }
-  EXPECTS(num_pi_remain == pi_tbp.size());
-  // if(num_pi_remain == 0) num_pi_remain = 1;
-  int        subranks = std::floor(nranks / num_pi_remain);
-  const bool no_pg    = (subranks == 0 || subranks == 1);
-  if(no_pg) subranks = nranks;
-  if(gf_nprocs_poi > 0) subranks = gf_nprocs_poi;
 
-  // Figure out how many orbitals in pi_tbp can be processed with subranks
-  // TODO: gf_nprocs_pi must be a multiple of total #ranks for best performance.
-  size_t num_oi_can_bp = std::ceil(nranks / (1.0 * subranks));
-  if(num_pi_remain < num_oi_can_bp) {
-    num_oi_can_bp = num_pi_remain;
-    subranks      = std::floor(nranks / num_pi_remain);
-    if(no_pg) subranks = nranks;
+  EXPECTS(num_pi_remain == pi_tbp.size());
+  const int  ppn       = gec.ppn();
+  const int  nnodes    = gec.nnodes();
+  int        subranks  = std::floor(nranks / num_pi_remain);
+  const bool no_pg     = (subranks == 0 || subranks == 1);
+  int        sub_nodes = 0;
+
+  if(no_pg) {
+    subranks  = nranks;
+    sub_nodes = nnodes;
+  }
+  else {
+    int sub_nodes = subranks / ppn;
+    if(subranks % ppn > 0 || sub_nodes == 0) sub_nodes++;
+    if(sub_nodes > nnodes) sub_nodes = nnodes;
+    subranks = sub_nodes * ppn;
+  }
+
+  if(gf_nprocs_poi > 0) {
+    if(nnodes > 1 && gf_nprocs_poi % ppn != 0)
+      tamm_terminate("[ERROR] gf_nprocs_poi should be a muliple of user mpi ranks per node");
+    if(nnodes == 1) {
+      // TODO: This applies only when using GA's PR runtime
+      int ga_num_pr = 1;
+      if(const char* ga_npr = std::getenv("GA_NUM_PROGRESS_RANKS_PER_NODE")) {
+        ga_num_pr = std::atoi(ga_npr);
+      }
+      if(ga_num_pr > 1)
+        tamm_terminate("[ERROR] use of multiple GA progress ranks for a single node gfccsd "
+                       "calculation is not allowed");
+    }
+    subranks  = gf_nprocs_poi;
+    sub_nodes = subranks / ppn;
+  }
+  if(sub_nodes == 0) sub_nodes++;
+
+  int num_oi_can_bp = nnodes / sub_nodes;
+  if(nnodes % sub_nodes > 0) num_oi_can_bp++;
+  // when using 1 node
+  if(gf_nprocs_poi > 0 && nnodes == 1) {
+    num_oi_can_bp = ppn / gf_nprocs_poi;
+    if(ppn % gf_nprocs_poi > 0) num_oi_can_bp++;
   }
 
   if(rank == 0) {
+    cout << "Total number of process groups = " << num_oi_can_bp << endl;
     cout << "Total, remaining orbitals, batch size = " << num_oi << ", " << num_pi_remain << ", "
          << num_oi_can_bp << endl;
     cout << "No of processes used to compute each orbital = " << subranks << endl;
@@ -1428,7 +1476,7 @@ void gfccsd_driver_ip_b(
 
 template<typename T>
 void gfccsd_driver_ea_a(
-  ExecutionContext& gec, ExecutionContext& sub_ec, const TiledIndexSpace& MO,
+  ExecutionContext& gec, ChemEnv& chem_env, const TiledIndexSpace& MO,
   Tensor<T>& t1_a, Tensor<T>& t1_b, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb, Tensor<T>& t2_abab,
   Tensor<T>& f1, Tensor<T>& t2v2_v, Tensor<T>& lt12_v_a, Tensor<T>& lt12_v_b, Tensor<T>& iy1_1_a,
   Tensor<T>& iy1_1_b, Tensor<T>& iy1_2_1_a, Tensor<T>& iy1_2_1_b, Tensor<T>& iy1_a,
@@ -1443,12 +1491,21 @@ void gfccsd_driver_ea_a(
   Tensor<T>& iy5_abba, Tensor<T>& iy6_a, Tensor<T>& iy6_b, Tensor<T>& v2ijab_aaaa,
   Tensor<T>& v2ijab_abab, Tensor<T>& v2ijab_bbbb, Tensor<T>& cholOO_a, Tensor<T>& cholOO_b,
   Tensor<T>& cholOV_a, Tensor<T>& cholOV_b, Tensor<T>& cholVV_a, Tensor<T>& cholVV_b,
-  std::vector<T>& p_evl_sorted_occ, std::vector<T>& p_evl_sorted_virt, long int total_orbitals,
+  std::vector<T>& p_evl_sorted_occ, std::vector<T>& p_evl_sorted_virt,
   const TAMM_SIZE nocc, const TAMM_SIZE nvir, size_t& nptsi, const TiledIndexSpace& CI,
-  const TiledIndexSpace& unit_tis, string files_prefix, string levelstr, int nva) {
+  const TiledIndexSpace& unit_tis, string files_prefix, string levelstr) {
   using ComplexTensor  = Tensor<std::complex<T>>;
   using VComplexTensor = std::vector<Tensor<std::complex<T>>>;
   using CMatrix = Eigen::Matrix<std::complex<T>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+  const CCSDOptions&     ccsd_options = chem_env.ioptions.ccsd_options;
+  auto debug = ccsd_options.debug;
+
+  ProcGroup& sub_pg = chem_env.cc_context.sub_pg;
+  ExecutionContext& sub_ec = (*chem_env.cc_context.sub_ec);
+
+  const int nva = chem_env.sys_data.n_vir_alpha;
+  const int total_orbitals = chem_env.sys_data.nmo;
 
   const TiledIndexSpace& O = MO("occ");
   const TiledIndexSpace& V = MO("virt");
@@ -1461,6 +1518,8 @@ void gfccsd_driver_ea_a(
   // const int obtiles = MO("occ_beta").num_tiles();
   const int vatiles = MO("virt_alpha").num_tiles();
   // const int vbtiles = MO("virt_beta").num_tiles();
+
+  TiledIndexSpace o_alpha, v_alpha, o_beta, v_beta;
 
   o_alpha = {MO("occ"), range(oatiles)};
   v_alpha = {MO("virt"), range(vatiles)};
@@ -1989,7 +2048,7 @@ void gfccsd_driver_ea_a(
 
 template<typename T>
 void gfccsd_driver_ea_b(
-  ExecutionContext& gec, ExecutionContext& sub_ec, const TiledIndexSpace& MO,
+  ExecutionContext& gec, ChemEnv& chem_env, const TiledIndexSpace& MO,
   Tensor<T>& t1_a, Tensor<T>& t1_b, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb, Tensor<T>& t2_abab,
   Tensor<T>& f1, Tensor<T>& t2v2_v, Tensor<T>& lt12_v_a, Tensor<T>& lt12_v_b, Tensor<T>& iy1_1_a,
   Tensor<T>& iy1_1_b, Tensor<T>& iy1_2_1_a, Tensor<T>& iy1_2_1_b, Tensor<T>& iy1_a,
@@ -2004,10 +2063,20 @@ void gfccsd_driver_ea_b(
   Tensor<T>& iy5_abba, Tensor<T>& iy6_a, Tensor<T>& iy6_b, Tensor<T>& v2ijab_aaaa,
   Tensor<T>& v2ijab_abab, Tensor<T>& v2ijab_bbbb, Tensor<T>& cholOO_a, Tensor<T>& cholOO_b,
   Tensor<T>& cholOV_a, Tensor<T>& cholOV_b, Tensor<T>& cholVV_a, Tensor<T>& cholVV_b,
-  std::vector<T>& p_evl_sorted_occ, std::vector<T>& p_evl_sorted_virt, long int total_orbitals,
+  std::vector<T>& p_evl_sorted_occ, std::vector<T>& p_evl_sorted_virt,
   const TAMM_SIZE nocc, const TAMM_SIZE nvir, size_t& nptsi, const TiledIndexSpace& CI,
-  const TiledIndexSpace& unit_tis, string files_prefix, string levelstr, int nva, int nvb) {
+  const TiledIndexSpace& unit_tis, string files_prefix, string levelstr) {
   using ComplexTensor = Tensor<std::complex<T>>;
+
+  const CCSDOptions&     ccsd_options = chem_env.ioptions.ccsd_options;
+  auto debug = ccsd_options.debug;
+
+  ProcGroup& sub_pg = chem_env.cc_context.sub_pg;
+  ExecutionContext& sub_ec = (*chem_env.cc_context.sub_ec);
+
+  const int nva = chem_env.sys_data.n_vir_alpha;
+  const int nvb = chem_env.sys_data.n_vir_beta;
+  const int total_orbitals = chem_env.sys_data.nmo;
 
   const TiledIndexSpace& O = MO("occ");
   const TiledIndexSpace& V = MO("virt");
@@ -2020,6 +2089,8 @@ void gfccsd_driver_ea_b(
   // const int obtiles = MO("occ_beta").num_tiles();
   const int vatiles = MO("virt_alpha").num_tiles();
   // const int vbtiles = MO("virt_beta").num_tiles();
+
+  TiledIndexSpace o_alpha, v_alpha, o_beta, v_beta;
 
   o_alpha = {MO("occ"), range(oatiles)};
   v_alpha = {MO("virt"), range(vatiles)};
@@ -2089,7 +2160,7 @@ void gfccsd_driver_ea_b(
     };
 
     gsch.allocate(DEArr_EA).execute();
-    if(sub_ec.pg().is_valid()) {
+    if(sub_pg.is_valid()) {
       Scheduler sub_sch{sub_ec};
       sub_sch(DEArr_EA() = 0).execute();
       block_for(sub_ec, DEArr_EA(), DEArr_EA_lambda);
@@ -3247,14 +3318,13 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           gf_omega = x;
           if(!gf_restart) {
             gfccsd_driver_ip_a<T>(
-              ec, ccsd_options, *(cc_context.sub_ec), MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
-              d_t2_abab, d_f1, t2v2_o, lt12_o_a, lt12_o_b, ix1_1_1_a, ix1_1_1_b, ix2_1_aaaa,
-              ix2_1_abab, ix2_1_bbbb, ix2_1_baba, ix2_2_a, ix2_2_b, ix2_3_a, ix2_3_b, ix2_4_aaaa,
-              ix2_4_abab, ix2_4_bbbb, ix2_5_aaaa, ix2_5_abba, ix2_5_abab, ix2_5_bbbb, ix2_5_baab,
-              ix2_5_baba, ix2_6_2_a, ix2_6_2_b, ix2_6_3_aaaa, ix2_6_3_abba, ix2_6_3_abab,
-              ix2_6_3_bbbb, ix2_6_3_baab, ix2_6_3_baba, v2ijab_aaaa, v2ijab_abab, v2ijab_bbbb,
-              p_evl_sorted_occ, p_evl_sorted_virt, sys_data.nmo, nocc, nvir, nptsi, unit_tis,
-              files_prefix, levelstr, noa);
+              ec, chem_env, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, d_f1, t2v2_o,
+              lt12_o_a, lt12_o_b, ix1_1_1_a, ix1_1_1_b, ix2_1_aaaa, ix2_1_abab, ix2_1_bbbb,
+              ix2_1_baba, ix2_2_a, ix2_2_b, ix2_3_a, ix2_3_b, ix2_4_aaaa, ix2_4_abab, ix2_4_bbbb,
+              ix2_5_aaaa, ix2_5_abba, ix2_5_abab, ix2_5_bbbb, ix2_5_baab, ix2_5_baba, ix2_6_2_a,
+              ix2_6_2_b, ix2_6_3_aaaa, ix2_6_3_abba, ix2_6_3_abab, ix2_6_3_bbbb, ix2_6_3_baab,
+              ix2_6_3_baba, v2ijab_aaaa, v2ijab_abab, v2ijab_bbbb, p_evl_sorted_occ,
+              p_evl_sorted_virt, nocc, nvir, nptsi, unit_tis, files_prefix, levelstr);
           }
           else if(rank == 0) cout << endl << "Restarting freq: " << gf_omega << endl;
           auto ni             = std::round((x - omega_min_ip) / omega_delta);
@@ -4167,15 +4237,15 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         gf_omega = x;
 
         if(!gf_restart) {
-          gfccsd_driver_ip_b<T>(ec, *(cc_context.sub_ec), MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
+          gfccsd_driver_ip_b<T>(ec, chem_env, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
                                 d_t2_abab, d_f1, t2v2_o, lt12_o_a, lt12_o_b, ix1_1_1_a, ix1_1_1_b,
                                 ix2_1_aaaa, ix2_1_abab, ix2_1_bbbb, ix2_1_baba, ix2_2_a, ix2_2_b,
                                 ix2_3_a, ix2_3_b, ix2_4_aaaa, ix2_4_abab, ix2_4_bbbb, ix2_5_aaaa,
                                 ix2_5_abba, ix2_5_abab, ix2_5_bbbb, ix2_5_baab, ix2_5_baba,
                                 ix2_6_2_a, ix2_6_2_b, ix2_6_3_aaaa, ix2_6_3_abba, ix2_6_3_abab,
                                 ix2_6_3_bbbb, ix2_6_3_baab, ix2_6_3_baba, v2ijab_aaaa, v2ijab_abab,
-                                v2ijab_bbbb, p_evl_sorted_occ, p_evl_sorted_virt, total_orbitals,
-                                nocc, nvir, nptsi, unit_tis, files_prefix, levelstr, noa, nob);
+                                v2ijab_bbbb, p_evl_sorted_occ, p_evl_sorted_virt,
+                                nocc, nvir, nptsi, unit_tis, files_prefix, levelstr);
         }
       }
 
@@ -4604,7 +4674,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         write_string_to_disk(ec, spfe.str(), extrap_file);
         if(rank == 0) {
           sys_data.results["output"]["GFCCSD"]["retarded_beta"]["nlevels"] = level;
-          chem_env.write_json_data( "GFCCSD");
+          chem_env.write_json_data();
         }
 
         sch.deallocate(xsub_local_b, o_local_b, Cp_local_b, hsub_tamm_b, bsub_tamm_b, Cp_b)
@@ -5073,15 +5143,15 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
         if(!gf_restart) {
           gfccsd_driver_ea_a<T>(
-            ec, *(cc_context.sub_ec), MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, d_f1, t2v2_v,
+            ec, chem_env, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, d_f1, t2v2_v,
             lt12_v_a, lt12_v_b, iy1_1_a, iy1_1_b, iy1_2_1_a, iy1_2_1_b, iy1_a, iy1_b, iy2_a, iy2_b,
             iy3_1_aaaa, iy3_1_bbbb, iy3_1_abab, iy3_1_baba, iy3_1_baab, iy3_1_abba, iy3_1_2_a,
             iy3_1_2_b, iy3_aaaa, iy3_bbbb, iy3_abab, iy3_baba, iy3_baab, iy3_abba, iy4_1_aaaa,
             iy4_1_baab, iy4_1_baba, iy4_1_bbbb, iy4_1_abba, iy4_1_abab, iy4_2_aaaa, iy4_2_baab,
             iy4_2_bbbb, iy4_2_abba, iy5_aaaa, iy5_abab, iy5_baab, iy5_bbbb, iy5_baba, iy5_abba,
             iy6_a, iy6_b, v2ijab_aaaa, v2ijab_abab, v2ijab_bbbb, cholOO_a, cholOO_b, cholOV_a,
-            cholOV_b, cholVV_a, cholVV_b, p_evl_sorted_occ, p_evl_sorted_virt, total_orbitals, nocc,
-            nvir, nptsi, CI, unit_tis, files_prefix, levelstr, nva);
+            cholOV_b, cholVV_a, cholVV_b, p_evl_sorted_occ, p_evl_sorted_virt, nocc,
+            nvir, nptsi, CI, unit_tis, files_prefix, levelstr);
         }
       }
 
@@ -5528,7 +5598,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         write_string_to_disk(ec, spfe.str(), extrap_file);
         if(rank == 0) {
           sys_data.results["output"]["GFCCSD"]["advanced_alpha"]["nlevels"] = level;
-          chem_env.write_json_data( "GFCCSD");
+          chem_env.write_json_data();
         }
 
         sch_l.deallocate(Cp_local_a).execute();
@@ -5653,15 +5723,15 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
         if(!gf_restart) {
           gfccsd_driver_ea_b<T>(
-            ec, *(cc_context.sub_ec), MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, d_f1, t2v2_v,
+            ec, chem_env, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, d_f1, t2v2_v,
             lt12_v_a, lt12_v_b, iy1_1_a, iy1_1_b, iy1_2_1_a, iy1_2_1_b, iy1_a, iy1_b, iy2_a, iy2_b,
             iy3_1_aaaa, iy3_1_bbbb, iy3_1_abab, iy3_1_baba, iy3_1_baab, iy3_1_abba, iy3_1_2_a,
             iy3_1_2_b, iy3_aaaa, iy3_bbbb, iy3_abab, iy3_baba, iy3_baab, iy3_abba, iy4_1_aaaa,
             iy4_1_baab, iy4_1_baba, iy4_1_bbbb, iy4_1_abba, iy4_1_abab, iy4_2_aaaa, iy4_2_baab,
             iy4_2_bbbb, iy4_2_abba, iy5_aaaa, iy5_abab, iy5_baab, iy5_bbbb, iy5_baba, iy5_abba,
             iy6_a, iy6_b, v2ijab_aaaa, v2ijab_abab, v2ijab_bbbb, cholOO_a, cholOO_b, cholOV_a,
-            cholOV_b, cholVV_a, cholVV_b, p_evl_sorted_occ, p_evl_sorted_virt, total_orbitals, nocc,
-            nvir, nptsi, CI, unit_tis, files_prefix, levelstr, nva, nvb);
+            cholOV_b, cholVV_a, cholVV_b, p_evl_sorted_occ, p_evl_sorted_virt, nocc,
+            nvir, nptsi, CI, unit_tis, files_prefix, levelstr);
         }
       }
 
@@ -6092,7 +6162,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         write_string_to_disk(ec, spfe.str(), extrap_file);
         if(rank == 0) {
           sys_data.results["output"]["GFCCSD"]["advanced_beta"]["nlevels"] = level;
-          chem_env.write_json_data( "GFCCSD");
+          chem_env.write_json_data();
         }
 
         sch.deallocate(ysub_local_b, o_local_b, Cp_local_b, hsub_tamm_b, bsub_tamm_b, Cp_b)

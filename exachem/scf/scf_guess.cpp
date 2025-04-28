@@ -359,7 +359,7 @@ void exachem::scf::SCFGuess::compute_ecp_ints(ExecutionContext& ec, const SCFVar
   double* buffer_sph_ = new double[size_];
   memset(buffer_, 0, size_ * sizeof(double));
 
-  libecpint::ECPIntegral engine(maxam, ecp_maxam);
+  libecpint::ECPIntegral engine(maxam, ecp_maxam, 0, 1e-17, 1024, 2048);
 
   auto compute_ecp_ints_lambda = [&](const IndexVector& blockid) {
     auto bi0 = blockid[0];
@@ -932,7 +932,9 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
 
   // Get atomic occupations
 
-  auto occs = compute_soad(atoms);
+  std::vector<libint2::Atom> atoms_copy;
+  for(auto& k: ec_atoms) { atoms_copy.push_back(k.atom); }
+  auto occs = compute_soad(atoms_copy);
 
   double fock_precision = std::numeric_limits<double>::epsilon();
   // auto   scf_options    = scf_options;

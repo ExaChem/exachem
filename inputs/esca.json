@@ -65,7 +65,6 @@
       "gf_eta": 0.01,
       "gf_threshold": 0.01,
       "gf_maxiter": 100,
-      "gf_itriples": false,
       "gf_preconditioning": true,
       "gf_ngmres": 20,
       "gf_damping_factor": 1.0,

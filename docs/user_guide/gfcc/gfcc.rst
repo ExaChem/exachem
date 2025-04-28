@@ -325,6 +325,13 @@ The following shows the input file for the CCSD/GFCCSD calculation.
 
   Specifies the threshold used to determine whether the GFCCSD linear equation is converged or not.
 
+**gf_preconditioning**
+   :sep:`|` :aspect:`Type:` bool
+   :sep:`|` :aspect:`Default:` true
+   :sep:`|`
+
+  Toggle preconditioner.
+
 **gf_omega_min_ip**
    :sep:`|` :aspect:`Type:` Double
    :sep:`|` :aspect:`Default:` -0.4
@@ -368,6 +375,12 @@ The following shows the input file for the CCSD/GFCCSD calculation.
 
    Number of mpi processes to use to process a single orbital.
 
+**gf_profile**
+   :sep:`|` :aspect:`Type:` bool
+   :sep:`|` :aspect:`Default:` false
+   :sep:`|`
+
+  Prints profiling information.
 
 Output File
 ===========

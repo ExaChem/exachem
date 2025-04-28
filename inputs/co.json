@@ -30,7 +30,6 @@
       "gf_os": false,
       "gf_cs": false,
       "gf_ngmres": 10,
-      "gf_itriples": false,
       "gf_maxiter": 100,
       "gf_damping_factor": 1.0,
       "gf_p_oi_range": 1,

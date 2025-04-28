@@ -68,7 +68,9 @@ public:
 
     auto is = std::ifstream(jfile);
 
-    auto jsax         = nlohmann::detail::json_sax_dom_parser<json>(jdata, false);
+    auto jsax =
+      nlohmann::detail::json_sax_dom_parser<json, nlohmann::detail::string_input_adapter_type>(
+        jdata, false);
     bool parse_result = json::sax_parse(is, &jsax);
     if(!parse_result) tamm_terminate("Error parsing file: " + jfile);
 

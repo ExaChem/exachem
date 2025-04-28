@@ -196,7 +196,7 @@
         "gf_os": false, 
         "gf_cs": true,
         "gf_profile": false, 
-        "gf_itriples": false,
+        "gf_preconditioning": true,
         "gf_restart": false,
         "gf_p_oi_range": 1,
         "gf_eta": -0.01,

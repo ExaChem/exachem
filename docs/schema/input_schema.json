@@ -447,12 +447,12 @@
             "gf_restart": {
               "type": "boolean"
             },
-            "gf_p_oi_range": {
-              "type": "number"
-            },
             "gf_eta": {
               "type": "number"
             },
+            "gf_lshift": {
+              "type": "number"
+            },            
             "gf_threshold": {
               "type": "number"
             },
@@ -509,18 +509,6 @@
             },
             "gf_extrapolate_level": {
               "type": "number"
-            },
-            "gf_analyze_level": {
-              "type": "number"
-            },
-            "gf_analyze_num_omega": {
-              "type": "number"
-            },
-            "gf_analyze_omega": {
-              "type": "array",
-              "items": {
-                "type": "number"
-              }
             }
           }
         }

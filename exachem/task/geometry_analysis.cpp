@@ -14,7 +14,7 @@
 
 namespace exachem::task {
 
-constexpr double ang2bohr = exachem::constants::ang2bohr;
+// constexpr double ang2bohr = exachem::constants::ang2bohr;
 constexpr double bohr2ang = exachem::constants::bohr2ang;
 
 std::vector<double> atom_mass = {

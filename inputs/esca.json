@@ -61,7 +61,6 @@
     "readt": false,
     "GFCCSD": {
       "restart": false,
-      "gf_p_oi_range": 1,
       "gf_eta": 0.01,
       "gf_threshold": 0.01,
       "gf_maxiter": 100,

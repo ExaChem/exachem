@@ -116,7 +116,6 @@
       "gf_ngmres": 10,
       "gf_maxiter": 100,
       "gf_damping_factor": 1.0,
-      "gf_p_oi_range": 1,
       "gf_eta": 0.01,
       "gf_threshold": 0.01,
       "gf_omega_min_ip": -0.4,

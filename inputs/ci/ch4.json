@@ -17,10 +17,9 @@
   },
   "SCF": {
     "tol_int": 1e-22,
-    "tol_sch": 1e-12,
     "conve": 1e-7,
     "convd": 1e-6,
-    "diis_hist": 20,
+    "diis_hist": 14,
     "charge": 0,
     "multiplicity": 3,
     "scf_type": "unrestricted",  
@@ -30,7 +29,7 @@
   },
   "CD": {
     "diagtol": 1e-12,
-    "max_cvecs": 40
+    "max_cvecs": 16
   },
   "CC": {
     "threshold": 1e-6,

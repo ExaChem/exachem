@@ -1,29 +1,78 @@
 {
   "output": {
+    "machine_info": {
+      "date": "Tue Apr 29 21:07:02 2025",
+      "nnodes": 1,
+      "nproc_per_node": 2,
+      "nproc_total": 2,
+      "cpu": {
+        "name": "Intel(R) Xeon(R) Platinum 8276M CPU @ 2.20GHz",
+        "cpu_memory_per_node_gib": 6046,
+        "total_cpu_memory_gib": 6046
+      }
+    },
+    "system_info": {
+      "nbf": 15,
+      "nshells": 9,
+      "nelectrons_total": 23,
+      "nelectrons_alpha": 12,
+      "nelectrons_beta": 11,
+      "nbf_orig": 15
+    },
     "SCF": {
+      "nucl_rep_energy": 68.88072203548295,
+      "xHF": 1.0,
       "iter": {
         "1": {
-          "energy": -220.78811388960042,
-          "e_diff": -220.78811388960042,
-          "rmsd": 0.0729722511582987,
+          "energy": -221.08215025477216,
+          "e_diff": -221.08215025477216,
+          "rmsd": 0.20393474550694723,
+          "ediis": 10.30290346014024,
           "performance": {
-            "total_time": 0.007235967
+            "total_time": 0.007373513
           }
         },
         "2": {
-          "energy": -220.8595499571952,
-          "e_diff": -0.07143606759478871,
-          "rmsd": 0.012730823503686593,
+          "energy": -220.7004891301279,
+          "e_diff": 0.3816611246442676,
+          "rmsd": 0.09361601297840028,
+          "ediis": 0.5774269992611306,
           "performance": {
-            "total_time": 0.008215421
+            "total_time": 0.008161992
+          }
+        },
+        "3": {
+          "energy": -220.8200810797419,
+          "e_diff": -0.11959194961400499,
+          "rmsd": 0.035976384241471024,
+          "ediis": 0.24811210303506329,
+          "performance": {
+            "total_time": 0.008311925
+          }
+        },
+        "4": {
+          "energy": -220.90952035724501,
+          "e_diff": -0.08943927750311786,
+          "rmsd": 0.007871044336482636,
+          "ediis": 0.001372397203103277,
+          "performance": {
+            "total_time": 0.008781087
           }
         }
       },
-      "final_energy": -220.8595499571952,
-      "n_iterations": 2
+      "NE_1e": -648.06775320727,
+      "kinetic_1e": 216.25152634976575,
+      "energy_1e": -431.8162268575045,
+      "energy_2e": 142.0259844647764,
+      "final_energy": -220.90952035724501,
+      "n_iterations": 4,
+      "performance": {
+        "total_time": 0.075520156
+      }
     },
     "CD": {
-      "n_cholesky_vectors": 76
+      "n_cholesky_vectors": 76,
+      "diagtol": 1e-06
     },
     "RT-EOMCCSD": {
       "dcdt": {
@@ -38,96 +87,123 @@
           "2": {
             "time_au": 0.025,
             "energy": {
-              "real": -0.0012809221678384464,
-              "imag": 0.030783990545690913
+              "real": -0.0012809219874834897,
+              "imag": 0.03078398903396358
             }
           },
           "3": {
             "time_au": 0.05,
             "energy": {
-              "real": -0.0049577216544876915,
-              "imag": 0.06094940278468131
+              "real": -0.004957720987594428,
+              "imag": 0.06094939993423738
             }
           },
           "4": {
             "time_au": 0.07500000000000001,
             "energy": {
-              "real": -0.010653276471262673,
-              "imag": 0.090092322696226
+              "real": -0.010653275139076162,
+              "imag": 0.09009231878325227
             }
           },
           "5": {
             "time_au": 0.1,
             "energy": {
-              "real": -0.017870224525000877,
-              "imag": 0.11805249293532638
+              "real": -0.01787022251777126,
+              "imag": 0.11805248825651629
             }
           },
           "6": {
             "time_au": 0.125,
             "energy": {
-              "real": -0.026195135123655525,
-              "imag": 0.14496161337856608
+              "real": -0.026195132573293374,
+              "imag": 0.14496160814894404
             }
           },
           "7": {
             "time_au": 0.15000000000000002,
             "energy": {
-              "real": -0.03542433836864559,
-              "imag": 0.17112265000140964
+              "real": -0.03542433547236018,
+              "imag": 0.17112264428945156
             }
           },
           "8": {
             "time_au": 0.17500000000000002,
             "energy": {
-              "real": -0.045599092253272036,
-              "imag": 0.19685130550860871
+              "real": -0.0455990891753551,
+              "imag": 0.19685129922898353
             }
           },
           "9": {
             "time_au": 0.2,
             "energy": {
-              "real": -0.05695128587530439,
-              "imag": 0.22235141282240703
+              "real": -0.05695128266812659,
+              "imag": 0.2223514057812768
             }
           },
           "10": {
             "time_au": 0.225,
             "energy": {
-              "real": -0.06980534783504741,
-              "imag": 0.24761358240947312
+              "real": -0.0698053443966056,
+              "imag": 0.24761357439313997
             }
           }
         }
       }
     }
   },
+  "molecule": {
+    "name": "ozone_td",
+    "basis": {
+      "basisset": "sto-3g"
+    },
+    "nbf": 15,
+    "nshells": 9,
+    "nelectrons": 23,
+    "nelectrons_alpha": 12,
+    "nelectrons_beta": 11
+  },
   "input": {
-    "molecule": {
-      "name": "ozone",
-      "basisset": "sto-3g",
-      
-      "geometry_units": "bohr"
+    "geometry": {
+      "coordinates": [
+        "O   0.0000000000        0.0000000000        0.0000000000",
+        "O   0.0000000000       -2.0473224350       -1.2595211660",
+        "O   0.0000000000        2.0473224350       -1.2595211660"
+      ],
+      "units": "bohr"
+    },
+    "basis": {
+      "basisset": "sto-3g"
+    },
+    "common": {
+      "file_prefix": "ozone"
     },
     "SCF": {
-      "tol_int": 1e-16,
-      "tol_lindep": 1e-06,
+      "restart": false,
       "conve": 0.1,
       "convd": 0.1,
-      "diis_hist": 10,
-      "AO_tilesize": 30,
-      "scf_type": "unrestricted",
-      "multiplicity": 2
+      "charge": 1,
+      "multiplicity": 2,
+      "scf_type": "unrestricted"
     },
-    "CCSD": {
-      "threshold": 1e-06
+    "CD": {
+      "diagtol": 1e-06,
+      "max_cvecs": 8
     },
-    "RT-EOMCC": {
-      "pcore": 1,
-      "ntimesteps": 10,
-      "rt_microiter": 10,
-      "rt_step_size": 0.025,
-      "rt_multiplier": 0.5
+    "CC": {
+      "threshold": 1e-06,
+      "tilesize": 30,
+      "debug": false,
+      "RT-EOMCC": {
+        "pcore": 1,
+        "ntimesteps": 10,
+        "rt_microiter": 10,
+        "rt_threshold": 1e-06,
+        "rt_step_size": 0.025,
+        "rt_multiplier": 0.5
+      }
+    },
+    "TASK": {
+      "rteom_ccsd": true
     }
   }
 }

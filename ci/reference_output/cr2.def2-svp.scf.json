@@ -278,10 +278,18 @@
       }
     }
   },
-  "input": {
-    "molecule": {
-      "name": "cr2"
+  "molecule": {
+    "name": "cr2",
+    "basis": {
+      "basisset": "def2-svp"
     },
+    "nbf": 62,
+    "nshells": 22,
+    "nelectrons": 48,
+    "nelectrons_alpha": 24,
+    "nelectrons_beta": 24
+  },
+  "input": {
     "geometry": {
       "coordinates": [
         "Cr1   0.00000000     0.00000000    0.00000000",
@@ -296,53 +304,43 @@
       "maxiter": 100
     },
     "SCF": {
-      "charge": 0,
-      "multiplicity": 1,
-      "lshift": 0.1,
-      "tol_int": 1e-22,
-      "tol_sch": 1.0000000000000001e-11,
       "tol_lindep": 1e-06,
+      "scf_type": "unrestricted",
       "conve": 1e-09,
       "convd": 1e-07,
       "diis_hist": 10,
-      "AO_tilesize": 30,
-      "damp": 100,
-      "debug": "false",
-      "restart": "false",
-      "noscf": "false",
-      "scf_type": "unrestricted",
-      "direct_df": "false",
+      "lshift": 0.1,
       "DFT": {
-        "snK": "false",
         "xc_type": [
           "PBE"
-        ],
-        "xc_grid_type": "UltraFine",
-        "xc_pruning_scheme": "Robust",
-        "xc_rad_quad": "MK",
-        "xc_weight_scheme": "SSF",
-        "xc_exec_space": "Host",
-        "xc_basis_tol": 1.0000000000000001e-11,
-        "xc_batch_size": 2048,
-        "xc_snK_etol": 1e-10,
-        "xc_snK_ktol": 1e-10,
-        "xc_lb_kernel": "Default",
-        "xc_mw_kernel": "Default",
-        "xc_int_kernel": "Default",
-        "xc_red_kernel": "Default",
-        "xc_lwd_kernel": "Default",
-        "xc_radang_size": [
-          0,
-          0
         ]
       },
-      "lambdas": [],
-      "polvecs": [],
-      "omegas": [],
-      "volumes": []
+      "guess": {
+        "atom_options": {
+          "Cr1": [
+            0,
+            3
+          ],
+          "Cr2": [
+            0,
+            -3
+          ]
+        }
+      }
     },
-    "CCSD": {
-      "threshold": 1e-06
+    "CD": {
+      "diagtol": 1e-08
+    },
+    "CC": {
+      "threshold": 1e-06,
+      "writet": true
+    },
+    "TASK": {
+      "scf": true,
+      "mp2": false,
+      "cd_2e": false,
+      "ccsd": false,
+      "ccsd_t": false
     }
   }
 }

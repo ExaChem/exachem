@@ -375,6 +375,20 @@ The following shows the input file for the CCSD/GFCCSD calculation.
 
    Number of mpi processes to use to process a single orbital.
 
+**gf_lshift**
+   :sep:`|` :aspect:`Type:` Double
+   :sep:`|` :aspect:`Default:` 1.0
+   :sep:`|`
+
+   Level shift.
+
+**gf_restart**
+   :sep:`|` :aspect:`Type:` bool
+   :sep:`|` :aspect:`Default:` false
+   :sep:`|`
+
+  Enable restart for all steps of the GFCC calculation.
+
 **gf_profile**
    :sep:`|` :aspect:`Type:` bool
    :sep:`|` :aspect:`Default:` false

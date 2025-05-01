@@ -83,7 +83,7 @@ for ref_file in ref_files:
         print("ERROR: SCF energy does not match. reference: " + str(ref_scf_energy) + ", current: " + str(cur_scf_energy))
         sys.exit(1)
 
-    ccsd_threshold = ref_data["input"]["CCSD"]["threshold"]
+    ccsd_threshold = ref_data["input"]["CC"]["threshold"]
     if "CCSD" in ref_data["output"]:
         #print("Checking CCSD results")
         ref_ccsd_energy = ref_data["output"]["CCSD"]["final_energy"]["correlation"]
@@ -147,7 +147,7 @@ for ref_file in ref_files:
 
     if "EOMCCSD" in ref_data["output"]:
         print("Checking EOMCCSD results", end='')
-        nroots = ref_data["input"]["EOMCCSD"]["eom_nroots"]
+        nroots = ref_data["input"]["CC"]["EOMCCSD"]["eom_nroots"]
         ref_lambda_data = ref_data["output"]["EOMCCSD"]["iter"]
         cur_lambda_data = cur_data["output"]["EOMCCSD"]["iter"]
 
@@ -169,8 +169,8 @@ for ref_file in ref_files:
 
     if "RT-EOMCCSD" in ref_data["output"]:
         print("Checking RT-EOMCCSD results", end='')
-        pcore = ref_data["input"]["RT-EOMCC"]["pcore"]
-        ntimesteps = ref_data["input"]["RT-EOMCC"]["ntimesteps"]
+        pcore = ref_data["input"]["CC"]["RT-EOMCC"]["pcore"]
+        ntimesteps = ref_data["input"]["CC"]["RT-EOMCC"]["ntimesteps"]
         ref_rteom_data = ref_data["output"]["RT-EOMCCSD"]["dcdt"]["timestep"]
         cur_rteom_data = cur_data["output"]["RT-EOMCCSD"]["dcdt"]["timestep"]
 
@@ -206,7 +206,7 @@ for ref_file in ref_files:
         ref_nlevels = ref_gfcc_data["nlevels"]
         cur_nlevels = cur_gfcc_data["nlevels"]
 
-        gf_threshold = ref_data["input"]["GFCCSD"]["gf_threshold"]
+        gf_threshold = ref_data["input"]["CC"]["GFCCSD"]["gf_threshold"]
 
         rcheck = check_results(ref_nlevels,cur_nlevels,gf_threshold,"levels")
         

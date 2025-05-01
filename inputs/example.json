@@ -190,7 +190,7 @@
           "h_max": 0.25
         },
 
-       "GFCCSD": {
+      "GFCCSD": {
         "gf_ip": true, 
         "gf_ea": false, 
         "gf_os": false, 
@@ -198,7 +198,7 @@
         "gf_profile": false, 
         "gf_preconditioning": true,
         "gf_restart": false,
-        "gf_p_oi_range": 1,
+        "gf_lshift": 1.0,
         "gf_eta": -0.01,
         "gf_threshold": 1e-2,
         "gf_maxiter": 500,
@@ -217,10 +217,7 @@
         "gf_omega_delta": 0.01, 
         "gf_omega_delta_e": 0.002, 
         "gf_orbitals": [],
-        "gf_extrapolate_level": 0,
-        "gf_analyze_level": 2,
-        "gf_analyze_num_omega": 0,
-        "gf_analyze_omega": [0.3, 0.2]
+        "gf_extrapolate_level": 0
        }
     },
 

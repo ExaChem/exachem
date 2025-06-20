@@ -101,10 +101,12 @@ void exachem::scf::SCFHartreeFock::reset_tolerences(ExecutionContext& exc, ChemE
       if(rank == 0) std::cout << "Resetting xc_snK_ktol to " << fock_precision << std::endl;
     }
   }
-  if(chem_env.ioptions.scf_options.xc_basis_tol > chem_env.ioptions.scf_options.conve) {
-    chem_env.ioptions.scf_options.xc_basis_tol = fock_precision;
+  if(chem_env.ioptions.scf_options.xc_basis_tol > chem_env.ioptions.scf_options.conve &&
+     (chem_env.sys_data.is_ks || chem_env.sys_data.do_snK)) {
+    chem_env.ioptions.scf_options.xc_basis_tol = chem_env.ioptions.scf_options.conve;
     if(rank == 0)
-      std::cout << "Resetting xc_basis_tol to " << chem_env.ioptions.scf_options.conve << std::endl;
+      std::cout << std::endl
+                << "Resetting xc_basis_tol to " << chem_env.ioptions.scf_options.conve << std::endl;
   }
 #endif
 } // reset_tolerences

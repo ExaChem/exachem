@@ -113,10 +113,29 @@ void ECBasis::parse_ecp(ExecutionContext& exc, std::string basisfile, std::vecto
   if(basis_has_ecp(exc, basisfile)) ecp_check(exc, basisfile, atoms, ec_atoms);
 }
 
-void ECBasis::construct_shells(std::vector<lib_atom>& atoms, std::vector<ECAtom>& ec_atoms) {
+void ECBasis::construct_shells(ExecutionContext& exc, std::vector<lib_atom>& atoms,
+                               std::vector<ECAtom>& ec_atoms) {
   std::vector<lib_shell> shell_vec;
 
+  const bool single_basis =
+    std::all_of(ec_atoms.begin() + 1, ec_atoms.end(),
+                [&ec_atoms](const ECAtom& s) { return s.basis == ec_atoms[0].basis; });
+
   for(size_t i = 0; i < atoms.size(); i++) {
+    if(!single_basis || i == 0) {
+      basis_set_file        = std::string(DATADIR) + "/basis/" + ec_atoms[i].basis + ".g94";
+      int basis_file_exists = 0;
+      if(exc.pg().rank() == 0) basis_file_exists = std::filesystem::exists(basis_set_file);
+      exc.pg().broadcast(&basis_file_exists, 0);
+
+      if(!basis_file_exists) {
+        std::string err_msg = "ERROR: ";
+        if(!single_basis) err_msg += "Atom " + ec_atoms[i].esymbol + " - ";
+        err_msg += "basis set file " + basis_set_file + " specified does not exist.";
+        tamm_terminate(err_msg);
+      }
+    }
+
     // const auto        Z = atoms[i].atomic_number;
     lib_basis_set ashells(ec_atoms[i].basis, {atoms[i]});
     shell_vec.insert(shell_vec.end(), ashells.begin(), ashells.end());
@@ -129,17 +148,9 @@ void ECBasis::construct_shells(std::vector<lib_atom>& atoms, std::vector<ECAtom>
 
 void ECBasis::basisset(ExecutionContext& exc, std::string basis, std::string gaussian_type,
                        std::vector<lib_atom>& atoms, std::vector<ECAtom>& ec_atoms) {
-  basis_set_file        = std::string(DATADIR) + "/basis/" + basis + ".g94";
-  int basis_file_exists = 0;
-  if(exc.pg().rank() == 0) basis_file_exists = std::filesystem::exists(basis_set_file);
-  exc.pg().broadcast(&basis_file_exists, 0);
-
-  if(!basis_file_exists)
-    tamm_terminate("ERROR: basis set file " + basis_set_file + " does not exist");
-
   // Initialize the Libint integrals library
   libint2::initialize(false);
-  construct_shells(atoms, ec_atoms);
+  construct_shells(exc, atoms, ec_atoms);
   if(gaussian_type == "spherical") shells.set_pure(true);
   else shells.set_pure(false); // use cartesian gaussians
   // libint2::Shell::do_enforce_unit_normalization(false);

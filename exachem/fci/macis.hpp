@@ -66,7 +66,7 @@ T vec_sum(const std::vector<T>& x) {
 
 namespace exachem::fci {
 
-void macis_driver(ExecutionContext& ec, SystemData& sys_data, const std::string files_prefix) {
+void macis_driver(ExecutionContext& ec, ChemEnv& chem_env, const std::string files_prefix) {
   using hrt_t = std::chrono::high_resolution_clock;
   using dur_t = std::chrono::duration<double, std::milli>;
 
@@ -78,7 +78,7 @@ void macis_driver(ExecutionContext& ec, SystemData& sys_data, const std::string 
 
   auto world_comm = ec.pg().comm();
   auto world_rank = macis::comm_rank(world_comm);
-  auto world_size = macis::comm_size(world_comm);
+  // auto world_size = macis::comm_size(world_comm);
 
   // Create Logger
   auto console = world_rank ? spdlog::null_logger_mt("CI") : spdlog::stdout_color_mt("CI");
@@ -95,7 +95,7 @@ void macis_driver(ExecutionContext& ec, SystemData& sys_data, const std::string 
   // Read FCIDUMP File
   size_t norb  = macis::read_fcidump_norb(fcidump_fname);
   size_t norb2 = norb * norb;
-  size_t norb3 = norb2 * norb;
+  // size_t norb3 = norb2 * norb;
   size_t norb4 = norb2 * norb2;
 
   // console->info("norb = {}", norb);
@@ -114,7 +114,7 @@ void macis_driver(ExecutionContext& ec, SystemData& sys_data, const std::string 
   } catch(...) { tamm_terminate("INPUT FILE ERROR: [FCI] Job Not Recognized"); }
 
   std::string ciexp_str = ci_options.expansion;
-  CIExpansion ci_exp;
+  CIExpansion ci_exp    = CIExpansion::CAS; // Default to CAS
   try {
     ci_exp = ci_exp_map.at(ciexp_str);
   } catch(...) { tamm_terminate("INPUT FILE ERROR: [FCI] CI Expansion Not Recognized"); }
@@ -271,9 +271,9 @@ void macis_driver(ExecutionContext& ec, SystemData& sys_data, const std::string 
         if(compute_asci_E0) {
           console->info("*  Calculating E0");
           E0 = 0;
-          for(auto ii = 0; ii < dets.size(); ++ii) {
+          for(size_t ii = 0; ii < dets.size(); ++ii) {
             double tmp = 0.0;
-            for(auto jj = 0; jj < dets.size(); ++jj) {
+            for(size_t jj = 0; jj < dets.size(); ++jj) {
               tmp += ham_gen.matrix_element(dets[ii], dets[jj]) * C[jj];
             }
             E0 += C[ii] * tmp;

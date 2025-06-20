@@ -8,6 +8,9 @@
 
 #include "exachem/fci/fci.hpp"
 #include "exachem/cholesky/cholesky_2e_driver.hpp"
+#if defined(USE_MACIS)
+#include "exachem/fci/macis.hpp"
+#endif
 
 using namespace tamm;
 
@@ -101,7 +104,7 @@ void fci_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   files_prefix = generate_fcidump(chem_env, ec, MO, lcao, d_f1, full_v2, ex_hw);
 #if defined(USE_MACIS)
-  if(options_map.task_options.fci) macis_driver(ec, sys_data, files_prefix);
+  if(chem_env.ioptions.task_options.fci) macis_driver(ec, chem_env, files_prefix);
 #endif
 
   free_tensors(lcao, d_f1, full_v2);

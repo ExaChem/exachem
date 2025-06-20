@@ -45,7 +45,7 @@ The values listed below are the defaults where few options are automatically adj
       "xc_rad_quad": "MK",
       "xc_weight_scheme": "SSF",
       "xc_exec_space": "Host",
-      "xc_basis_tol": 1e-10,
+      "xc_basis_tol": 1e-8,
       "xc_batch_size": 2048,
       "xc_snK_etol": 1e-10,
       "xc_snK_ktol": 1e-10,

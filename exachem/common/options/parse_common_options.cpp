@@ -31,7 +31,9 @@ void ParseCommonOptions::parse(ChemEnv& chem_env) {
   json                               jatom_basis = jinput["basis"]["atom_basis"];
   std::map<std::string, std::string> atom_basis_map;
   for(auto& [element_symbol, basis_string]: jatom_basis.items()) {
-    atom_basis_map[element_symbol] = basis_string;
+    std::string _basis_string = basis_string;
+    txt_utils::to_lower(_basis_string);
+    atom_basis_map[element_symbol] = _basis_string;
   }
 
   for(size_t i = 0; i < chem_env.ec_atoms.size(); i++) {

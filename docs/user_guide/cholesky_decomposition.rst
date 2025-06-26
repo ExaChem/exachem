@@ -22,12 +22,12 @@ Options used in the Cholesky decomposition of atomic-orbital based two-electron 
 .. code-block:: json
 
   "CD": {
-    "diagonal": 1e-5,
+    "diagtol": 1e-5,
     "itilesize": 1000,
     "write_cv": [false,5000]
   }
 
-:diagonal: ``[default=1e-5]`` The diagonal threshold used to terminate the decomposition procedure and truncate the Cholesky vectors.
+:diagtol: ``[default=1e-5]`` The diagonal threshold used to terminate the decomposition procedure and truncate the Cholesky vectors.
 
 :itilesize: ``[default=1000]`` The tilesize for the cholesky dimension representing the number of cholesky vectors. It is recommended to leave this at the default value.
 

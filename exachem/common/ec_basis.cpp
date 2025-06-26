@@ -7,6 +7,7 @@
  */
 
 #include "exachem/common/ec_basis.hpp"
+#include <unordered_set>
 namespace fs = std::filesystem;
 
 void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vector<lib_atom>& atoms,
@@ -31,6 +32,9 @@ void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vecto
   std::string      amlabel;
   std::vector<int> atomlist;
 
+  std::ostringstream oss;
+  bool               atom_has_ecp = false;
+
   while(std::getline(is, line)) {
     if(line.find("END") != std::string::npos) break;
 
@@ -47,10 +51,10 @@ void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vecto
 
     // true if line starts with element symbol
     bool is_es = elemsymbol.find_first_not_of("0123456789") != std::string::npos;
-
     // TODO: Check if its valid symbol
 
     if(is_es && count == 3) {
+      atom_has_ecp = false;
       std::string nelec_str;
       iss_ >> nelec_str >> nelec;
       atomlist.clear();
@@ -58,6 +62,7 @@ void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vecto
       for(size_t i = 0; i < ec_atoms.size(); i++) {
         if(elemsymbol == ec_atoms[i].esymbol) {
           if(ec_atoms[i].has_ecp) continue;
+          atom_has_ecp          = true;
           has_ecp               = true;
           ec_atoms[i].has_ecp   = true;
           ec_atoms[i].ecp_nelec = nelec;
@@ -67,10 +72,12 @@ void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vecto
           // break;
         }
       }
+      if(atom_has_ecp) oss << line << std::endl;
       continue;
     }
     if(is_es && count == 2) {
       iss_ >> amlabel;
+      if(atom_has_ecp) oss << line << std::endl;
       continue;
     }
     if(!is_es && count == 3) {
@@ -88,17 +95,20 @@ void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vecto
         ec_atoms[iatom].ecp_exps.push_back(_exp);
         ec_atoms[iatom].ecp_coeffs.push_back(_coef);
       }
+      if(atom_has_ecp) oss << line << std::endl;
     }
   }
   while(std::getline(is, line))
     ;
+  if(exc.print())
+    std::cout << std::endl << "ECP" << std::endl << oss.str() << "END" << std::endl << std::endl;
 }
 
 bool ECBasis::basis_has_ecp(ExecutionContext& exc, std::string basisfile) {
   // parse ECP section of basis file
   if(!basisfile.empty()) {
     if(!fs::exists(basisfile)) {
-      std::string bfnf_msg = basisfile + "not found";
+      std::string bfnf_msg = basisfile + " specified not found";
       tamm_terminate(bfnf_msg);
     }
     else if(exc.pg().rank() == 0)
@@ -106,6 +116,66 @@ bool ECBasis::basis_has_ecp(ExecutionContext& exc, std::string basisfile) {
     return true;
   }
   return false;
+}
+
+void print_basis_info(const std::vector<libint2::Atom>& atoms, const std::vector<ECAtom>& ec_atoms,
+                      const libint2::BasisSet& basis) {
+  std::unordered_set<int> printed_Z;
+  auto                    a2s_map   = basis.atom2shell(atoms);
+  const auto              elem_info = libint2::chemistry::get_element_info();
+
+  for(size_t i = 0; i < ec_atoms.size(); ++i) {
+    int Z = ec_atoms[i].atom.atomic_number;
+
+    if(printed_Z.count(Z)) continue;
+    printed_Z.insert(Z);
+
+    const std::string symbol = ec_atoms[i].esymbol;
+
+    const std::string ename = symbol + " (" + elem_info[Z - 1].name + ")";
+    std::cout << "  " << ename << std::endl;
+    std::cout << "  " << std::string(ename.length(), '-') << std::endl;
+    std::cout << std::setw(18) << std::right << "Exponent" << std::setw(20) << "Coefficients"
+              << std::endl;
+    std::cout << std::string(6, ' ') << std::setw(16) << std::right << std::string(16, '-') << "  "
+              << std::setw(20) << std::string(20, '-') << std::endl;
+
+    // Get shells centered on this atom
+    auto nshells     = a2s_map[i].size();
+    auto shell_start = a2s_map[i][0];
+    int  shell_count = 1;
+
+    for(size_t s = shell_start; s < shell_start + nshells; ++s) {
+      const auto& shell = basis[s];
+
+      for(size_t c = 0; c < shell.contr.size(); ++c) {
+        const auto& contr = shell.contr[c];
+        std::string l_str;
+        switch(contr.l) {
+          case 0: l_str = "S"; break;
+          case 1: l_str = "P"; break;
+          case 2: l_str = "D"; break;
+          case 3: l_str = "F"; break;
+          case 4: l_str = "G"; break;
+          case 5: l_str = "H"; break;
+          case 6: l_str = "I"; break;
+          case 7: l_str = "K"; break;
+          default: l_str = "L" + std::to_string(contr.l); break;
+        }
+
+        for(size_t p = 0; p < shell.alpha.size(); ++p) {
+          std::cout << "  " << shell_count << " " << l_str << "  " << std::uppercase
+                    << std::scientific << std::setprecision(8) << std::setw(13) << shell.alpha[p]
+                    << "  " << std::fixed << std::setprecision(6) << std::right << std::setw(12)
+                    << contr.coeff[p] << std::endl;
+        }
+        shell_count++;
+
+        std::cout << std::endl;
+      }
+    }
+    std::cout << std::endl;
+  }
 }
 
 void ECBasis::parse_ecp(ExecutionContext& exc, std::string basisfile, std::vector<lib_atom>& atoms,
@@ -154,6 +224,7 @@ void ECBasis::basisset(ExecutionContext& exc, std::string basis, std::string gau
   if(gaussian_type == "spherical") shells.set_pure(true);
   else shells.set_pure(false); // use cartesian gaussians
   // libint2::Shell::do_enforce_unit_normalization(false);
+  if(exc.print()) print_basis_info(atoms, ec_atoms, shells);
 }
 
 ECBasis::ECBasis(ExecutionContext& exc, std::string basis, std::string basisfile,

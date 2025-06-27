@@ -16,7 +16,6 @@
 #include <queue>
 #include <unordered_set>
 
-constexpr double    ang2bohr       = exachem::constants::ang2bohr;
 std::vector<double> atom_radii_int = {
   0.38, 0.32, 1.34, 0.9,  0.82, 0.77, 0.75, 0.73, 0.71, 0.69, 1.54, 1.3,  1.18, 1.11, 1.06,
   1.02, 0.99, 0.97, 1.96, 1.74, 1.44, 1.36, 1.25, 1.27, 1.39, 1.25, 1.26, 1.21, 1.38, 1.31,
@@ -87,7 +86,7 @@ void InternalCoordinates::print(ExecutionContext& ec) {
   // meaning that a while loop checking the type can be used
 
   if(ec.print()) {
-    constexpr double  ang2bohr = exachem::constants::ang2bohr;
+    const double      ang2bohr = exachem::constants::ang2bohr;
     std::stringstream ss;
 
     ss << "Printing Internal Coordinates" << std::endl;
@@ -169,8 +168,8 @@ void InternalCoordinates::print(ExecutionContext& ec) {
 }
 
 double angle_eval(Eigen::MatrixXd coords, bool _, int i, int j, int k) {
-  Eigen::RowVectorXd v1 = (coords.row(i) - coords.row(j)) * ang2bohr;
-  Eigen::RowVectorXd v2 = (coords.row(k) - coords.row(j)) * ang2bohr;
+  Eigen::RowVectorXd v1 = (coords.row(i) - coords.row(j)) * exachem::constants::ang2bohr;
+  Eigen::RowVectorXd v2 = (coords.row(k) - coords.row(j)) * exachem::constants::ang2bohr;
 
   double dot_product = v1.dot(v2) / (v1.norm() * v2.norm());
   if(dot_product < -1) { dot_product = -1; }
@@ -305,7 +304,8 @@ InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool
       if(bondmatrix(i, j) == 1.0) {
         double length = exachem::task::single_bond_length_optimize(ec, num_atoms, data_mat, i, j,
                                                                    3e50, atom_radii_int);
-        coords.push_back(InternalCoordinate(i, j, length / ang2bohr)); // converting to angstrom
+        coords.push_back(InternalCoordinate(
+          i, j, length / exachem::constants::ang2bohr)); // converting to angstrom
       }
     }
   }

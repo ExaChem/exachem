@@ -24,14 +24,16 @@ A geometry can be specified as follows:
 
 .. literalinclude:: ../../inputs/example.json
    :language: json
-   :lines: 3-13
+   :lines: 3-15
 
 :coordinates: The element *symbol* followed by the *x y z* coordinates. Additional characters can be added to the element symbol to distinguish between atoms of the same element. For example, the atom labels ``O`` and  ``O34`` will both be interpreted as oxygen atoms, but the program will keep their distinction for further use. An atom label starting with "bq" (e.g. ``bqH``) is interpreted as a ghost atom that contributes only basis functions, not electrons.
 
 :units: The following possible string values are recognized ``[default=angstrom]``
 
    * :strong:`"bohr"`: Atomic units (A.U.) 
-   * :strong:`"angstrom"`: Angstroms, converted to A.U. using the conversion factor 1.8897259878858.
+   * :strong:`"angstrom"`: Angstroms, converted to A.U.
+
+:ang2au: Angstrom to A.U conversion factor. ``[default=1.8897261259077822]``
 
 :natoms_max: Geometry analysis will only be performed if the number of atoms is less than or equal to this value. ``[default=30]``
 

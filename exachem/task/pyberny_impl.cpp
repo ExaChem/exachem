@@ -18,8 +18,6 @@ using exachem::task::InternalCoordinates;
 
 namespace exachem::task {
 
-constexpr double ang2bohr = exachem::constants::ang2bohr;
-
 std::vector<double> atom_radii_impl = {
   0.38, 0.32, 1.34, 0.9,  0.82, 0.77, 0.75, 0.73, 0.71, 0.69, 1.54, 1.3,  1.18, 1.11, 1.06,
   1.02, 0.99, 0.97, 1.96, 1.74, 1.44, 1.36, 1.25, 1.27, 1.39, 1.25, 1.26, 1.21, 1.38, 1.31,
@@ -97,7 +95,7 @@ double bond_weight(Eigen::MatrixXd rho, int i, int j) { return rho(i, j); }
 
 std::tuple<double, std::tuple<Eigen::VectorXd, Eigen::VectorXd>> bond_eval(Eigen::MatrixXd coords,
                                                                            int i, int j) {
-  Eigen::VectorXd v  = (coords.row(i) - coords.row(j)) * ang2bohr;
+  Eigen::VectorXd v  = (coords.row(i) - coords.row(j)) * exachem::constants::ang2bohr;
   double          r  = v.norm();
   Eigen::VectorXd f1 = v / r;
   Eigen::VectorXd f2 = -v / r;
@@ -112,7 +110,7 @@ std::tuple<double, std::tuple<Eigen::VectorXd, Eigen::VectorXd>> bond_eval(Eigen
 }
 
 double bond_eval(Eigen::MatrixXd coords, int i, int j, bool _) {
-  Eigen::VectorXd v = (coords.row(i) - coords.row(j)) * ang2bohr;
+  Eigen::VectorXd v = (coords.row(i) - coords.row(j)) * exachem::constants::ang2bohr;
   double          r = v.norm();
   return r;
 }
@@ -121,8 +119,8 @@ double angle_center(Eigen::VectorXd ijk, int j) { return round(2 * ijk(j)); }
 
 std::tuple<double, std::tuple<Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd>>
 angle_eval_impl(Eigen::MatrixXd coords, int i, int j, int k) {
-  auto v1 = (coords.row(i) - coords.row(j)) * ang2bohr;
-  auto v2 = (coords.row(k) - coords.row(j)) * ang2bohr;
+  auto v1 = (coords.row(i) - coords.row(j)) * exachem::constants::ang2bohr;
+  auto v2 = (coords.row(k) - coords.row(j)) * exachem::constants::ang2bohr;
 
   double dot_product = v1.dot(v2) / (v1.norm() * v2.norm());
   if(std::isnan(dot_product)) { dot_product = 0.0; }
@@ -168,8 +166,8 @@ angle_eval_impl(Eigen::MatrixXd coords, int i, int j, int k) {
 }
 
 double angle_eval_impl(Eigen::MatrixXd coords, bool _, int i, int j, int k) {
-  auto v1 = (coords.row(i) - coords.row(j)) * ang2bohr;
-  auto v2 = (coords.row(k) - coords.row(j)) * ang2bohr;
+  auto v1 = (coords.row(i) - coords.row(j)) * exachem::constants::ang2bohr;
+  auto v2 = (coords.row(k) - coords.row(j)) * exachem::constants::ang2bohr;
 
   double dot_product = v1.dot(v2) / (v1.norm() * v2.norm());
   if(std::isnan(dot_product)) { dot_product = 0.0; }
@@ -256,9 +254,9 @@ torsion_eval(Eigen::MatrixXd coords, int i, int j, int k, int l) {
 }
 
 double torsion_eval(Eigen::MatrixXd coords, int i, int j, int k, int l, bool _) {
-  Eigen::VectorXd v1 = (coords.row(i) - coords.row(j)) * ang2bohr;
-  Eigen::VectorXd v2 = (coords.row(l) - coords.row(k)) * ang2bohr;
-  Eigen::Vector3d w  = (coords.row(k) - coords.row(j)) * ang2bohr;
+  Eigen::VectorXd v1 = (coords.row(i) - coords.row(j)) * exachem::constants::ang2bohr;
+  Eigen::VectorXd v2 = (coords.row(l) - coords.row(k)) * exachem::constants::ang2bohr;
+  Eigen::Vector3d w  = (coords.row(k) - coords.row(j)) * exachem::constants::ang2bohr;
 
   auto            ew = w / w.norm();
   Eigen::Vector3d a1 = v1 - v1.dot(ew) * ew;
@@ -699,7 +697,7 @@ std::tuple<Eigen::VectorXd, Eigen::MatrixXd> update_geom(ExecutionContext& ec, E
   Eigen::MatrixXd                                              coords_new = geom;
 
   for(int i = 0; i < 20; i++) {
-    Eigen::MatrixXd B_inv_dq = (B_inv * dq) / ang2bohr;
+    Eigen::MatrixXd B_inv_dq = (B_inv * dq) / exachem::constants::ang2bohr;
 
     for(int j = 0; j < B_inv_dq.size() / 3; j++) {
       coords_new(j, 0) += B_inv_dq(j * 3);

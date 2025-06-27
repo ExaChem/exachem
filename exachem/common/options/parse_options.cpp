@@ -64,8 +64,9 @@ void ECOptionParser::initialize(ChemEnv& chem_env) {
 
   std::vector<string> geometry;
   // std::vector<string> geom_bohr;
-  constexpr double ang2bohr = exachem::constants::ang2bohr;
-  std::string      geom_units{"angstrom"};
+  parse_option<double>(exachem::constants::ang2bohr, jinput["geometry"], "ang2au");
+  const double ang2bohr = exachem::constants::ang2bohr;
+  std::string  geom_units{"angstrom"};
 
   parse_option<string>(geom_units, jinput["geometry"], "units");
   parse_option<std::vector<string>>(geometry, jinput["geometry"], "coordinates", false);

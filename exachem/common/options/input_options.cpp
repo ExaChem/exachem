@@ -208,16 +208,19 @@ void CommonOptions::print() {
   std::cout << std::defaultfloat;
   std::cout << std::endl << "Common Options" << std::endl;
   std::cout << "{" << std::endl;
-  std::cout << " maxiter    = " << maxiter << std::endl;
-  std::cout << " basis      = " << basis << " ";
+  std::cout << " maxiter       = " << maxiter << std::endl;
+  std::cout << " basis         = " << basis << " ";
   std::cout << gaussian_type;
   std::cout << std::endl;
-  if(!dfbasis.empty()) std::cout << " dfbasis    = " << dfbasis << std::endl;
-  if(!basisfile.empty()) std::cout << " basisfile  = " << basisfile << std::endl;
-  std::cout << " geom_units = " << geom_units << std::endl;
-  std::cout << " natoms_max = " << natoms_max << std::endl;
-  txt_utils::print_bool(" debug     ", debug);
-  if(!file_prefix.empty()) std::cout << " file_prefix    = " << file_prefix << std::endl;
+  if(!dfbasis.empty()) std::cout << " dfbasis       = " << dfbasis << std::endl;
+  if(!basisfile.empty()) std::cout << " basisfile     = " << basisfile << std::endl;
+  std::cout << " geom_units    = " << geom_units << std::endl;
+  std::cout << " ang2au factor = " << std::setprecision(10) << exachem::constants::ang2bohr
+            << std::endl;
+
+  // std::cout << " natoms_max    = " << natoms_max << std::endl;
+  txt_utils::print_bool(" debug        ", debug);
+  if(!file_prefix.empty()) std::cout << " file_prefix   = " << file_prefix << std::endl;
   if(!output_dir.empty()) std::cout << " output_dir    = " << output_dir << std::endl;
   std::cout << "}" << std::endl;
 }

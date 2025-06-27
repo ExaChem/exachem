@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "exachem/common/constants.hpp"
 #include "exachem/common/ecatom.hpp"
 #include "exachem/common/txt_utils.hpp"
 #include <iostream>

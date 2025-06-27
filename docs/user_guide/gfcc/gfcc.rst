@@ -292,7 +292,7 @@ The following shows the input file for the CCSD/GFCCSD calculation.
 
 .. literalinclude:: ../../../inputs/ci/co.json
    :language: json
-   :lines: 2-53
+   :lines: 2-51
 
 - The ``GFCCSD`` section lists the options (labeled with the ``gf_`` prefix) 
   used in the Cholesky-based GFCCSD calculations.

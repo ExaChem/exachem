@@ -118,6 +118,14 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
     print_internal(ec, chem_env);
   print_geometry(ec, chem_env);
 
+  // ECBasis constructs the basisset with all the basis functions. Remove the bq atoms
+  for(int i = (int) chem_env.atoms.size() - 1; i >= 0; --i) {
+    if(chem_env.ec_atoms[i].is_bq) {
+      chem_env.atoms.erase(chem_env.atoms.begin() + i);
+      chem_env.ec_atoms.erase(chem_env.ec_atoms.begin() + i);
+    }
+  }
+
   // Check task options. Needed when multiple tasks are supported
   check_task_options(ec, chem_env);
 

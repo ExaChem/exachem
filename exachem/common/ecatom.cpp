@@ -12,6 +12,7 @@ int ECAtom::get_atomic_number(std::string element_symbol) {
   int Z = -1;
   for(const auto& e: libint2::chemistry::get_element_info()) {
     auto es = element_symbol;
+    if(txt_utils::strequal_case(es.substr(0, 2), "bq")) es = es.substr(2);
     es.erase(std::remove_if(std::begin(es), std::end(es), [](auto d) { return std::isdigit(d); }),
              es.end());
     if(txt_utils::strequal_case(e.symbol, es)) {
@@ -32,4 +33,12 @@ std::string ECAtom::get_symbol(const int atomic_number) {
     if(elem.Z == atomic_number) { return elem.symbol; }
   }
   return "NOSYM";
+}
+
+// Function to get the name given an atomic number
+std::string ECAtom::get_name(const int atomic_number) {
+  for(const auto& elem: libint2::chemistry::get_element_info()) {
+    if(elem.Z == atomic_number) { return elem.name; }
+  }
+  return "NONAME";
 }

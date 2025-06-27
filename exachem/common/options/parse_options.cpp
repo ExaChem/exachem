@@ -83,10 +83,15 @@ void ECOptionParser::initialize(ChemEnv& chem_env) {
     double             x, y, z;
     iss >> element_symbol >> x >> y >> z;
     // geom_bohr[i] = element_symbol;
+
     const auto Z                 = ECAtom::get_atomic_number(element_symbol);
     chem_env.atoms[i]            = {Z, x * convert_units, y * convert_units, z * convert_units};
     chem_env.ec_atoms[i].atom    = chem_env.atoms[i];
     chem_env.ec_atoms[i].esymbol = element_symbol;
+
+    if(txt_utils::strequal_case(element_symbol.substr(0, 2), "bq")) {
+      chem_env.ec_atoms[i].is_bq = true;
+    }
 
     // ss_bohr << std::setw(3) << std::left << geom_bohr[i] << " " << std::right << std::setw(14)
     //         << std::fixed << std::setprecision(10) << atoms[i].x << " " << std::right

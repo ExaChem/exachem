@@ -92,7 +92,8 @@ void geometry_optimizer(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Ato
   } // max_steps
 
   if(ec.print()) {
-    std::cout << "Geometry optimizer did not converge in " << max_steps << " steps" << std::endl;
+    std::cout << std::endl
+              << "Geometry optimizer did not converge in " << max_steps << " steps" << std::endl;
     std::cout << std::endl << std::setw(34) << "Last geometry produced" << std::endl;
     print_geometry(ec, chem_env);
   }

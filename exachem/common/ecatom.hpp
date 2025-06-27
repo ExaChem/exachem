@@ -22,6 +22,7 @@ public:
   Atom                atom;
   std::string         esymbol;
   std::string         basis;
+  bool                is_bq{false};
   bool                has_ecp{false};
   int                 ecp_nelec{};
   std::vector<double> ecp_coeffs{};
@@ -30,4 +31,5 @@ public:
   std::vector<int>    ecp_ns{};
   static int          get_atomic_number(std::string element_symbol);
   static std::string  get_symbol(const int atomic_number);
+  static std::string  get_name(const int atomic_number);
 };

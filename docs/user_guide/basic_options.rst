@@ -24,9 +24,9 @@ A geometry can be specified as follows:
 
 .. literalinclude:: ../../inputs/example.json
    :language: json
-   :lines: 3-12
+   :lines: 3-13
 
-:coordinates: The element *symbol* followed by the *x y z* coordinates. Additional characters can be added to the element symbol to distinguish between atoms of the same element. For example, the strings ``O`` and  ``O34`` will both be interpreted as oxygen atoms, but the program will keep their distinction for further use.
+:coordinates: The element *symbol* followed by the *x y z* coordinates. Additional characters can be added to the element symbol to distinguish between atoms of the same element. For example, the atom labels ``O`` and  ``O34`` will both be interpreted as oxygen atoms, but the program will keep their distinction for further use. An atom label starting with "bq" (e.g. ``bqH``) is interpreted as a ghost atom that contributes only basis functions, not electrons.
 
 :units: The following possible string values are recognized ``[default=angstrom]``
 
@@ -44,7 +44,7 @@ Some common options supported are as follows:
 
 .. literalinclude:: ../../inputs/example.json
    :language: json
-   :lines: 16-23
+   :lines: 20-28
 
 :maxiter: An integer used to specify the maximum number of iterations for all sections below.
    This value can be changed on a per section basis. ``[default: 100]``
@@ -71,7 +71,8 @@ Spherical-harmonic (5 *d*, 7 *f*, 9 *g*, ...) angular functions are utilized by 
    "basisfile": "/path/to/basis_file_with_ecps",
    "atom_basis": {
       "H": "cc-pvtz",
-      "O": "aug-cc-pvtz"
+      "O": "aug-cc-pvtz",
+      "bqH": "aug-cc-pvtz"
    }
  }
 

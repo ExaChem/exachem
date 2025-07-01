@@ -213,7 +213,6 @@ void CommonOptions::print() {
   std::cout << gaussian_type;
   std::cout << std::endl;
   if(!dfbasis.empty()) std::cout << " dfbasis       = " << dfbasis << std::endl;
-  if(!basisfile.empty()) std::cout << " basisfile     = " << basisfile << std::endl;
   std::cout << " geom_units    = " << geom_units << std::endl;
   std::cout << " ang2au factor = " << std::setprecision(10) << exachem::constants::ang2bohr
             << std::endl;

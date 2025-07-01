@@ -94,8 +94,10 @@ def parse_nwchem_input(input_file):
 
   atom_except_list=[]
   atom_basis={}
+  atom_ecp={}
   geom_block=False
   basis_block=False
+  ecp_block=False
   scf_block=False
   dft_block=False
   tce_block=False
@@ -216,12 +218,30 @@ def parse_nwchem_input(input_file):
         else: 
           atom_symbol = get_first_word(oline)
           atom_basis[atom_symbol] = get_next_word(line,"library")
+          if atom_symbol.startswith("bq"): 
+            all_rem_words = get_next_word(line,"library",True)
+            atom_basis[atom_symbol] = all_rem_words[1]          
         continue
 
       if basis_block and line.startswith('end'):
         basis_block=False
         if atom_basis: nwchem_opt["atom_basis"] = atom_basis
         continue
+
+      if line.startswith("ecp"):
+        ecp_block=True
+        continue
+
+      if ecp_block and "library" in line:
+        if line.startswith("#"): continue
+        atom_symbol = get_first_word(oline)
+        atom_ecp[atom_symbol] = get_next_word(line,"library")
+        continue
+
+      if ecp_block and line.startswith('end'):
+        ecp_block=False
+        if atom_ecp: nwchem_opt["atom_ecp"] = atom_ecp
+        continue        
 
       #SCF options
       if line.startswith("scf"):
@@ -287,7 +307,7 @@ def parse_nwchem_input(input_file):
           if 'density' in line:
             dft_opt["convd"] = float(get_next_word(line,"density"))
           if 'diis' in line:
-            dft_opt["diis_hist"] = int(get_next_word(line,"ndiis"))
+            dft_opt["diis_hist"] = int(get_next_word(line,"diis"))
 
           if 'acccoul' in line:
             dft_opt["tol_sch"] = float(get_next_word(line,"acccoul"))
@@ -416,6 +436,9 @@ if __name__ == '__main__':
 
   if "atom_basis" in nwchem_opt.keys():
     exachem_opt["basis"]["atom_basis"] = nwchem_opt["atom_basis"]
+
+  if "atom_ecp" in nwchem_opt.keys():
+    exachem_opt["basis"]["atom_ecp"] = nwchem_opt["atom_ecp"]    
 
 
   """

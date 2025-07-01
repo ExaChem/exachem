@@ -66,7 +66,6 @@ void ParseTaskOptions::update_common_options(ChemEnv& chem_env) {
   task_options.maxiter       = common_options.maxiter;
   task_options.basis         = common_options.basis;
   task_options.dfbasis       = common_options.dfbasis;
-  task_options.basisfile     = common_options.basisfile;
   task_options.gaussian_type = common_options.gaussian_type;
   task_options.geom_units    = common_options.geom_units;
   task_options.file_prefix   = common_options.file_prefix;

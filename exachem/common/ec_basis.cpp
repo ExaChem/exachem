@@ -10,9 +10,11 @@
 #include <unordered_set>
 namespace fs = std::filesystem;
 
-void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vector<lib_atom>& atoms,
-                        std::vector<ECAtom>& ec_atoms) {
-  std::ifstream is(basisfile);
+// ca_symbol represents each unique atom symbol in the geometry
+void ECBasis::parse_ecp_basis_file(ExecutionContext& exc, std::string ca_symbol,
+                                   std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
+                                   const std::string ecp_basisfile) {
+  std::ifstream is(ecp_basisfile);
   std::string   line, rest;
   bool          ecp_found{false};
 
@@ -24,13 +26,14 @@ void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vecto
   } while(std::getline(is, line));
 
   if(!ecp_found) {
-    std::string bfnf_msg = "ECP block not found in " + basisfile;
+    std::string bfnf_msg = "ECP block not found in " + ecp_basisfile;
     tamm_terminate(bfnf_msg);
   }
 
   int              nelec = 0;
   std::string      amlabel;
   std::vector<int> atomlist;
+  const int        ca_z = ec_atoms[0].get_atomic_number(ca_symbol);
 
   std::ostringstream oss;
   bool               atom_has_ecp = false;
@@ -58,9 +61,13 @@ void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vecto
       std::string nelec_str;
       iss_ >> nelec_str >> nelec;
       atomlist.clear();
+      const int es_z = ec_atoms[0].get_atomic_number(elemsymbol);
 
+      // handle all atoms with the same element symbol represented by ca_symbol
       for(size_t i = 0; i < ec_atoms.size(); i++) {
-        if(elemsymbol == ec_atoms[i].esymbol) {
+        if(es_z == ca_z && // make sure ca_symbol atomic number matches one in ECP basis file
+           txt_utils::strequal_case(ca_symbol, ec_atoms[i].esymbol)) // match labeled atom symbols
+        {
           if(ec_atoms[i].has_ecp) continue;
           atom_has_ecp          = true;
           has_ecp               = true;
@@ -102,20 +109,6 @@ void ECBasis::ecp_check(ExecutionContext& exc, std::string basisfile, std::vecto
     ;
   if(exc.print())
     std::cout << std::endl << "ECP" << std::endl << oss.str() << "END" << std::endl << std::endl;
-}
-
-bool ECBasis::basis_has_ecp(ExecutionContext& exc, std::string basisfile) {
-  // parse ECP section of basis file
-  if(!basisfile.empty()) {
-    if(!fs::exists(basisfile)) {
-      std::string bfnf_msg = basisfile + " specified not found";
-      tamm_terminate(bfnf_msg);
-    }
-    else if(exc.pg().rank() == 0)
-      std::cout << std::endl << "Parsing ECP block in " << basisfile << std::endl;
-    return true;
-  }
-  return false;
 }
 
 void print_basis_info(const std::vector<libint2::Atom>& atoms, const std::vector<ECAtom>& ec_atoms,
@@ -178,9 +171,36 @@ void print_basis_info(const std::vector<libint2::Atom>& atoms, const std::vector
   }
 }
 
-void ECBasis::parse_ecp(ExecutionContext& exc, std::string basisfile, std::vector<lib_atom>& atoms,
-                        std::vector<ECAtom>& ec_atoms) {
-  if(basis_has_ecp(exc, basisfile)) ecp_check(exc, basisfile, atoms, ec_atoms);
+void check_basis_file(ExecutionContext& exc, bool single_basis, const ECAtom& ecatom,
+                      bool ecp_check = false) {
+  auto basis_set_file = std::string(DATADIR) + "/basis/" + ecatom.basis + ".g94";
+  if(ecp_check) basis_set_file = std::string(DATADIR) + "/basis/" + ecatom.ecp_basis + ".ecp";
+  int basis_file_exists = 0;
+  if(exc.pg().rank() == 0) basis_file_exists = std::filesystem::exists(basis_set_file);
+  exc.pg().broadcast(&basis_file_exists, 0);
+
+  if(!basis_file_exists) {
+    std::string err_msg = "ERROR: ";
+    if(!single_basis) err_msg += "Atom " + ecatom.esymbol + " - ";
+    err_msg += "basis set file " + basis_set_file + " specified does not exist.";
+    tamm_terminate(err_msg);
+  }
+}
+
+void ECBasis::parse_ecps(ExecutionContext& exc, std::vector<lib_atom>& atoms,
+                         std::vector<ECAtom>& ec_atoms) {
+  std::cout << std::endl;
+  std::map<std::string, ECAtom> unique_atom_labels;
+  for(auto& ecatom: ec_atoms) { unique_atom_labels.emplace(ecatom.esymbol, ecatom); }
+  for(const auto& [esymbol, ecatom]: unique_atom_labels) {
+    if(ecatom.ecp_basis.empty()) continue;
+    // There is no global ecp basis specification for all atoms.
+    // single_basis=false, ecp=true
+    check_basis_file(exc, false, ecatom, true);
+    auto ecp_basis_file = std::string(DATADIR) + "/basis/" + ecatom.ecp_basis + ".ecp";
+    if(exc.pg().rank() == 0) std::cout << "Parsing ECP block in " << ecp_basis_file << std::endl;
+    parse_ecp_basis_file(exc, esymbol, atoms, ec_atoms, ecp_basis_file);
+  }
 }
 
 void ECBasis::construct_shells(ExecutionContext& exc, std::vector<lib_atom>& atoms,
@@ -192,19 +212,7 @@ void ECBasis::construct_shells(ExecutionContext& exc, std::vector<lib_atom>& ato
                 [&ec_atoms](const ECAtom& s) { return s.basis == ec_atoms[0].basis; });
 
   for(size_t i = 0; i < atoms.size(); i++) {
-    if(!single_basis || i == 0) {
-      basis_set_file        = std::string(DATADIR) + "/basis/" + ec_atoms[i].basis + ".g94";
-      int basis_file_exists = 0;
-      if(exc.pg().rank() == 0) basis_file_exists = std::filesystem::exists(basis_set_file);
-      exc.pg().broadcast(&basis_file_exists, 0);
-
-      if(!basis_file_exists) {
-        std::string err_msg = "ERROR: ";
-        if(!single_basis) err_msg += "Atom " + ec_atoms[i].esymbol + " - ";
-        err_msg += "basis set file " + basis_set_file + " specified does not exist.";
-        tamm_terminate(err_msg);
-      }
-    }
+    if(!single_basis || i == 0) { check_basis_file(exc, single_basis, ec_atoms[i]); }
 
     // const auto        Z = atoms[i].atomic_number;
     lib_basis_set ashells(ec_atoms[i].basis, {atoms[i]});
@@ -227,11 +235,10 @@ void ECBasis::basisset(ExecutionContext& exc, std::string basis, std::string gau
   if(exc.print()) print_basis_info(atoms, ec_atoms, shells);
 }
 
-ECBasis::ECBasis(ExecutionContext& exc, std::string basis, std::string basisfile,
-                 std::string gaussian_type, std::vector<lib_atom>& atoms,
-                 std::vector<ECAtom>& ec_atoms) {
+ECBasis::ECBasis(ExecutionContext& exc, std::string basis, std::string gaussian_type,
+                 std::vector<lib_atom>& atoms, std::vector<ECAtom>& ec_atoms) {
   basisset(exc, basis, gaussian_type, atoms, ec_atoms);
-  parse_ecp(exc, basisfile, atoms, ec_atoms);
+  parse_ecps(exc, atoms, ec_atoms);
 }
 
 void BasisFunctionCount::compute(const bool is_spherical, libint2::Shell& s) {

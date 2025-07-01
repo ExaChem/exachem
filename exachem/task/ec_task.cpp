@@ -107,9 +107,9 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
   const auto input_file = chem_env.input_file;
   // TODO: This is redundant if multiple tasks for same geometry are executed.
 
-  SCFOptions& scf_options   = chem_env.ioptions.scf_options;
-  chem_env.ec_basis         = ECBasis(ec, scf_options.basis, scf_options.basisfile,
-                                      scf_options.gaussian_type, chem_env.atoms, chem_env.ec_atoms);
+  SCFOptions& scf_options = chem_env.ioptions.scf_options;
+  chem_env.ec_basis =
+    ECBasis(ec, scf_options.basis, scf_options.gaussian_type, chem_env.atoms, chem_env.ec_atoms);
   chem_env.shells           = chem_env.ec_basis.shells;
   chem_env.sys_data.has_ecp = chem_env.ec_basis.has_ecp;
 

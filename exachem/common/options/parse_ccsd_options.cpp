@@ -168,7 +168,6 @@ void ParseCCSDOptions::update_common_options(ChemEnv& chem_env) {
   cc_options.maxiter       = common_options.maxiter;
   cc_options.basis         = common_options.basis;
   cc_options.dfbasis       = common_options.dfbasis;
-  cc_options.basisfile     = common_options.basisfile;
   cc_options.gaussian_type = common_options.gaussian_type;
   cc_options.geom_units    = common_options.geom_units;
   cc_options.file_prefix   = common_options.file_prefix;

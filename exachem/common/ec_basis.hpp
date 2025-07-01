@@ -19,16 +19,15 @@ private:
                 std::vector<lib_atom>& atoms, std::vector<ECAtom>& ec_atoms);
   void construct_shells(ExecutionContext& exc, std::vector<lib_atom>& atoms,
                         std::vector<ECAtom>& ec_atoms);
-  bool basis_has_ecp(ExecutionContext& exc, std::string basisfile);
-  void ecp_check(ExecutionContext& exc, std::string basisfile, std::vector<lib_atom>& atoms,
-                 std::vector<ECAtom>& ec_atoms);
-  void parse_ecp(ExecutionContext& exc, std::string basisfile, std::vector<lib_atom>& atoms,
-                 std::vector<ECAtom>& ec_atoms);
+  void parse_ecp_basis_file(ExecutionContext& exc, std::string esym, std::vector<lib_atom>& atoms,
+                            std::vector<ECAtom>& ec_atoms, const std::string ecp_basisfile);
+  void parse_ecps(ExecutionContext& exc, std::vector<lib_atom>& atoms,
+                  std::vector<ECAtom>& ec_atoms);
 
 public:
   ECBasis() = default;
-  ECBasis(ExecutionContext& exc, std::string basis, std::string basisfile,
-          std::string gaussian_type, std::vector<lib_atom>& atoms, std::vector<ECAtom>& ec_atoms);
+  ECBasis(ExecutionContext& exc, std::string basis, std::string gaussian_type,
+          std::vector<lib_atom>& atoms, std::vector<ECAtom>& ec_atoms);
 
   std::string   basis_set_file;
   lib_basis_set shells;

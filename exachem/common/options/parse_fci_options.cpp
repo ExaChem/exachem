@@ -82,7 +82,6 @@ void ParseFCIOptions::update_common_options(ChemEnv& chem_env) {
   fci_options.maxiter       = common_options.maxiter;
   fci_options.basis         = common_options.basis;
   fci_options.dfbasis       = common_options.dfbasis;
-  fci_options.basisfile     = common_options.basisfile;
   fci_options.gaussian_type = common_options.gaussian_type;
   fci_options.geom_units    = common_options.geom_units;
   fci_options.file_prefix   = common_options.file_prefix;

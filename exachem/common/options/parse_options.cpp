@@ -36,8 +36,9 @@ void ECOptionParser::parse_n_check(std::string_view filename, json& jinput) {
 
   json jbasis = jinput["basis"];
 
-  const std::vector<std::string> valid_basis{"comments", "basisset", "basisfile",
-                                             /*"gaussian_type",*/ "df_basisset", "atom_basis"};
+  const std::vector<std::string> valid_basis{"comments", "basisset",
+                                             /*"gaussian_type",*/ "df_basisset", "atom_basis",
+                                             "atom_ecp"};
   for(auto& el: jbasis.items()) {
     if(std::find(valid_basis.begin(), valid_basis.end(), el.key()) == valid_basis.end())
       tamm_terminate("INPUT FILE ERROR: Invalid basis section option [" + el.key() +

@@ -23,7 +23,6 @@ public:
   int         maxiter{100};
   std::string basis{"sto-3g"};
   std::string dfbasis{};
-  std::string basisfile{}; // supports only ECPs for now
   std::string gaussian_type{"spherical"};
   std::string geom_units{"angstrom"};
   int         natoms_max{30}; // max natoms for geometry analysis

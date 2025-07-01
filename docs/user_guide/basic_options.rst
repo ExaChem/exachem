@@ -24,7 +24,7 @@ A geometry can be specified as follows:
 
 .. literalinclude:: ../../inputs/example.json
    :language: json
-   :lines: 3-15
+   :lines: 2-14
 
 :coordinates: The element *symbol* followed by the *x y z* coordinates. Additional characters can be added to the element symbol to distinguish between atoms of the same element. For example, the atom labels ``O`` and  ``O34`` will both be interpreted as oxygen atoms, but the program will keep their distinction for further use. An atom label starting with "bq" (e.g. ``bqH``) is interpreted as a ghost atom that contributes only basis functions, not electrons.
 
@@ -65,26 +65,17 @@ Basis set options
 Currently support basis sets consisting of contracted Gaussian functions up to a maximum angular momentum of six (h functions).
 Spherical-harmonic (5 *d*, 7 *f*, 9 *g*, ...) angular functions are utilized by default.
 
-.. code-block:: json
-
- "basis": {
-   "basisset": "cc-pvdz",
-   "df_basisset": "cc-pvdz-ri",
-   "basisfile": "/path/to/basis_file_with_ecps",
-   "atom_basis": {
-      "H": "cc-pvtz",
-      "O": "aug-cc-pvtz",
-      "bqH": "aug-cc-pvtz"
-   }
- }
+.. literalinclude:: ../../inputs/example.json
+   :language: json
+   :lines: 30-40
 
 :basisset: String specifying the basis set name. Parsing of the basis set will be handled by *Libint*, which expects to find a ``<basisset>.g94`` file with Gaussian-style format and located at ``$LIBINT_DATA_PATH/basis`` or ``<libint2_install_prefix>/share/libint/<libint2_version>/basis`` (if ``LIBINT_DATA_PATH`` is not defined).
 
 :df_basisset: String specifying the density-fitting basis set name. Parsing of the basis set will be handled by *Libint*, which expects to find a ``<basisset>.g94`` file with Gaussian-style format and located at ``$LIBINT_DATA_PATH/basis`` or ``<libint2_install_prefix>/share/libint/<libint2_version>/basis`` (if ``LIBINT_DATA_PATH`` is not defined).
 
-:basisfile: Currently used for ECPs only. This is a basis file containing the ECP block. Only the ECP block of this file is parsed and everthing else is ignored. The specified file should follow the NWChem format from the basis set exchange website.
-
 :atom_basis: Specify the basis set for individual atoms. The full strings specified in `Geometry`_  will be used to distinguish different atoms of the same element.
+
+:atom_ecp: For ECPs only. Specify the ECP basis set for individual atoms. The specified file should follow the NWChem format from the basis set exchange website. Parsing of the ECP basis set expects to find a ``<basisset>.ecp`` file in NWChem format and located at ``$LIBINT_DATA_PATH/basis`` or ``<libint2_install_prefix>/share/libint/<libint2_version>/basis`` (if ``LIBINT_DATA_PATH`` is not defined). The corresponding basis files are expected to contain the ECP block. Only the ECP block of these basis files is parsed and everthing else is ignored.
 
 ..  :df_basisset: Used to specify the auxiliary basisset for density fitting.
 

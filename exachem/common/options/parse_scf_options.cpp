@@ -151,7 +151,6 @@ void ParseSCFOptions::update_common_options(ChemEnv& chem_env) {
   scf_options.maxiter       = common_options.maxiter;
   scf_options.basis         = common_options.basis;
   scf_options.dfbasis       = common_options.dfbasis;
-  scf_options.basisfile     = common_options.basisfile;
   scf_options.gaussian_type = common_options.gaussian_type;
   scf_options.geom_units    = common_options.geom_units;
   scf_options.file_prefix   = common_options.file_prefix;

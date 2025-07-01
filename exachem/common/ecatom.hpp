@@ -22,6 +22,7 @@ public:
   Atom                atom;
   std::string         esymbol;
   std::string         basis;
+  std::string         ecp_basis{};
   bool                is_bq{false};
   bool                has_ecp{false};
   int                 ecp_nelec{};

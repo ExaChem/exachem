@@ -113,19 +113,19 @@ void ECBasis::parse_ecp_basis_file(ExecutionContext& exc, std::string ca_symbol,
 
 void print_basis_info(const std::vector<libint2::Atom>& atoms, const std::vector<ECAtom>& ec_atoms,
                       const libint2::BasisSet& basis) {
-  std::unordered_set<int> printed_Z;
-  auto                    a2s_map   = basis.atom2shell(atoms);
-  const auto              elem_info = libint2::chemistry::get_element_info();
+  std::set<std::pair<std::string, std::string>> unique_sym_basis;
+  auto                                          a2s_map   = basis.atom2shell(atoms);
+  const auto                                    elem_info = libint2::chemistry::get_element_info();
 
   for(size_t i = 0; i < ec_atoms.size(); ++i) {
+    const std::string                   ec_symbol = ec_atoms[i].esymbol;
+    std::pair<std::string, std::string> key       = {ec_symbol, ec_atoms[i].basis};
+    if(unique_sym_basis.count(key)) continue;
+    unique_sym_basis.insert(key);
+
     int Z = ec_atoms[i].atom.atomic_number;
-
-    if(printed_Z.count(Z)) continue;
-    printed_Z.insert(Z);
-
-    const std::string symbol = ec_atoms[i].esymbol;
-
-    const std::string ename = symbol + " (" + elem_info[Z - 1].name + ")";
+    if(ec_atoms[i].is_bq) { Z = ECAtom::get_atomic_number(ec_symbol); }
+    const std::string ename = ec_symbol + " (" + elem_info[Z - 1].name + ")";
     std::cout << "  " << ename << std::endl;
     std::cout << "  " << std::string(ename.length(), '-') << std::endl;
     std::cout << std::setw(18) << std::right << "Exponent" << std::setw(20) << "Coefficients"
@@ -215,7 +215,7 @@ void ECBasis::construct_shells(ExecutionContext& exc, std::vector<lib_atom>& ato
     if(!single_basis || i == 0) { check_basis_file(exc, single_basis, ec_atoms[i]); }
 
     // const auto        Z = atoms[i].atomic_number;
-    lib_basis_set ashells(ec_atoms[i].basis, {atoms[i]});
+    lib_basis_set ashells(ec_atoms[i].basis, {atoms[i]}, true);
     shell_vec.insert(shell_vec.end(), ashells.begin(), ashells.end());
   }
 

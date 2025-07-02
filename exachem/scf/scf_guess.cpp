@@ -949,6 +949,7 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
     // const auto Z = k.atom.atomic_number;
     const auto        es             = k.esymbol;
     const bool        has_ecp        = k.has_ecp;
+    const bool        is_bq          = k.is_bq;
     auto              acharge        = scf_options.charge;
     auto              amultiplicity  = scf_options.multiplicity;
     bool              custom_opts    = false;
@@ -959,9 +960,16 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
     atom.push_back(kcopy);
 
     // Generate local basis set
+    if(is_bq) atom[0].atomic_number = k.get_atomic_number(es);
     libint2::BasisSet shells_atom(k.basis, atom);
     shells_atom.set_pure(true);
     size_t nao_atom = shells_atom.nbf();
+    if(is_bq) {
+      indx += nao_atom;
+      ++iatom;
+      atom.pop_back();
+      continue;
+    }
 
     if(atom_loc.find(es) != atom_loc.end()) {
       int atom_indx = atom_loc[es];

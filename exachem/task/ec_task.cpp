@@ -121,8 +121,10 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
   // ECBasis constructs the basisset with all the basis functions. Remove the bq atoms
   for(int i = (int) chem_env.atoms.size() - 1; i >= 0; --i) {
     if(chem_env.ec_atoms[i].is_bq) {
-      chem_env.atoms.erase(chem_env.atoms.begin() + i);
-      chem_env.ec_atoms.erase(chem_env.ec_atoms.begin() + i);
+      chem_env.atoms[i].atomic_number         = 0;
+      chem_env.ec_atoms[i].atom.atomic_number = 0;
+      // chem_env.atoms.erase(chem_env.atoms.begin() + i);
+      // chem_env.ec_atoms.erase(chem_env.ec_atoms.begin() + i);
     }
   }
 

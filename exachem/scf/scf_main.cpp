@@ -9,7 +9,7 @@
 #include "exachem/scf/scf_main.hpp"
 #include "exachem/common/termcolor.hpp"
 #include "exachem/scf/scf_common.hpp"
-#include "exachem/scf/scf_hartree_fock.hpp"
+#include "exachem/scf/scf_engine.hpp"
 #include "exachem/scf/scf_outputs.hpp"
 #include <string_view>
 

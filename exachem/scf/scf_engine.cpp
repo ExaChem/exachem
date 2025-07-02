@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "exachem/scf/scf_hartree_fock.hpp"
+#include "exachem/scf/scf_engine.hpp"
 #include "exachem/common/cutils.hpp"
 #include "exachem/common/ec_dplot.hpp"
 #include "exachem/common/options/parser_utils.hpp"

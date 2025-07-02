@@ -16,7 +16,7 @@ set(SCF_INCLUDES
     ${SCF_SRCDIR}/scf_matrix.hpp
     ${SCF_SRCDIR}/scf_restart.hpp
     ${SCF_SRCDIR}/scf_outputs.hpp
-    ${SCF_SRCDIR}/scf_hartree_fock.hpp
+    ${SCF_SRCDIR}/scf_engine.hpp
     ${SCF_SRCDIR}/scf_tamm_tensors.hpp
     ${SCF_SRCDIR}/scf_eigen_tensors.hpp
     )
@@ -33,6 +33,6 @@ set(SCF_SRCS
     ${SCF_SRCDIR}/scf_matrix.cpp 
     ${SCF_SRCDIR}/scf_restart.cpp         
     ${SCF_SRCDIR}/scf_outputs.cpp
-    ${SCF_SRCDIR}/scf_hartree_fock.cpp
+    ${SCF_SRCDIR}/scf_engine.cpp
     )
 

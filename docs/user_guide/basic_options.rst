@@ -84,7 +84,7 @@ Spherical-harmonic (5 *d*, 7 *f*, 9 *g*, ...) angular functions are utilized by 
 TASK Options
 ~~~~~~~~~~~~
 
-The **TASK** block of the input file specifies the method to run. Only a single task can be specified at once. The supported task options are shown below.
+The **TASK** block of the input file specifies the method to run. Only a single task can be enabled at once. The supported task options are shown below.
 
 .. code-block:: json
 
@@ -94,7 +94,7 @@ The **TASK** block of the input file specifies the method to run. Only a single 
    "cc2": false,
    "fcidump": false,
    "cd_2e": false,
-   "ducc": false,
+   "ducc": [false, "default"],
    "ccsd": false,
    "ccsd_t": false,
    "ccsd_lambda": false,
@@ -104,9 +104,14 @@ The **TASK** block of the input file specifies the method to run. Only a single 
    "operation": ["energy"]
  }
 
-A task automatically runs the tasks it depends on. For e.g. if **ccsd** is enabled, it automatically runs the tasks **scf** (hartree fock) and **cd_2e** (cholesky decomposition of the 2e integrals).
+A task automatically runs the tasks it depends on. For e.g. if **ccsd** is enabled, it automatically runs the tasks **scf** (hartree fock) and **cd_2e** (cholesky decomposition of the 2e integrals). 
 
-:operation: ``[default=energy]`` Specifies the calculation that will be performed in the task.
+:ducc: The *ducc* task has two options that can be specified.
+   
+   * :strong:`default`  : Runs the double unitary CC formalism (DUCC).
+   * :strong:`qflow`  : Runs the quantum flow variant.
+
+:operation: ``[default=energy]`` Specifies the calculation that will be performed in the enabled task.
 
    * :strong:`energy`  : Computes the single point energy.
    * :strong:`gradient`: Computes numerical gradients for the level of theory specified.

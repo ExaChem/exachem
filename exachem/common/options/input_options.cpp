@@ -225,20 +225,22 @@ void CommonOptions::print() {
 }
 
 void CCSDOptions::initialize() {
-  threshold      = 1e-6;
-  tilesize       = 40;
-  ndiis          = 5;
-  lshift         = 0;
-  nactive_oa     = 0;
-  nactive_ob     = 0;
-  nactive_va     = 0;
-  nactive_vb     = 0;
-  ducc_lvl       = 2;
-  ccsd_maxiter   = 100;
-  freeze_core    = 0;
-  freeze_virtual = 0;
-  balance_tiles  = true;
-  profile_ccsd   = false;
+  threshold       = 1e-6;
+  tilesize        = 40;
+  ndiis           = 5;
+  lshift          = 0;
+  nactive_oa      = 0;
+  nactive_ob      = 0;
+  nactive_va      = 0;
+  nactive_vb      = 0;
+  ducc_lvl        = 2;
+  qflow_cycles    = 100;
+  qflow_threshold = 1e-3;
+  ccsd_maxiter    = 100;
+  freeze_core     = 0;
+  freeze_virtual  = 0;
+  balance_tiles   = true;
+  profile_ccsd    = false;
 
   writet      = false;
   writet_iter = ndiis;
@@ -381,7 +383,6 @@ void TaskOptions::print() {
   txt_utils::print_bool(" fci          ", fci);
   txt_utils::print_bool(" fcidump      ", fcidump);
   txt_utils::print_bool(" cd_2e        ", cd_2e);
-  txt_utils::print_bool(" ducc         ", ducc);
   txt_utils::print_bool(" ccsd         ", ccsd);
   txt_utils::print_bool(" ccsd_sf      ", ccsd_sf);
   txt_utils::print_bool(" ccsd_lambda  ", ccsd_lambda);
@@ -389,7 +390,8 @@ void TaskOptions::print() {
   txt_utils::print_bool(" rteom_cc2    ", rteom_cc2);
   txt_utils::print_bool(" rteom_ccsd   ", rteom_ccsd);
   txt_utils::print_bool(" gfccsd       ", gfccsd);
-  std::cout << " dlpno_ccsd:  " << dlpno_ccsd.first << ", " << dlpno_ccsd.second << "\n";
-  std::cout << " dlpno_ccsd_t " << dlpno_ccsd_t.first << ", " << dlpno_ccsd_t.second << "\n";
+  std::cout << " ducc:  " << ducc.first << ", " << ducc.second << std::endl;
+  std::cout << " dlpno_ccsd:  " << dlpno_ccsd.first << ", " << dlpno_ccsd.second << std::endl;
+  std::cout << " dlpno_ccsd_t " << dlpno_ccsd_t.first << ", " << dlpno_ccsd_t.second << std::endl;
   std::cout << "}" << std::endl;
 }

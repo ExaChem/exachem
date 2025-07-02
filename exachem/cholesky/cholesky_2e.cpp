@@ -141,13 +141,13 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& 
 
   // Active space sizes
   // 'int' (internal) are orbitals in the active space
-  // 'ext' (internal) are orbitals outside the active space
+  // 'ext' (external) are orbitals outside the active space
   // xxx_int + xxx_ext = xxx
   TAMM_SIZE occ_alpha_int = 0;
   TAMM_SIZE occ_beta_int  = 0;
   TAMM_SIZE vir_alpha_int = 0;
   TAMM_SIZE vir_beta_int  = 0;
-  if(task_options.ducc) {
+  if(task_options.ducc.first) {
     occ_alpha_int = ccsd_options.nactive_oa;
     occ_beta_int  = ccsd_options.nactive_ob;
     vir_alpha_int = ccsd_options.nactive_va;
@@ -168,7 +168,7 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& 
   bool balance_tiles = ccsd_options.balance_tiles;
 
   // Check if active space is allowed:
-  if(task_options.ducc) {
+  if(task_options.ducc.first) {
     if(n_occ_alpha != n_occ_beta)
       tamm_terminate("[DUCC ERROR]: DUCC is only for closed-shell calculations");
     if(occ_alpha_int > n_occ_alpha) tamm_terminate("[DUCC ERROR]: nactive_oa > n_occ_alpha");

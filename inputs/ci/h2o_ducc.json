@@ -50,6 +50,6 @@
     }    
   },
   "TASK": {
-    "ducc": true  
+    "ducc": [true,"default"] 
   }  
 }

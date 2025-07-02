@@ -32,7 +32,11 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   free_tensors(cholVpr);
 
-  DUCC_T_CCSD_Driver<T>(chem_env, ec, MO, d_t1, d_t2, d_f1, v2tensors);
+  IndexVector occ_int_vec;
+  IndexVector virt_int_vec;
+  std::string pos_str;
+  DUCC_T_CCSD_Driver<T>(chem_env, ec, MO, d_t1, d_t2, d_f1, v2tensors, occ_int_vec, virt_int_vec,
+                        pos_str);
 
   v2tensors.deallocate();
   free_tensors(d_t1, d_t2, d_f1);

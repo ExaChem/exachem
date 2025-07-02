@@ -39,7 +39,7 @@ void ParseTaskOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(task_options.fci, jtask, "fci");
   parse_option<bool>(task_options.fcidump, jtask, "fcidump");
   parse_option<bool>(task_options.cd_2e, jtask, "cd_2e");
-  parse_option<bool>(task_options.ducc, jtask, "ducc");
+  parse_option<std::pair<bool, std::string>>(task_options.ducc, jtask, "ducc");
   parse_option<bool>(task_options.ccsd, jtask, "ccsd");
   parse_option<bool>(task_options.ccsd_sf, jtask, "ccsd_sf");
   parse_option<bool>(task_options.ccsd_t, jtask, "ccsd_t");

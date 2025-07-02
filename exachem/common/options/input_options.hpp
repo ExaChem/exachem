@@ -117,12 +117,13 @@ public:
   std::pair<bool, double> tamplitudes{false, 0.05};
   std::vector<int>        cc_rdm{};
 
-  int  nactive_oa, nactive_ob, nactive_va, nactive_vb;
-  int  ducc_lvl;
-  int  ccsd_maxiter;
-  bool freeze_atomic{false};
-  int  freeze_core;
-  int  freeze_virtual;
+  int    nactive_oa, nactive_ob, nactive_va, nactive_vb;
+  int    ducc_lvl, qflow_cycles;
+  double qflow_threshold;
+  int    ccsd_maxiter;
+  bool   freeze_atomic{false};
+  int    freeze_core;
+  int    freeze_virtual;
 
   // RT-EOMCC
   int    pcore;      // pth core orbital
@@ -258,7 +259,6 @@ public:
   bool                         cc2{false};
   bool                         fci{false};
   bool                         fcidump{false};
-  bool                         ducc{false};
   bool                         cd_2e{false};
   bool                         ccsd{false};
   bool                         ccsd_sf{false};
@@ -269,6 +269,8 @@ public:
   bool                         rteom_cc2{false};
   bool                         rteom_ccsd{false};
   bool                         gfccsd{false};
+  std::pair<bool, std::string> ducc{false, "default"};
+
   std::pair<bool, std::string> dlpno_ccsd{false, ""};
   std::pair<bool, std::string> dlpno_ccsd_t{false, ""};
   std::vector<std::string>     operation{"energy"};

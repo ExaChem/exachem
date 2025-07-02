@@ -125,7 +125,9 @@ The double unitary CC formalism (DUCC) is described in the following paper.
    "nactive_ob"  : 0,
    "nactive_va"  : 0,
    "nactive_vb"  : 0,
-   "ducc_lvl" : 2
+   "ducc_lvl" : 2,
+   "qflow_cycles" : 100,
+   "qflow_threshold" : 1e-3
  }
 
 :nactive_oa: ``[default=0]`` An integer that specifies the number of active occupied alpha orbitals included in the Hamiltonian H.
@@ -138,6 +140,9 @@ The double unitary CC formalism (DUCC) is described in the following paper.
    * :strong:`0`: Only computes the bare Hamiltonian.
    * :strong:`1`: Computes level 0 plus the single commutator of F and V and double commutator of F.
    * :strong:`2`: Computes level 1 plus the double commutator of V and triple commutator of F.
+
+:qflow_cycles: ``[default=100]`` An integer that specifies the number of QFlow cycles. A single QFlow cycle computes all of the effective Hamiltonians of a given size given by nactive_oa, nactive_ob, nactive_va, and nactive_vb and then call solvers to update the global pool of cluster amplitudes.  
+:qflow_threshold: ``[default=1e-3]`` Specifies the convergence threshold for the energy of the leading active space of the QFlow cycles. The QFlow cycles are converged when the difference between the current and previous energy is less than qflow_threshold.
 
 EOMCCSD
 ~~~~~~~

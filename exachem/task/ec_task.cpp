@@ -32,7 +32,7 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
                                   task.gw,
                                   task.cd_2e,
                                   task.cc2,
-                                  task.ducc,
+                                  task.ducc.first,
                                   task.ccsd,
                                   task.ccsdt,
                                   task.ccsd_t,
@@ -47,7 +47,7 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
     tamm_terminate("[INPUT FILE ERROR] only a single task can be enabled at once!");
 
   const std::vector<bool> tvec_nograd = {
-    task.sinfo,     task.gw,         task.fci,         task.cd_2e,    task.ducc,  task.fcidump,
+    task.sinfo,     task.gw,         task.fci,         task.cd_2e,    task.ducc.first, task.fcidump,
     task.rteom_cc2, task.rteom_ccsd, task.ccsd_lambda, task.eom_ccsd, task.gfccsd};
   const std::vector<std::string> task_nograd = {
     "sinfo",     "gw",         "fci",         "cd_2e",    "ducc",  "fcidump",
@@ -145,7 +145,20 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
   else if(task.cc2) cc2::cd_cc2_driver(ec, chem_env);
   else if(task.ccsd_lambda) cc::ccsd_lambda::ccsd_lambda_driver(ec, chem_env);
   else if(task.eom_ccsd) cc::eom::eom_ccsd_driver(ec, chem_env);
-  else if(task.ducc) cc::ducc::ducc_driver(ec, chem_env);
+  else if(task.ducc.first) {
+    auto comp_type = task.ducc.second;
+    if(comp_type == "qflow") {
+#if defined(USE_NWQSIM)
+      cc::ducc::ducc_qflow_driver(ec, chem_env);
+#else
+      if(ec.pg().rank() == 0)
+        std::cout << std::endl
+                  << "QFLOW is not enabled. Please rebuild with USE_NWQSIM=ON to use DUCC QFLOW."
+                  << std::endl;
+#endif
+    }
+    else cc::ducc::ducc_driver(ec, chem_env);
+  }
 #if defined(EC_COMPLEX)
   else if(task.fci || task.fcidump) fci::fci_driver(ec, chem_env);
   else if(task.gfccsd) cc::gfcc::gfccsd_driver(ec, chem_env);

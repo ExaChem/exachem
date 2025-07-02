@@ -10,7 +10,7 @@
 #include "exachem/scf/scf_matrix.hpp"
 
 // Originally scf_restart_test
-void exachem::scf::SCFRestart::operator()(const ExecutionContext& ec, ChemEnv& chem_env,
+void exachem::scf::DefaultSCFRestart::run(const ExecutionContext& ec, ChemEnv& chem_env,
                                           std::string files_prefix) {
   const bool restart = chem_env.ioptions.scf_options.restart || chem_env.ioptions.scf_options.noscf;
   const auto rank    = ec.pg().rank();
@@ -53,12 +53,12 @@ void exachem::scf::SCFRestart::operator()(const ExecutionContext& ec, ChemEnv& c
   }
 }
 
-void exachem::scf::SCFRestart::operator()(ExecutionContext& ec, ChemEnv& chem_env,
+void exachem::scf::DefaultSCFRestart::run(ExecutionContext& ec, ChemEnv& chem_env,
                                           ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
                                           EigenTensors& etensors, std::string files_prefix) {
   const auto N      = chem_env.sys_data.nbf_orig;
   const auto Northo = N - chem_env.sys_data.n_lindep;
   EXPECTS(Northo == chem_env.sys_data.nbf);
-
-  SCFIO::rw_md_disk(ec, chem_env, scalapack_info, ttensors, etensors, files_prefix, true);
+  SCFIO scf_io;
+  scf_io.rw_md_disk(ec, chem_env, scalapack_info, ttensors, etensors, files_prefix, true);
 }

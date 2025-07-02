@@ -12,107 +12,87 @@ void SCFOptions::print() {
   std::cout << std::defaultfloat;
   std::cout << std::endl << "SCF Options" << std::endl;
   std::cout << "{" << std::endl;
-  std::cout << " charge            = " << charge << std::endl;
-  std::cout << " multiplicity      = " << multiplicity << std::endl;
-  std::cout << " level shift       = " << lshift << std::endl;
-  std::cout << " tol_int           = " << tol_int << std::endl;
-  std::cout << " tol_sch           = " << tol_sch << std::endl;
-  std::cout << " tol_lindep        = " << tol_lindep << std::endl;
-  std::cout << " conve             = " << conve << std::endl;
-  std::cout << " convd             = " << convd << std::endl;
-  std::cout << " diis_hist         = " << diis_hist << std::endl;
-  std::cout << " AO_tilesize       = " << AO_tilesize << std::endl;
-  std::cout << " writem            = " << writem << std::endl;
-  std::cout << " damp              = " << damp << std::endl;
-  std::cout << " n_lindep          = " << n_lindep << std::endl;
+  print_option("charge", charge, 18);
+  print_option("multiplicity", multiplicity, 18);
+  print_option("level shift", lshift, 18);
+  print_option("tol_int", tol_int, 18);
+  print_option("tol_sch", tol_sch, 18);
+  print_option("tol_lindep", tol_lindep, 18);
+  print_option("conve", conve, 18);
+  print_option("convd", convd, 18);
+  print_option("diis_hist", diis_hist, 18);
+  print_option("AO_tilesize", AO_tilesize, 18);
+  print_option("writem", writem, 18);
+  print_option("damp", damp, 18);
+  print_option("n_lindep", n_lindep, 18);
+
   if(!moldenfile.empty()) {
-    std::cout << " moldenfile        = " << moldenfile << std::endl;
+    print_option("moldenfile", moldenfile, 18);
     // std::cout << " n_lindep = " << n_lindep <<  std::endl;
   }
 
-  std::cout << " scf_type          = " << scf_type << std::endl;
+  print_option("scf_type", scf_type, 18);
 
   // QED
-  if(!qed_omegas.empty()) {
-    std::cout << " qed_omegas       = [";
-    for(auto x: qed_omegas) { std::cout << x << ","; }
-    std::cout << "\b]" << std::endl;
-  }
-
-  if(!qed_lambdas.empty()) {
-    std::cout << " qed_lambdas       = [";
-    for(auto x: qed_lambdas) { std::cout << x << ","; }
-    std::cout << "\b]" << std::endl;
-  }
-
-  if(!qed_volumes.empty()) {
-    std::cout << " qed_volumes       = [";
-    for(auto x: qed_volumes) { std::cout << x << ","; }
-    std::cout << "\b]" << std::endl;
-  }
-
-  if(!qed_polvecs.empty()) {
-    std::cout << " qed_polvecs       = [";
-    for(auto x: qed_polvecs) {
-      std::cout << "[";
-      for(auto y: x) { std::cout << y << ","; }
-      std::cout << "\b],";
-    }
-    std::cout << "\b]" << std::endl;
-  }
-
-  txt_utils::print_bool(" direct_df        ", direct_df);
+  print_vec("qed_omegas", qed_omegas, 17);
+  print_vec("qed_lambdas", qed_lambdas, 17);
+  print_vec("qed_volumes", qed_volumes, 17);
+  print_vec2d("qed_polvecs", qed_polvecs, 17);
+  print_option("direct_df", direct_df, 18);
 
   if(!xc_type.empty() || snK) {
-    std::cout << " DFT " << std::endl << " {" << std::endl;
-    std::cout << "  xc_type           = [ ";
-    for(auto xcfunc: xc_type) { std::cout << " \"" << xcfunc << "\","; }
-    std::cout << "\b ]" << std::endl;
+    std::cout << " DFT" << std::endl << " {" << std::endl;
+    // Print xc_type as a custom formatted vector
+    std::cout << "  " << std::setw(20) << std::left << "xc_type"
+              << "= [ ";
+    for(const auto& xcfunc: xc_type) { std::cout << "\"" << xcfunc << "\", "; }
+    std::cout << "\b\b ]" << std::endl; // Remove last comma and space
 
-    std::cout << "  xc_grid_type      = " << xc_grid_type << std::endl;
-    std::cout << "  xc_pruning_scheme = " << xc_pruning_scheme << std::endl;
-    std::cout << "  xc_weight_scheme  = " << xc_weight_scheme << std::endl;
-    std::cout << "  xc_exec_space     = " << xc_exec_space << std::endl;
-    std::cout << "  xc_basis_tol      = " << xc_basis_tol << std::endl;
-    std::cout << "  xc_batch_size     = " << xc_batch_size << std::endl;
-    std::cout << "  xc_lb_kernel      = " << xc_lb_kernel << std::endl;
-    std::cout << "  xc_mw_kernel      = " << xc_mw_kernel << std::endl;
-    std::cout << "  xc_int_kernel     = " << xc_int_kernel << std::endl;
-    std::cout << "  xc_red_kernel     = " << xc_red_kernel << std::endl;
-    std::cout << "  xc_lwd_kernel     = " << xc_lwd_kernel << std::endl;
+    print_option("xc_grid_type", xc_grid_type, 20);
+    print_option("xc_pruning_scheme", xc_pruning_scheme, 20);
+    print_option("xc_weight_scheme", xc_weight_scheme, 20);
+    print_option("xc_exec_space", xc_exec_space, 20);
+    print_option("xc_basis_tol", xc_basis_tol, 20);
+    print_option("xc_batch_size", xc_batch_size, 20);
+    print_option("xc_lb_kernel", xc_lb_kernel, 20);
+    print_option("xc_mw_kernel", xc_mw_kernel, 20);
+    print_option("xc_int_kernel", xc_int_kernel, 20);
+    print_option("xc_red_kernel", xc_red_kernel, 20);
+    print_option("xc_lwd_kernel", xc_lwd_kernel, 20);
+
+    std::cout << " }" << std::endl;
+
     if(xc_radang_size.first > 0 && xc_radang_size.second > 0) {
-      std::cout << "  xc_radang_size    = " << xc_radang_size.first << ", " << xc_radang_size.second
-                << std::endl;
+      print_pair("xc_radang_size", xc_radang_size, 20);
     }
-    else { std::cout << "  xc_rad_quad       = " << xc_rad_quad << std::endl; }
+    else { print_option("xc_rad_quad", xc_rad_quad, 20); }
 
-    txt_utils::print_bool("  snK              ", snK);
-    std::cout << "  xc_snK_etol       = " << xc_snK_etol << std::endl;
-    std::cout << "  xc_snK_ktol       = " << xc_snK_ktol << std::endl;
+    print_option("snK", snK, 20);
+    print_option("xc_snK_etol", xc_snK_etol, 20);
+    print_option("xc_snK_ktol", xc_snK_ktol, 20);
     std::cout << " }" << std::endl;
   }
 
   if(scalapack_np_row > 0 && scalapack_np_col > 0) {
-    std::cout << " scalapack_np_row  = " << scalapack_np_row << std::endl;
-    std::cout << " scalapack_np_col  = " << scalapack_np_col << std::endl;
-    if(scalapack_nb > 1) std::cout << " scalapack_nb      = " << scalapack_nb << std::endl;
+    print_option("scalapack_np_row", scalapack_np_row, 20);
+    print_option("scalapack_np_col", scalapack_np_col, 20);
+    if(scalapack_nb > 1) print_option("scalapack_nb", scalapack_nb, 20);
   }
-  std::cout << " restart_size      = " << restart_size << std::endl;
-  txt_utils::print_bool(" restart          ", restart);
-  txt_utils::print_bool(" debug            ", debug);
-  if(restart) txt_utils::print_bool(" noscf            ", noscf);
-  // txt_utils::print_bool(" sad         ", sad);
+  print_option("restart_size", restart_size, 18);
+  print_option("restart", restart, 18);
+  print_option("debug", debug, 18);
+  if(restart) print_option("noscf", noscf, 18);
+  // if(sad) print_option("sad", sad, 18);
   if(mulliken_analysis || mos_txt || mo_vectors_analysis.first) {
     std::cout << " PRINT {" << std::endl;
-    if(mos_txt) std::cout << std::boolalpha << "  mos_txt             = " << mos_txt << std::endl;
-    if(mulliken_analysis)
-      std::cout << std::boolalpha << "  mulliken_analysis   = " << mulliken_analysis << std::endl;
-    if(mo_vectors_analysis.first) {
-      std::cout << "  mo_vectors_analysis = [" << std::boolalpha << mo_vectors_analysis.first;
-      std::cout << "," << mo_vectors_analysis.second << "]" << std::endl;
-    }
+
+    if(mos_txt) print_option("mos_txt", mos_txt, 20);
+    if(mulliken_analysis) print_option("mulliken_analysis", mulliken_analysis, 20);
+
+    if(mo_vectors_analysis.first) { print_pair("mo_vectors_analysis", mo_vectors_analysis, 20); }
     std::cout << " }" << std::endl;
   }
+
   std::cout << "}" << std::endl << std::flush;
 } // END of SCFOptions::print
 
@@ -120,87 +100,79 @@ void CCSDOptions::print() {
   std::cout << std::defaultfloat;
   std::cout << std::endl << "CCSD Options" << std::endl;
   std::cout << "{" << std::endl;
-  std::cout << " cache_size           = " << cache_size << std::endl;
-  std::cout << " ccsdt_tilesize       = " << ccsdt_tilesize << std::endl;
 
-  std::cout << " ndiis                = " << ndiis << std::endl;
-  std::cout << " threshold            = " << threshold << std::endl;
-  std::cout << " tilesize             = " << tilesize << std::endl;
-  // if(nactive > 0) std::cout << " nactive              = " << nactive << std::endl;
-  if(pcore > 0) std::cout << " pcore                = " << pcore << std::endl;
-  std::cout << " ccsd_maxiter         = " << ccsd_maxiter << std::endl;
-  txt_utils::print_bool(" freeze_atomic       ", freeze_atomic);
-  std::cout << " freeze_core          = " << freeze_core << std::endl;
-  std::cout << " freeze_virtual       = " << freeze_virtual << std::endl;
-  if(lshift != 0) std::cout << " lshift               = " << lshift << std::endl;
-  if(gf_nprocs_poi > 0) std::cout << " gf_nprocs_poi        = " << gf_nprocs_poi << std::endl;
-  txt_utils::print_bool(" readt               ", readt);
-  txt_utils::print_bool(" writet              ", writet);
-  std::cout << " writet_iter          = " << writet_iter << std::endl;
-  txt_utils::print_bool(" profile_ccsd        ", profile_ccsd);
-  txt_utils::print_bool(" balance_tiles       ", balance_tiles);
+  print_option("cache_size", cache_size, 22);
+  print_option("ccsdt_tilesize", ccsdt_tilesize, 22);
+  print_option("ndiis", ndiis, 22);
+  print_option("threshold", threshold, 22);
+  print_option("tilesize", tilesize, 22);
+  // if(nactive > 0)
+  print_option("ccsd_maxiter", ccsd_maxiter, 22);
 
-  if(!dlpno_dfbasis.empty()) std::cout << " dlpno_dfbasis        = " << dlpno_dfbasis << std::endl;
-  if(!doubles_opt_eqns.empty()) {
-    std::cout << " doubles_opt_eqns        = [";
-    for(auto x: doubles_opt_eqns) std::cout << x << ",";
-    std::cout << "]" << std::endl;
-  }
+  if(pcore > 0) print_option("pcore", pcore, 22);
+  print_option("freeze_atomic", freeze_atomic, 22);
+  print_option("freeze_core", freeze_core, 22);
+  print_option("freeze_virtual", freeze_virtual, 22);
+  if(lshift != 0) print_option("lshift", lshift, 22);
+  if(gf_nprocs_poi > 0) print_option("gf_nprocs_poi", gf_nprocs_poi, 22);
 
-  if(!ext_data_path.empty()) { std::cout << " ext_data_path   = " << ext_data_path << std::endl; }
+  print_option("readt", readt, 22);
+  print_option("writet", writet, 22);
+  print_option("writet_iter", writet_iter, 22);
+  print_option("profile_ccsd", profile_ccsd, 22);
+  print_option("balance_tiles", balance_tiles, 22);
+
+  if(!dlpno_dfbasis.empty()) print_option("dlpno_dfbasis", dlpno_dfbasis, 22);
+
+  if(!doubles_opt_eqns.empty()) print_vec("doubles_opt_eqns", doubles_opt_eqns);
+  if(!ext_data_path.empty()) { print_option("ext_data_path", ext_data_path, 18); }
 
   if(eom_nroots > 0) {
-    std::cout << " eom_nroots           = " << eom_nroots << std::endl;
-    std::cout << " eom_microiter        = " << eom_microiter << std::endl;
-    std::cout << " eom_threshold        = " << eom_threshold << std::endl;
+    print_option("eom_nroots", eom_nroots, 22);
+    print_option("eom_microiter", eom_microiter, 22);
+    print_option("eom_threshold", eom_threshold, 22);
   }
 
   if(gf_p_oi_range > 0) {
-    std::cout << " gf_p_oi_range        = " << gf_p_oi_range << std::endl;
-    txt_utils::print_bool(" gf_ip               ", gf_ip);
-    txt_utils::print_bool(" gf_ea               ", gf_ea);
-    txt_utils::print_bool(" gf_os               ", gf_os);
-    txt_utils::print_bool(" gf_cs               ", gf_cs);
-    txt_utils::print_bool(" gf_restart          ", gf_restart);
-    txt_utils::print_bool(" gf_profile          ", gf_profile);
-    txt_utils::print_bool(" gf_itriples         ", gf_itriples);
-    std::cout << " gf_ndiis             = " << gf_ndiis << std::endl;
-    std::cout << " gf_ngmres            = " << gf_ngmres << std::endl;
-    std::cout << " gf_maxiter           = " << gf_maxiter << std::endl;
-    std::cout << " gf_eta               = " << gf_eta << std::endl;
-    std::cout << " gf_lshift            = " << gf_lshift << std::endl;
-    std::cout << " gf_preconditioning   = " << gf_preconditioning << std::endl;
-    std::cout << " gf_damping_factor    = " << gf_damping_factor << std::endl;
-
-    // std::cout << " gf_omega       = " << gf_omega <<std::endl;
-    std::cout << " gf_threshold         = " << gf_threshold << std::endl;
-    std::cout << " gf_omega_min_ip      = " << gf_omega_min_ip << std::endl;
-    std::cout << " gf_omega_max_ip      = " << gf_omega_max_ip << std::endl;
-    std::cout << " gf_omega_min_ip_e    = " << gf_omega_min_ip_e << std::endl;
-    std::cout << " gf_omega_max_ip_e    = " << gf_omega_max_ip_e << std::endl;
-    std::cout << " gf_omega_min_ea      = " << gf_omega_min_ea << std::endl;
-    std::cout << " gf_omega_max_ea      = " << gf_omega_max_ea << std::endl;
-    std::cout << " gf_omega_min_ea_e    = " << gf_omega_min_ea_e << std::endl;
-    std::cout << " gf_omega_max_ea_e    = " << gf_omega_max_ea_e << std::endl;
-    std::cout << " gf_omega_delta       = " << gf_omega_delta << std::endl;
-    std::cout << " gf_omega_delta_e     = " << gf_omega_delta_e << std::endl;
+    print_option("gf_p_oi_range", gf_p_oi_range, 22);
+    print_option("gf_ip", gf_ip, 22);
+    print_option("gf_ea", gf_ea, 22);
+    print_option("gf_os", gf_os, 22);
+    print_option("gf_cs", gf_cs, 22);
+    print_option("gf_restart", gf_restart, 22);
+    print_option("gf_profile", gf_profile, 22);
+    print_option("gf_itriples", gf_itriples, 22);
+    print_option("gf_ndiis", gf_ndiis, 22);
+    print_option("gf_ngmres", gf_ngmres, 22);
+    print_option("gf_maxiter", gf_maxiter, 22);
+    print_option("gf_eta", gf_eta, 22);
+    print_option("gf_lshift", gf_lshift, 22);
+    print_option("gf_preconditioning", gf_preconditioning, 22);
+    print_option("gf_damping_factor", gf_damping_factor, 22);
+    // print_option("gf_omega",          gf_omega);
+    print_option("gf_threshold", gf_threshold, 22);
+    print_option("gf_omega_min_ip", gf_omega_min_ip, 22);
+    print_option("gf_omega_max_ip", gf_omega_max_ip, 22);
+    print_option("gf_omega_min_ip_e", gf_omega_min_ip_e, 22);
+    print_option("gf_omega_max_ip_e", gf_omega_max_ip_e, 22);
+    print_option("gf_omega_min_ea", gf_omega_min_ea, 22);
+    print_option("gf_omega_max_ea", gf_omega_max_ea, 22);
+    print_option("gf_omega_min_ea_e", gf_omega_min_ea_e, 22);
+    print_option("gf_omega_max_ea_e", gf_omega_max_ea_e, 22);
+    print_option("gf_omega_delta", gf_omega_delta, 22);
+    print_option("gf_omega_delta_e", gf_omega_delta_e, 22);
     if(!gf_orbitals.empty()) {
-      std::cout << " gf_orbitals        = [";
-      for(auto x: gf_orbitals) std::cout << x << ",";
-      std::cout << "]" << std::endl;
+      if(!gf_orbitals.empty()) print_vec("gf_orbitals", gf_orbitals, 22);
     }
     if(gf_analyze_level > 0) {
-      std::cout << " gf_analyze_level     = " << gf_analyze_level << std::endl;
-      std::cout << " gf_analyze_num_omega = " << gf_analyze_num_omega << std::endl;
-      std::cout << " gf_analyze_omega     = [";
-      for(auto x: gf_analyze_omega) std::cout << x << ",";
-      std::cout << "]" << std::endl;
+      print_option("gf_analyze_level", gf_analyze_level, 22);
+      print_option("gf_analyze_num_omega", gf_analyze_num_omega, 22);
+      print_vec("gf_analyze_omega", gf_analyze_omega, 22);
     }
-    if(gf_extrapolate_level > 0)
-      std::cout << " gf_extrapolate_level = " << gf_extrapolate_level << std::endl;
+    if(gf_extrapolate_level > 0) print_option("gf_extrapolate_level", gf_extrapolate_level, 22);
   }
 
-  txt_utils::print_bool(" debug               ", debug);
+  print_option("debug", debug, 22);
   std::cout << "}" << std::endl;
 } // END of CCSDOptions::print()
 
@@ -208,19 +180,21 @@ void CommonOptions::print() {
   std::cout << std::defaultfloat;
   std::cout << std::endl << "Common Options" << std::endl;
   std::cout << "{" << std::endl;
-  std::cout << " maxiter       = " << maxiter << std::endl;
-  std::cout << " basis         = " << basis << " ";
-  std::cout << gaussian_type;
-  std::cout << std::endl;
-  if(!dfbasis.empty()) std::cout << " dfbasis       = " << dfbasis << std::endl;
-  std::cout << " geom_units    = " << geom_units << std::endl;
-  std::cout << " ang2au factor = " << std::setprecision(10) << exachem::constants::ang2bohr
-            << std::endl;
 
-  // std::cout << " natoms_max    = " << natoms_max << std::endl;
-  txt_utils::print_bool(" debug        ", debug);
-  if(!file_prefix.empty()) std::cout << " file_prefix   = " << file_prefix << std::endl;
-  if(!output_dir.empty()) std::cout << " output_dir    = " << output_dir << std::endl;
+  print_option("maxiter", maxiter, 14);
+
+  // Combine basis and gaussian_type on one line
+  std::cout << "  " << std::setw(14) << std::left << "basis"
+            << "= " << basis << " " << gaussian_type << std::endl;
+
+  if(!dfbasis.empty()) print_option("dfbasis", dfbasis, 14);
+  print_option("geom_units", geom_units, 14);
+  print_option("ang2au factor", exachem::constants::ang2bohr, 14, 10);
+  // print_option("natoms_max", natoms_max, 14);
+  print_option("debug", debug, 14);
+  if(!file_prefix.empty()) print_option("file_prefix", file_prefix, 14);
+  if(!output_dir.empty()) print_option("output_dir", output_dir, 14);
+
   std::cout << "}" << std::endl;
 }
 
@@ -337,14 +311,12 @@ void CDOptions::print() {
   std::cout << std::defaultfloat;
   std::cout << std::endl << "CD Options" << std::endl;
   std::cout << "{" << std::endl;
-  std::cout << std::boolalpha << " debug            = " << debug << std::endl;
-  std::cout << std::boolalpha << " skip_cd          = [" << skip_cd.first << "," << skip_cd.second
-            << "]" << std::endl;
-  std::cout << std::boolalpha << " write_cv         = [" << write_cv.first << "," << write_cv.second
-            << "]" << std::endl;
-  std::cout << " diagtol          = " << diagtol << std::endl;
-  std::cout << " itilesize        = " << itilesize << std::endl;
-  std::cout << " max_cvecs_factor = " << max_cvecs_factor << std::endl;
+  print_option("debug", debug, 18);
+  print_pair("skip_cd", skip_cd, 18);
+  print_pair("write_cv", write_cv, 18);
+  print_option("diagtol", diagtol, 18);
+  print_option("itilesize", itilesize, 18);
+  print_option("max_cvecs_factor", max_cvecs_factor, 18);
   std::cout << "}" << std::endl;
 }
 
@@ -352,21 +324,21 @@ void GWOptions::print() {
   std::cout << std::defaultfloat;
   std::cout << std::endl << "GW Options" << std::endl;
   std::cout << "{" << std::endl;
-  std::cout << " ngl       = " << ngl << std::endl;
-  std::cout << " noqpa     = " << noqpa << std::endl;
-  std::cout << " noqpb     = " << noqpb << std::endl;
-  std::cout << " nvqpa     = " << nvqpa << std::endl;
-  std::cout << " nvqp/b     = " << nvqpb << std::endl;
-  std::cout << " ieta      = " << ieta << std::endl;
-  std::cout << " maxnewton = " << maxnewton << std::endl;
-  std::cout << " maxev     = " << maxev << std::endl;
-  std::cout << " method    = " << method << std::endl;
-  std::cout << " cdbasis   = " << cdbasis << std::endl;
-  txt_utils::print_bool(" evgw     ", evgw);
-  txt_utils::print_bool(" evgw0    ", evgw0);
-  txt_utils::print_bool(" core     ", core);
-  txt_utils::print_bool(" minres   ", minres);
-  txt_utils::print_bool(" debug    ", debug);
+  print_option("ngl", ngl, 12);
+  print_option("noqpa", noqpa, 12);
+  print_option("noqpb", noqpb, 12);
+  print_option("nvqpa", nvqpa, 12);
+  print_option("nvqp/b", nvqpb, 12);
+  print_option("ieta", ieta, 12);
+  print_option("maxnewton", maxnewton, 12);
+  print_option("maxev", maxev, 12);
+  print_option("method", method, 12);
+  print_option("cdbasis", cdbasis, 12);
+  print_option("evgw", evgw, 12);
+  print_option("evgw0", evgw0, 12);
+  print_option("core", core, 12);
+  print_option("minres", minres, 12);
+  print_option("debug", debug, 12);
   std::cout << "}" << std::endl;
 }
 
@@ -375,23 +347,23 @@ void TaskOptions::print() {
 
   std::cout << std::endl << "Task Options" << std::endl;
   std::cout << "{" << std::endl;
-  txt_utils::print_bool(" sinfo        ", sinfo);
-  txt_utils::print_bool(" scf          ", scf);
-  txt_utils::print_bool(" mp2          ", mp2);
-  txt_utils::print_bool(" gw           ", gw);
-  txt_utils::print_bool(" cc2          ", cc2);
-  txt_utils::print_bool(" fci          ", fci);
-  txt_utils::print_bool(" fcidump      ", fcidump);
-  txt_utils::print_bool(" cd_2e        ", cd_2e);
-  txt_utils::print_bool(" ccsd         ", ccsd);
-  txt_utils::print_bool(" ccsd_sf      ", ccsd_sf);
-  txt_utils::print_bool(" ccsd_lambda  ", ccsd_lambda);
-  txt_utils::print_bool(" eom_ccsd     ", eom_ccsd);
-  txt_utils::print_bool(" rteom_cc2    ", rteom_cc2);
-  txt_utils::print_bool(" rteom_ccsd   ", rteom_ccsd);
-  txt_utils::print_bool(" gfccsd       ", gfccsd);
-  std::cout << " ducc:  " << ducc.first << ", " << ducc.second << std::endl;
-  std::cout << " dlpno_ccsd:  " << dlpno_ccsd.first << ", " << dlpno_ccsd.second << std::endl;
-  std::cout << " dlpno_ccsd_t " << dlpno_ccsd_t.first << ", " << dlpno_ccsd_t.second << std::endl;
+  print_option("sinfo", sinfo, 18);
+  print_option("scf", scf, 18);
+  print_option("mp2", mp2, 18);
+  print_option("gw", gw, 18);
+  print_option("cc2", cc2, 18);
+  print_option("fci", fci, 18);
+  print_option("fcidump", fcidump, 18);
+  print_option("cd_2e", cd_2e, 18);
+  print_option("ccsd", ccsd, 18);
+  print_option("ccsd_sf", ccsd_sf, 18);
+  print_option("ccsd_lambda", ccsd_lambda, 18);
+  print_option("eom_ccsd", eom_ccsd, 18);
+  print_option("rteom_cc2", rteom_cc2, 18);
+  print_option("rteom_ccsd", rteom_ccsd, 18);
+  print_option("gfccsd", gfccsd, 18);
+  print_pair("ducc", ducc, 18);
+  print_pair("dlpno_ccsd", dlpno_ccsd, 18);
+  print_pair("dlpno_ccsd_t", dlpno_ccsd_t, 18);
   std::cout << "}" << std::endl;
 }

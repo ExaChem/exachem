@@ -13,7 +13,7 @@
 #include "exachem/scf/scf_guess.hpp"
 
 namespace exachem::scf {
-class SCFIter: public SCFCompute {
+class SCFIter {
 private:
   template<typename TensorType>
   void scf_diis(ExecutionContext& ec, ChemEnv& chem_env, const TiledIndexSpace& tAO,

@@ -22,7 +22,8 @@ void scf(ExecutionContext& ec, ChemEnv& chem_env) {
 
   auto hf_t1 = std::chrono::high_resolution_clock::now();
 
-  SCFHartreeFock SCFHF(ec, chem_env);
+  SCFEngine scf_engine(ec, chem_env);
+  scf_engine.run(ec, chem_env);
 
   auto hf_t2 = std::chrono::high_resolution_clock::now();
 

@@ -10,26 +10,78 @@
 
 #include "exachem/common/constants.hpp"
 #include "exachem/common/ecatom.hpp"
-#include "exachem/common/txt_utils.hpp"
+// #include "exachem/common/txt_utils.hpp"
 #include <iostream>
 #include <limits>
 #include <map>
 #include <string>
 #include <vector>
 
-class CommonOptions {
+class PrintOptions {
+protected:
+  template<typename T>
+  static void print_vec(const std::string& label, const std::vector<T>& vec, int width = 20) {
+    if(!vec.empty()) {
+      std::cout << "  " << std::setw(width) << label << " = [";
+      for(const auto& x: vec) std::cout << x << ",";
+      std::cout << "\b]" << std::endl;
+    }
+  }
+
+  template<typename T>
+  static void print_vec2d(const std::string& label, const std::vector<std::vector<T>>& vec2d,
+                          int width = 20) {
+    if(!vec2d.empty()) {
+      std::cout << "  " << std::setw(width) << label << " = [";
+      for(const auto& x: vec2d) {
+        std::cout << "[";
+        for(const auto& y: x) std::cout << y << ",";
+        std::cout << "\b],";
+      }
+      std::cout << "\b]" << std::endl;
+    }
+  }
+
+  // Stream precision is typically a positive integer, so using -1 signals “do nothing”
+  template<typename T>
+  static void print_option(const std::string& label, const T& value, int width = 20,
+                           int precision = -1) {
+    std::cout << "  " << std::setw(width) << std::left << label << "= ";
+    if constexpr(std::is_same_v<T, bool>)
+      std::cout << std::boolalpha << value << std::noboolalpha << std::endl;
+    else if constexpr(std::is_floating_point_v<T>)
+      if(precision > 0) std::cout << std::setprecision(precision) << value << std::endl;
+      else std::cout << value << std::endl;
+    else std::cout << value << std::endl;
+  }
+
+  template<typename T, typename U>
+  static void print_pair(const std::string& label, const std::pair<T, U>& p, int width = 18) {
+    std::cout << "  " << std::setw(width) << std::left << label << "= [";
+    if constexpr(std::is_same_v<T, bool>)
+      std::cout << std::boolalpha << p.first << std::noboolalpha;
+    else std::cout << p.first;
+    std::cout << ", ";
+    if constexpr(std::is_same_v<U, bool>)
+      std::cout << std::boolalpha << p.second << std::noboolalpha;
+    else std::cout << p.second;
+    std::cout << "]" << std::endl;
+  }
+};
+
+class CommonOptions: public PrintOptions {
 public:
-  bool        debug{false};
-  int         maxiter{100};
-  std::string basis{"sto-3g"};
-  std::string dfbasis{};
-  std::string gaussian_type{"spherical"};
-  std::string geom_units{"angstrom"};
-  int         natoms_max{30}; // max natoms for geometry analysis
-  std::string file_prefix{};
-  std::string output_dir{};
-  std::string ext_data_path{};
-  void        print();
+  bool         debug{false};
+  int          maxiter{100};
+  std::string  basis{"sto-3g"};
+  std::string  dfbasis{};
+  std::string  gaussian_type{"spherical"};
+  std::string  geom_units{"angstrom"};
+  int          natoms_max{30}; // max natoms for geometry analysis
+  std::string  file_prefix{};
+  std::string  output_dir{};
+  std::string  ext_data_path{};
+  virtual void print();
 };
 
 class DPlotOptions: public CommonOptions {
@@ -95,7 +147,7 @@ public:
   std::vector<double>              qed_volumes{};
   std::vector<double>              qed_lambdas{};
   std::vector<std::vector<double>> qed_polvecs{};
-  void                             print();
+  void                             print() override;
 };
 
 class CCSDOptions: public CommonOptions {
@@ -192,7 +244,7 @@ public:
   std::vector<double> gf_analyze_omega;
   // Force processing of specified orbitals first
   std::vector<size_t> gf_orbitals;
-  void                print();
+  void                print() override;
 };
 
 class CDOptions: public CommonOptions {
@@ -207,7 +259,7 @@ public:
   // enabled only if set to true and nbf > 1000
   // write to disk after every count number of vectors are computed.
   std::pair<bool, int> write_cv{false, 5000};
-  void                 print();
+  void                 print() override;
 };
 
 class FCIOptions: public CommonOptions {
@@ -247,7 +299,7 @@ public:
   bool        minres{false};  // Use MINRES solver
   std::string method{"sdgw"}; // Method to use [cdgw,sdgw]
   std::string cdbasis{""};    // Name of the CD basis set
-  void        print();
+  void        print() override;
 };
 
 class TaskOptions: public CommonOptions {
@@ -274,7 +326,7 @@ public:
   std::pair<bool, std::string> dlpno_ccsd{false, ""};
   std::pair<bool, std::string> dlpno_ccsd_t{false, ""};
   std::vector<std::string>     operation{"energy"};
-  void                         print();
+  void                         print() override;
 };
 
 class ECOptions {

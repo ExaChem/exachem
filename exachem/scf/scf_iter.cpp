@@ -208,8 +208,9 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
 
   if(rank == 0 && debug)
     std::cout << std::fixed << std::setprecision(2) << "diagonalize: " << do_time << "s, ";
-
-  compute_density<TensorType>(ec, chem_env, scf_vars, scalapack_info, ttensors, etensors);
+  SCFCompute scf_compute;
+  scf_compute.compute_density<TensorType>(ec, chem_env, scf_vars, scalapack_info, ttensors,
+                                          etensors);
 
   double rmsd = 0.0;
   // clang-format off

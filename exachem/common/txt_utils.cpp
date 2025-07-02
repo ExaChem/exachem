@@ -28,7 +28,3 @@ bool txt_utils::strequal_case(const std::string& a, const std::string& b) {
          std::equal(a.begin(), a.end(), b.begin(),
                     [](const char a, const char b) { return std::tolower(a) == std::tolower(b); });
 }
-
-void txt_utils::print_bool(const std::string str, bool val) {
-  std::cout << str << " = " << std::boolalpha << val << std::endl;
-}

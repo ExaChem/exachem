@@ -16,5 +16,4 @@ void        to_upper(std::string& str);
 void        to_lower(std::string& str);
 std::string str_upper(const std::string str);
 bool        strequal_case(const std::string& a, const std::string& b);
-void        print_bool(const std::string str, bool val);
 } // namespace txt_utils

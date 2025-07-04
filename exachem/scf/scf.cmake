@@ -13,7 +13,6 @@ set(SCF_INCLUDES
     ${SCF_SRCDIR}/scf_common.hpp
     ${SCF_SRCDIR}/scf_compute.hpp
     ${SCF_SRCDIR}/scf_taskmap.hpp
-    ${SCF_SRCDIR}/scf_matrix.hpp
     ${SCF_SRCDIR}/scf_restart.hpp
     ${SCF_SRCDIR}/scf_outputs.hpp
     ${SCF_SRCDIR}/scf_engine.hpp
@@ -30,7 +29,6 @@ set(SCF_SRCS
     ${SCF_SRCDIR}/scf_common.cpp
     ${SCF_SRCDIR}/scf_compute.cpp        
     ${SCF_SRCDIR}/scf_taskmap.cpp
-    ${SCF_SRCDIR}/scf_matrix.cpp 
     ${SCF_SRCDIR}/scf_restart.cpp         
     ${SCF_SRCDIR}/scf_outputs.cpp
     ${SCF_SRCDIR}/scf_engine.cpp

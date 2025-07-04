@@ -8,24 +8,85 @@
 
 #include "exachem/scf/scf_outputs.hpp"
 #include "exachem/common/options/parser_utils.hpp"
-#include "exachem/scf/scf_matrix.hpp"
 
-template<typename TensorType>
-double exachem::scf::SCFIO::tt_trace(ExecutionContext& ec, Tensor<TensorType>& T1,
-                                     Tensor<TensorType>& T2) {
-  Tensor<TensorType> tensor{T1.tiled_index_spaces()}; //{tAO, tAO};
-  Tensor<TensorType>::allocate(&ec, tensor);
+template<typename T>
+double exachem::scf::DefaultSCFIO<T>::tt_trace(ExecutionContext& ec, Tensor<T>& T1, Tensor<T>& T2) {
+  Tensor<T> tensor{T1.tiled_index_spaces()};
+  Tensor<T>::allocate(&ec, tensor);
   const TiledIndexSpace tis_ao = T1.tiled_index_spaces()[0];
   auto [mu, nu, ku]            = tis_ao.labels<3>("all");
   Scheduler{ec}(tensor(mu, nu) = T1(mu, ku) * T2(ku, nu)).execute();
   double trace = tamm::trace(tensor);
-  Tensor<TensorType>::deallocate(tensor);
+  Tensor<T>::deallocate(tensor);
   return trace;
 }
 
-void exachem::scf::SCFIO::print_energies(ExecutionContext& ec, ChemEnv& chem_env,
-                                         TAMMTensors& ttensors, EigenTensors& etensors,
-                                         SCFVars& scf_vars, ScalapackInfo& scalapack_info) {
+template<typename T>
+Matrix exachem::scf::DefaultSCFIO<T>::read_scf_mat(const std::string& matfile) {
+  std::string mname = fs::path(matfile).extension();
+  mname.erase(0, 1); // remove "."
+
+  auto mfile_id = H5Fopen(matfile.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+
+  // Read attributes - reduced dims
+  std::vector<int64_t> rdims(2);
+  auto                 attr_dataset = H5Dopen(mfile_id, "rdims", H5P_DEFAULT);
+  H5Dread(attr_dataset, H5T_NATIVE_INT64, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdims.data());
+
+  Matrix mat         = Matrix::Zero(rdims[0], rdims[1]);
+  auto   mdataset_id = H5Dopen(mfile_id, mname.c_str(), H5P_DEFAULT);
+
+  /* Read the datasets. */
+  H5Dread(mdataset_id, get_hdf5_dt<T>(), H5S_ALL, H5S_ALL, H5P_DEFAULT, mat.data());
+
+  H5Dclose(attr_dataset);
+  H5Dclose(mdataset_id);
+  H5Fclose(mfile_id);
+
+  return mat;
+}
+
+template<typename T>
+void exachem::scf::DefaultSCFIO<T>::write_scf_mat(Matrix& C, const std::string& matfile) {
+  std::string mname = fs::path(matfile).extension();
+  mname.erase(0, 1); // remove "."
+
+  const auto  N      = C.rows();
+  const auto  Northo = C.cols();
+  TensorType* buf    = C.data();
+
+  /* Create a file. */
+  hid_t file_id = H5Fcreate(matfile.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+
+  hsize_t tsize        = N * Northo;
+  hid_t   dataspace_id = H5Screate_simple(1, &tsize, NULL);
+
+  /* Create dataset. */
+  hid_t dataset_id = H5Dcreate(file_id, mname.c_str(), get_hdf5_dt<T>(), dataspace_id, H5P_DEFAULT,
+                               H5P_DEFAULT, H5P_DEFAULT);
+  /* Write the dataset. */
+  /* herr_t status = */ H5Dwrite(dataset_id, get_hdf5_dt<T>(), H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
+
+  /* Create and write attribute information - dims */
+  std::vector<int64_t> rdims{N, Northo};
+  hsize_t              attr_size      = rdims.size();
+  auto                 attr_dataspace = H5Screate_simple(1, &attr_size, NULL);
+  auto attr_dataset = H5Dcreate(file_id, "rdims", H5T_NATIVE_INT64, attr_dataspace, H5P_DEFAULT,
+                                H5P_DEFAULT, H5P_DEFAULT);
+  H5Dwrite(attr_dataset, H5T_NATIVE_INT64, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdims.data());
+  H5Dclose(attr_dataset);
+  H5Sclose(attr_dataspace);
+
+  H5Dclose(dataset_id);
+  H5Sclose(dataspace_id);
+  H5Fclose(file_id);
+}
+
+template<typename T>
+void exachem::scf::DefaultSCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_env,
+                                                   TAMMTensors& ttensors, EigenTensors& etensors,
+                                                   SCFVars&       scf_vars,
+                                                   ScalapackInfo& scalapack_info) {
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -139,7 +200,9 @@ void exachem::scf::SCFIO::print_energies(ExecutionContext& ec, ChemEnv& chem_env
   }
 }
 
-void exachem::scf::SCFIO::print_mulliken(ChemEnv& chem_env, Matrix& D, Matrix& D_beta, Matrix& S) {
+template<typename T>
+void exachem::scf::DefaultSCFIO<T>::print_mulliken(ChemEnv& chem_env, Matrix& D, Matrix& D_beta,
+                                                   Matrix& S) {
   std::vector<Atom>&   atoms    = chem_env.atoms;
   std::vector<ECAtom>& ec_atoms = chem_env.ec_atoms;
   libint2::BasisSet&   shells   = chem_env.shells;
@@ -222,30 +285,31 @@ void exachem::scf::SCFIO::print_mulliken(ChemEnv& chem_env, Matrix& D, Matrix& D
 }
 
 template<typename T>
-void exachem::scf::SCFIO::rw_mat_disk(Tensor<T> tensor, std::string tfilename, bool profile,
-                                      bool read) {
+void exachem::scf::DefaultSCFIO<T>::rw_mat_disk(Tensor<T> tensor, std::string tfilename,
+                                                bool profile, bool read) {
 #if !defined(USE_SERIAL_IO)
   if(read) read_from_disk<T>(tensor, tfilename, true, {}, profile);
   else write_to_disk<T>(tensor, tfilename, true, profile);
 #else
-  //   SCFMatrix scf_matrix;
   if((tensor.execution_context())->pg().rank() == 0) {
     if(read) {
-      Matrix teig = read_scf_mat<T>(tfilename);
+      Matrix teig = this->read_scf_mat(tfilename);
       eigen_to_tamm_tensor(tensor, teig);
     }
     else {
       Matrix teig = tamm_to_eigen_matrix(tensor);
-      write_scf_mat<T>(teig, tfilename);
+      this->write_scf_mat(teig, tfilename);
     }
   }
   tensor.execution_context()->pg().barrier();
 #endif
 }
 
-void exachem::scf::SCFIO::rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env,
-                                     ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
-                                     EigenTensors& etensors, std::string files_prefix, bool read) {
+template<typename T>
+void exachem::scf::DefaultSCFIO<T>::rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env,
+                                               ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
+                                               EigenTensors& etensors, std::string files_prefix,
+                                               bool read) {
   const auto rank   = ec.pg().rank();
   const bool is_uhf = chem_env.sys_data.is_unrestricted;
   auto       debug  = chem_env.ioptions.scf_options.debug;
@@ -270,8 +334,8 @@ void exachem::scf::SCFIO::rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_e
     ec.pg().barrier();
   }
 
-  std::vector<Tensor<TensorType>> tensor_list{ttensors.C_alpha, ttensors.D_alpha};
-  std::vector<std::string>        tensor_fnames{movecsfile_alpha, densityfile_alpha};
+  std::vector<Tensor<T>>   tensor_list{ttensors.C_alpha, ttensors.D_alpha};
+  std::vector<std::string> tensor_fnames{movecsfile_alpha, densityfile_alpha};
   if(chem_env.sys_data.is_unrestricted) {
     tensor_list.insert(tensor_list.end(), {ttensors.C_beta, ttensors.D_beta});
     tensor_fnames.insert(tensor_fnames.end(), {movecsfile_beta, densityfile_beta});
@@ -307,7 +371,6 @@ void exachem::scf::SCFIO::rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_e
 #endif
 }
 
-template void exachem::scf::SCFIO::rw_mat_disk<double>(Tensor<double> tensor, std::string tfilename,
-                                                       bool profile, bool read);
-template double exachem::scf::SCFIO::tt_trace<double>(ExecutionContext& ec, Tensor<TensorType>& T1,
-                                                      Tensor<TensorType>& T2);
+// Explicit template instantiations
+template class exachem::scf::DefaultSCFIO<double>;
+template class exachem::scf::SCFIO<double>;

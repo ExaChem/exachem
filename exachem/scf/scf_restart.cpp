@@ -7,7 +7,6 @@
  */
 
 #include "exachem/scf/scf_restart.hpp"
-#include "exachem/scf/scf_matrix.hpp"
 
 // Originally scf_restart_test
 void exachem::scf::DefaultSCFRestart::run(const ExecutionContext& ec, ChemEnv& chem_env,
@@ -59,6 +58,6 @@ void exachem::scf::DefaultSCFRestart::run(ExecutionContext& ec, ChemEnv& chem_en
   const auto N      = chem_env.sys_data.nbf_orig;
   const auto Northo = N - chem_env.sys_data.n_lindep;
   EXPECTS(Northo == chem_env.sys_data.nbf);
-  SCFIO scf_io;
+  SCFIO<TensorType> scf_io;
   scf_io.rw_md_disk(ec, chem_env, scalapack_info, ttensors, etensors, files_prefix, true);
 }

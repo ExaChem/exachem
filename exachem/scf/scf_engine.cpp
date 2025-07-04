@@ -227,15 +227,15 @@ void exachem::scf::DefaultSCFEngine::scf_orthogonalizer(ExecutionContext& ec, Ch
         scf_vars.ttensors.X_alpha = {scf_vars.tN_bc, scf_vars.tNortho_bc};
         scf_vars.ttensors.X_alpha.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
         Tensor<TensorType>::allocate(&scalapack_info.ec, scf_vars.ttensors.X_alpha);
-        scf_output.rw_mat_disk<TensorType>(scf_vars.ttensors.X_alpha, fname[FileType::Ortho],
-                                           chem_env.ioptions.scf_options.debug, true);
+        scf_output.rw_mat_disk(scf_vars.ttensors.X_alpha, fname[FileType::Ortho],
+                               chem_env.ioptions.scf_options.debug, true);
       }
     }
 #else
     scf_vars.ttensors.X_alpha = {scf_vars.tAO, scf_vars.tAO_ortho};
     sch.allocate(scf_vars.ttensors.X_alpha).execute();
-    scf_output.rw_mat_disk<TensorType>(scf_vars.ttensors.X_alpha, fname[FileType::Ortho],
-                                       chem_env.ioptions.scf_options.debug, true);
+    scf_output.rw_mat_disk(scf_vars.ttensors.X_alpha, fname[FileType::Ortho],
+                           chem_env.ioptions.scf_options.debug, true);
 #endif
   }
   else {
@@ -250,11 +250,11 @@ void exachem::scf::DefaultSCFEngine::scf_orthogonalizer(ExecutionContext& ec, Ch
     if(N >= chem_env.ioptions.scf_options.restart_size) {
 #if defined(USE_SCALAPACK)
       if(scalapack_info.pg.is_valid())
-        scf_output.rw_mat_disk<TensorType>(scf_vars.ttensors.X_alpha, fname[FileType::Ortho],
-                                           chem_env.ioptions.scf_options.debug);
+        scf_output.rw_mat_disk(scf_vars.ttensors.X_alpha, fname[FileType::Ortho],
+                               chem_env.ioptions.scf_options.debug);
 #else
-      scf_output.rw_mat_disk<TensorType>(scf_vars.ttensors.X_alpha, fname[FileType::Ortho],
-                                         chem_env.ioptions.scf_options.debug);
+      scf_output.rw_mat_disk(scf_vars.ttensors.X_alpha, fname[FileType::Ortho],
+                             chem_env.ioptions.scf_options.debug);
 #endif
     }
   }
@@ -402,25 +402,25 @@ void exachem::scf::DefaultSCFEngine::scf_final_io(ExecutionContext& ec, ChemEnv&
     if(rank == 0) cout << "done." << endl;
   }
 
-  scf_output.rw_mat_disk<TensorType>(scf_vars.ttensors.H1, fname[FileType::Hcore],
-                                     chem_env.ioptions.scf_options.debug);
+  scf_output.rw_mat_disk(scf_vars.ttensors.H1, fname[FileType::Hcore],
+                         chem_env.ioptions.scf_options.debug);
   if(chem_env.sys_data.is_ks) {
     // write vxc to disk
-    scf_output.rw_mat_disk<TensorType>(scf_vars.ttensors.VXC_alpha, fname[FileType::VxcAlpha],
-                                       chem_env.ioptions.scf_options.debug);
+    scf_output.rw_mat_disk(scf_vars.ttensors.VXC_alpha, fname[FileType::VxcAlpha],
+                           chem_env.ioptions.scf_options.debug);
     if(chem_env.sys_data.is_unrestricted)
-      scf_output.rw_mat_disk<TensorType>(scf_vars.ttensors.VXC_beta, fname[FileType::VxcBeta],
-                                         chem_env.ioptions.scf_options.debug);
+      scf_output.rw_mat_disk(scf_vars.ttensors.VXC_beta, fname[FileType::VxcBeta],
+                             chem_env.ioptions.scf_options.debug);
   }
   if(chem_env.sys_data.is_qed) {
-    scf_output.rw_mat_disk<TensorType>(scf_vars.ttensors.QED_Dx, fname[FileType::QEDDx],
-                                       chem_env.ioptions.scf_options.debug);
-    scf_output.rw_mat_disk<TensorType>(scf_vars.ttensors.QED_Dy, fname[FileType::QEDDy],
-                                       chem_env.ioptions.scf_options.debug);
-    scf_output.rw_mat_disk<TensorType>(scf_vars.ttensors.QED_Dz, fname[FileType::QEDDz],
-                                       chem_env.ioptions.scf_options.debug);
-    scf_output.rw_mat_disk<TensorType>(scf_vars.ttensors.QED_Qxx, fname[FileType::QEDQxx],
-                                       chem_env.ioptions.scf_options.debug);
+    scf_output.rw_mat_disk(scf_vars.ttensors.QED_Dx, fname[FileType::QEDDx],
+                           chem_env.ioptions.scf_options.debug);
+    scf_output.rw_mat_disk(scf_vars.ttensors.QED_Dy, fname[FileType::QEDDy],
+                           chem_env.ioptions.scf_options.debug);
+    scf_output.rw_mat_disk(scf_vars.ttensors.QED_Dz, fname[FileType::QEDDz],
+                           chem_env.ioptions.scf_options.debug);
+    scf_output.rw_mat_disk(scf_vars.ttensors.QED_Qxx, fname[FileType::QEDQxx],
+                           chem_env.ioptions.scf_options.debug);
   }
 } // scf_final_io
 
@@ -678,9 +678,9 @@ void exachem::scf::DefaultSCFEngine::compute_fock_matrix(ExecutionContext& ec, C
     // TODO: skip for non-CC methods
     if(!chem_env.ioptions.task_options.scf) xHF_adjust = 1.0;
     // build a new Fock matrix
-    scf_iter.compute_2bf<TensorType>(
-      ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4,
-      scf_vars.ttensors, scf_vars.etensors, is_3c_init, scf_vars.do_dens_fit, xHF_adjust);
+    scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen, shell2bf,
+                         SchwarzK, max_nprim4, scf_vars.ttensors, scf_vars.etensors, is_3c_init,
+                         scf_vars.do_dens_fit, xHF_adjust);
 
     // Add QED contribution;
     // CHECK
@@ -733,11 +733,11 @@ exachem::scf::DefaultSCFEngine::update_movecs(ExecutionContext& ec, ChemEnv& che
     schg.allocate(scf_vars.ttensors.VXC_beta);
   schg.execute();
 
-  scf_output.rw_mat_disk<TensorType>(C_alpha_tamm, fname[FileType::AlphaMovecs],
-                                     chem_env.ioptions.scf_options.debug, true);
+  scf_output.rw_mat_disk(C_alpha_tamm, fname[FileType::AlphaMovecs],
+                         chem_env.ioptions.scf_options.debug, true);
   if(chem_env.sys_data.is_unrestricted)
-    scf_output.rw_mat_disk<TensorType>(C_beta_tamm, fname[FileType::BetaMovecs],
-                                       chem_env.ioptions.scf_options.debug, true);
+    scf_output.rw_mat_disk(C_beta_tamm, fname[FileType::BetaMovecs],
+                           chem_env.ioptions.scf_options.debug, true);
 
   if(rank == 0 && chem_env.ioptions.scf_options.molden) {
     Matrix C_a = tamm_to_eigen_matrix(C_alpha_tamm);
@@ -921,12 +921,12 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
       if(N >= chem_env.ioptions.scf_options.restart_size && fs::exists(fname[FileType::Schwarz])) {
         if(rank == 0) cout << "Read Schwarz matrix from disk ... " << endl;
 
-        SchwarzK = scf_output.read_scf_mat<TensorType>(fname[FileType::Schwarz]);
+        SchwarzK = scf_output.read_scf_mat(fname[FileType::Schwarz]);
       }
       else {
         // if(rank == 0) cout << "pre-computing data for Schwarz bounds... " << endl;
         SchwarzK = scf_compute.compute_schwarz_ints<>(ec, scf_vars, chem_env.shells);
-        if(rank == 0) scf_output.write_scf_mat<TensorType>(SchwarzK, fname[FileType::Schwarz]);
+        if(rank == 0) scf_output.write_scf_mat(SchwarzK, fname[FileType::Schwarz]);
       }
     }
     hf_t1 = std::chrono::high_resolution_clock::now();
@@ -936,8 +936,8 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
     if(scf_vars.do_dens_fit) {
       std::tie(scf_vars.d_mu, scf_vars.d_nu, scf_vars.d_ku)    = scf_vars.tdfAO.labels<3>("all");
       std::tie(scf_vars.d_mup, scf_vars.d_nup, scf_vars.d_kup) = scf_vars.tdfAOt.labels<3>("all");
-      scf_iter.init_ri<TensorType>(ec, chem_env, scalapack_info, scf_vars, scf_vars.etensors,
-                                   scf_vars.ttensors);
+      scf_iter.init_ri(ec, chem_env, scalapack_info, scf_vars, scf_vars.etensors,
+                       scf_vars.ttensors);
     }
     // const auto do_schwarz_screen = SchwarzK.cols() != 0 && SchwarzK.rows() != 0;
 
@@ -1031,7 +1031,7 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
 
     if(!scf_vars.do_dens_fit && scf_vars.do_load_bal) {
       // Collect task info
-      auto [s1vec, s2vec, ntask_vec] = scf_iter.compute_2bf_taskinfo<TensorType>(
+      auto [s1vec, s2vec, ntask_vec] = scf_iter.compute_2bf_taskinfo(
         ec, chem_env, scf_vars, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4,
         scf_vars.ttensors, scf_vars.etensors, scf_vars.do_dens_fit);
 
@@ -1074,9 +1074,9 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
       }
 
       // F_alpha = H1 + F_alpha_tmp
-      scf_iter.compute_2bf<TensorType>(
-        ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4,
-        scf_vars.ttensors, scf_vars.etensors, scf_state.is_3c_init, scf_vars.do_dens_fit, xHF);
+      scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen, shell2bf,
+                           SchwarzK, max_nprim4, scf_vars.ttensors, scf_vars.etensors,
+                           scf_state.is_3c_init, scf_vars.do_dens_fit, xHF);
 
       // Add QED contribution
       if(chem_env.sys_data.do_qed) {
@@ -1142,16 +1142,16 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
       // if(rank==0) cout << std::setprecision(18) << "norm of D_tamm: " << D_tamm_nrm << endl;
 
       // build a new Fock matrix
-      scf_iter.compute_2bf<TensorType>(
-        ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4,
-        scf_vars.ttensors, scf_vars.etensors, scf_state.is_3c_init, scf_vars.do_dens_fit, xHF);
+      scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen, shell2bf,
+                           SchwarzK, max_nprim4, scf_vars.ttensors, scf_vars.etensors,
+                           scf_state.is_3c_init, scf_vars.do_dens_fit, xHF);
 
       // Add QED contribution
       if(chem_env.sys_data.do_qed) {
         scf_qed.compute_QED_2body<TensorType>(ec, chem_env, scf_vars, scf_vars.ttensors);
       }
 
-      std::tie(scf_state.ehf, scf_state.rmsd) = scf_iter.scf_iter_body<TensorType>(
+      std::tie(scf_state.ehf, scf_state.rmsd) = scf_iter.scf_iter_body(
         ec, chem_env, scalapack_info, scf_state.iter, scf_vars, scf_vars.ttensors, scf_vars.etensors
 #if defined(USE_GAUXC)
         ,

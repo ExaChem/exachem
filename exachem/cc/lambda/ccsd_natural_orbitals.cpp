@@ -148,8 +148,8 @@ void ccsd_natural_orbitals(ChemEnv& chem_env, std::vector<int>& cc_rdm, std::str
   Tensor<T> alpha_density{mu, nu};
   sch.allocate(C_alpha_AO2, C_alpha_AOMO, C_alpha_NO_AOMO, alpha_density).execute();
 
-  exachem::scf::SCFIO scf_output;
-  scf_output.rw_mat_disk<T>(
+  exachem::scf::SCFIO<TensorType> scf_output;
+  scf_output.rw_mat_disk(
     C_alpha_AO2, files_dir + "/scf/" + chem_env.sys_data.output_file_prefix + ".alpha.movecs",
     false, true); // read C
 
@@ -176,13 +176,13 @@ void ccsd_natural_orbitals(ChemEnv& chem_env, std::vector<int>& cc_rdm, std::str
     std::cout << "\nCCSD natural orbitals density written to " + files_dir + "/scf/" +
                    chem_env.sys_data.output_file_prefix + +".ccsd.alpha.density"
               << std::endl;
-  scf_output.rw_mat_disk<TensorType>(
+  scf_output.rw_mat_disk(
     C_alpha_AO2, files_dir + "/scf/" + chem_env.sys_data.output_file_prefix + +".ccsd.alpha.movecs",
     false, false);
-  scf_output.rw_mat_disk<TensorType>(alpha_density,
-                                     files_dir + "/scf/" + chem_env.sys_data.output_file_prefix +
-                                       ".ccsd.alpha.density",
-                                     false, false);
+  scf_output.rw_mat_disk(alpha_density,
+                         files_dir + "/scf/" + chem_env.sys_data.output_file_prefix +
+                           ".ccsd.alpha.density",
+                         false, false);
 
   sch.deallocate(C_alpha_AO2, C_alpha_AOMO, C_alpha_NO_AOMO, alpha_density).execute();
 }

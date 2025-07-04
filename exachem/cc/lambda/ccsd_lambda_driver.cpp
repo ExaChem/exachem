@@ -139,8 +139,8 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
 
   std::string densityfile_alpha =
     files_dir + "/scf/" + sys_data.output_file_prefix + ".alpha.density";
-  scf::SCFIO scf_output;
-  scf_output.rw_mat_disk<T>(dens, densityfile_alpha, debug, true); // read density
+  scf::SCFIO<TensorType> scf_output;
+  scf_output.rw_mat_disk(dens, densityfile_alpha, debug, true); // read density
 
   // compute electronic dipole moments
   sch(dipole_mx() = dens() * DipX_ao())(dipole_my() = dens() * DipY_ao())(dipole_mz() =

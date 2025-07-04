@@ -23,14 +23,14 @@ namespace exachem::scf {
 
 class DefaultSCFEngine {
 protected:
-  SCFCompute scf_compute;
-  SCFQed     scf_qed;
-  SCFIter    scf_iter;
-  SCFGuess   scf_guess;
-  SCFRestart scf_restart;
-  SCFIO      scf_output;
-  ECMolden   ec_molden;
-  SCFVars    scf_vars;
+  SCFCompute          scf_compute;
+  SCFQed              scf_qed;
+  SCFIter<TensorType> scf_iter;
+  SCFGuess            scf_guess;
+  SCFRestart          scf_restart;
+  SCFIO<TensorType>   scf_output;
+  ECMolden            ec_molden;
+  SCFVars             scf_vars;
 
   std::string files_prefix;
   enum class FileType {

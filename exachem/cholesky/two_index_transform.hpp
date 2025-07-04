@@ -124,8 +124,8 @@ void two_index_transform(ExecutionContext& ec, ChemEnv& chem_env) {
   const bool is_rhf = sys_data.is_restricted;
   // const bool is_rohf = sys_data.is_restricted_os;
 
-  Matrix     CTiled(nao, N);
-  scf::SCFIO scf_output;
+  Matrix                 CTiled(nao, N);
+  scf::SCFIO<TensorType> scf_output;
 
   std::string err_msg{};
 
@@ -203,13 +203,13 @@ void two_index_transform(ExecutionContext& ec, ChemEnv& chem_env) {
         const auto  f1file       = files_prefix + ".td.f1_mo";
         const auto  lcaofile     = files_prefix + ".td.movecs_so";
         if(is_rhf) {
-          scf_output.write_scf_mat<TensorType>(F, f1file);
-          scf_output.write_scf_mat<TensorType>(CTiled, lcaofile);
+          scf_output.write_scf_mat(F, f1file);
+          scf_output.write_scf_mat(CTiled, lcaofile);
         }
         else if(is_uhf) {
           if(fs::exists(f1file) && fs::exists(lcaofile)) {
-            F      = scf_output.read_scf_mat<TensorType>(f1file);
-            CTiled = scf_output.read_scf_mat<TensorType>(lcaofile);
+            F      = scf_output.read_scf_mat(f1file);
+            CTiled = scf_output.read_scf_mat(lcaofile);
           }
           else { err_msg = "Files [" + f1file + ", " + lcaofile + "] do not exist "; }
 

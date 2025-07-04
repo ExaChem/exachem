@@ -8,8 +8,8 @@
 
 #include "exachem/scf/scf_iter.hpp"
 
-template<typename TensorType>
-std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
+template<typename T>
+std::tuple<T, T> exachem::scf::DefaultSCFIter<T>::scf_iter_body(
   ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const int& iter,
   SCFVars& scf_vars, TAMMTensors& ttensors, EigenTensors& etensors
 #if defined(USE_GAUXC)
@@ -25,25 +25,25 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
   const bool   is_rhf = sys_data.is_restricted;
   const double lshift = scf_vars.lshift;
 
-  Tensor<TensorType>& H1       = ttensors.H1;
-  Tensor<TensorType>& S1       = ttensors.S1;
-  Tensor<TensorType>& D_diff   = ttensors.D_diff;
-  Tensor<TensorType>& ehf_tmp  = ttensors.ehf_tmp;
-  Tensor<TensorType>& ehf_tamm = ttensors.ehf_tamm;
+  Tensor<T>& H1       = ttensors.H1;
+  Tensor<T>& S1       = ttensors.S1;
+  Tensor<T>& D_diff   = ttensors.D_diff;
+  Tensor<T>& ehf_tmp  = ttensors.ehf_tmp;
+  Tensor<T>& ehf_tamm = ttensors.ehf_tamm;
 
-  Matrix&             D_alpha           = etensors.D_alpha;
-  Tensor<TensorType>& F_alpha           = ttensors.F_alpha;
-  Tensor<TensorType>& FD_alpha_tamm     = ttensors.FD_alpha;
-  Tensor<TensorType>& FDS_alpha_tamm    = ttensors.FDS_alpha;
-  Tensor<TensorType>& D_alpha_tamm      = ttensors.D_alpha;
-  Tensor<TensorType>& D_last_alpha_tamm = ttensors.D_last_alpha;
+  Matrix&    D_alpha           = etensors.D_alpha;
+  Tensor<T>& F_alpha           = ttensors.F_alpha;
+  Tensor<T>& FD_alpha_tamm     = ttensors.FD_alpha;
+  Tensor<T>& FDS_alpha_tamm    = ttensors.FDS_alpha;
+  Tensor<T>& D_alpha_tamm      = ttensors.D_alpha;
+  Tensor<T>& D_last_alpha_tamm = ttensors.D_last_alpha;
 
-  Matrix&             D_beta           = etensors.D_beta;
-  Tensor<TensorType>& F_beta           = ttensors.F_beta;
-  Tensor<TensorType>& FD_beta_tamm     = ttensors.FD_beta;
-  Tensor<TensorType>& FDS_beta_tamm    = ttensors.FDS_beta;
-  Tensor<TensorType>& D_beta_tamm      = ttensors.D_beta;
-  Tensor<TensorType>& D_last_beta_tamm = ttensors.D_last_beta;
+  Matrix&    D_beta           = etensors.D_beta;
+  Tensor<T>& F_beta           = ttensors.F_beta;
+  Tensor<T>& FD_beta_tamm     = ttensors.FD_beta;
+  Tensor<T>& FDS_beta_tamm    = ttensors.FDS_beta;
+  Tensor<T>& D_beta_tamm      = ttensors.D_beta;
+  Tensor<T>& D_last_beta_tamm = ttensors.D_last_beta;
 
   Scheduler sch{ec};
 
@@ -61,8 +61,7 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
   const bool do_snK = sys_data.do_snK;
   if(do_snK) {
     const auto snK_start = std::chrono::high_resolution_clock::now();
-    scf::gauxc::compute_exx<TensorType>(ec, chem_env, scf_vars, ttensors, etensors,
-                                        gauxc_integrator);
+    scf::gauxc::compute_exx<T>(ec, chem_env, scf_vars, ttensors, etensors, gauxc_integrator);
     const auto snK_stop = std::chrono::high_resolution_clock::now();
     const auto snK_time =
       std::chrono::duration_cast<std::chrono::duration<double>>((snK_stop - snK_start)).count();
@@ -101,8 +100,7 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
   double     gauxc_exc = 0;
   if(is_ks) {
     const auto xcf_start = std::chrono::high_resolution_clock::now();
-    gauxc_exc =
-      scf::gauxc::compute_xcf<TensorType>(ec, chem_env, ttensors, etensors, gauxc_integrator);
+    gauxc_exc = scf::gauxc::compute_xcf<T>(ec, chem_env, ttensors, etensors, gauxc_integrator);
 
     const auto xcf_stop = std::chrono::high_resolution_clock::now();
     const auto xcf_time =
@@ -129,10 +127,10 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
   }
 #endif
 
-  Tensor<TensorType> err_mat_alpha_tamm{tAO, tAO};
-  Tensor<TensorType> err_mat_beta_tamm{tAO, tAO};
-  Tensor<TensorType>::allocate(&ec, err_mat_alpha_tamm);
-  if(is_uhf) Tensor<TensorType>::allocate(&ec, err_mat_beta_tamm);
+  Tensor<T> err_mat_alpha_tamm{tAO, tAO};
+  Tensor<T> err_mat_beta_tamm{tAO, tAO};
+  Tensor<T>::allocate(&ec, err_mat_alpha_tamm);
+  if(is_uhf) Tensor<T>::allocate(&ec, err_mat_beta_tamm);
 
   // clang-format off
   sch
@@ -200,8 +198,7 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
 
   auto     do_t1 = std::chrono::high_resolution_clock::now();
   SCFGuess scf_guess;
-  scf_guess.scf_diagonalize<TensorType>(sch, chem_env, scf_vars, scalapack_info, ttensors,
-                                        etensors);
+  scf_guess.scf_diagonalize<T>(sch, chem_env, scf_vars, scalapack_info, ttensors, etensors);
 
   auto do_t2   = std::chrono::high_resolution_clock::now();
   auto do_time = std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
@@ -209,8 +206,7 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
   if(rank == 0 && debug)
     std::cout << std::fixed << std::setprecision(2) << "diagonalize: " << do_time << "s, ";
   SCFCompute scf_compute;
-  scf_compute.compute_density<TensorType>(ec, chem_env, scf_vars, scalapack_info, ttensors,
-                                          etensors);
+  scf_compute.compute_density<T>(ec, chem_env, scf_vars, scalapack_info, ttensors, etensors);
 
   double rmsd = 0.0;
   // clang-format off
@@ -252,17 +248,15 @@ std::tuple<TensorType, TensorType> exachem::scf::SCFIter::scf_iter_body(
   return std::make_tuple(ehf, rmsd);
 }
 
-template<typename TensorType>
+template<typename T>
 std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-exachem::scf::SCFIter::compute_2bf_taskinfo(ExecutionContext& ec, ChemEnv& chem_env,
-                                            const SCFVars& scf_vars, const bool do_schwarz_screen,
-                                            const std::vector<size_t>& shell2bf,
-                                            const Matrix& SchwarzK, const size_t& max_nprim4,
-                                            TAMMTensors& ttensors, EigenTensors& etensors,
-                                            const bool cs1s2) {
-  Matrix&             D       = etensors.D_alpha;
-  Matrix&             D_beta  = etensors.D_beta;
-  Tensor<TensorType>& F_dummy = ttensors.F_dummy;
+exachem::scf::DefaultSCFIter<T>::compute_2bf_taskinfo(
+  ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars, const bool do_schwarz_screen,
+  const std::vector<size_t>& shell2bf, const Matrix& SchwarzK, const size_t& max_nprim4,
+  TAMMTensors& ttensors, EigenTensors& etensors, const bool cs1s2) {
+  Matrix&    D       = etensors.D_alpha;
+  Matrix&    D_beta  = etensors.D_beta;
+  Tensor<T>& F_dummy = ttensors.F_dummy;
 
   SystemData&              sys_data    = chem_env.sys_data;
   SCFOptions&              scf_options = chem_env.ioptions.scf_options;
@@ -336,9 +330,9 @@ exachem::scf::SCFIter::compute_2bf_taskinfo(ExecutionContext& ec, ChemEnv& chem_
   return std::make_tuple(s1vec, s2vec, ntask_vec);
 }
 
-template<typename TensorType>
-void exachem::scf::SCFIter::compute_3c_ints(ExecutionContext& ec, ChemEnv& chem_env,
-                                            const SCFVars& scf_vars, Tensor<TensorType>& xyZ) {
+template<typename T>
+void exachem::scf::DefaultSCFIter<T>::compute_3c_ints(ExecutionContext& ec, ChemEnv& chem_env,
+                                                      const SCFVars& scf_vars, Tensor<T>& xyZ) {
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
@@ -374,9 +368,9 @@ void exachem::scf::SCFIter::compute_3c_ints(ExecutionContext& ec, ChemEnv& chem_
     auto bi1 = blockid[1];
     auto bi2 = blockid[2];
 
-    const TAMM_SIZE         size       = xyZ.block_size(blockid);
-    auto                    block_dims = xyZ.block_dims(blockid);
-    std::vector<TensorType> dbuf(size);
+    const TAMM_SIZE size       = xyZ.block_size(blockid);
+    auto            block_dims = xyZ.block_dims(blockid);
+    std::vector<T>  dbuf(size);
 
     auto bd1 = block_dims[1];
     auto bd2 = block_dims[2];
@@ -401,7 +395,7 @@ void exachem::scf::SCFIter::compute_3c_ints(ExecutionContext& ec, ChemEnv& chem_
         //// if (s2>s1) continue;
         // auto n2 = shells[s2].size();
         // auto n123 = n0*n1*n2;
-        // std::vector<TensorType> tbuf(n123);
+        // std::vector<T> tbuf(n123);
         auto                  dimj          = curshelloffset_j + AO_tiles[s2];
         decltype(s0range_end) s0range_start = 0l;
         if(bi2 > 0) s0range_start = df_shell_tile_map[bi2 - 1] + 1;
@@ -440,10 +434,11 @@ void exachem::scf::SCFIter::compute_3c_ints(ExecutionContext& ec, ChemEnv& chem_
   if(rank == 0 && debug) std::cout << "2BF-DFC: " << do_time << "s, ";
 }
 
-template<typename TensorType>
-void exachem::scf::SCFIter::compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_env,
-                                            EigenTensors& etensors, const SCFVars& scf_vars,
-                                            TAMMTensors& ttensors) {
+template<typename T>
+void exachem::scf::DefaultSCFIter<T>::compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_env,
+                                                      EigenTensors&  etensors,
+                                                      const SCFVars& scf_vars,
+                                                      TAMMTensors&   ttensors) {
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
@@ -454,7 +449,7 @@ void exachem::scf::SCFIter::compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_
   const std::vector<Tile>&   dfAO_tiles        = scf_vars.dfAO_tiles;
   const std::vector<size_t>& df_shell_tile_map = scf_vars.df_shell_tile_map;
 
-  Tensor<TensorType>& Vm1 = ttensors.Vm1;
+  Tensor<T>& Vm1 = ttensors.Vm1;
 
   auto& dfNorm = etensors.dfNorm;
 
@@ -477,9 +472,9 @@ void exachem::scf::SCFIter::compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_
     auto bi0 = blockid[0];
     auto bi1 = blockid[1];
 
-    const TAMM_SIZE         size       = Vm1.block_size(blockid);
-    auto                    block_dims = Vm1.block_dims(blockid);
-    std::vector<TensorType> dbuf(size);
+    const TAMM_SIZE size       = Vm1.block_size(blockid);
+    auto            block_dims = Vm1.block_dims(blockid);
+    std::vector<T>  dbuf(size);
 
     auto                  bd1           = block_dims[1];
     auto                  s1range_end   = df_shell_tile_map[bi0];
@@ -507,7 +502,7 @@ void exachem::scf::SCFIter::compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_
 
         auto n2 = dfbs[s2].size();
 
-        std::vector<TensorType> tbuf(n1 * n2);
+        std::vector<T> tbuf(n1 * n2);
         engine.compute(dfbs[s1], dfbs[s2]);
         if(results[0] == nullptr) continue;
 
@@ -542,10 +537,11 @@ void exachem::scf::SCFIter::compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_
   for(size_t s1 = 0; s1 < dfbs.size(); ++s1) dfNorm(s1) = norms[s1];
 }
 
-template<typename TensorType>
-void exachem::scf::SCFIter::init_ri(ExecutionContext& ec, ChemEnv& chem_env,
-                                    ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
-                                    EigenTensors& etensors, TAMMTensors& ttensors) {
+template<typename T>
+void exachem::scf::DefaultSCFIter<T>::init_ri(ExecutionContext& ec, ChemEnv& chem_env,
+                                              ScalapackInfo& scalapack_info,
+                                              const SCFVars& scf_vars, EigenTensors& etensors,
+                                              TAMMTensors& ttensors) {
   SystemData& sys_data    = chem_env.sys_data;
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -560,41 +556,41 @@ void exachem::scf::SCFIter::init_ri(ExecutionContext& ec, ChemEnv& chem_env,
   Scheduler   sch{ec};
   ExecutionHW exhw = ec.exhw();
 
-  Tensor<TensorType>& xyK = ttensors.xyK;
-  Tensor<TensorType>& xyZ = ttensors.xyZ;
-  Tensor<TensorType>& Vm1 = ttensors.Vm1;
+  Tensor<T>& xyK = ttensors.xyK;
+  Tensor<T>& xyZ = ttensors.xyZ;
+  Tensor<T>& Vm1 = ttensors.Vm1;
 
   // Compute 2c integrals
-  Tensor<TensorType>::allocate(&ec, Vm1);
+  Tensor<T>::allocate(&ec, Vm1);
   sch(Vm1() = 0.0).execute();
   ec.pg().barrier();
 
-  compute_2c_ints<TensorType>(ec, chem_env, etensors, scf_vars, ttensors);
+  compute_2c_ints(ec, chem_env, etensors, scf_vars, ttensors);
 
   // Obtain inverse (square root) of V
-  Matrix                  V;
-  std::vector<TensorType> eps(ndf);
+  Matrix         V;
+  std::vector<T> eps(ndf);
 
   auto ig1 = std::chrono::high_resolution_clock::now();
 
-  Tensor<TensorType> v_tmp{scf_vars.tdfAO, scf_vars.tdfAO};
-  Tensor<TensorType> eps_tamm{scf_vars.tdfAO};
-  Tensor<TensorType>::allocate(&ec, v_tmp, eps_tamm);
+  Tensor<T> v_tmp{scf_vars.tdfAO, scf_vars.tdfAO};
+  Tensor<T> eps_tamm{scf_vars.tdfAO};
+  Tensor<T>::allocate(&ec, v_tmp, eps_tamm);
 
 #if defined(USE_SCALAPACK)
-  Tensor<TensorType> V_sca;
+  Tensor<T> V_sca;
   if(scalapack_info.pg.is_valid()) {
     blacspp::Grid*                  blacs_grid       = scalapack_info.blacs_grid.get();
     const auto&                     grid             = *blacs_grid;
     scalapackpp::BlockCyclicDist2D* blockcyclic_dist = scalapack_info.blockcyclic_dist.get();
     const tamm::Tile                mb               = blockcyclic_dist->mb();
 
-    TiledIndexSpace    tN_bc{IndexSpace{range(ndf)}, mb};
-    Tensor<TensorType> S_BC{tN_bc, tN_bc};
+    TiledIndexSpace tN_bc{IndexSpace{range(ndf)}, mb};
+    Tensor<T>       S_BC{tN_bc, tN_bc};
     V_sca = {tN_bc, tN_bc};
     S_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
     V_sca.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-    Tensor<TensorType>::allocate(&scalapack_info.ec, S_BC, V_sca);
+    Tensor<T>::allocate(&scalapack_info.ec, S_BC, V_sca);
 
     tamm::to_block_cyclic_tensor(Vm1, S_BC);
 
@@ -660,7 +656,7 @@ void exachem::scf::SCFIter::init_ri(ExecutionContext& ec, ChemEnv& chem_env,
 #endif
     }
 
-    Tensor<TensorType>::deallocate(S_BC);
+    Tensor<T>::deallocate(S_BC);
     tamm::from_block_cyclic_tensor(V_sca, v_tmp);
   }
 #else
@@ -696,8 +692,8 @@ void exachem::scf::SCFIter::init_ri(ExecutionContext& ec, ChemEnv& chem_env,
 
   if(!direct) {
     // Compute 3c ints
-    Tensor<TensorType>::allocate(&ec, xyZ);
-    compute_3c_ints<TensorType>(ec, chem_env, scf_vars, xyZ);
+    Tensor<T>::allocate(&ec, xyZ);
+    compute_3c_ints(ec, chem_env, scf_vars, xyZ);
 
     // Orthonormalize DF basis
     sch(xyK(mu, nu, d_nu) = xyZ(mu, nu, d_mu) * Vm1(d_mu, d_nu))
@@ -706,12 +702,13 @@ void exachem::scf::SCFIter::init_ri(ExecutionContext& ec, ChemEnv& chem_env,
   }
 }
 
-template<typename TensorType>
-void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv& chem_env,
-                                                  const SCFVars&             scf_vars,
-                                                  const std::vector<size_t>& shell2bf,
-                                                  TAMMTensors& ttensors, EigenTensors& etensors,
-                                                  const Matrix& SchwarzK) {
+template<typename T>
+void exachem::scf::DefaultSCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv& chem_env,
+                                                            const SCFVars&             scf_vars,
+                                                            const std::vector<size_t>& shell2bf,
+                                                            TAMMTensors&               ttensors,
+                                                            EigenTensors&              etensors,
+                                                            const Matrix&              SchwarzK) {
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
@@ -756,12 +753,12 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
   // auto   shblk = is_spherical ? 2 * obs.max_l() + 1 : ((obs.max_l() + 1) * (obs.max_l() + 2)) /
   // 2; Matrix Dblk(shblk, shblk);
 
-  Matrix              Jtmp    = Matrix::Zero(1, ndf);
-  Tensor<TensorType>& F_dummy = ttensors.F_dummy;
-  Tensor<TensorType>& Vm1     = ttensors.Vm1;
-  IndexSpace          dummy{range(1)};
-  TiledIndexSpace     tdummy{dummy};
-  Tensor<TensorType>  Jtmp_tamm{tdummy, scf_vars.tdfAO}, Xtmp_tamm{tdummy, scf_vars.tdfAO};
+  Matrix          Jtmp    = Matrix::Zero(1, ndf);
+  Tensor<T>&      F_dummy = ttensors.F_dummy;
+  Tensor<T>&      Vm1     = ttensors.Vm1;
+  IndexSpace      dummy{range(1)};
+  TiledIndexSpace tdummy{dummy};
+  Tensor<T>       Jtmp_tamm{tdummy, scf_vars.tdfAO}, Xtmp_tamm{tdummy, scf_vars.tdfAO};
 
   const auto buildJ_start = std::chrono::high_resolution_clock::now();
 
@@ -846,7 +843,7 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
   Jtmp.setZero();
   tamm_to_eigen_tensor(Jtmp_tamm, Jtmp);
   ec.pg().barrier();
-  Tensor<TensorType>::deallocate(Jtmp_tamm);
+  Tensor<T>::deallocate(Jtmp_tamm);
   // const auto buildX_stop = std::chrono::high_resolution_clock::now();
   // const auto buildX_time =
   //   std::chrono::duration_cast<std::chrono::duration<double>>((buildX_stop -
@@ -927,12 +924,13 @@ void exachem::scf::SCFIter::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv&
     std::cout << std::fixed << std::setprecision(2) << "DF-J: " << total_time << "s, ";
 };
 
-template<typename TensorType>
-void exachem::scf::SCFIter::compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_env,
-                                           ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
-                                           const std::vector<size_t>& shell2bf,
-                                           TAMMTensors& ttensors, EigenTensors& etensors,
-                                           bool& is_3c_init, double xHF) {
+template<typename T>
+void exachem::scf::DefaultSCFIter<T>::compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_env,
+                                                     ScalapackInfo&             scalapack_info,
+                                                     const SCFVars&             scf_vars,
+                                                     const std::vector<size_t>& shell2bf,
+                                                     TAMMTensors& ttensors, EigenTensors& etensors,
+                                                     bool& is_3c_init, double xHF) {
   SystemData& sys_data    = chem_env.sys_data;
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -950,12 +948,12 @@ void exachem::scf::SCFIter::compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_e
   Scheduler   sch{ec};
   ExecutionHW exhw = ec.exhw();
 
-  Tensor<TensorType>& xyK         = ttensors.xyK;
-  Tensor<TensorType>& F_alpha_tmp = ttensors.F_alpha_tmp;
-  Tensor<TensorType>& F_beta_tmp  = ttensors.F_beta_tmp;
+  Tensor<T>& xyK         = ttensors.xyK;
+  Tensor<T>& F_alpha_tmp = ttensors.F_alpha_tmp;
+  Tensor<T>& F_beta_tmp  = ttensors.F_beta_tmp;
 
-  Tensor<TensorType> Jtmp_tamm{scf_vars.tdfAO};                          // ndf
-  Tensor<TensorType> tmp_df{scf_vars.tAO, scf_vars.tAO, scf_vars.tdfAO}; // n, n, ndf
+  Tensor<T> Jtmp_tamm{scf_vars.tdfAO};                          // ndf
+  Tensor<T> tmp_df{scf_vars.tAO, scf_vars.tAO, scf_vars.tdfAO}; // n, n, ndf
 
   auto ig1  = std::chrono::high_resolution_clock::now();
   auto tig1 = ig1;
@@ -987,7 +985,7 @@ void exachem::scf::SCFIter::compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_e
   if(xHF > 0.0 && !do_snK) {
     ig1 = std::chrono::high_resolution_clock::now();
 
-    TensorType factor = is_rhf ? 0.5 : 1.0;
+    T factor = is_rhf ? 0.5 : 1.0;
     // clang-format off
       sch.allocate(tmp_df);
       sch
@@ -1015,14 +1013,12 @@ void exachem::scf::SCFIter::compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_e
     std::cout << "3c contractions: " << std::fixed << std::setprecision(2) << tigtime << "s, ";
 }
 
-template<typename TensorType>
-void exachem::scf::SCFIter::compute_2bf(ExecutionContext& ec, ChemEnv& chem_env,
-                                        ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
-                                        const bool                 do_schwarz_screen,
-                                        const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
-                                        const size_t& max_nprim4, TAMMTensors& ttensors,
-                                        EigenTensors& etensors, bool& is_3c_init,
-                                        const bool do_density_fitting, double xHF) {
+template<typename T>
+void exachem::scf::DefaultSCFIter<T>::compute_2bf(
+  ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
+  const bool do_schwarz_screen, const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
+  const size_t& max_nprim4, TAMMTensors& ttensors, EigenTensors& etensors, bool& is_3c_init,
+  const bool do_density_fitting, double xHF) {
   using libint2::Operator;
 
   SystemData&              sys_data    = chem_env.sys_data;
@@ -1041,9 +1037,9 @@ void exachem::scf::SCFIter::compute_2bf(ExecutionContext& ec, ChemEnv& chem_env,
   Matrix& G_beta = etensors.G_beta;
   Matrix& D_beta = etensors.D_beta;
 
-  Tensor<TensorType>& F_dummy     = ttensors.F_dummy;
-  Tensor<TensorType>& F_alpha_tmp = ttensors.F_alpha_tmp;
-  Tensor<TensorType>& F_beta_tmp  = ttensors.F_beta_tmp;
+  Tensor<T>& F_dummy     = ttensors.F_dummy;
+  Tensor<T>& F_alpha_tmp = ttensors.F_alpha_tmp;
+  Tensor<T>& F_beta_tmp  = ttensors.F_beta_tmp;
 
   double fock_precision = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
   auto   rank           = ec.pg().rank();
@@ -1321,19 +1317,18 @@ void exachem::scf::SCFIter::compute_2bf(ExecutionContext& ec, ChemEnv& chem_env,
   else {
     if(scf_vars.direct_df) {
       G.setZero(N, N);
-      compute_2bf_ri_direct<TensorType>(ec, chem_env, scf_vars, shell2bf, ttensors, etensors,
-                                        SchwarzK);
+      compute_2bf_ri_direct(ec, chem_env, scf_vars, shell2bf, ttensors, etensors, SchwarzK);
     }
     else {
-      compute_2bf_ri<TensorType>(ec, chem_env, scalapack_info, scf_vars, shell2bf, ttensors,
-                                 etensors, is_3c_init, xHF);
+      compute_2bf_ri(ec, chem_env, scalapack_info, scf_vars, shell2bf, ttensors, etensors,
+                     is_3c_init, xHF);
     }
   } // end density fitting
 
-  auto [mu, nu]               = scf_vars.tAO.labels<2>("all");
-  Tensor<TensorType>& H1      = ttensors.H1;
-  Tensor<TensorType>& F_alpha = ttensors.F_alpha;
-  Tensor<TensorType>& F_beta  = ttensors.F_beta;
+  auto [mu, nu]      = scf_vars.tAO.labels<2>("all");
+  Tensor<T>& H1      = ttensors.H1;
+  Tensor<T>& F_alpha = ttensors.F_alpha;
+  Tensor<T>& F_beta  = ttensors.F_beta;
 
   // symmetrize the result
   // clang-format off
@@ -1348,24 +1343,21 @@ void exachem::scf::SCFIter::compute_2bf(ExecutionContext& ec, ChemEnv& chem_env,
     // clang-format off
     sch 
       (F_beta()       = 0.5 * F_beta_tmp())
-      (F_beta(mu,nu) += 0.5 * F_beta_tmp(nu,mu))
+      (F_beta(mu,nu) +=  0.5 * F_beta_tmp(nu,mu))
       (F_beta()      += H1())
       .execute();
     // clang-format on
   }
 }
 
-template<typename TensorType>
-void exachem::scf::SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env,
-                                     const TiledIndexSpace& tAO, Tensor<TensorType> F_alpha,
-                                     Tensor<TensorType> F_beta, Tensor<TensorType> err_mat_alpha,
-                                     Tensor<TensorType> err_mat_beta, int iter, int max_hist,
-                                     const SCFVars& scf_vars, const int n_lindep,
-                                     std::vector<Tensor<TensorType>>& diis_hist_alpha,
-                                     std::vector<Tensor<TensorType>>& diis_hist_beta,
-                                     std::vector<Tensor<TensorType>>& fock_hist_alpha,
-                                     std::vector<Tensor<TensorType>>& fock_hist_beta) {
-  using Vector = Eigen::Matrix<TensorType, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+template<typename T>
+void exachem::scf::DefaultSCFIter<T>::scf_diis(
+  ExecutionContext& ec, ChemEnv& chem_env, const TiledIndexSpace& tAO, Tensor<T> F_alpha,
+  Tensor<T> F_beta, Tensor<T> err_mat_alpha, Tensor<T> err_mat_beta, int iter, int max_hist,
+  const SCFVars& scf_vars, const int n_lindep, std::vector<Tensor<T>>& diis_hist_alpha,
+  std::vector<Tensor<T>>& diis_hist_beta, std::vector<Tensor<T>>& fock_hist_alpha,
+  std::vector<Tensor<T>>& fock_hist_beta) {
+  using Vector = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
   tamm::Scheduler sch{ec};
   SystemData&     sys_data = chem_env.sys_data;
@@ -1377,7 +1369,7 @@ void exachem::scf::SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env,
   if(ndiis > max_hist) {
     auto maxe = 0;
     if(!scf_vars.switch_diis) {
-      std::vector<TensorType> max_err(diis_hist_alpha.size());
+      std::vector<T> max_err(diis_hist_alpha.size());
       max_err[diis_hist_alpha.size() - 1] = 0.0;
       for(size_t i = 0; i < diis_hist_alpha.size() - 1; i++) {
         max_err[i] = tamm::norm(diis_hist_alpha[i]);
@@ -1389,58 +1381,58 @@ void exachem::scf::SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env,
       }
       maxe = std::distance(max_err.begin(), std::max_element(max_err.begin(), max_err.end()));
     }
-    Tensor<TensorType>::deallocate(diis_hist_alpha[maxe]);
-    Tensor<TensorType>::deallocate(fock_hist_alpha[maxe]);
+    Tensor<T>::deallocate(diis_hist_alpha[maxe]);
+    Tensor<T>::deallocate(fock_hist_alpha[maxe]);
     diis_hist_alpha.erase(diis_hist_alpha.begin() + maxe);
     fock_hist_alpha.erase(fock_hist_alpha.begin() + maxe);
     if(is_uhf) {
-      Tensor<TensorType>::deallocate(diis_hist_beta[maxe]);
-      Tensor<TensorType>::deallocate(fock_hist_beta[maxe]);
+      Tensor<T>::deallocate(diis_hist_beta[maxe]);
+      Tensor<T>::deallocate(fock_hist_beta[maxe]);
       diis_hist_beta.erase(diis_hist_beta.begin() + maxe);
       fock_hist_beta.erase(fock_hist_beta.begin() + maxe);
     }
   }
   else {
     if(ndiis == (int) (max_hist / 2) && n_lindep > 1) {
-      for(auto x: diis_hist_alpha) Tensor<TensorType>::deallocate(x);
-      for(auto x: fock_hist_alpha) Tensor<TensorType>::deallocate(x);
+      for(auto x: diis_hist_alpha) Tensor<T>::deallocate(x);
+      for(auto x: fock_hist_alpha) Tensor<T>::deallocate(x);
       diis_hist_alpha.clear();
       fock_hist_alpha.clear();
       if(is_uhf) {
-        for(auto x: diis_hist_beta) Tensor<TensorType>::deallocate(x);
-        for(auto x: fock_hist_beta) Tensor<TensorType>::deallocate(x);
+        for(auto x: diis_hist_beta) Tensor<T>::deallocate(x);
+        for(auto x: fock_hist_beta) Tensor<T>::deallocate(x);
         diis_hist_beta.clear();
         fock_hist_beta.clear();
       }
     }
   }
 
-  Tensor<TensorType> Fcopy{tAO, tAO};
-  Tensor<TensorType> Fcopy_beta{tAO, tAO};
-  Tensor<TensorType>::allocate(&ec, Fcopy);
+  Tensor<T> Fcopy{tAO, tAO};
+  Tensor<T> Fcopy_beta{tAO, tAO};
+  Tensor<T>::allocate(&ec, Fcopy);
   sch(Fcopy() = F_alpha()).execute();
 
   diis_hist_alpha.push_back(err_mat_alpha);
   fock_hist_alpha.push_back(Fcopy);
 
   if(is_uhf) {
-    Tensor<TensorType>::allocate(&ec, Fcopy_beta);
+    Tensor<T>::allocate(&ec, Fcopy_beta);
     sch(Fcopy_beta() = F_beta()).execute();
     diis_hist_beta.push_back(err_mat_beta);
     fock_hist_beta.push_back(Fcopy_beta);
   }
 
-  Matrix                  A;
-  Vector                  b;
-  int                     idim = std::min((int) diis_hist_alpha.size(), max_hist);
-  int64_t                 info = -1;
-  int64_t                 N    = idim + 1;
-  std::vector<TensorType> X;
+  Matrix         A;
+  Vector         b;
+  int            idim = std::min((int) diis_hist_alpha.size(), max_hist);
+  int64_t        info = -1;
+  int64_t        N    = idim + 1;
+  std::vector<T> X;
 
-  // Tensor<TensorType> dhi_trans{tAO, tAO};
-  Tensor<TensorType> dhi_trace{};
+  // Tensor<T> dhi_trans{tAO, tAO};
+  Tensor<T> dhi_trace{};
   auto [mu, nu] = tAO.labels<2>("all");
-  Tensor<TensorType>::allocate(&ec, dhi_trace); // dhi_trans
+  Tensor<T>::allocate(&ec, dhi_trace); // dhi_trans
 
   // ----- Construct Pulay matrix -----
   A = Matrix::Zero(idim + 1, idim + 1);
@@ -1449,7 +1441,7 @@ void exachem::scf::SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env,
     for(int j = i; j < idim; j++) {
       // A(i, j) = (diis_hist[i].transpose() * diis_hist[j]).trace();
       sch(dhi_trace() = diis_hist_alpha[i](nu, mu) * diis_hist_alpha[j](nu, mu)).execute();
-      TensorType dhi  = get_scalar(dhi_trace); // dhi_trace.trace();
+      T dhi           = get_scalar(dhi_trace); // dhi_trace.trace();
       A(i + 1, j + 1) = dhi;
     }
   }
@@ -1459,7 +1451,7 @@ void exachem::scf::SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env,
       for(int j = i; j < idim; j++) {
         // A(i, j) = (diis_hist[i].transpose() * diis_hist[j]).trace();
         sch(dhi_trace() = diis_hist_beta[i](nu, mu) * diis_hist_beta[j](nu, mu)).execute();
-        TensorType dhi = get_scalar(dhi_trace); // dhi_trace.trace();
+        T dhi = get_scalar(dhi_trace); // dhi_trace.trace();
         A(i + 1, j + 1) += dhi;
       }
     }
@@ -1476,14 +1468,14 @@ void exachem::scf::SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env,
 
   while(info != 0) {
     if(idim == 1) {
-      Tensor<TensorType>::deallocate(dhi_trace);
+      Tensor<T>::deallocate(dhi_trace);
       return;
     }
 
     N = idim + 1;
-    std::vector<TensorType> AC(N * (N + 1) / 2);
-    std::vector<TensorType> AF(AC.size());
-    std::vector<TensorType> B(N, 0.);
+    std::vector<T> AC(N * (N + 1) / 2);
+    std::vector<T> AF(AC.size());
+    std::vector<T> B(N, 0.);
     B.front() = -1.0;
     X.resize(N);
 
@@ -1495,9 +1487,9 @@ void exachem::scf::SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env,
       }
     }
 
-    TensorType              RCOND;
-    std::vector<int64_t>    IPIV(N);
-    std::vector<TensorType> BERR(1), FERR(1); // NRHS
+    T                    RCOND;
+    std::vector<int64_t> IPIV(N);
+    std::vector<T>       BERR(1), FERR(1); // NRHS
     info = lapack::spsvx(lapack::Factored::NotFactored, lapack::Uplo::Lower, N, 1, AC.data(),
                          AF.data(), IPIV.data(), B.data(), N, X.data(), N, &RCOND, FERR.data(),
                          BERR.data());
@@ -1507,21 +1499,21 @@ void exachem::scf::SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env,
         cout
           << "<DIIS> Singularity in Pulay matrix detected." /*Error and Fock matrices removed." */
           << endl;
-      Tensor<TensorType>::deallocate(diis_hist_alpha[0]);
-      Tensor<TensorType>::deallocate(fock_hist_alpha[0]);
+      Tensor<T>::deallocate(diis_hist_alpha[0]);
+      Tensor<T>::deallocate(fock_hist_alpha[0]);
       diis_hist_alpha.erase(diis_hist_alpha.begin());
       fock_hist_alpha.erase(fock_hist_alpha.begin());
 
       if(is_uhf) {
-        Tensor<TensorType>::deallocate(diis_hist_beta[0]);
-        Tensor<TensorType>::deallocate(fock_hist_beta[0]);
+        Tensor<T>::deallocate(diis_hist_beta[0]);
+        Tensor<T>::deallocate(fock_hist_beta[0]);
         diis_hist_beta.erase(diis_hist_beta.begin());
         fock_hist_beta.erase(fock_hist_beta.begin());
       }
 
       idim--;
       if(idim == 1) {
-        Tensor<TensorType>::deallocate(dhi_trace);
+        Tensor<T>::deallocate(dhi_trace);
         return;
       }
       Matrix A_pl  = A.block(2, 2, idim, idim);
@@ -1537,9 +1529,9 @@ void exachem::scf::SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env,
 
   } // while
 
-  Tensor<TensorType>::deallocate(dhi_trace); // dhi_trans
+  Tensor<T>::deallocate(dhi_trace); // dhi_trans
 
-  std::vector<TensorType> X_final(N);
+  std::vector<T> X_final(N);
   // Reordering [0...N] -> [1...N,0] to match eigen's lu solve
   X_final.back() = X.front();
   std::copy(X.begin() + 1, X.end(), X_final.begin());
@@ -1559,49 +1551,4 @@ void exachem::scf::SCFIter::scf_diis(ExecutionContext& ec, ChemEnv& chem_env,
   sch.execute();
 }
 
-template std::tuple<double, double> exachem::scf::SCFIter::scf_iter_body<double>(
-  ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const int& iter,
-  SCFVars& scf_vars, TAMMTensors& ttensors, EigenTensors& etensors
-#if defined(USE_GAUXC)
-  ,
-  GauXC::XCIntegrator<Matrix>& gauxc_integrator
-#endif
-);
-
-template std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-exachem::scf::SCFIter::compute_2bf_taskinfo<double>(
-  ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars, const bool do_schwarz_screen,
-  const std::vector<size_t>& shell2bf, const Matrix& SchwarzK, const size_t& max_nprim4,
-  TAMMTensors& ttensors, EigenTensors& etensors, const bool cs1s2);
-
-template void exachem::scf::SCFIter::compute_2bf<double>(
-  ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
-  const bool do_schwarz_screen, const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
-  const size_t& max_nprim4, TAMMTensors& ttensors, EigenTensors& etensors, bool& is_3c_init,
-  const bool do_density_fitting, double xHF);
-
-template void exachem::scf::SCFIter::compute_2bf_ri<double>(
-  ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
-  const std::vector<size_t>& shell2bf, TAMMTensors& ttensors, EigenTensors& etensors,
-  bool& is_3c_init, double xHF);
-
-template void exachem::scf::SCFIter::init_ri<double>(ExecutionContext& ec, ChemEnv& chem_env,
-                                                     ScalapackInfo& scalapack_info,
-                                                     const SCFVars& scf_vars,
-                                                     EigenTensors& etensors, TAMMTensors& ttensors);
-
-template void exachem::scf::SCFIter::compute_2c_ints<double>(ExecutionContext& ec,
-                                                             ChemEnv&          chem_env,
-                                                             EigenTensors&     etensors,
-                                                             const SCFVars&    scf_vars,
-                                                             TAMMTensors&      ttensors);
-
-template void exachem::scf::SCFIter::compute_3c_ints<double>(ExecutionContext&   ec,
-                                                             ChemEnv&            chem_env,
-                                                             const SCFVars&      scf_vars,
-                                                             Tensor<TensorType>& xyZ);
-
-template void exachem::scf::SCFIter::compute_2bf_ri_direct<double>(
-  ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars,
-  const std::vector<size_t>& shell2bf, TAMMTensors& ttensors, EigenTensors& etensors,
-  const Matrix& SchwarzK);
+template class exachem::scf::SCFIter<double>;

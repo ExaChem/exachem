@@ -8,8 +8,12 @@
 
 #include "exachem/scf/scf_taskmap.hpp"
 
-void exachem::scf::Loads::readLoads(std::vector<NODE_T>& s1_all, std::vector<NODE_T>& s2_all,
-                                    std::vector<VAL_T> ntasks_all) {
+namespace exachem::scf {
+
+// Implementation of DefaultLoads methods
+
+void DefaultLoads::readLoads(std::vector<NODE_T>& s1_all, std::vector<NODE_T>& s2_all,
+                             std::vector<VAL_T> ntasks_all) {
   EDGE_T nLoads = 0;
 
   NODE_T rank;
@@ -33,7 +37,7 @@ void exachem::scf::Loads::readLoads(std::vector<NODE_T>& s1_all, std::vector<NOD
   }
 }
 
-void exachem::scf::Loads::simpleLoadBal(NODE_T nMachine) {
+void DefaultLoads::simpleLoadBal(NODE_T nMachine) {
   // sort Loads array w.r.t to ntasks
   sort(loadList.begin(), loadList.end(), [](Load a, Load b) { return a.nTasks > b.nTasks; });
   auto cmpbyFirst = [](const std::pair<VAL_T, NODE_T>& T1, const std::pair<VAL_T, NODE_T>& T2) {
@@ -85,7 +89,7 @@ void exachem::scf::Loads::simpleLoadBal(NODE_T nMachine) {
   }
 }
 
-void exachem::scf::Loads::createTaskMap(
+void DefaultLoads::createTaskMap(
   Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& taskmap) {
   for(auto i = 0; i < nLoads; i++) {
     auto u        = loadList[i].s1;
@@ -95,3 +99,5 @@ void exachem::scf::Loads::createTaskMap(
     // std::cout<<u<<" "<<v<<" "<<taskmap(u,v)<<" "<<L.loadList[i].nTasks<<std::endl;
   }
 }
+
+} // namespace exachem::scf

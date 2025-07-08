@@ -26,8 +26,8 @@ void exachem::scf::SCFQed::qed_functionals_setup(std::vector<double>& params, Ch
 
 template<typename TensorType>
 void exachem::scf::SCFQed::compute_QED_1body(ExecutionContext& ec, ChemEnv& chem_env,
-                                             const SCFVars& scf_vars, TAMMTensors& ttensors) {
-  auto [mu, nu] = scf_vars.tAO.labels<2>("all");
+                                             const SCFData& scf_data, TAMMTensors& ttensors) {
+  auto [mu, nu] = scf_data.tAO.labels<2>("all");
   Scheduler sch{ec};
 
   SystemData&                 sys_data    = chem_env.sys_data;
@@ -84,8 +84,8 @@ void exachem::scf::SCFQed::compute_QED_1body(ExecutionContext& ec, ChemEnv& chem
 
 template<typename TensorType>
 void exachem::scf::SCFQed::compute_QED_2body(ExecutionContext& ec, ChemEnv& chem_env,
-                                             const SCFVars& scf_vars, TAMMTensors& ttensors) {
-  auto [mu, nu, ku] = scf_vars.tAO.labels<3>("all");
+                                             const SCFData& scf_data, TAMMTensors& ttensors) {
+  auto [mu, nu, ku] = scf_data.tAO.labels<3>("all");
   Tensor<TensorType> tensor{ttensors.QED_1body.tiled_index_spaces()}; //{tAO, tAO};
   Scheduler          sch{ec};
 
@@ -145,7 +145,7 @@ void exachem::scf::SCFQed::compute_QED_2body(ExecutionContext& ec, ChemEnv& chem
 
 template<typename TensorType>
 void exachem::scf::SCFQed::compute_qed_emult_ints(ExecutionContext& ec, ChemEnv& chem_env,
-                                                  const SCFVars& spvars, TAMMTensors& ttensors) {
+                                                  const SCFData& spvars, TAMMTensors& ttensors) {
   using libint2::Atom;
   using libint2::BasisSet;
   using libint2::Engine;
@@ -304,15 +304,15 @@ void exachem::scf::SCFQed::compute_qed_emult_ints(ExecutionContext& ec, ChemEnv&
 
 template void exachem::scf::SCFQed::compute_QED_1body<double>(ExecutionContext& ec,
                                                               ChemEnv&          chem_env,
-                                                              const SCFVars&    scf_vars,
+                                                              const SCFData&    scf_data,
                                                               TAMMTensors&      ttensors);
 
 template void exachem::scf::SCFQed::compute_QED_2body<double>(ExecutionContext& ec,
                                                               ChemEnv&          chem_env,
-                                                              const SCFVars&    scf_vars,
+                                                              const SCFData&    scf_data,
                                                               TAMMTensors&      ttensors);
 
 template void exachem::scf::SCFQed::compute_qed_emult_ints<double>(ExecutionContext& ec,
                                                                    ChemEnv&          chem_env,
-                                                                   const SCFVars&    spvars,
+                                                                   const SCFData&    spvars,
                                                                    TAMMTensors&      ttensors);

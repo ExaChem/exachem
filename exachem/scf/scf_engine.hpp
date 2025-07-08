@@ -30,7 +30,7 @@ protected:
   SCFRestart          scf_restart;
   SCFIO<TensorType>   scf_output;
   ECMolden            ec_molden;
-  SCFVars             scf_vars;
+  SCFData             scf_data;
 
   std::string files_prefix;
   enum class FileType {

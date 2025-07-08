@@ -35,7 +35,7 @@ std::vector<size_t> exachem::scf::sort_indexes(std::vector<T>& v, bool reverse) 
 //
 // A is conditioned to max_condition_number
 std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec, ChemEnv& chem_env,
-                                                            SCFVars&       scf_vars,
+                                                            SCFData&       scf_data,
                                                             ScalapackInfo& scalapack_info,
                                                             exachem::scf::TAMMTensors& ttensors,
                                                             bool symmetric, double threshold) {
@@ -65,8 +65,8 @@ std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec
     scalapackpp::BlockCyclicDist2D* blockcyclic_dist = scalapack_info.blockcyclic_dist.get();
     const tamm::Tile                mb               = blockcyclic_dist->mb();
 
-    scf_vars.tN_bc         = TiledIndexSpace{IndexSpace{range(sys_data.nbf_orig)}, mb};
-    TiledIndexSpace& tN_bc = scf_vars.tN_bc;
+    scf_data.tN_bc         = TiledIndexSpace{IndexSpace{range(sys_data.nbf_orig)}, mb};
+    TiledIndexSpace& tN_bc = scf_data.tN_bc;
     Tensor<T>        S_BC{tN_bc, tN_bc};
     V_sca = {tN_bc, tN_bc};
     S_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
@@ -184,11 +184,11 @@ std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec
   sys_data.n_lindep = n_illcond;
   sys_data.nbf      = n_cond;
 
-  scf_vars.tAO_ortho =
+  scf_data.tAO_ortho =
     TiledIndexSpace{IndexSpace{range((size_t) sys_data.nbf)}, scf_options.AO_tilesize};
 
-  Tensor<T> X_tmp{scf_vars.tAO, scf_vars.tAO_ortho};
-  Tensor<T> eps_tamm{scf_vars.tAO_ortho};
+  Tensor<T> X_tmp{scf_data.tAO, scf_data.tAO_ortho};
+  Tensor<T> eps_tamm{scf_data.tAO_ortho};
   Tensor<T>::allocate(&ec, X_tmp, eps_tamm);
 
   if(world_rank == 0) {
@@ -202,13 +202,13 @@ std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec
 #if defined(USE_SCALAPACK)
   if(scalapack_info.pg.is_valid()) {
     const tamm::Tile _mb = (scalapack_info.blockcyclic_dist.get())->mb();
-    scf_vars.tNortho_bc  = TiledIndexSpace{IndexSpace{range(sys_data.nbf)}, _mb};
-    ttensors.X_alpha     = {scf_vars.tN_bc, scf_vars.tNortho_bc};
+    scf_data.tNortho_bc  = TiledIndexSpace{IndexSpace{range(sys_data.nbf)}, _mb};
+    ttensors.X_alpha     = {scf_data.tN_bc, scf_data.tNortho_bc};
     ttensors.X_alpha.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
     Tensor<TensorType>::allocate(&scalapack_info.ec, ttensors.X_alpha);
   }
 #else
-  ttensors.X_alpha = {scf_vars.tAO, scf_vars.tAO_ortho};
+  ttensors.X_alpha = {scf_data.tAO, scf_data.tAO_ortho};
   sch.allocate(ttensors.X_alpha).execute();
 #endif
 
@@ -233,9 +233,9 @@ std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec
   ec.pg().barrier();
 #endif
 
-  Tensor<T> X_comp{scf_vars.tAO, scf_vars.tAO_ortho};
-  auto      mu   = scf_vars.tAO.label("all");
-  auto      mu_o = scf_vars.tAO_ortho.label("all");
+  Tensor<T> X_comp{scf_data.tAO, scf_data.tAO_ortho};
+  auto      mu   = scf_data.tAO.label("all");
+  auto      mu_o = scf_data.tAO_ortho.label("all");
 
 #if defined(USE_SCALAPACK)
   sch.allocate(X_comp).execute();
@@ -254,7 +254,7 @@ std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec
 }
 
 std::tuple<Matrix, size_t, double, double>
-exachem::scf::gensqrtinv_atscf(ExecutionContext& ec, ChemEnv& chem_env, SCFVars& scf_vars,
+exachem::scf::gensqrtinv_atscf(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
                                ScalapackInfo& scalapack_info, Tensor<double> S1,
                                TiledIndexSpace& tao_atom, bool symmetric, double threshold) {
   using T = double;

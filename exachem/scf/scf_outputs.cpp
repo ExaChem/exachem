@@ -85,7 +85,7 @@ void exachem::scf::DefaultSCFIO<T>::write_scf_mat(Matrix& C, const std::string& 
 template<typename T>
 void exachem::scf::DefaultSCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_env,
                                                    TAMMTensors& ttensors, EigenTensors& etensors,
-                                                   SCFVars&       scf_vars,
+                                                   SCFData&       scf_data,
                                                    ScalapackInfo& scalapack_info) {
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
@@ -111,7 +111,7 @@ void exachem::scf::DefaultSCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv
     energy_2e  = 0.5 * tt_trace(ec, ttensors.D_last_alpha, ttensors.F_alpha_tmp);
 
     if(is_ks) {
-      if((!is_qed) || (is_qed && do_qed)) { energy_2e += scf_vars.exc; }
+      if((!is_qed) || (is_qed && do_qed)) { energy_2e += scf_data.exc; }
     }
 
     if(is_qed) {
@@ -119,12 +119,12 @@ void exachem::scf::DefaultSCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv
         energy_qed = tt_trace(ec, ttensors.D_last_alpha, ttensors.QED_1body);
         energy_qed += 0.5 * tt_trace(ec, ttensors.D_last_alpha, ttensors.QED_2body);
       }
-      else { energy_qed = scf_vars.eqed; }
+      else { energy_qed = scf_data.eqed; }
 
       Tensor<double> X_a;
 
 #if defined(USE_SCALAPACK)
-      X_a = {scf_vars.tAO, scf_vars.tAO_ortho};
+      X_a = {scf_data.tAO, scf_data.tAO_ortho};
       Tensor<double>::allocate(&ec, X_a);
       if(scalapack_info.pg.is_valid()) { tamm::from_block_cyclic_tensor(ttensors.X_alpha, X_a); }
 #else
@@ -134,9 +134,9 @@ void exachem::scf::DefaultSCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv
       energy_qed_et              = 0.0;
       std::vector<double> polvec = {0.0, 0.0, 0.0};
       Scheduler           sch{ec};
-      Tensor<double>      ehf_tmp{scf_vars.tAO, scf_vars.tAO};
-      Tensor<double>      QED_Qxx{scf_vars.tAO, scf_vars.tAO};
-      Tensor<double>      QED_Qyy{scf_vars.tAO, scf_vars.tAO};
+      Tensor<double>      ehf_tmp{scf_data.tAO, scf_data.tAO};
+      Tensor<double>      QED_Qxx{scf_data.tAO, scf_data.tAO};
+      Tensor<double>      QED_Qyy{scf_data.tAO, scf_data.tAO};
       sch.allocate(ehf_tmp, QED_Qxx, QED_Qyy).execute();
 
       for(int i = 0; i < sys_data.qed_nmodes; i++) {
@@ -176,7 +176,7 @@ void exachem::scf::DefaultSCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv
     NE_1e += tt_trace(ec, ttensors.D_last_beta, ttensors.V1);
     energy_1e += tt_trace(ec, ttensors.D_last_beta, ttensors.H1);
     energy_2e += 0.5 * tt_trace(ec, ttensors.D_last_beta, ttensors.F_beta_tmp);
-    if(is_ks) { energy_2e += scf_vars.exc; }
+    if(is_ks) { energy_2e += scf_data.exc; }
   }
 
   if(ec.pg().rank() == 0) {

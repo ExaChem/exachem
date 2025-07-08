@@ -12,9 +12,8 @@
 
 #include "exachem/common/chemenv.hpp"
 #include "exachem/common/cutils.hpp"
-#include "exachem/scf/scf_eigen_tensors.hpp"
-#include "exachem/scf/scf_tamm_tensors.hpp"
-#include "exachem/scf/scf_vars.hpp"
+#include "exachem/scf/scf_data.hpp"
+#include "exachem/scf/scf_tensors.hpp"
 
 using namespace tamm;
 using libint2::Atom;
@@ -37,7 +36,7 @@ public:
 };
 
 std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, ChemEnv& chem_env,
-                                              SCFVars& scf_vars, ScalapackInfo& scalapack_info,
+                                              SCFData& scf_data, ScalapackInfo& scalapack_info,
                                               TAMMTensors& ttensors, bool symmetric = false,
                                               double threshold = 1e-5);
 
@@ -71,12 +70,12 @@ std::vector<size_t> sort_indexes(std::vector<T>& v, bool reverse = false);
 // A is conditioned to max_condition_number
 
 std::tuple<size_t, double, double> gensqrtinv(ExecutionContext& ec, ChemEnv& chem_env,
-                                              SCFVars& scf_vars, ScalapackInfo& scalapack_info,
+                                              SCFData& scf_data, ScalapackInfo& scalapack_info,
                                               TAMMTensors& ttensors, bool symmetric,
                                               double threshold);
 
 std::tuple<Matrix, size_t, double, double>
-gensqrtinv_atscf(ExecutionContext& ec, ChemEnv& chem_env, SCFVars& scf_vars,
+gensqrtinv_atscf(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
                  ScalapackInfo& scalapack_info, Tensor<double> S1, TiledIndexSpace& tao_atom,
                  bool symmetric, double threshold);
 

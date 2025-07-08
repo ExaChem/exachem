@@ -5,7 +5,7 @@ set(SCF_SRCDIR scf)
 
 set(SCF_INCLUDES
     ${SCF_SRCDIR}/scf_qed.hpp
-    ${SCF_SRCDIR}/scf_vars.hpp
+    ${SCF_SRCDIR}/scf_data.hpp
     ${SCF_SRCDIR}/scf_iter.hpp
     ${SCF_SRCDIR}/scf_main.hpp
     ${SCF_SRCDIR}/scf_gauxc.hpp
@@ -16,8 +16,7 @@ set(SCF_INCLUDES
     ${SCF_SRCDIR}/scf_restart.hpp
     ${SCF_SRCDIR}/scf_outputs.hpp
     ${SCF_SRCDIR}/scf_engine.hpp
-    ${SCF_SRCDIR}/scf_tamm_tensors.hpp
-    ${SCF_SRCDIR}/scf_eigen_tensors.hpp
+    ${SCF_SRCDIR}/scf_tensors.hpp
     )
 
 set(SCF_SRCS

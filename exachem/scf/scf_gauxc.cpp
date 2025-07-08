@@ -12,7 +12,7 @@
 
 std::tuple<std::shared_ptr<GauXC::XCIntegrator<Matrix>>, double>
 exachem::scf::gauxc::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
-                                 const SCFVars& scf_vars) {
+                                 const SCFData& scf_data) {
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -248,7 +248,7 @@ GauXC::BasisSet<double> exachem::scf::gauxc::make_gauxc_basis(const libint2::Bas
 }
 
 template<typename TensorType>
-void exachem::scf::gauxc::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, SCFVars& scf_vars,
+void exachem::scf::gauxc::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
                                       exachem::scf::TAMMTensors&   ttensors,
                                       exachem::scf::EigenTensors&  etensors,
                                       GauXC::XCIntegrator<Matrix>& xc_integrator) {
@@ -256,13 +256,13 @@ void exachem::scf::gauxc::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, S
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   Scheduler              sch{ec};
-  const TiledIndexSpace& tAO = scf_vars.tAO;
+  const TiledIndexSpace& tAO = scf_data.tAO;
   auto [mu, nu]              = tAO.labels<2>("all");
 
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;
   auto       rank0  = ec.pg().rank() == 0;
-  auto       factor = is_rhf ? 0.5 * scf_vars.xHF : scf_vars.xHF;
+  auto       factor = is_rhf ? 0.5 * scf_data.xHF : scf_data.xHF;
 
   GauXC::IntegratorSettingsSNLinK sn_link_settings;
   sn_link_settings.energy_tol = scf_options.xc_snK_etol;
@@ -385,7 +385,7 @@ template double exachem::scf::gauxc::compute_xcf<double>(
   exachem::scf::EigenTensors& etensors, GauXC::XCIntegrator<Matrix>& xc_integrator);
 
 template void exachem::scf::gauxc::compute_exx<double>(ExecutionContext& ec, ChemEnv& chem_env,
-                                                       SCFVars&                     scf_vars,
+                                                       SCFData&                     scf_data,
                                                        exachem::scf::TAMMTensors&   ttensors,
                                                        exachem::scf::EigenTensors&  etensors,
                                                        GauXC::XCIntegrator<Matrix>& xc_integrator);

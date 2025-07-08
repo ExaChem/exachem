@@ -442,22 +442,22 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
   // const TAMM_GA_SIZE northo      = sys_data.nbf;
   const TAMM_GA_SIZE nao = sys_data.nbf_orig;
 
-  SCFVars    scf_vars; // init vars
+  SCFData    scf_data; // init vars
   SCFCompute scf_compute;
-  std::tie(scf_vars.shell_tile_map, scf_vars.AO_tiles, scf_vars.AO_opttiles) =
+  std::tie(scf_data.shell_tile_map, scf_data.AO_tiles, scf_data.AO_opttiles) =
     scf_compute.compute_AO_tiles(ec, chem_env, shells);
-  scf_compute.compute_shellpair_list(ec, shells, scf_vars);
+  scf_compute.compute_shellpair_list(ec, shells, scf_data);
   auto [obs_shellpair_list, obs_shellpair_data] = scf_compute.compute_shellpairs(shells);
 
   IndexSpace AO{range(0, shells.nbf())};
-  scf_vars.tAO    = {AO, scf_vars.AO_opttiles};
-  Matrix SchwarzK = scf_compute.compute_schwarz_ints<>(ec, scf_vars, shells);
+  scf_data.tAO    = {AO, scf_data.AO_opttiles};
+  Matrix SchwarzK = scf_compute.compute_schwarz_ints<>(ec, scf_data, shells);
 
   auto shell2bf = BasisSetMap::map_shell_to_basis_function(shells);
   auto bf2shell = BasisSetMap::map_basis_function_to_shell(shells);
 
-  std::vector<size_t>     shell_tile_map = scf_vars.shell_tile_map;
-  std::vector<tamm::Tile> AO_tiles       = scf_vars.AO_tiles;
+  std::vector<size_t>     shell_tile_map = scf_data.shell_tile_map;
+  std::vector<tamm::Tile> AO_tiles       = scf_data.AO_tiles;
 
   // TiledIndexSpace tAOt{tAO.index_space(), AO_tiles};
 
@@ -624,11 +624,11 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
 
         for(size_t s2 = s2range_start; s2 <= s2range_end; ++s2) {
           if(s2 > s1) {
-            auto s2spl = scf_vars.obs_shellpair_list[s2];
+            auto s2spl = scf_data.obs_shellpair_list[s2];
             if(std::find(s2spl.begin(), s2spl.end(), s1) == s2spl.end()) continue;
           }
           else {
-            auto s2spl = scf_vars.obs_shellpair_list[s1];
+            auto s2spl = scf_data.obs_shellpair_list[s1];
             if(std::find(s2spl.begin(), s2spl.end(), s2) == s2spl.end()) continue;
           }
 

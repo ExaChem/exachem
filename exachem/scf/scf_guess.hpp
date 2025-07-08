@@ -54,30 +54,30 @@ private:
 public:
   Matrix compute_soad(const std::vector<Atom>& atoms);
   template<typename TensorType>
-  void compute_dipole_ints(ExecutionContext& ec, const SCFVars& spvars, Tensor<TensorType>& tensorX,
+  void compute_dipole_ints(ExecutionContext& ec, const SCFData& spvars, Tensor<TensorType>& tensorX,
                            Tensor<TensorType>& tensorY, Tensor<TensorType>& tensorZ,
                            std::vector<libint2::Atom>& atoms, libint2::BasisSet& shells,
                            libint2::Operator otype);
   template<typename TensorType>
-  void compute_1body_ints(ExecutionContext& ec, const SCFVars& scf_vars,
+  void compute_1body_ints(ExecutionContext& ec, const SCFData& scf_data,
                           Tensor<TensorType>& tensor1e, std::vector<libint2::Atom>& atoms,
                           libint2::BasisSet& shells, libint2::Operator otype);
   template<typename TensorType>
-  void compute_ecp_ints(ExecutionContext& ec, const SCFVars& scf_vars, Tensor<TensorType>& tensor1e,
+  void compute_ecp_ints(ExecutionContext& ec, const SCFData& scf_data, Tensor<TensorType>& tensor1e,
                         std::vector<libecpint::GaussianShell>& shells,
                         std::vector<libecpint::ECP>&           ecps);
   template<typename TensorType>
-  void compute_pchg_ints(ExecutionContext& ec, const SCFVars& scf_vars,
+  void compute_pchg_ints(ExecutionContext& ec, const SCFData& scf_data,
                          Tensor<TensorType>&                                    tensor1e,
                          std::vector<std::pair<double, std::array<double, 3>>>& q,
                          libint2::BasisSet& shells, libint2::Operator otype);
   template<typename TensorType>
-  void scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, SCFVars& scf_vars,
+  void scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, SCFData& scf_data,
                        ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
                        EigenTensors& etensors);
 
   template<typename TensorType>
-  void compute_sad_guess(ExecutionContext& ec, ChemEnv& chem_env, SCFVars& scf_vars,
+  void compute_sad_guess(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
                          ScalapackInfo& scalapack_info, EigenTensors& etensors,
                          TAMMTensors& ttensors);
 

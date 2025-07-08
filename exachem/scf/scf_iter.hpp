@@ -19,47 +19,47 @@ class DefaultSCFIter {
 protected:
   virtual void scf_diis(ExecutionContext& ec, ChemEnv& chem_env, const TiledIndexSpace& tAO,
                         Tensor<T> F_alpha, Tensor<T> F_beta, Tensor<T> err_mat_alpha,
-                        Tensor<T> err_mat_beta, int iter, int max_hist, const SCFVars& scf_vars,
+                        Tensor<T> err_mat_beta, int iter, int max_hist, const SCFData& scf_data,
                         const int n_lindep, std::vector<Tensor<T>>& diis_hist_alpha,
                         std::vector<Tensor<T>>& diis_hist_beta,
                         std::vector<Tensor<T>>& fock_hist_alpha,
                         std::vector<Tensor<T>>& fock_hist_beta);
 
   virtual void compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_env,
-                              ScalapackInfo& scalapack_info, const SCFVars& scf_vars,
+                              ScalapackInfo& scalapack_info, const SCFData& scf_data,
                               const std::vector<size_t>& shell2bf, TAMMTensors& ttensors,
                               EigenTensors& etensors, bool& is_3c_init, double xHF);
 
-  virtual void compute_3c_ints(ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars,
+  virtual void compute_3c_ints(ExecutionContext& ec, ChemEnv& chem_env, const SCFData& scf_data,
                                Tensor<T>& xyZ);
 
   virtual void compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_env, EigenTensors& etensors,
-                               const SCFVars& scf_vars, TAMMTensors& ttensors);
+                               const SCFData& scf_data, TAMMTensors& ttensors);
 
   virtual void compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv& chem_env,
-                                     const SCFVars& scf_vars, const std::vector<size_t>& shell2bf,
+                                     const SCFData& scf_data, const std::vector<size_t>& shell2bf,
                                      TAMMTensors& ttensors, EigenTensors& etensors,
                                      const Matrix& SchwarzK);
 
 public:
   virtual void init_ri(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-                       const SCFVars& scf_vars, EigenTensors& etensors, TAMMTensors& ttensors);
+                       const SCFData& scf_data, EigenTensors& etensors, TAMMTensors& ttensors);
 
   virtual void compute_2bf(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-                           const SCFVars& scf_vars, const bool do_schwarz_screen,
+                           const SCFData& scf_data, const bool do_schwarz_screen,
                            const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
                            const size_t& max_nprim4, TAMMTensors& ttensors, EigenTensors& etensors,
                            bool& is_3c_init, const bool do_density_fitting, double xHF);
 
   virtual std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-  compute_2bf_taskinfo(ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars,
+  compute_2bf_taskinfo(ExecutionContext& ec, ChemEnv& chem_env, const SCFData& scf_data,
                        const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
                        const Matrix& SchwarzK, const size_t& max_nprim4, TAMMTensors& ttensors,
                        EigenTensors& etensors, const bool cs1s2 = false);
 
   virtual std::tuple<T, T> scf_iter_body(ExecutionContext& ec, ChemEnv& chem_env,
                                          ScalapackInfo& scalapack_info, const int& iter,
-                                         SCFVars& scf_vars, TAMMTensors& ttensors,
+                                         SCFData& scf_data, TAMMTensors& ttensors,
                                          EigenTensors& etensors
 #if defined(USE_GAUXC)
                                          ,

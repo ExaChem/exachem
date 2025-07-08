@@ -189,7 +189,7 @@ void check_basis_file(ExecutionContext& exc, bool single_basis, const ECAtom& ec
 
 void ECBasis::parse_ecps(ExecutionContext& exc, std::vector<lib_atom>& atoms,
                          std::vector<ECAtom>& ec_atoms) {
-  std::cout << std::endl;
+  if(exc.print()) std::cout << std::endl;
   std::map<std::string, ECAtom> unique_atom_labels;
   for(auto& ecatom: ec_atoms) { unique_atom_labels.emplace(ecatom.esymbol, ecatom); }
   for(const auto& [esymbol, ecatom]: unique_atom_labels) {

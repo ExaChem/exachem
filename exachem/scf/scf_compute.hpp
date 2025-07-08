@@ -26,14 +26,14 @@ namespace exachem::scf {
 class SCFCompute {
 public:
   void compute_shellpair_list(const ExecutionContext& ec, const libint2::BasisSet& shells,
-                              SCFVars& scf_vars);
+                              SCFData& scf_data);
   void compute_trafo(const libint2::BasisSet& shells, EigenTensors& etensors);
   std::tuple<int, double> compute_NRE(const ExecutionContext&     ec,
                                       std::vector<libint2::Atom>& atoms);
   std::tuple<shellpair_list_t, shellpair_data_t>
        compute_shellpairs(const libint2::BasisSet& bs1,
                           const libint2::BasisSet& bs2 = libint2::BasisSet(), double threshold = 1e-16);
-  void compute_orthogonalizer(ExecutionContext& ec, ChemEnv& chem_env, SCFVars& scf_vars,
+  void compute_orthogonalizer(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
                               ScalapackInfo& scalapack_info, TAMMTensors& ttensors);
 
   std::tuple<std::vector<size_t>, std::vector<Tile>, std::vector<Tile>>
@@ -51,16 +51,16 @@ public:
                             EigenTensors& etensors);
 
   template<typename TensorType>
-  void compute_hamiltonian(ExecutionContext& ec, const SCFVars& scf_vars, ChemEnv& chem_env,
+  void compute_hamiltonian(ExecutionContext& ec, const SCFData& scf_data, ChemEnv& chem_env,
                            TAMMTensors& ttensors, EigenTensors& etensors);
 
   template<typename TensorType>
-  void compute_density(ExecutionContext& ec, ChemEnv& chem_env, const SCFVars& scf_vars,
+  void compute_density(ExecutionContext& ec, ChemEnv& chem_env, const SCFData& scf_data,
                        ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
                        EigenTensors& etensors);
 
   template<libint2::Operator Kernel = libint2::Operator::coulomb>
-  Matrix compute_schwarz_ints(ExecutionContext& ec, const SCFVars& scf_vars,
+  Matrix compute_schwarz_ints(ExecutionContext& ec, const SCFData& scf_data,
                               const libint2::BasisSet& bs1,
                               const libint2::BasisSet& bs2 = libint2::BasisSet(),
                               bool use_2norm               = false, // use infty norm by default

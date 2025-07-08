@@ -10,9 +10,8 @@
 
 #include "exachem/common/cutils.hpp"
 #include "exachem/common/ec_molden.hpp"
-#include "exachem/scf/scf_eigen_tensors.hpp"
 #include "exachem/scf/scf_outputs.hpp"
-#include "exachem/scf/scf_tamm_tensors.hpp"
+#include "exachem/scf/scf_tensors.hpp"
 using namespace tamm;
 
 namespace exachem::scf {

@@ -9,7 +9,7 @@
 #pragma once
 
 #include "exachem/common/libint2_includes.hpp"
-#include "tamm/tamm.hpp"
+#include "exachem/scf/scf_tensors.hpp"
 #include <libecpint.hpp>
 
 using namespace tamm;
@@ -19,7 +19,7 @@ using shellpair_data_t =
 
 namespace exachem::scf {
 
-class SCFVars {
+class SCFData {
 public:
   // diis
   int                      idiis        = 0;

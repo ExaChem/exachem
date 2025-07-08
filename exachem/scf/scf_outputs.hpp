@@ -11,9 +11,8 @@
 #include "exachem/common/cutils.hpp"
 #include "exachem/common/ec_basis.hpp"
 #include "exachem/scf/scf_compute.hpp"
-#include "exachem/scf/scf_eigen_tensors.hpp"
-#include "exachem/scf/scf_tamm_tensors.hpp"
-#include "exachem/scf/scf_vars.hpp"
+#include "exachem/scf/scf_data.hpp"
+#include "exachem/scf/scf_tensors.hpp"
 #include <string>
 
 namespace exachem::scf {
@@ -39,7 +38,7 @@ public:
                            bool read = false);
   virtual void print_mulliken(ChemEnv& chem_env, Matrix& D, Matrix& D_beta, Matrix& S);
   virtual void print_energies(ExecutionContext& ec, ChemEnv& chem_env, TAMMTensors& ttensors,
-                              EigenTensors& etensors, SCFVars& scf_vars,
+                              EigenTensors& etensors, SCFData& scf_data,
                               ScalapackInfo& scalapack_info);
 };
 

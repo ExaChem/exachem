@@ -18,14 +18,13 @@
 #include "exachem/common/chemenv.hpp"
 #include "exachem/common/options/input_options.hpp"
 #include "exachem/scf/scf_compute.hpp"
-#include "exachem/scf/scf_eigen_tensors.hpp"
-#include "exachem/scf/scf_tamm_tensors.hpp"
-#include "exachem/scf/scf_vars.hpp"
+#include "exachem/scf/scf_data.hpp"
+#include "exachem/scf/scf_tensors.hpp"
 
 namespace exachem::scf::gauxc {
 
 std::tuple<std::shared_ptr<GauXC::XCIntegrator<Matrix>>, double>
-setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env, const SCFVars& scf_vars);
+setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data);
 
 GauXC::Molecule make_gauxc_molecule(const std::vector<libint2::Atom>& atoms);
 
@@ -37,7 +36,7 @@ TensorType compute_xcf(ExecutionContext& ec, ChemEnv& chem_env, exachem::scf::TA
                        GauXC::XCIntegrator<Matrix>& xc_integrator);
 
 template<typename TensorType>
-void compute_exx(ExecutionContext& ec, ChemEnv& chem_env, SCFVars& scf_vars,
+void compute_exx(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
                  exachem::scf::TAMMTensors& ttensors, exachem::scf::EigenTensors& etensors,
                  GauXC::XCIntegrator<Matrix>& xc_integrator);
 

@@ -29,18 +29,18 @@ exachem::scf::DefaultSCFEngine::DefaultSCFEngine(ExecutionContext& exc, ChemEnv&
 
 void exachem::scf::DefaultSCFEngine::initialize_scf_vars_and_tensors(ChemEnv& chem_env) {
   const int N     = chem_env.shells.nbf();
-  scf_vars.lshift = chem_env.ioptions.scf_options.lshift;
-  if(!chem_env.ioptions.scf_options.dfbasis.empty()) scf_vars.do_dens_fit = true;
-  chem_env.scf_context.do_df = scf_vars.do_dens_fit;
+  scf_data.lshift = chem_env.ioptions.scf_options.lshift;
+  if(!chem_env.ioptions.scf_options.dfbasis.empty()) scf_data.do_dens_fit = true;
+  chem_env.scf_context.do_df = scf_data.do_dens_fit;
 
-  if(!scf_vars.do_dens_fit || scf_vars.direct_df || chem_env.sys_data.is_ks ||
+  if(!scf_data.do_dens_fit || scf_data.direct_df || chem_env.sys_data.is_ks ||
      chem_env.sys_data.do_snK) {
     // needed for 4c HF, direct_df, KS, or snK
-    scf_vars.etensors.D_alpha = Matrix::Zero(N, N);
-    scf_vars.etensors.G_alpha = Matrix::Zero(N, N);
+    scf_data.etensors.D_alpha = Matrix::Zero(N, N);
+    scf_data.etensors.G_alpha = Matrix::Zero(N, N);
     if(chem_env.sys_data.is_unrestricted) {
-      scf_vars.etensors.D_beta = Matrix::Zero(N, N);
-      scf_vars.etensors.G_beta = Matrix::Zero(N, N);
+      scf_data.etensors.D_beta = Matrix::Zero(N, N);
+      scf_data.etensors.G_beta = Matrix::Zero(N, N);
     }
   }
 }
@@ -92,49 +92,49 @@ void exachem::scf::DefaultSCFEngine::write_dplot_data(ExecutionContext& ec, Chem
 
   // if(dplot_opt.density == "spin") // TODO
   // else plot total density by default when cube=true
-  /* else */ EC_DPLOT::write_dencube(ec, chem_env, scf_vars.etensors.D_alpha,
-                                     scf_vars.etensors.D_beta, files_prefix);
+  /* else */ EC_DPLOT::write_dencube(ec, chem_env, scf_data.etensors.D_alpha,
+                                     scf_data.etensors.D_beta, files_prefix);
 #if defined(USE_SCALAPACK)
   if(scalapack_info.pg.is_valid()) {
-    tamm::from_block_cyclic_tensor(scf_vars.ttensors.C_alpha_BC, scf_vars.ttensors.C_alpha);
+    tamm::from_block_cyclic_tensor(scf_data.ttensors.C_alpha_BC, scf_data.ttensors.C_alpha);
     if(is_uhf)
-      tamm::from_block_cyclic_tensor(scf_vars.ttensors.C_beta_BC, scf_vars.ttensors.C_beta);
+      tamm::from_block_cyclic_tensor(scf_data.ttensors.C_beta_BC, scf_data.ttensors.C_beta);
   }
-  tamm_to_eigen_tensor(scf_vars.ttensors.C_alpha, scf_vars.etensors.C_alpha);
-  if(is_uhf) tamm_to_eigen_tensor(scf_vars.ttensors.C_beta, scf_vars.etensors.C_beta);
+  tamm_to_eigen_tensor(scf_data.ttensors.C_alpha, scf_data.etensors.C_alpha);
+  if(is_uhf) tamm_to_eigen_tensor(scf_data.ttensors.C_beta, scf_data.etensors.C_beta);
 #else
   if(rank != 0) {
-    scf_vars.etensors.C_alpha.resize(chem_env.sys_data.nbf_orig, chem_env.sys_data.nbf);
+    scf_data.etensors.C_alpha.resize(chem_env.sys_data.nbf_orig, chem_env.sys_data.nbf);
     if(is_uhf) {
-      scf_vars.etensors.C_beta.resize(chem_env.sys_data.nbf_orig, chem_env.sys_data.nbf);
+      scf_data.etensors.C_beta.resize(chem_env.sys_data.nbf_orig, chem_env.sys_data.nbf);
     }
   }
-  ec.pg().broadcast(scf_vars.etensors.C_alpha.data(), scf_vars.etensors.C_alpha.size(), 0);
+  ec.pg().broadcast(scf_data.etensors.C_alpha.data(), scf_data.etensors.C_alpha.size(), 0);
   if(is_uhf) {
-    ec.pg().broadcast(scf_vars.etensors.C_beta.data(), scf_vars.etensors.C_beta.size(), 0);
+    ec.pg().broadcast(scf_data.etensors.C_beta.data(), scf_data.etensors.C_beta.size(), 0);
   }
 #endif
   if(dplot_opt.orbitals > 0) {
     for(int iorb = chem_env.sys_data.nelectrons_alpha - 1;
         iorb >= std::max(0, chem_env.sys_data.nelectrons_alpha - dplot_opt.orbitals); iorb--) {
-      EC_DPLOT::write_mocube(ec, chem_env, scf_vars.etensors.C_alpha, iorb, "alpha", files_prefix);
+      EC_DPLOT::write_mocube(ec, chem_env, scf_data.etensors.C_alpha, iorb, "alpha", files_prefix);
     }
     for(int iorb = chem_env.sys_data.nelectrons_alpha;
         iorb <
         std::min(chem_env.sys_data.nbf, chem_env.sys_data.nelectrons_alpha + dplot_opt.orbitals);
         iorb++) {
-      EC_DPLOT::write_mocube(ec, chem_env, scf_vars.etensors.C_alpha, iorb, "alpha", files_prefix);
+      EC_DPLOT::write_mocube(ec, chem_env, scf_data.etensors.C_alpha, iorb, "alpha", files_prefix);
     }
     if(is_uhf) {
       for(int iorb = chem_env.sys_data.nelectrons_beta - 1;
           iorb >= std::max(0, chem_env.sys_data.nelectrons_beta - dplot_opt.orbitals); iorb--) {
-        EC_DPLOT::write_mocube(ec, chem_env, scf_vars.etensors.C_beta, iorb, "beta", files_prefix);
+        EC_DPLOT::write_mocube(ec, chem_env, scf_data.etensors.C_beta, iorb, "beta", files_prefix);
       }
       for(int iorb = chem_env.sys_data.nelectrons_beta - 1;
           iorb <
           std::min(chem_env.sys_data.nbf, chem_env.sys_data.nelectrons_beta + dplot_opt.orbitals);
           iorb++) {
-        EC_DPLOT::write_mocube(ec, chem_env, scf_vars.etensors.C_beta, iorb, "beta", files_prefix);
+        EC_DPLOT::write_mocube(ec, chem_env, scf_data.etensors.C_beta, iorb, "beta", files_prefix);
       }
     }
   }
@@ -142,27 +142,27 @@ void exachem::scf::DefaultSCFEngine::write_dplot_data(ExecutionContext& ec, Chem
 } // write_dplot_data
 
 void exachem::scf::DefaultSCFEngine::qed_tensors_1e(ExecutionContext& ec, ChemEnv& chem_env) {
-  const TiledIndexSpace& tAO  = scf_vars.tAO;
-  scf_vars.ttensors.QED_Dx    = {tAO, tAO};
-  scf_vars.ttensors.QED_Dy    = {tAO, tAO};
-  scf_vars.ttensors.QED_Dz    = {tAO, tAO};
-  scf_vars.ttensors.QED_Qxx   = {tAO, tAO};
-  scf_vars.ttensors.QED_Qxy   = {tAO, tAO};
-  scf_vars.ttensors.QED_Qxz   = {tAO, tAO};
-  scf_vars.ttensors.QED_Qyy   = {tAO, tAO};
-  scf_vars.ttensors.QED_Qyz   = {tAO, tAO};
-  scf_vars.ttensors.QED_Qzz   = {tAO, tAO};
-  scf_vars.ttensors.QED_1body = {tAO, tAO};
-  scf_vars.ttensors.QED_2body = {tAO, tAO};
+  const TiledIndexSpace& tAO  = scf_data.tAO;
+  scf_data.ttensors.QED_Dx    = {tAO, tAO};
+  scf_data.ttensors.QED_Dy    = {tAO, tAO};
+  scf_data.ttensors.QED_Dz    = {tAO, tAO};
+  scf_data.ttensors.QED_Qxx   = {tAO, tAO};
+  scf_data.ttensors.QED_Qxy   = {tAO, tAO};
+  scf_data.ttensors.QED_Qxz   = {tAO, tAO};
+  scf_data.ttensors.QED_Qyy   = {tAO, tAO};
+  scf_data.ttensors.QED_Qyz   = {tAO, tAO};
+  scf_data.ttensors.QED_Qzz   = {tAO, tAO};
+  scf_data.ttensors.QED_1body = {tAO, tAO};
+  scf_data.ttensors.QED_2body = {tAO, tAO};
 
   Tensor<TensorType>::allocate(
-    &ec, scf_vars.ttensors.QED_Dx, scf_vars.ttensors.QED_Dy, scf_vars.ttensors.QED_Dz,
-    scf_vars.ttensors.QED_Qxx, scf_vars.ttensors.QED_Qxy, scf_vars.ttensors.QED_Qxz,
-    scf_vars.ttensors.QED_Qyy, scf_vars.ttensors.QED_Qyz, scf_vars.ttensors.QED_Qzz,
-    scf_vars.ttensors.QED_1body, scf_vars.ttensors.QED_2body);
-  scf_qed.compute_qed_emult_ints<TensorType>(ec, chem_env, scf_vars, scf_vars.ttensors);
+    &ec, scf_data.ttensors.QED_Dx, scf_data.ttensors.QED_Dy, scf_data.ttensors.QED_Dz,
+    scf_data.ttensors.QED_Qxx, scf_data.ttensors.QED_Qxy, scf_data.ttensors.QED_Qxz,
+    scf_data.ttensors.QED_Qyy, scf_data.ttensors.QED_Qyz, scf_data.ttensors.QED_Qzz,
+    scf_data.ttensors.QED_1body, scf_data.ttensors.QED_2body);
+  scf_qed.compute_qed_emult_ints<TensorType>(ec, chem_env, scf_data, scf_data.ttensors);
   if(chem_env.sys_data.do_qed)
-    scf_qed.compute_QED_1body<TensorType>(ec, chem_env, scf_vars, scf_vars.ttensors);
+    scf_qed.compute_QED_1body<TensorType>(ec, chem_env, scf_data, scf_data.ttensors);
 } // end of initialize_qed_tensors
 
 void exachem::scf::DefaultSCFEngine::setup_libecpint(
@@ -214,32 +214,32 @@ void exachem::scf::DefaultSCFEngine::scf_orthogonalizer(ExecutionContext& ec, Ch
     chem_env.sys_data.nbf =
       chem_env.sys_data.nbf_orig - chem_env.sys_data.n_lindep; // Compute Northo
 
-    scf_vars.tAO_ortho = TiledIndexSpace{IndexSpace{range(0, (size_t) (chem_env.sys_data.nbf))},
+    scf_data.tAO_ortho = TiledIndexSpace{IndexSpace{range(0, (size_t) (chem_env.sys_data.nbf))},
                                          chem_env.ioptions.scf_options.AO_tilesize};
 
 #if defined(USE_SCALAPACK)
     {
       const tamm::Tile _mb =
         chem_env.ioptions.scf_options.scalapack_nb; //(scalapack_info.blockcyclic_dist)->mb();
-      scf_vars.tN_bc      = TiledIndexSpace{IndexSpace{range(chem_env.sys_data.nbf_orig)}, _mb};
-      scf_vars.tNortho_bc = TiledIndexSpace{IndexSpace{range(chem_env.sys_data.nbf)}, _mb};
+      scf_data.tN_bc      = TiledIndexSpace{IndexSpace{range(chem_env.sys_data.nbf_orig)}, _mb};
+      scf_data.tNortho_bc = TiledIndexSpace{IndexSpace{range(chem_env.sys_data.nbf)}, _mb};
       if(scalapack_info.pg.is_valid()) {
-        scf_vars.ttensors.X_alpha = {scf_vars.tN_bc, scf_vars.tNortho_bc};
-        scf_vars.ttensors.X_alpha.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-        Tensor<TensorType>::allocate(&scalapack_info.ec, scf_vars.ttensors.X_alpha);
-        scf_output.rw_mat_disk(scf_vars.ttensors.X_alpha, fname[FileType::Ortho],
+        scf_data.ttensors.X_alpha = {scf_data.tN_bc, scf_data.tNortho_bc};
+        scf_data.ttensors.X_alpha.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
+        Tensor<TensorType>::allocate(&scalapack_info.ec, scf_data.ttensors.X_alpha);
+        scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
                                chem_env.ioptions.scf_options.debug, true);
       }
     }
 #else
-    scf_vars.ttensors.X_alpha = {scf_vars.tAO, scf_vars.tAO_ortho};
-    sch.allocate(scf_vars.ttensors.X_alpha).execute();
-    scf_output.rw_mat_disk(scf_vars.ttensors.X_alpha, fname[FileType::Ortho],
+    scf_data.ttensors.X_alpha = {scf_data.tAO, scf_data.tAO_ortho};
+    sch.allocate(scf_data.ttensors.X_alpha).execute();
+    scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
                            chem_env.ioptions.scf_options.debug, true);
 #endif
   }
   else {
-    scf_compute.compute_orthogonalizer(ec, chem_env, scf_vars, scalapack_info, scf_vars.ttensors);
+    scf_compute.compute_orthogonalizer(ec, chem_env, scf_data, scalapack_info, scf_data.ttensors);
 
     if(rank == 0) {
       json jX;
@@ -250,10 +250,10 @@ void exachem::scf::DefaultSCFEngine::scf_orthogonalizer(ExecutionContext& ec, Ch
     if(N >= chem_env.ioptions.scf_options.restart_size) {
 #if defined(USE_SCALAPACK)
       if(scalapack_info.pg.is_valid())
-        scf_output.rw_mat_disk(scf_vars.ttensors.X_alpha, fname[FileType::Ortho],
+        scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
                                chem_env.ioptions.scf_options.debug);
 #else
-      scf_output.rw_mat_disk(scf_vars.ttensors.X_alpha, fname[FileType::Ortho],
+      scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
                              chem_env.ioptions.scf_options.debug);
 #endif
     }
@@ -261,16 +261,16 @@ void exachem::scf::DefaultSCFEngine::scf_orthogonalizer(ExecutionContext& ec, Ch
 
 #if defined(USE_SCALAPACK)
   if(scalapack_info.pg.is_valid()) {
-    scf_vars.ttensors.F_BC = {scf_vars.tN_bc, scf_vars.tN_bc};
-    scf_vars.ttensors.F_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-    scf_vars.ttensors.C_alpha_BC = {scf_vars.tN_bc, scf_vars.tNortho_bc};
-    scf_vars.ttensors.C_alpha_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-    Tensor<TensorType>::allocate(&scalapack_info.ec, scf_vars.ttensors.F_BC,
-                                 scf_vars.ttensors.C_alpha_BC);
+    scf_data.ttensors.F_BC = {scf_data.tN_bc, scf_data.tN_bc};
+    scf_data.ttensors.F_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
+    scf_data.ttensors.C_alpha_BC = {scf_data.tN_bc, scf_data.tNortho_bc};
+    scf_data.ttensors.C_alpha_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
+    Tensor<TensorType>::allocate(&scalapack_info.ec, scf_data.ttensors.F_BC,
+                                 scf_data.ttensors.C_alpha_BC);
     if(chem_env.sys_data.is_unrestricted) {
-      scf_vars.ttensors.C_beta_BC = {scf_vars.tN_bc, scf_vars.tNortho_bc};
-      scf_vars.ttensors.C_beta_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-      Tensor<TensorType>::allocate(&scalapack_info.ec, scf_vars.ttensors.C_beta_BC);
+      scf_data.ttensors.C_beta_BC = {scf_data.tN_bc, scf_data.tNortho_bc};
+      scf_data.ttensors.C_beta_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
+      Tensor<TensorType>::allocate(&scalapack_info.ec, scf_data.ttensors.C_beta_BC);
     }
   }
 #endif
@@ -278,117 +278,117 @@ void exachem::scf::DefaultSCFEngine::scf_orthogonalizer(ExecutionContext& ec, Ch
 } // scf_orthogonalizer
 
 void exachem::scf::DefaultSCFEngine::declare_main_tensors(ExecutionContext& ec, ChemEnv& chem_env) {
-  const TiledIndexSpace& tAO  = scf_vars.tAO;
-  const TiledIndexSpace& tAOt = scf_vars.tAOt;
+  const TiledIndexSpace& tAO  = scf_data.tAO;
+  const TiledIndexSpace& tAOt = scf_data.tAOt;
 
-  scf_vars.ttensors.ehf_tamm = Tensor<TensorType>{};
-  scf_vars.ttensors.F_dummy  = {tAOt, tAOt}; // not allocated
+  scf_data.ttensors.ehf_tamm = Tensor<TensorType>{};
+  scf_data.ttensors.F_dummy  = {tAOt, tAOt}; // not allocated
 
-  scf_vars.ttensors.ehf_tmp      = {tAO, tAO};
-  scf_vars.ttensors.F_alpha      = {tAO, tAO};
-  scf_vars.ttensors.D_alpha      = {tAO, tAO};
-  scf_vars.ttensors.D_diff       = {tAO, tAO};
-  scf_vars.ttensors.D_last_alpha = {tAO, tAO};
-  scf_vars.ttensors.F_alpha_tmp  = {tAO, tAO};
-  scf_vars.ttensors.FD_alpha     = {tAO, tAO};
-  scf_vars.ttensors.FDS_alpha    = {tAO, tAO};
+  scf_data.ttensors.ehf_tmp      = {tAO, tAO};
+  scf_data.ttensors.F_alpha      = {tAO, tAO};
+  scf_data.ttensors.D_alpha      = {tAO, tAO};
+  scf_data.ttensors.D_diff       = {tAO, tAO};
+  scf_data.ttensors.D_last_alpha = {tAO, tAO};
+  scf_data.ttensors.F_alpha_tmp  = {tAO, tAO};
+  scf_data.ttensors.FD_alpha     = {tAO, tAO};
+  scf_data.ttensors.FDS_alpha    = {tAO, tAO};
 
-  scf_vars.ttensors.C_alpha  = {tAO, scf_vars.tAO_ortho};
-  scf_vars.ttensors.C_occ_a  = {tAO, scf_vars.tAO_occ_a};
-  scf_vars.ttensors.C_occ_aT = {scf_vars.tAO_occ_a, tAO};
+  scf_data.ttensors.C_alpha  = {tAO, scf_data.tAO_ortho};
+  scf_data.ttensors.C_occ_a  = {tAO, scf_data.tAO_occ_a};
+  scf_data.ttensors.C_occ_aT = {scf_data.tAO_occ_a, tAO};
 
   // TODO: Enable only for DFT
-  scf_vars.ttensors.VXC_alpha = {tAO, tAO};
-  scf_vars.ttensors.VXC_beta  = {tAO, tAO};
+  scf_data.ttensors.VXC_alpha = {tAO, tAO};
+  scf_data.ttensors.VXC_beta  = {tAO, tAO};
 
   if(chem_env.sys_data.is_unrestricted) {
-    scf_vars.ttensors.C_beta       = {tAO, scf_vars.tAO_ortho};
-    scf_vars.ttensors.C_occ_b      = {tAO, scf_vars.tAO_occ_b};
-    scf_vars.ttensors.C_occ_bT     = {scf_vars.tAO_occ_b, tAO};
-    scf_vars.ttensors.ehf_beta_tmp = {tAO, tAO};
-    scf_vars.ttensors.F_beta       = {tAO, tAO};
-    scf_vars.ttensors.D_beta       = {tAO, tAO};
-    scf_vars.ttensors.D_last_beta  = {tAO, tAO};
-    scf_vars.ttensors.F_beta_tmp   = {tAO, tAO};
-    scf_vars.ttensors.FD_beta      = {tAO, tAO};
-    scf_vars.ttensors.FDS_beta     = {tAO, tAO};
+    scf_data.ttensors.C_beta       = {tAO, scf_data.tAO_ortho};
+    scf_data.ttensors.C_occ_b      = {tAO, scf_data.tAO_occ_b};
+    scf_data.ttensors.C_occ_bT     = {scf_data.tAO_occ_b, tAO};
+    scf_data.ttensors.ehf_beta_tmp = {tAO, tAO};
+    scf_data.ttensors.F_beta       = {tAO, tAO};
+    scf_data.ttensors.D_beta       = {tAO, tAO};
+    scf_data.ttensors.D_last_beta  = {tAO, tAO};
+    scf_data.ttensors.F_beta_tmp   = {tAO, tAO};
+    scf_data.ttensors.FD_beta      = {tAO, tAO};
+    scf_data.ttensors.FDS_beta     = {tAO, tAO};
   }
   Tensor<TensorType>::allocate(
-    &ec, scf_vars.ttensors.F_alpha, scf_vars.ttensors.C_alpha, scf_vars.ttensors.C_occ_a,
-    scf_vars.ttensors.C_occ_aT, scf_vars.ttensors.D_alpha, scf_vars.ttensors.D_last_alpha,
-    scf_vars.ttensors.D_diff, scf_vars.ttensors.F_alpha_tmp, scf_vars.ttensors.ehf_tmp,
-    scf_vars.ttensors.ehf_tamm, scf_vars.ttensors.FD_alpha, scf_vars.ttensors.FDS_alpha);
+    &ec, scf_data.ttensors.F_alpha, scf_data.ttensors.C_alpha, scf_data.ttensors.C_occ_a,
+    scf_data.ttensors.C_occ_aT, scf_data.ttensors.D_alpha, scf_data.ttensors.D_last_alpha,
+    scf_data.ttensors.D_diff, scf_data.ttensors.F_alpha_tmp, scf_data.ttensors.ehf_tmp,
+    scf_data.ttensors.ehf_tamm, scf_data.ttensors.FD_alpha, scf_data.ttensors.FDS_alpha);
   if(chem_env.sys_data.is_unrestricted)
-    Tensor<TensorType>::allocate(&ec, scf_vars.ttensors.F_beta, scf_vars.ttensors.C_beta,
-                                 scf_vars.ttensors.C_occ_b, scf_vars.ttensors.C_occ_bT,
-                                 scf_vars.ttensors.D_beta, scf_vars.ttensors.D_last_beta,
-                                 scf_vars.ttensors.F_beta_tmp, scf_vars.ttensors.ehf_beta_tmp,
-                                 scf_vars.ttensors.FD_beta, scf_vars.ttensors.FDS_beta);
+    Tensor<TensorType>::allocate(&ec, scf_data.ttensors.F_beta, scf_data.ttensors.C_beta,
+                                 scf_data.ttensors.C_occ_b, scf_data.ttensors.C_occ_bT,
+                                 scf_data.ttensors.D_beta, scf_data.ttensors.D_last_beta,
+                                 scf_data.ttensors.F_beta_tmp, scf_data.ttensors.ehf_beta_tmp,
+                                 scf_data.ttensors.FD_beta, scf_data.ttensors.FDS_beta);
 
-  if(chem_env.sys_data.is_ks) Tensor<TensorType>::allocate(&ec, scf_vars.ttensors.VXC_alpha);
+  if(chem_env.sys_data.is_ks) Tensor<TensorType>::allocate(&ec, scf_data.ttensors.VXC_alpha);
   if(chem_env.sys_data.is_ks && chem_env.sys_data.is_unrestricted)
-    Tensor<TensorType>::allocate(&ec, scf_vars.ttensors.VXC_beta);
+    Tensor<TensorType>::allocate(&ec, scf_data.ttensors.VXC_beta);
 
-  if(scf_vars.do_dens_fit) {
-    scf_vars.ttensors.xyZ =
-      Tensor<TensorType>{scf_vars.tAO, scf_vars.tAO, scf_vars.tdfAO}; // n,n,ndf
-    scf_vars.ttensors.xyK =
-      Tensor<TensorType>{scf_vars.tAO, scf_vars.tAO, scf_vars.tdfAO};           // n,n,ndf
-    scf_vars.ttensors.Vm1 = Tensor<TensorType>{scf_vars.tdfAO, scf_vars.tdfAO}; // ndf, ndf
-    if(!scf_vars.direct_df) Tensor<TensorType>::allocate(&ec, scf_vars.ttensors.xyK);
+  if(scf_data.do_dens_fit) {
+    scf_data.ttensors.xyZ =
+      Tensor<TensorType>{scf_data.tAO, scf_data.tAO, scf_data.tdfAO}; // n,n,ndf
+    scf_data.ttensors.xyK =
+      Tensor<TensorType>{scf_data.tAO, scf_data.tAO, scf_data.tdfAO};           // n,n,ndf
+    scf_data.ttensors.Vm1 = Tensor<TensorType>{scf_data.tdfAO, scf_data.tdfAO}; // ndf, ndf
+    if(!scf_data.direct_df) Tensor<TensorType>::allocate(&ec, scf_data.ttensors.xyK);
   }
 
   // Setup tiled index spaces when a fitting basis is provided
   //  dfCocc;
   IndexSpace dfCocc            = {range(0, chem_env.sys_data.nelectrons_alpha)};
-  scf_vars.tdfCocc             = {dfCocc, chem_env.ioptions.scf_options.dfAO_tilesize};
-  std::tie(scf_vars.dCocc_til) = scf_vars.tdfCocc.labels<1>("all");
+  scf_data.tdfCocc             = {dfCocc, chem_env.ioptions.scf_options.dfAO_tilesize};
+  std::tie(scf_data.dCocc_til) = scf_data.tdfCocc.labels<1>("all");
 
 } // declare main tensors
 
 void exachem::scf::DefaultSCFEngine::deallocate_main_tensors(ExecutionContext& ec,
                                                              ChemEnv&          chem_env) {
-  for(auto x: scf_vars.ttensors.ehf_tamm_hist) Tensor<TensorType>::deallocate(x);
+  for(auto x: scf_data.ttensors.ehf_tamm_hist) Tensor<TensorType>::deallocate(x);
 
-  for(auto x: scf_vars.ttensors.diis_hist) Tensor<TensorType>::deallocate(x);
-  for(auto x: scf_vars.ttensors.fock_hist) Tensor<TensorType>::deallocate(x);
-  for(auto x: scf_vars.ttensors.D_hist) Tensor<TensorType>::deallocate(x);
+  for(auto x: scf_data.ttensors.diis_hist) Tensor<TensorType>::deallocate(x);
+  for(auto x: scf_data.ttensors.fock_hist) Tensor<TensorType>::deallocate(x);
+  for(auto x: scf_data.ttensors.D_hist) Tensor<TensorType>::deallocate(x);
 
   if(chem_env.sys_data.is_unrestricted) {
-    for(auto x: scf_vars.ttensors.diis_beta_hist) Tensor<TensorType>::deallocate(x);
-    for(auto x: scf_vars.ttensors.fock_beta_hist) Tensor<TensorType>::deallocate(x);
-    for(auto x: scf_vars.ttensors.D_beta_hist) Tensor<TensorType>::deallocate(x);
+    for(auto x: scf_data.ttensors.diis_beta_hist) Tensor<TensorType>::deallocate(x);
+    for(auto x: scf_data.ttensors.fock_beta_hist) Tensor<TensorType>::deallocate(x);
+    for(auto x: scf_data.ttensors.D_beta_hist) Tensor<TensorType>::deallocate(x);
   }
-  if(scf_vars.do_dens_fit) {
-    if(scf_vars.direct_df) { Tensor<TensorType>::deallocate(scf_vars.ttensors.Vm1); }
-    else { Tensor<TensorType>::deallocate(scf_vars.ttensors.xyK); }
+  if(scf_data.do_dens_fit) {
+    if(scf_data.direct_df) { Tensor<TensorType>::deallocate(scf_data.ttensors.Vm1); }
+    else { Tensor<TensorType>::deallocate(scf_data.ttensors.xyK); }
   }
   if(chem_env.sys_data.is_ks) {
-    Tensor<TensorType>::deallocate(scf_vars.ttensors.VXC_alpha);
+    Tensor<TensorType>::deallocate(scf_data.ttensors.VXC_alpha);
     if(chem_env.sys_data.is_unrestricted)
-      Tensor<TensorType>::deallocate(scf_vars.ttensors.VXC_beta);
+      Tensor<TensorType>::deallocate(scf_data.ttensors.VXC_beta);
   }
   if(chem_env.sys_data.is_qed) {
     Tensor<TensorType>::deallocate(
-      scf_vars.ttensors.QED_Dx, scf_vars.ttensors.QED_Dy, scf_vars.ttensors.QED_Dz,
-      scf_vars.ttensors.QED_Qxx, scf_vars.ttensors.QED_Qxy, scf_vars.ttensors.QED_Qxz,
-      scf_vars.ttensors.QED_Qyy, scf_vars.ttensors.QED_Qyz, scf_vars.ttensors.QED_Qzz,
-      scf_vars.ttensors.QED_1body, scf_vars.ttensors.QED_2body);
+      scf_data.ttensors.QED_Dx, scf_data.ttensors.QED_Dy, scf_data.ttensors.QED_Dz,
+      scf_data.ttensors.QED_Qxx, scf_data.ttensors.QED_Qxy, scf_data.ttensors.QED_Qxz,
+      scf_data.ttensors.QED_Qyy, scf_data.ttensors.QED_Qyz, scf_data.ttensors.QED_Qzz,
+      scf_data.ttensors.QED_1body, scf_data.ttensors.QED_2body);
   }
 
   Tensor<TensorType>::deallocate(
-    scf_vars.ttensors.H1, scf_vars.ttensors.S1, scf_vars.ttensors.T1, scf_vars.ttensors.V1,
-    scf_vars.ttensors.F_alpha_tmp, scf_vars.ttensors.ehf_tmp, scf_vars.ttensors.ehf_tamm,
-    scf_vars.ttensors.F_alpha, scf_vars.ttensors.C_alpha, scf_vars.ttensors.C_occ_a,
-    scf_vars.ttensors.C_occ_aT, scf_vars.ttensors.D_alpha, scf_vars.ttensors.D_diff,
-    scf_vars.ttensors.D_last_alpha, scf_vars.ttensors.FD_alpha, scf_vars.ttensors.FDS_alpha);
+    scf_data.ttensors.H1, scf_data.ttensors.S1, scf_data.ttensors.T1, scf_data.ttensors.V1,
+    scf_data.ttensors.F_alpha_tmp, scf_data.ttensors.ehf_tmp, scf_data.ttensors.ehf_tamm,
+    scf_data.ttensors.F_alpha, scf_data.ttensors.C_alpha, scf_data.ttensors.C_occ_a,
+    scf_data.ttensors.C_occ_aT, scf_data.ttensors.D_alpha, scf_data.ttensors.D_diff,
+    scf_data.ttensors.D_last_alpha, scf_data.ttensors.FD_alpha, scf_data.ttensors.FDS_alpha);
 
   if(chem_env.sys_data.is_unrestricted)
-    Tensor<TensorType>::deallocate(scf_vars.ttensors.F_beta, scf_vars.ttensors.C_beta,
-                                   scf_vars.ttensors.C_occ_b, scf_vars.ttensors.C_occ_bT,
-                                   scf_vars.ttensors.D_beta, scf_vars.ttensors.D_last_beta,
-                                   scf_vars.ttensors.F_beta_tmp, scf_vars.ttensors.ehf_beta_tmp,
-                                   scf_vars.ttensors.FD_beta, scf_vars.ttensors.FDS_beta);
+    Tensor<TensorType>::deallocate(scf_data.ttensors.F_beta, scf_data.ttensors.C_beta,
+                                   scf_data.ttensors.C_occ_b, scf_data.ttensors.C_occ_bT,
+                                   scf_data.ttensors.D_beta, scf_data.ttensors.D_last_beta,
+                                   scf_data.ttensors.F_beta_tmp, scf_data.ttensors.ehf_beta_tmp,
+                                   scf_data.ttensors.FD_beta, scf_data.ttensors.FDS_beta);
 
 } // deallocate_main_tensors
 
@@ -397,29 +397,29 @@ void exachem::scf::DefaultSCFEngine::scf_final_io(ExecutionContext& ec, ChemEnv&
 
   if(!chem_env.ioptions.scf_options.noscf) {
     if(rank == 0) cout << "writing orbitals and density to disk ... ";
-    scf_output.rw_md_disk(ec, chem_env, scalapack_info, scf_vars.ttensors, scf_vars.etensors,
+    scf_output.rw_md_disk(ec, chem_env, scalapack_info, scf_data.ttensors, scf_data.etensors,
                           files_prefix);
     if(rank == 0) cout << "done." << endl;
   }
 
-  scf_output.rw_mat_disk(scf_vars.ttensors.H1, fname[FileType::Hcore],
+  scf_output.rw_mat_disk(scf_data.ttensors.H1, fname[FileType::Hcore],
                          chem_env.ioptions.scf_options.debug);
   if(chem_env.sys_data.is_ks) {
     // write vxc to disk
-    scf_output.rw_mat_disk(scf_vars.ttensors.VXC_alpha, fname[FileType::VxcAlpha],
+    scf_output.rw_mat_disk(scf_data.ttensors.VXC_alpha, fname[FileType::VxcAlpha],
                            chem_env.ioptions.scf_options.debug);
     if(chem_env.sys_data.is_unrestricted)
-      scf_output.rw_mat_disk(scf_vars.ttensors.VXC_beta, fname[FileType::VxcBeta],
+      scf_output.rw_mat_disk(scf_data.ttensors.VXC_beta, fname[FileType::VxcBeta],
                              chem_env.ioptions.scf_options.debug);
   }
   if(chem_env.sys_data.is_qed) {
-    scf_output.rw_mat_disk(scf_vars.ttensors.QED_Dx, fname[FileType::QEDDx],
+    scf_output.rw_mat_disk(scf_data.ttensors.QED_Dx, fname[FileType::QEDDx],
                            chem_env.ioptions.scf_options.debug);
-    scf_output.rw_mat_disk(scf_vars.ttensors.QED_Dy, fname[FileType::QEDDy],
+    scf_output.rw_mat_disk(scf_data.ttensors.QED_Dy, fname[FileType::QEDDy],
                            chem_env.ioptions.scf_options.debug);
-    scf_output.rw_mat_disk(scf_vars.ttensors.QED_Dz, fname[FileType::QEDDz],
+    scf_output.rw_mat_disk(scf_data.ttensors.QED_Dz, fname[FileType::QEDDz],
                            chem_env.ioptions.scf_options.debug);
-    scf_output.rw_mat_disk(scf_vars.ttensors.QED_Qxx, fname[FileType::QEDQxx],
+    scf_output.rw_mat_disk(scf_data.ttensors.QED_Qxx, fname[FileType::QEDQxx],
                            chem_env.ioptions.scf_options.debug);
   }
 } // scf_final_io
@@ -432,20 +432,20 @@ void exachem::scf::DefaultSCFEngine::setup_tiled_index_space(ExecutionContext& e
   const int N = chem_env.shells.nbf();
   AO          = {range(0, N)};
   scf_compute.recompute_tilesize(exc, chem_env);
-  std::tie(scf_vars.shell_tile_map, scf_vars.AO_tiles, scf_vars.AO_opttiles) =
+  std::tie(scf_data.shell_tile_map, scf_data.AO_tiles, scf_data.AO_opttiles) =
     scf_compute.compute_AO_tiles(exc, chem_env, chem_env.shells);
-  scf_vars.tAO                                       = {AO, scf_vars.AO_opttiles};
-  scf_vars.tAOt                                      = {AO, scf_vars.AO_tiles};
-  std::tie(scf_vars.mu, scf_vars.nu, scf_vars.ku)    = scf_vars.tAO.labels<3>("all");
-  std::tie(scf_vars.mup, scf_vars.nup, scf_vars.kup) = scf_vars.tAOt.labels<3>("all");
+  scf_data.tAO                                       = {AO, scf_data.AO_opttiles};
+  scf_data.tAOt                                      = {AO, scf_data.AO_tiles};
+  std::tie(scf_data.mu, scf_data.nu, scf_data.ku)    = scf_data.tAO.labels<3>("all");
+  std::tie(scf_data.mup, scf_data.nup, scf_data.kup) = scf_data.tAOt.labels<3>("all");
 
-  scf_vars.tAO_occ_a = TiledIndexSpace{range(0, chem_env.sys_data.nelectrons_alpha),
+  scf_data.tAO_occ_a = TiledIndexSpace{range(0, chem_env.sys_data.nelectrons_alpha),
                                        chem_env.ioptions.scf_options.AO_tilesize};
-  scf_vars.tAO_occ_b = TiledIndexSpace{range(0, chem_env.sys_data.nelectrons_beta),
+  scf_data.tAO_occ_b = TiledIndexSpace{range(0, chem_env.sys_data.nelectrons_beta),
                                        chem_env.ioptions.scf_options.AO_tilesize};
 
-  std::tie(scf_vars.mu_oa, scf_vars.nu_oa) = scf_vars.tAO_occ_a.labels<2>("all");
-  std::tie(scf_vars.mu_ob, scf_vars.nu_ob) = scf_vars.tAO_occ_b.labels<2>("all");
+  std::tie(scf_data.mu_oa, scf_data.nu_oa) = scf_data.tAO_occ_a.labels<2>("all");
+  std::tie(scf_data.mu_ob, scf_data.nu_ob) = scf_data.tAO_occ_b.labels<2>("all");
 } // setup_tiled_index_space
 
 #if defined(USE_GAUXC)
@@ -453,12 +453,12 @@ GauXC::XCIntegrator<Matrix>
 exachem::scf::DefaultSCFEngine::get_gauxc_integrator(ExecutionContext& ec, ChemEnv& chem_env) {
   auto rank = ec.pg().rank();
   if(chem_env.sys_data.is_ks || chem_env.sys_data.do_snK)
-    std::tie(gauxc_integrator_ptr, xHF) = scf::gauxc::setup_gauxc(ec, chem_env, scf_vars);
+    std::tie(gauxc_integrator_ptr, xHF) = scf::gauxc::setup_gauxc(ec, chem_env, scf_data);
   else xHF = 1.0;
   auto gauxc_integrator = (chem_env.sys_data.is_ks || chem_env.sys_data.do_snK)
                             ? GauXC::XCIntegrator<Matrix>(std::move(*gauxc_integrator_ptr))
                             : GauXC::XCIntegrator<Matrix>();
-  scf_vars.xHF          = xHF;
+  scf_data.xHF          = xHF;
   if(rank == 0) std::cout << "HF exch = " << xHF << std::endl;
   return gauxc_integrator;
 } // get_gauxc_integrator
@@ -469,8 +469,8 @@ void exachem::scf::DefaultSCFEngine::add_snk_contribution(
   // Add snK contribution
   if(chem_env.sys_data.do_snK) {
     const auto snK_start = std::chrono::high_resolution_clock::now();
-    scf::gauxc::compute_exx<TensorType>(ec, chem_env, scf_vars, scf_vars.ttensors,
-                                        scf_vars.etensors, gauxc_integrator);
+    scf::gauxc::compute_exx<TensorType>(ec, chem_env, scf_data, scf_data.ttensors,
+                                        scf_data.etensors, gauxc_integrator);
     const auto snK_stop = std::chrono::high_resolution_clock::now();
     const auto snK_time =
       std::chrono::duration_cast<std::chrono::duration<double>>((snK_stop - snK_start)).count();
@@ -488,8 +488,8 @@ void exachem::scf::DefaultSCFEngine::compute_update_xc(
   const bool is_ks = chem_env.sys_data.is_ks;
   if(is_ks) {
     const auto xcf_start = std::chrono::high_resolution_clock::now();
-    gauxc_exc            = scf::gauxc::compute_xcf<TensorType>(ec, chem_env, scf_vars.ttensors,
-                                                    scf_vars.etensors, gauxc_integrator);
+    gauxc_exc            = scf::gauxc::compute_xcf<TensorType>(ec, chem_env, scf_data.ttensors,
+                                                    scf_data.etensors, gauxc_integrator);
 
     const auto xcf_stop = std::chrono::high_resolution_clock::now();
     const auto xcf_time =
@@ -497,20 +497,20 @@ void exachem::scf::DefaultSCFEngine::compute_update_xc(
     auto debug = chem_env.ioptions.scf_options.debug;
     if(rank == 0 && debug)
       std::cout << std::fixed << std::setprecision(2) << "xcf: " << xcf_time << "s, ";
-    if(chem_env.sys_data.is_qed && !chem_env.sys_data.do_qed) { scf_vars.eqed = gauxc_exc; }
+    if(chem_env.sys_data.is_qed && !chem_env.sys_data.do_qed) { scf_data.eqed = gauxc_exc; }
   }
 
   ehf += gauxc_exc;
-  scf_vars.exc = gauxc_exc;
+  scf_data.exc = gauxc_exc;
 
   if(is_ks) {
-    sch(scf_vars.ttensors.F_alpha() += scf_vars.ttensors.VXC_alpha());
+    sch(scf_data.ttensors.F_alpha() += scf_data.ttensors.VXC_alpha());
     if(chem_env.sys_data.is_unrestricted) {
       // clang-format off
       sch
-        (scf_vars.ttensors.F_alpha() += scf_vars.ttensors.VXC_beta())
-        (scf_vars.ttensors.F_beta()  += scf_vars.ttensors.VXC_alpha())
-        (scf_vars.ttensors.F_beta()  += -1.0 * scf_vars.ttensors.VXC_beta());
+        (scf_data.ttensors.F_alpha() += scf_data.ttensors.VXC_beta())
+        (scf_data.ttensors.F_beta()  += scf_data.ttensors.VXC_alpha())
+        (scf_data.ttensors.F_beta()  += -1.0 * scf_data.ttensors.VXC_beta());
       // clang-format on
     }
     sch.execute();
@@ -537,33 +537,33 @@ void exachem::scf::DefaultSCFEngine::process_molden_data(ExecutionContext& ec, C
 void exachem::scf::DefaultSCFEngine::setup_density_fitting(ExecutionContext& exc,
                                                            ChemEnv&          chem_env) {
   auto rank = exc.pg().rank();
-  if(scf_vars.do_dens_fit) {
-    scf_vars.dfbs = libint2::BasisSet(chem_env.ioptions.scf_options.dfbasis, chem_env.atoms);
+  if(scf_data.do_dens_fit) {
+    scf_data.dfbs = libint2::BasisSet(chem_env.ioptions.scf_options.dfbasis, chem_env.atoms);
 
-    //  if(chem_env.ioptions.scf_options.gaussian_type == "spherical") scf_vars.dfbs.set_pure(true);
-    //     else scf_vars.dfbs.set_pure(false); // use cartesian gaussians
-    set_basis_purity(chem_env, scf_vars.dfbs);
-    if(rank == 0) cout << "density-fitting basis set rank = " << scf_vars.dfbs.nbf() << endl;
+    //  if(chem_env.ioptions.scf_options.gaussian_type == "spherical") scf_data.dfbs.set_pure(true);
+    //     else scf_data.dfbs.set_pure(false); // use cartesian gaussians
+    set_basis_purity(chem_env, scf_data.dfbs);
+    if(rank == 0) cout << "density-fitting basis set rank = " << scf_data.dfbs.nbf() << endl;
 
-    chem_env.sys_data.ndf = scf_vars.dfbs.nbf();
-    scf_vars.dfAO         = IndexSpace{range(0, chem_env.sys_data.ndf)};
+    chem_env.sys_data.ndf = scf_data.dfbs.nbf();
+    scf_data.dfAO         = IndexSpace{range(0, chem_env.sys_data.ndf)};
     scf_compute.recompute_tilesize(exc, chem_env, true);
-    std::tie(scf_vars.df_shell_tile_map, scf_vars.dfAO_tiles, scf_vars.dfAO_opttiles) =
-      scf_compute.compute_AO_tiles(exc, chem_env, scf_vars.dfbs, true);
+    std::tie(scf_data.df_shell_tile_map, scf_data.dfAO_tiles, scf_data.dfAO_opttiles) =
+      scf_compute.compute_AO_tiles(exc, chem_env, scf_data.dfbs, true);
 
-    scf_vars.tdfAO  = TiledIndexSpace{scf_vars.dfAO, scf_vars.dfAO_opttiles};
-    scf_vars.tdfAOt = TiledIndexSpace{scf_vars.dfAO, scf_vars.dfAO_tiles};
+    scf_data.tdfAO  = TiledIndexSpace{scf_data.dfAO, scf_data.dfAO_opttiles};
+    scf_data.tdfAOt = TiledIndexSpace{scf_data.dfAO, scf_data.dfAO_tiles};
     chem_env.sys_data.results["output"]["system_info"]["ndf"] = chem_env.sys_data.ndf;
   }
   std::unique_ptr<DFFockEngine> dffockengine(
-    scf_vars.do_dens_fit ? new DFFockEngine(chem_env.shells, scf_vars.dfbs) : nullptr);
+    scf_data.do_dens_fit ? new DFFockEngine(chem_env.shells, scf_data.dfbs) : nullptr);
   // End setup for fitting basis
 
 } // setup_density_fitting
 
 double exachem::scf::DefaultSCFEngine::calculate_diis_error(bool is_uhf, size_t ndiis) {
-  double lediis = pow(tamm::norm(scf_vars.ttensors.diis_hist[ndiis - 1]), 2);
-  if(is_uhf) { lediis += pow(tamm::norm(scf_vars.ttensors.diis_beta_hist[ndiis - 1]), 2); }
+  double lediis = pow(tamm::norm(scf_data.ttensors.diis_hist[ndiis - 1]), 2);
+  if(is_uhf) { lediis += pow(tamm::norm(scf_data.ttensors.diis_beta_hist[ndiis - 1]), 2); }
   return lediis;
 } // calculate_diis_energy
 
@@ -571,15 +571,15 @@ void exachem::scf::DefaultSCFEngine::reset_fock_and_save_last_density(ExecutionC
                                                                       ChemEnv&          chem_env) {
   // clang-format off
   Scheduler sch{exc};
-sch (scf_vars.ttensors.F_alpha_tmp() = 0)
-          (scf_vars.ttensors.D_last_alpha(scf_vars.mu,scf_vars.nu) = scf_vars.ttensors.D_alpha(scf_vars.mu,scf_vars.nu))
+sch (scf_data.ttensors.F_alpha_tmp() = 0)
+          (scf_data.ttensors.D_last_alpha(scf_data.mu,scf_data.nu) = scf_data.ttensors.D_alpha(scf_data.mu,scf_data.nu))
           .execute();
   // clang-format on
 
   if(chem_env.sys_data.is_unrestricted) {
     // clang-format off
-        sch (scf_vars.ttensors.F_beta_tmp() = 0)
-            (scf_vars.ttensors.D_last_beta(scf_vars.mu,scf_vars.nu) = scf_vars.ttensors.D_beta(scf_vars.mu,scf_vars.nu))
+        sch (scf_data.ttensors.F_beta_tmp() = 0)
+            (scf_data.ttensors.D_last_beta(scf_data.mu,scf_data.nu) = scf_data.ttensors.D_beta(scf_data.mu,scf_data.nu))
             .execute();
     // clang-format on
   }
@@ -595,17 +595,17 @@ void exachem::scf::DefaultSCFEngine::handle_energy_bumps(ExecutionContext& exc, 
   if(scf_state.nbumps > scf_state.nbumps_max &&
      scf_state.ndiis >= (size_t) chem_env.ioptions.scf_options.diis_hist) {
     scf_state.nbumps = 0;
-    scf_vars.idiis   = 0;
+    scf_data.idiis   = 0;
     if(rank == 0) std::cout << "Resetting DIIS" << std::endl;
-    for(auto x: scf_vars.ttensors.diis_hist) Tensor<TensorType>::deallocate(x);
-    for(auto x: scf_vars.ttensors.fock_hist) Tensor<TensorType>::deallocate(x);
-    scf_vars.ttensors.diis_hist.clear();
-    scf_vars.ttensors.fock_hist.clear();
+    for(auto x: scf_data.ttensors.diis_hist) Tensor<TensorType>::deallocate(x);
+    for(auto x: scf_data.ttensors.fock_hist) Tensor<TensorType>::deallocate(x);
+    scf_data.ttensors.diis_hist.clear();
+    scf_data.ttensors.fock_hist.clear();
     if(is_uhf) {
-      for(auto x: scf_vars.ttensors.diis_beta_hist) Tensor<TensorType>::deallocate(x);
-      for(auto x: scf_vars.ttensors.fock_beta_hist) Tensor<TensorType>::deallocate(x);
-      scf_vars.ttensors.diis_beta_hist.clear();
-      scf_vars.ttensors.fock_beta_hist.clear();
+      for(auto x: scf_data.ttensors.diis_beta_hist) Tensor<TensorType>::deallocate(x);
+      for(auto x: scf_data.ttensors.fock_beta_hist) Tensor<TensorType>::deallocate(x);
+      scf_data.ttensors.diis_beta_hist.clear();
+      scf_data.ttensors.fock_beta_hist.clear();
     }
   }
 } // handle_energy_bumps()
@@ -641,11 +641,11 @@ void exachem::scf::DefaultSCFEngine::print_write_iteration(ExecutionContext& exc
   }
   if(scf_state.iter % chem_env.ioptions.scf_options.writem == 0 ||
      chem_env.ioptions.scf_options.writem == 1) {
-    scf_output.rw_md_disk(exc, chem_env, scalapack_info, scf_vars.ttensors, scf_vars.etensors,
+    scf_output.rw_md_disk(exc, chem_env, scalapack_info, scf_data.ttensors, scf_data.etensors,
                           files_prefix);
   }
   if(chem_env.ioptions.scf_options.debug)
-    scf_output.print_energies(exc, chem_env, scf_vars.ttensors, scf_vars.etensors, scf_vars,
+    scf_output.print_energies(exc, chem_env, scf_data.ttensors, scf_data.etensors, scf_data,
                               scalapack_info);
 
 } // print_energy_iteration
@@ -671,39 +671,39 @@ void exachem::scf::DefaultSCFEngine::compute_fock_matrix(ExecutionContext& ec, C
                                                          bool&                is_3c_init) {
   Scheduler sch{ec};
   if(chem_env.sys_data.is_ks) { // or rohf
-    sch(scf_vars.ttensors.F_alpha_tmp() = 0).execute();
-    if(chem_env.sys_data.is_unrestricted) sch(scf_vars.ttensors.F_beta_tmp() = 0).execute();
+    sch(scf_data.ttensors.F_alpha_tmp() = 0).execute();
+    if(chem_env.sys_data.is_unrestricted) sch(scf_data.ttensors.F_beta_tmp() = 0).execute();
 
     auto xHF_adjust = xHF;
     // TODO: skip for non-CC methods
     if(!chem_env.ioptions.task_options.scf) xHF_adjust = 1.0;
     // build a new Fock matrix
-    scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen, shell2bf,
-                         SchwarzK, max_nprim4, scf_vars.ttensors, scf_vars.etensors, is_3c_init,
-                         scf_vars.do_dens_fit, xHF_adjust);
+    scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
+                         SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors, is_3c_init,
+                         scf_data.do_dens_fit, xHF_adjust);
 
     // Add QED contribution;
     // CHECK
 
     if(chem_env.sys_data.do_qed) {
-      scf_qed.compute_QED_2body<TensorType>(ec, chem_env, scf_vars, scf_vars.ttensors);
+      scf_qed.compute_QED_2body<TensorType>(ec, chem_env, scf_data, scf_data.ttensors);
     }
   }
-  else if(scf_vars.lshift > 0) {
+  else if(scf_data.lshift > 0) {
     // Remove level shift from Fock matrix
-    double lval = chem_env.sys_data.is_restricted ? 0.5 * scf_vars.lshift : scf_vars.lshift;
+    double lval = chem_env.sys_data.is_restricted ? 0.5 * scf_data.lshift : scf_data.lshift;
     // clang-format off
         sch
-        (scf_vars.ttensors.ehf_tmp(scf_vars.mu,scf_vars.ku) = scf_vars.ttensors.S1(scf_vars.mu,scf_vars.nu) * scf_vars.ttensors.D_last_alpha(scf_vars.nu,scf_vars.ku))
-        (scf_vars.ttensors.F_alpha(scf_vars.mu,scf_vars.ku) += lval * scf_vars.ttensors.ehf_tmp(scf_vars.mu,scf_vars.nu) * scf_vars.ttensors.S1(scf_vars.nu,scf_vars.ku))
+        (scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.ku) = scf_data.ttensors.S1(scf_data.mu,scf_data.nu) * scf_data.ttensors.D_last_alpha(scf_data.nu,scf_data.ku))
+        (scf_data.ttensors.F_alpha(scf_data.mu,scf_data.ku) += lval * scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.nu) * scf_data.ttensors.S1(scf_data.nu,scf_data.ku))
         .execute();
     // clang-format on
 
     if(is_uhf) {
       // clang-format off
           sch
-          (scf_vars.ttensors.ehf_tmp(scf_vars.mu,scf_vars.ku) = scf_vars.ttensors.S1(scf_vars.mu,scf_vars.nu) * scf_vars.ttensors.D_last_beta(scf_vars.nu,scf_vars.ku))
-          (scf_vars.ttensors.F_beta(scf_vars.mu,scf_vars.ku) += lval * scf_vars.ttensors.ehf_tmp(scf_vars.mu,scf_vars.nu) * scf_vars.ttensors.S1(scf_vars.nu,scf_vars.ku))
+          (scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.ku) = scf_data.ttensors.S1(scf_data.mu,scf_data.nu) * scf_data.ttensors.D_last_beta(scf_data.nu,scf_data.ku))
+          (scf_data.ttensors.F_beta(scf_data.mu,scf_data.ku) += lval * scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.nu) * scf_data.ttensors.S1(scf_data.nu,scf_data.ku))
           .execute();
       // clang-format on
     }
@@ -720,17 +720,17 @@ exachem::scf::DefaultSCFEngine::update_movecs(ExecutionContext& ec, ChemEnv& che
   Scheduler          schg{ec};
   AO_ortho     = {range(0, (size_t) (chem_env.sys_data.nbf_orig - chem_env.sys_data.n_lindep))};
   tAO_ortho    = {AO_ortho, chem_env.ioptions.scf_options.AO_tilesize};
-  C_alpha_tamm = {scf_vars.tAO, tAO_ortho};
-  C_beta_tamm  = {scf_vars.tAO, tAO_ortho};
-  scf_vars.ttensors.VXC_alpha = Tensor<TensorType>{scf_vars.tAO, scf_vars.tAO};
+  C_alpha_tamm = {scf_data.tAO, tAO_ortho};
+  C_beta_tamm  = {scf_data.tAO, tAO_ortho};
+  scf_data.ttensors.VXC_alpha = Tensor<TensorType>{scf_data.tAO, scf_data.tAO};
   if(chem_env.sys_data.is_unrestricted)
-    scf_vars.ttensors.VXC_beta = Tensor<TensorType>{scf_vars.tAO, scf_vars.tAO};
+    scf_data.ttensors.VXC_beta = Tensor<TensorType>{scf_data.tAO, scf_data.tAO};
 
   schg.allocate(C_alpha_tamm);
   if(chem_env.sys_data.is_unrestricted) schg.allocate(C_beta_tamm);
-  if(chem_env.sys_data.is_ks) schg.allocate(scf_vars.ttensors.VXC_alpha);
+  if(chem_env.sys_data.is_ks) schg.allocate(scf_data.ttensors.VXC_alpha);
   if(chem_env.sys_data.is_ks && chem_env.sys_data.is_unrestricted)
-    schg.allocate(scf_vars.ttensors.VXC_beta);
+    schg.allocate(scf_data.ttensors.VXC_beta);
   schg.execute();
 
   scf_output.rw_mat_disk(C_alpha_tamm, fname[FileType::AlphaMovecs],
@@ -743,12 +743,12 @@ exachem::scf::DefaultSCFEngine::update_movecs(ExecutionContext& ec, ChemEnv& che
     Matrix C_a = tamm_to_eigen_matrix(C_alpha_tamm);
     if(chem_env.sys_data.is_unrestricted)
       std::cout << "[MOLDEN] molden write for UHF unsupported!" << std::endl;
-    else ec_molden.write_molden(chem_env, C_a, scf_vars.etensors.eps_a, files_prefix);
+    else ec_molden.write_molden(chem_env, C_a, scf_data.etensors.eps_a, files_prefix);
   }
 
-  if(chem_env.sys_data.is_ks) schg.deallocate(scf_vars.ttensors.VXC_alpha);
+  if(chem_env.sys_data.is_ks) schg.deallocate(scf_data.ttensors.VXC_alpha);
   if(chem_env.sys_data.is_ks && chem_env.sys_data.is_unrestricted)
-    schg.deallocate(scf_vars.ttensors.VXC_beta);
+    schg.deallocate(scf_data.ttensors.VXC_beta);
   schg.execute();
 
   ec.pg().barrier();
@@ -829,7 +829,7 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
 
   // Compute non-negligible shell-pair list
 
-  scf_compute.compute_shellpair_list(exc, chem_env.shells, scf_vars);
+  scf_compute.compute_shellpair_list(exc, chem_env.shells, scf_data);
   setup_tiled_index_space(exc, chem_env);
 
   Scheduler schg{exc};
@@ -837,8 +837,8 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
 
   Tensor<TensorType> Fa_global, Fb_global;
 
-  Fa_global = {scf_vars.tAO, scf_vars.tAO};
-  Fb_global = {scf_vars.tAO, scf_vars.tAO};
+  Fa_global = {scf_data.tAO, scf_data.tAO};
+  Fb_global = {scf_data.tAO, scf_data.tAO};
   schg.allocate(Fa_global);
   if(chem_env.sys_data.is_unrestricted) schg.allocate(Fb_global);
   schg.execute();
@@ -854,7 +854,7 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
 
   exc.pg().barrier();
 
-  // const bool scf_vars.do_load_bal = scf_vars.do_scf_vars.do_load_bal;
+  // const bool scf_data.do_load_bal = scf_data.do_scf_vars.do_load_bal;
 
   // This is originally scf_restart_test
   scf_restart.run(exc, chem_env, files_prefix);
@@ -873,15 +873,15 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
     chem_env.sys_data.results["output"]["SCF"]["xHF"] = xHF;
 
     // Compute SPH<->CART transformation
-    scf_compute.compute_trafo(chem_env.shells, scf_vars.etensors);
+    scf_compute.compute_trafo(chem_env.shells, scf_data.etensors);
 
-    scf_vars.direct_df = scf_vars.do_dens_fit && chem_env.ioptions.scf_options.direct_df;
-    if(scf_vars.direct_df && xHF != 0.0 && !chem_env.sys_data.do_snK) {
+    scf_data.direct_df = scf_data.do_dens_fit && chem_env.ioptions.scf_options.direct_df;
+    if(scf_data.direct_df && xHF != 0.0 && !chem_env.sys_data.do_snK) {
       if(rank == 0) {
         cout << "[Warning] Direct DF cannot be used without snK and xHF != 0.0" << endl;
         cout << "Falling back to in-core DF" << endl;
       }
-      scf_vars.direct_df = false;
+      scf_data.direct_df = false;
     }
 
     // SETUP LibECPint
@@ -893,20 +893,20 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
 
     Scheduler sch{ec};
 
-    const TiledIndexSpace& tAO = scf_vars.tAO;
-    // const TiledIndexSpace& tAOt = scf_vars.tAOt;
+    const TiledIndexSpace& tAO = scf_data.tAO;
+    // const TiledIndexSpace& tAOt = scf_data.tAOt;
 
     /*** =========================== ***/
     /*** compute 1-e integrals       ***/
     /*** =========================== ***/
-    scf_compute.compute_hamiltonian<TensorType>(ec, scf_vars, chem_env, scf_vars.ttensors,
-                                                scf_vars.etensors);
+    scf_compute.compute_hamiltonian<TensorType>(ec, scf_data, chem_env, scf_data.ttensors,
+                                                scf_data.etensors);
     if(chem_env.sys_data.is_qed) qed_tensors_1e(ec, chem_env);
     if(chem_env.sys_data.has_ecp) {
       Tensor<TensorType> ECP{tAO, tAO};
       Tensor<TensorType>::allocate(&ec, ECP);
-      scf_guess.compute_ecp_ints(ec, scf_vars, ECP, libecp_shells, ecps);
-      sch(scf_vars.ttensors.H1() += ECP()).deallocate(ECP).execute();
+      scf_guess.compute_ecp_ints(ec, scf_data, ECP, libecp_shells, ecps);
+      sch(scf_data.ttensors.H1() += ECP()).deallocate(ECP).execute();
     }
 
     /*** =========================== ***/
@@ -917,7 +917,7 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
 
     // pre-compute data for Schwarz bounds
     Matrix SchwarzK;
-    if(!scf_vars.do_dens_fit || scf_vars.direct_df) {
+    if(!scf_data.do_dens_fit || scf_data.direct_df) {
       if(N >= chem_env.ioptions.scf_options.restart_size && fs::exists(fname[FileType::Schwarz])) {
         if(rank == 0) cout << "Read Schwarz matrix from disk ... " << endl;
 
@@ -925,7 +925,7 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
       }
       else {
         // if(rank == 0) cout << "pre-computing data for Schwarz bounds... " << endl;
-        SchwarzK = scf_compute.compute_schwarz_ints<>(ec, scf_vars, chem_env.shells);
+        SchwarzK = scf_compute.compute_schwarz_ints<>(ec, scf_data, chem_env.shells);
         if(rank == 0) scf_output.write_scf_mat(SchwarzK, fname[FileType::Schwarz]);
       }
     }
@@ -933,11 +933,11 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
 
     declare_main_tensors(ec, chem_env);
 
-    if(scf_vars.do_dens_fit) {
-      std::tie(scf_vars.d_mu, scf_vars.d_nu, scf_vars.d_ku)    = scf_vars.tdfAO.labels<3>("all");
-      std::tie(scf_vars.d_mup, scf_vars.d_nup, scf_vars.d_kup) = scf_vars.tdfAOt.labels<3>("all");
-      scf_iter.init_ri(ec, chem_env, scalapack_info, scf_vars, scf_vars.etensors,
-                       scf_vars.ttensors);
+    if(scf_data.do_dens_fit) {
+      std::tie(scf_data.d_mu, scf_data.d_nu, scf_data.d_ku)    = scf_data.tdfAO.labels<3>("all");
+      std::tie(scf_data.d_mup, scf_data.d_nup, scf_data.d_kup) = scf_data.tdfAOt.labels<3>("all");
+      scf_iter.init_ri(ec, chem_env, scalapack_info, scf_data, scf_data.etensors,
+                       scf_data.ttensors);
     }
     // const auto do_schwarz_screen = SchwarzK.cols() != 0 && SchwarzK.rows() != 0;
 
@@ -946,13 +946,13 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
 
     if(chem_env.ioptions.scf_options.restart || chem_env.ioptions.scf_options.noscf) {
       // This was originally scf_restart.restart()
-      scf_restart.run(ec, chem_env, scalapack_info, scf_vars.ttensors, scf_vars.etensors,
+      scf_restart.run(ec, chem_env, scalapack_info, scf_data.ttensors, scf_data.etensors,
                       files_prefix);
-      if(!scf_vars.do_dens_fit || scf_vars.direct_df || chem_env.sys_data.is_ks ||
+      if(!scf_data.do_dens_fit || scf_data.direct_df || chem_env.sys_data.is_ks ||
          chem_env.sys_data.do_snK) {
-        tamm_to_eigen_tensor(scf_vars.ttensors.D_alpha, scf_vars.etensors.D_alpha);
+        tamm_to_eigen_tensor(scf_data.ttensors.D_alpha, scf_data.etensors.D_alpha);
         if(chem_env.sys_data.is_unrestricted) {
-          tamm_to_eigen_tensor(scf_vars.ttensors.D_beta, scf_vars.etensors.D_beta);
+          tamm_to_eigen_tensor(scf_data.ttensors.D_beta, scf_data.etensors.D_beta);
         }
       }
       ec.pg().barrier();
@@ -961,27 +961,27 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
       auto N      = chem_env.sys_data.nbf_orig;
       auto Northo = chem_env.sys_data.nbf;
 
-      scf_vars.etensors.C_alpha.setZero(N, Northo);
-      if(chem_env.sys_data.is_unrestricted) scf_vars.etensors.C_beta.setZero(N, Northo);
+      scf_data.etensors.C_alpha.setZero(N, Northo);
+      if(chem_env.sys_data.is_unrestricted) scf_data.etensors.C_beta.setZero(N, Northo);
 
       if(rank == 0) {
         cout << endl << "Reading from molden file provided ..." << endl;
         if(ec_molden.molden_file_valid) {
-          ec_molden.read_molden<TensorType>(chem_env, scf_vars.etensors.C_alpha,
-                                            scf_vars.etensors.C_beta);
+          ec_molden.read_molden<TensorType>(chem_env, scf_data.etensors.C_alpha,
+                                            scf_data.etensors.C_beta);
         }
       }
 
-      scf_compute.compute_density<TensorType>(ec, chem_env, scf_vars, scalapack_info,
-                                              scf_vars.ttensors, scf_vars.etensors);
+      scf_compute.compute_density<TensorType>(ec, chem_env, scf_data, scalapack_info,
+                                              scf_data.ttensors, scf_data.etensors);
       // X=C?
 
       ec.pg().barrier();
     }
     else {
       if(rank == 0) cout << "Superposition of Atomic Density Guess ..." << endl;
-      scf_guess.compute_sad_guess<TensorType>(ec, chem_env, scf_vars, scalapack_info,
-                                              scf_vars.etensors, scf_vars.ttensors);
+      scf_guess.compute_sad_guess<TensorType>(ec, chem_env, scf_data, scalapack_info,
+                                              scf_data.etensors, scf_data.ttensors);
 
       ec.pg().barrier();
     }
@@ -999,15 +999,15 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
     if(rank == 0 && chem_env.ioptions.scf_options.debug &&
        N < chem_env.ioptions.scf_options.restart_size) {
       Matrix S(chem_env.sys_data.nbf_orig, chem_env.sys_data.nbf_orig);
-      tamm_to_eigen_tensor(scf_vars.ttensors.S1, S);
+      tamm_to_eigen_tensor(scf_data.ttensors.S1, S);
       if(chem_env.sys_data.is_restricted)
         cout << "debug #electrons       = "
-             << (int) std::round((scf_vars.etensors.D_alpha * S).trace()) << endl;
+             << (int) std::round((scf_data.etensors.D_alpha * S).trace()) << endl;
       if(chem_env.sys_data.is_unrestricted) {
         cout << "debug #alpha electrons = "
-             << (int) std::round((scf_vars.etensors.D_alpha * S).trace()) << endl;
+             << (int) std::round((scf_data.etensors.D_alpha * S).trace()) << endl;
         cout << "debug #beta  electrons = "
-             << (int) std::round((scf_vars.etensors.D_beta * S).trace()) << endl;
+             << (int) std::round((scf_data.etensors.D_beta * S).trace()) << endl;
       }
     }
     if(rank == 0 && !chem_env.ioptions.scf_options.noscf) {
@@ -1029,11 +1029,11 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
     const size_t        max_nprim4 = static_cast<size_t>(std::pow(max_nprim, 4));
     std::vector<size_t> shell2bf   = chem_env.shells.shell2bf();
 
-    if(!scf_vars.do_dens_fit && scf_vars.do_load_bal) {
+    if(!scf_data.do_dens_fit && scf_data.do_load_bal) {
       // Collect task info
       auto [s1vec, s2vec, ntask_vec] = scf_iter.compute_2bf_taskinfo(
-        ec, chem_env, scf_vars, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4,
-        scf_vars.ttensors, scf_vars.etensors, scf_vars.do_dens_fit);
+        ec, chem_env, scf_data, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4,
+        scf_data.ttensors, scf_data.etensors, scf_data.do_dens_fit);
 
       auto [s1_all, s2_all, ntasks_all] =
         gather_task_vectors<TensorType>(ec, s1vec, s2vec, ntask_vec);
@@ -1045,42 +1045,42 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
         dummyLoads.readLoads(s1_all, s2_all, ntasks_all);
         dummyLoads.simpleLoadBal(ec.pg().size().value());
         tmdim = std::max(dummyLoads.maxS1, dummyLoads.maxS2);
-        scf_vars.etensors.taskmap.resize(tmdim + 1, tmdim + 1);
+        scf_data.etensors.taskmap.resize(tmdim + 1, tmdim + 1);
         // value in this array is the rank that executes task i,j
         // -1 indicates a task i,j that can be skipped
-        scf_vars.etensors.taskmap.setConstant(-1);
+        scf_data.etensors.taskmap.setConstant(-1);
         // cout<<"creating task map"<<endl;
-        dummyLoads.createTaskMap(scf_vars.etensors.taskmap);
+        dummyLoads.createTaskMap(scf_data.etensors.taskmap);
         // cout<<"task map creation completed"<<endl;
       }
       ec.pg().broadcast(&tmdim, 0);
-      if(rank != 0) scf_vars.etensors.taskmap.resize(tmdim + 1, tmdim + 1);
-      ec.pg().broadcast(scf_vars.etensors.taskmap.data(), scf_vars.etensors.taskmap.size(), 0);
+      if(rank != 0) scf_data.etensors.taskmap.resize(tmdim + 1, tmdim + 1);
+      ec.pg().broadcast(scf_data.etensors.taskmap.data(), scf_data.etensors.taskmap.size(), 0);
     }
 
     if(chem_env.ioptions.scf_options.noscf) {
       // clang-format off
-      sch (scf_vars.ttensors.F_alpha_tmp() = 0)
-          (scf_vars.ttensors.D_last_alpha(scf_vars.mu,scf_vars.nu) = scf_vars.ttensors.D_alpha(scf_vars.mu,scf_vars.nu))
+      sch (scf_data.ttensors.F_alpha_tmp() = 0)
+          (scf_data.ttensors.D_last_alpha(scf_data.mu,scf_data.nu) = scf_data.ttensors.D_alpha(scf_data.mu,scf_data.nu))
           .execute();
       // clang-format on
 
       if(chem_env.sys_data.is_unrestricted) {
         // clang-format off
-        sch (scf_vars.ttensors.F_beta_tmp() = 0)
-            (scf_vars.ttensors.D_last_beta(scf_vars.mu,scf_vars.nu) = scf_vars.ttensors.D_beta(scf_vars.mu,scf_vars.nu))
+        sch (scf_data.ttensors.F_beta_tmp() = 0)
+            (scf_data.ttensors.D_last_beta(scf_data.mu,scf_data.nu) = scf_data.ttensors.D_beta(scf_data.mu,scf_data.nu))
             .execute();
         // clang-format on
       }
 
       // F_alpha = H1 + F_alpha_tmp
-      scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen, shell2bf,
-                           SchwarzK, max_nprim4, scf_vars.ttensors, scf_vars.etensors,
-                           scf_state.is_3c_init, scf_vars.do_dens_fit, xHF);
+      scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
+                           SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors,
+                           scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
 
       // Add QED contribution
       if(chem_env.sys_data.do_qed) {
-        scf_qed.compute_QED_2body<TensorType>(ec, chem_env, scf_vars, scf_vars.ttensors);
+        scf_qed.compute_QED_2body<TensorType>(ec, chem_env, scf_data, scf_data.ttensors);
       }
 
 #if defined(USE_GAUXC)
@@ -1090,9 +1090,9 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
       if(chem_env.sys_data.is_restricted) {
         // clang-format off
         sch
-          (scf_vars.ttensors.ehf_tmp(scf_vars.mu,scf_vars.nu)  = scf_vars.ttensors.H1(scf_vars.mu,scf_vars.nu))
-          (scf_vars.ttensors.ehf_tmp(scf_vars.mu,scf_vars.nu) += scf_vars.ttensors.F_alpha(scf_vars.mu,scf_vars.nu))
-          (scf_vars.ttensors.ehf_tamm()      = 0.5 * scf_vars.ttensors.D_alpha() * scf_vars.ttensors.ehf_tmp())
+          (scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.nu)  = scf_data.ttensors.H1(scf_data.mu,scf_data.nu))
+          (scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.nu) += scf_data.ttensors.F_alpha(scf_data.mu,scf_data.nu))
+          (scf_data.ttensors.ehf_tamm()      = 0.5 * scf_data.ttensors.D_alpha() * scf_data.ttensors.ehf_tmp())
           .execute();
         // clang-format on
       }
@@ -1100,17 +1100,17 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
       if(chem_env.sys_data.is_unrestricted) {
         // clang-format off
         sch
-          (scf_vars.ttensors.ehf_tmp(scf_vars.mu,scf_vars.nu)  = scf_vars.ttensors.H1(scf_vars.mu,scf_vars.nu))
-          (scf_vars.ttensors.ehf_tmp(scf_vars.mu,scf_vars.nu) += scf_vars.ttensors.F_alpha(scf_vars.mu,scf_vars.nu))
-          (scf_vars.ttensors.ehf_tamm()      = 0.5 * scf_vars.ttensors.D_alpha() * scf_vars.ttensors.ehf_tmp())
-          (scf_vars.ttensors.ehf_tmp(scf_vars.mu,scf_vars.nu)  = scf_vars.ttensors.H1(scf_vars.mu,scf_vars.nu))
-          (scf_vars.ttensors.ehf_tmp(scf_vars.mu,scf_vars.nu) += scf_vars.ttensors.F_beta(scf_vars.mu,scf_vars.nu))
-          (scf_vars.ttensors.ehf_tamm()     += 0.5 * scf_vars.ttensors.D_beta()  * scf_vars.ttensors.ehf_tmp())
+          (scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.nu)  = scf_data.ttensors.H1(scf_data.mu,scf_data.nu))
+          (scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.nu) += scf_data.ttensors.F_alpha(scf_data.mu,scf_data.nu))
+          (scf_data.ttensors.ehf_tamm()      = 0.5 * scf_data.ttensors.D_alpha() * scf_data.ttensors.ehf_tmp())
+          (scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.nu)  = scf_data.ttensors.H1(scf_data.mu,scf_data.nu))
+          (scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.nu) += scf_data.ttensors.F_beta(scf_data.mu,scf_data.nu))
+          (scf_data.ttensors.ehf_tamm()     += 0.5 * scf_data.ttensors.D_beta()  * scf_data.ttensors.ehf_tmp())
           .execute();
         // clang-format on
       }
 
-      scf_state.ehf = get_scalar(scf_vars.ttensors.ehf_tamm);
+      scf_state.ehf = get_scalar(scf_data.ttensors.ehf_tamm);
 
 #if defined(USE_GAUXC)
       compute_update_xc(ec, chem_env, gauxc_integrator, scf_state.ehf);
@@ -1138,21 +1138,21 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
       // resetting the Fock matrix and saving the last density.
       reset_fock_and_save_last_density(ec, chem_env);
 
-      // auto D_tamm_nrm = norm(scf_vars.ttensors.D_alpha);
+      // auto D_tamm_nrm = norm(scf_data.ttensors.D_alpha);
       // if(rank==0) cout << std::setprecision(18) << "norm of D_tamm: " << D_tamm_nrm << endl;
 
       // build a new Fock matrix
-      scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_vars, do_schwarz_screen, shell2bf,
-                           SchwarzK, max_nprim4, scf_vars.ttensors, scf_vars.etensors,
-                           scf_state.is_3c_init, scf_vars.do_dens_fit, xHF);
+      scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
+                           SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors,
+                           scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
 
       // Add QED contribution
       if(chem_env.sys_data.do_qed) {
-        scf_qed.compute_QED_2body<TensorType>(ec, chem_env, scf_vars, scf_vars.ttensors);
+        scf_qed.compute_QED_2body<TensorType>(ec, chem_env, scf_data, scf_data.ttensors);
       }
 
       std::tie(scf_state.ehf, scf_state.rmsd) = scf_iter.scf_iter_body(
-        ec, chem_env, scalapack_info, scf_state.iter, scf_vars, scf_vars.ttensors, scf_vars.etensors
+        ec, chem_env, scalapack_info, scf_state.iter, scf_data, scf_data.ttensors, scf_data.etensors
 #if defined(USE_GAUXC)
         ,
         gauxc_integrator
@@ -1160,7 +1160,7 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
       );
 
       // DIIS error
-      scf_state.ndiis = scf_vars.ttensors.diis_hist.size();
+      scf_state.ndiis = scf_data.ttensors.diis_hist.size();
       scf_state.ediis = calculate_diis_error(is_uhf, scf_state.ndiis);
 
       scf_state.ehf += enuc;
@@ -1176,12 +1176,12 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
       print_write_iteration(ec, chem_env, loop_time, scf_state);
 
       // if(rank==0) cout << "D at the end of iteration: " << endl << std::setprecision(6) <<
-      // scf_vars.etensors.D_alpha << endl;
+      // scf_data.etensors.D_alpha << endl;
       scf_main_loop_continue = check_convergence(ec, chem_env, scf_state);
       if(!scf_state.is_conv) break;
 
       // Reset lshift to input option.
-      if(fabs(scf_state.ediff) > 1e-2) scf_vars.lshift = chem_env.ioptions.scf_options.lshift;
+      if(fabs(scf_state.ediff) > 1e-2) scf_data.lshift = chem_env.ioptions.scf_options.lshift;
 
     } while(scf_main_loop_continue); // SCF main loop
 
@@ -1199,19 +1199,19 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
     compute_fock_matrix(ec, chem_env, is_uhf, do_schwarz_screen, SchwarzK, max_nprim4, shell2bf,
                         scf_state.is_3c_init);
 
-    sch(Fa_global(scf_vars.mu, scf_vars.nu) = scf_vars.ttensors.F_alpha(scf_vars.mu, scf_vars.nu));
+    sch(Fa_global(scf_data.mu, scf_data.nu) = scf_data.ttensors.F_alpha(scf_data.mu, scf_data.nu));
     if(chem_env.sys_data.is_unrestricted)
-      sch(Fb_global(scf_vars.mu, scf_vars.nu) = scf_vars.ttensors.F_beta(scf_vars.mu, scf_vars.nu));
+      sch(Fb_global(scf_data.mu, scf_data.nu) = scf_data.ttensors.F_beta(scf_data.mu, scf_data.nu));
     sch.execute();
     if(rank == 0)
       std::cout << std::endl
                 << "Nuclear repulsion energy = " << std::setprecision(15) << enuc << endl;
-    scf_output.print_energies(ec, chem_env, scf_vars.ttensors, scf_vars.etensors, scf_vars,
+    scf_output.print_energies(ec, chem_env, scf_data.ttensors, scf_data.etensors, scf_data,
                               scalapack_info);
 
     if(rank == 0 && chem_env.ioptions.scf_options.mulliken_analysis && scf_state.is_conv) {
-      Matrix S = tamm_to_eigen_matrix(scf_vars.ttensors.S1);
-      scf_output.print_mulliken(chem_env, scf_vars.etensors.D_alpha, scf_vars.etensors.D_beta, S);
+      Matrix S = tamm_to_eigen_matrix(scf_data.ttensors.S1);
+      scf_output.print_mulliken(chem_env, scf_data.etensors.D_alpha, scf_data.etensors.D_beta, S);
     }
 
     scf_final_io(ec, chem_env);
@@ -1221,15 +1221,15 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
 
 #if defined(USE_SCALAPACK)
     if(scalapack_info.pg.is_valid()) {
-      Tensor<TensorType>::deallocate(scf_vars.ttensors.F_BC, scf_vars.ttensors.X_alpha,
-                                     scf_vars.ttensors.C_alpha_BC);
+      Tensor<TensorType>::deallocate(scf_data.ttensors.F_BC, scf_data.ttensors.X_alpha,
+                                     scf_data.ttensors.C_alpha_BC);
       if(chem_env.sys_data.is_unrestricted)
-        Tensor<TensorType>::deallocate(scf_vars.ttensors.C_beta_BC);
+        Tensor<TensorType>::deallocate(scf_data.ttensors.C_beta_BC);
       scalapack_info.ec.flush_and_sync();
       scalapack_info.ec.pg().destroy_coll();
     }
 #else
-    sch.deallocate(scf_vars.ttensors.X_alpha);
+    sch.deallocate(scf_data.ttensors.X_alpha);
     sch.execute();
 #endif
 
@@ -1272,12 +1272,12 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
 
   auto [C_alpha_tamm, C_beta_tamm, tAO_ortho] = update_movecs(exc, chem_env);
 
-  chem_env.is_context.AO_opt   = scf_vars.tAO;
-  chem_env.is_context.AO_tis   = scf_vars.tAOt;
+  chem_env.is_context.AO_opt   = scf_data.tAO;
+  chem_env.is_context.AO_tis   = scf_data.tAOt;
   chem_env.is_context.AO_ortho = tAO_ortho;
 
   // chem_env.scf_context.scf_converged = true;
 
-  chem_env.scf_context.update(scf_state.ehf, enuc, scf_vars.shell_tile_map, C_alpha_tamm, Fa_global,
+  chem_env.scf_context.update(scf_state.ehf, enuc, scf_data.shell_tile_map, C_alpha_tamm, Fa_global,
                               C_beta_tamm, Fb_global, chem_env.ioptions.scf_options.noscf);
 } // END of scf_hf(ExecutionContext& exc, ChemEnv& chem_env)

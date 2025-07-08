@@ -110,7 +110,7 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
   .execute();
   // clang-format on
 
-  scf::SCFVars    spvars;
+  scf::SCFData    spvars;
   scf::SCFCompute scf_compute;
   scf_compute.compute_shellpair_list(ec, chem_env.shells, spvars);
   std::tie(spvars.shell_tile_map, spvars.AO_tiles, spvars.AO_opttiles) =

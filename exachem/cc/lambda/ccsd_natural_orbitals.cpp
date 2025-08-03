@@ -115,7 +115,7 @@ void ccsd_natural_orbitals(ChemEnv& chem_env, std::vector<int>& cc_rdm, std::str
   for(auto x = 0; x < nev; x++) occnum[x] = real(noocc_vals(x));
 
   // Sort eigenvalues
-  std::vector<size_t> noocc_sorted_order = exachem::scf::sort_indexes(occnum, true);
+  std::vector<size_t> noocc_sorted_order = exachem::scf::SCFUtil::sort_indexes(occnum, true);
   for(auto x = 0; x < nev; x++) occnum_sorted[x] = occnum[noocc_sorted_order[x]];
 
   // Print occupation numbers

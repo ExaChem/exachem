@@ -8,7 +8,9 @@
 
 #include "exachem/scf/scf_qed.hpp"
 
-void exachem::scf::SCFQed::qed_functionals_setup(std::vector<double>& params, ChemEnv& chem_env) {
+template<typename T>
+void exachem::scf::DefaultSCFQed<T>::qed_functionals_setup(std::vector<double>& params,
+                                                           ChemEnv&             chem_env) {
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   params[0] = 1.0;
@@ -24,9 +26,10 @@ void exachem::scf::SCFQed::qed_functionals_setup(std::vector<double>& params, Ch
   libxc_params.close();
 }
 
-template<typename TensorType>
-void exachem::scf::SCFQed::compute_QED_1body(ExecutionContext& ec, ChemEnv& chem_env,
-                                             const SCFData& scf_data, TAMMTensors& ttensors) {
+template<typename T>
+void exachem::scf::DefaultSCFQed<T>::compute_QED_1body(ExecutionContext& ec, ChemEnv& chem_env,
+                                                       const SCFData&  scf_data,
+                                                       TAMMTensors<T>& ttensors) {
   auto [mu, nu] = scf_data.tAO.labels<2>("all");
   Scheduler sch{ec};
 
@@ -82,12 +85,13 @@ void exachem::scf::SCFQed::compute_QED_1body(ExecutionContext& ec, ChemEnv& chem
   // clang-format on
 }
 
-template<typename TensorType>
-void exachem::scf::SCFQed::compute_QED_2body(ExecutionContext& ec, ChemEnv& chem_env,
-                                             const SCFData& scf_data, TAMMTensors& ttensors) {
+template<typename T>
+void exachem::scf::DefaultSCFQed<T>::compute_QED_2body(ExecutionContext& ec, ChemEnv& chem_env,
+                                                       const SCFData&  scf_data,
+                                                       TAMMTensors<T>& ttensors) {
   auto [mu, nu, ku] = scf_data.tAO.labels<3>("all");
-  Tensor<TensorType> tensor{ttensors.QED_1body.tiled_index_spaces()}; //{tAO, tAO};
-  Scheduler          sch{ec};
+  Tensor<T> tensor{ttensors.QED_1body.tiled_index_spaces()}; //{tAO, tAO};
+  Scheduler sch{ec};
 
   auto&       atoms       = chem_env.atoms;
   SystemData& sys_data    = chem_env.sys_data;
@@ -143,9 +147,10 @@ void exachem::scf::SCFQed::compute_QED_2body(ExecutionContext& ec, ChemEnv& chem
   // clang-format on
 }
 
-template<typename TensorType>
-void exachem::scf::SCFQed::compute_qed_emult_ints(ExecutionContext& ec, ChemEnv& chem_env,
-                                                  const SCFData& spvars, TAMMTensors& ttensors) {
+template<typename T>
+void exachem::scf::DefaultSCFQed<T>::compute_qed_emult_ints(ExecutionContext& ec, ChemEnv& chem_env,
+                                                            const SCFData&  spvars,
+                                                            TAMMTensors<T>& ttensors) {
   using libint2::Atom;
   using libint2::BasisSet;
   using libint2::Engine;
@@ -174,12 +179,12 @@ void exachem::scf::SCFQed::compute_qed_emult_ints(ExecutionContext& ec, ChemEnv&
     auto bi0 = blockid[0];
     auto bi1 = blockid[1];
 
-    const TAMM_SIZE         size       = ttensors.QED_Dx.block_size(blockid);
-    auto                    block_dims = ttensors.QED_Dx.block_dims(blockid);
-    std::vector<TensorType> dbufx(size);
-    std::vector<TensorType> dbufy(size);
-    std::vector<TensorType> dbufz(size);
-    std::vector<TensorType> dbufQ(size);
+    const TAMM_SIZE size       = ttensors.QED_Dx.block_size(blockid);
+    auto            block_dims = ttensors.QED_Dx.block_dims(blockid);
+    std::vector<T>  dbufx(size);
+    std::vector<T>  dbufy(size);
+    std::vector<T>  dbufz(size);
+    std::vector<T>  dbufQ(size);
 
     auto bd1 = block_dims[1];
 
@@ -221,15 +226,15 @@ void exachem::scf::SCFQed::compute_qed_emult_ints(ExecutionContext& ec, ChemEnv&
         // auto bf2 = shell2bf[s2];
         auto n2 = shells[s2].size();
 
-        std::vector<TensorType> tbufX(n1 * n2);
-        std::vector<TensorType> tbufY(n1 * n2);
-        std::vector<TensorType> tbufZ(n1 * n2);
-        std::vector<TensorType> tbufXX(n1 * n2);
-        std::vector<TensorType> tbufXY(n1 * n2);
-        std::vector<TensorType> tbufXZ(n1 * n2);
-        std::vector<TensorType> tbufYY(n1 * n2);
-        std::vector<TensorType> tbufYZ(n1 * n2);
-        std::vector<TensorType> tbufZZ(n1 * n2);
+        std::vector<T> tbufX(n1 * n2);
+        std::vector<T> tbufY(n1 * n2);
+        std::vector<T> tbufZ(n1 * n2);
+        std::vector<T> tbufXX(n1 * n2);
+        std::vector<T> tbufXY(n1 * n2);
+        std::vector<T> tbufXZ(n1 * n2);
+        std::vector<T> tbufYY(n1 * n2);
+        std::vector<T> tbufYZ(n1 * n2);
+        std::vector<T> tbufZZ(n1 * n2);
 
         // compute shell pair; return is the pointer to the buffer
         const auto& buf = engine.compute(shells[s1], shells[s2]);
@@ -302,17 +307,5 @@ void exachem::scf::SCFQed::compute_qed_emult_ints(ExecutionContext& ec, ChemEnv&
   block_for(ec, ttensors.QED_Dx(), compute_qed_emult_ints_lambda);
 }
 
-template void exachem::scf::SCFQed::compute_QED_1body<double>(ExecutionContext& ec,
-                                                              ChemEnv&          chem_env,
-                                                              const SCFData&    scf_data,
-                                                              TAMMTensors&      ttensors);
-
-template void exachem::scf::SCFQed::compute_QED_2body<double>(ExecutionContext& ec,
-                                                              ChemEnv&          chem_env,
-                                                              const SCFData&    scf_data,
-                                                              TAMMTensors&      ttensors);
-
-template void exachem::scf::SCFQed::compute_qed_emult_ints<double>(ExecutionContext& ec,
-                                                                   ChemEnv&          chem_env,
-                                                                   const SCFData&    spvars,
-                                                                   TAMMTensors&      ttensors);
+template class exachem::scf::DefaultSCFQed<double>;
+template class exachem::scf::SCFQed<double>;

@@ -31,13 +31,13 @@ public:
 
   // SCF I/O routines
   virtual void rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env,
-                          ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
+                          ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors,
                           EigenTensors& etensors, std::string files_prefix, bool read = false);
 
   virtual void rw_mat_disk(Tensor<T> tensor, std::string tfilename, bool profile,
                            bool read = false);
   virtual void print_mulliken(ChemEnv& chem_env, Matrix& D, Matrix& D_beta, Matrix& S);
-  virtual void print_energies(ExecutionContext& ec, ChemEnv& chem_env, TAMMTensors& ttensors,
+  virtual void print_energies(ExecutionContext& ec, ChemEnv& chem_env, TAMMTensors<T>& ttensors,
                               EigenTensors& etensors, SCFData& scf_data,
                               ScalapackInfo& scalapack_info);
 };

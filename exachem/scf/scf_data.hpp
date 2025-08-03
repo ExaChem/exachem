@@ -46,8 +46,8 @@ public:
   tamm::TiledIndexSpace tNortho_bc;
 
   // Tensors for AO and SCF calculations
-  EigenTensors etensors; // Holds Eigen-based tensors for SCF and AO operations
-  TAMMTensors  ttensors; //  Holds TAMM-based tensors for SCF and AO operations
+  EigenTensors            etensors; // Holds Eigen-based tensors for SCF and AO operations
+  TAMMTensors<TensorType> ttensors; //  Holds TAMM-based tensors for SCF and AO operations
 
   // AO labels
   // tamm::TiledIndexLabel mu_ld, nu_ld;

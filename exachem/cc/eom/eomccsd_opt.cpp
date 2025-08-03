@@ -592,7 +592,7 @@ void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIn
       //  SORT THE EIGENVECTORS AND CORRESPONDING EIGENVALUES
       //################################################################################
 
-      std::vector<size_t> omegar_sorted_order = sort_indexes(omegar);
+      std::vector<size_t> omegar_sorted_order = SCFUtil::sort_indexes(omegar);
       std::sort(omegar.begin(), omegar.end());
 
       auto hbar_right1 = hbardiag.eigenvectors();

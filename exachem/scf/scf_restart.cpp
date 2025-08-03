@@ -53,7 +53,7 @@ void exachem::scf::DefaultSCFRestart::run(const ExecutionContext& ec, ChemEnv& c
 }
 
 void exachem::scf::DefaultSCFRestart::run(ExecutionContext& ec, ChemEnv& chem_env,
-                                          ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
+                                          ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors,
                                           EigenTensors& etensors, std::string files_prefix) {
   const auto N      = chem_env.sys_data.nbf_orig;
   const auto Northo = N - chem_env.sys_data.n_lindep;

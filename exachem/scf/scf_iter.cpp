@@ -11,7 +11,7 @@
 template<typename T>
 std::tuple<T, T> exachem::scf::DefaultSCFIter<T>::scf_iter_body(
   ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const int& iter,
-  SCFData& scf_data, TAMMTensors& ttensors, EigenTensors& etensors
+  SCFData& scf_data, TAMMTensors<T>& ttensors, EigenTensors& etensors
 #if defined(USE_GAUXC)
   ,
   GauXC::XCIntegrator<Matrix>& gauxc_integrator
@@ -58,10 +58,11 @@ std::tuple<T, T> exachem::scf::DefaultSCFIter<T>::scf_iter_body(
   double ehf = 0.0;
 
 #if defined(USE_GAUXC)
-  const bool do_snK = sys_data.do_snK;
+  SCFGauxc<T> scf_gauxc;
+  const bool  do_snK = sys_data.do_snK;
   if(do_snK) {
     const auto snK_start = std::chrono::high_resolution_clock::now();
-    scf::gauxc::compute_exx<T>(ec, chem_env, scf_data, ttensors, etensors, gauxc_integrator);
+    scf_gauxc.compute_exx(ec, chem_env, scf_data, ttensors, etensors, gauxc_integrator);
     const auto snK_stop = std::chrono::high_resolution_clock::now();
     const auto snK_time =
       std::chrono::duration_cast<std::chrono::duration<double>>((snK_stop - snK_start)).count();
@@ -96,11 +97,12 @@ std::tuple<T, T> exachem::scf::DefaultSCFIter<T>::scf_iter_body(
   ehf = get_scalar(ehf_tamm);
 
 #if defined(USE_GAUXC)
+
   const bool is_ks     = sys_data.is_ks;
   double     gauxc_exc = 0;
   if(is_ks) {
     const auto xcf_start = std::chrono::high_resolution_clock::now();
-    gauxc_exc = scf::gauxc::compute_xcf<T>(ec, chem_env, ttensors, etensors, gauxc_integrator);
+    gauxc_exc = scf_gauxc.compute_xcf(ec, chem_env, ttensors, etensors, gauxc_integrator);
 
     const auto xcf_stop = std::chrono::high_resolution_clock::now();
     const auto xcf_time =
@@ -196,17 +198,17 @@ std::tuple<T, T> exachem::scf::DefaultSCFIter<T>::scf_iter_body(
     }
   }
 
-  auto     do_t1 = std::chrono::high_resolution_clock::now();
-  SCFGuess scf_guess;
-  scf_guess.scf_diagonalize<T>(sch, chem_env, scf_data, scalapack_info, ttensors, etensors);
+  auto        do_t1 = std::chrono::high_resolution_clock::now();
+  SCFGuess<T> scf_guess;
+  scf_guess.scf_diagonalize(sch, chem_env, scf_data, scalapack_info, ttensors, etensors);
 
   auto do_t2   = std::chrono::high_resolution_clock::now();
   auto do_time = std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
 
   if(rank == 0 && debug)
     std::cout << std::fixed << std::setprecision(2) << "diagonalize: " << do_time << "s, ";
-  SCFCompute scf_compute;
-  scf_compute.compute_density<T>(ec, chem_env, scf_data, scalapack_info, ttensors, etensors);
+  SCFCompute<T> scf_compute;
+  scf_compute.compute_density(ec, chem_env, scf_data, scalapack_info, ttensors, etensors);
 
   double rmsd = 0.0;
   // clang-format off
@@ -253,7 +255,7 @@ std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
 exachem::scf::DefaultSCFIter<T>::compute_2bf_taskinfo(
   ExecutionContext& ec, ChemEnv& chem_env, const SCFData& scf_data, const bool do_schwarz_screen,
   const std::vector<size_t>& shell2bf, const Matrix& SchwarzK, const size_t& max_nprim4,
-  TAMMTensors& ttensors, EigenTensors& etensors, const bool cs1s2) {
+  TAMMTensors<T>& ttensors, EigenTensors& etensors, const bool cs1s2) {
   Matrix&    D       = etensors.D_alpha;
   Matrix&    D_beta  = etensors.D_beta;
   Tensor<T>& F_dummy = ttensors.F_dummy;
@@ -436,9 +438,9 @@ void exachem::scf::DefaultSCFIter<T>::compute_3c_ints(ExecutionContext& ec, Chem
 
 template<typename T>
 void exachem::scf::DefaultSCFIter<T>::compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_env,
-                                                      EigenTensors&  etensors,
-                                                      const SCFData& scf_data,
-                                                      TAMMTensors&   ttensors) {
+                                                      EigenTensors&   etensors,
+                                                      const SCFData&  scf_data,
+                                                      TAMMTensors<T>& ttensors) {
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
@@ -541,7 +543,7 @@ template<typename T>
 void exachem::scf::DefaultSCFIter<T>::init_ri(ExecutionContext& ec, ChemEnv& chem_env,
                                               ScalapackInfo& scalapack_info,
                                               const SCFData& scf_data, EigenTensors& etensors,
-                                              TAMMTensors& ttensors) {
+                                              TAMMTensors<T>& ttensors) {
   SystemData& sys_data    = chem_env.sys_data;
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -706,7 +708,7 @@ template<typename T>
 void exachem::scf::DefaultSCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv& chem_env,
                                                             const SCFData&             scf_data,
                                                             const std::vector<size_t>& shell2bf,
-                                                            TAMMTensors&               ttensors,
+                                                            TAMMTensors<T>&            ttensors,
                                                             EigenTensors&              etensors,
                                                             const Matrix&              SchwarzK) {
   using libint2::BraKet;
@@ -925,12 +927,10 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec
 };
 
 template<typename T>
-void exachem::scf::DefaultSCFIter<T>::compute_2bf_ri(ExecutionContext& ec, ChemEnv& chem_env,
-                                                     ScalapackInfo&             scalapack_info,
-                                                     const SCFData&             scf_data,
-                                                     const std::vector<size_t>& shell2bf,
-                                                     TAMMTensors& ttensors, EigenTensors& etensors,
-                                                     bool& is_3c_init, double xHF) {
+void exachem::scf::DefaultSCFIter<T>::compute_2bf_ri(
+  ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const SCFData& scf_data,
+  const std::vector<size_t>& shell2bf, TAMMTensors<T>& ttensors, EigenTensors& etensors,
+  bool& is_3c_init, double xHF) {
   SystemData& sys_data    = chem_env.sys_data;
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -1017,7 +1017,7 @@ template<typename T>
 void exachem::scf::DefaultSCFIter<T>::compute_2bf(
   ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const SCFData& scf_data,
   const bool do_schwarz_screen, const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
-  const size_t& max_nprim4, TAMMTensors& ttensors, EigenTensors& etensors, bool& is_3c_init,
+  const size_t& max_nprim4, TAMMTensors<T>& ttensors, EigenTensors& etensors, bool& is_3c_init,
   const bool do_density_fitting, double xHF) {
   using libint2::Operator;
 

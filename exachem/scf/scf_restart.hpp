@@ -20,7 +20,7 @@ public:
   virtual ~DefaultSCFRestart() = default;
   virtual void run(const ExecutionContext& ec, ChemEnv& chem_env, std::string files_prefix);
   virtual void run(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-                   TAMMTensors& ttensors, EigenTensors& etensors, std::string files_prefix);
+                   TAMMTensors<T>& ttensors, EigenTensors& etensors, std::string files_prefix);
 };
 
 class SCFRestart: public DefaultSCFRestart {
@@ -30,7 +30,7 @@ public:
   }
 
   void run(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-           TAMMTensors& ttensors, EigenTensors& etensors, std::string files_prefix) override {
+           TAMMTensors<T>& ttensors, EigenTensors& etensors, std::string files_prefix) override {
     DefaultSCFRestart::run(ec, chem_env, scalapack_info, ttensors, etensors, files_prefix);
   }
 };

@@ -23,14 +23,14 @@ namespace exachem::scf {
 
 class DefaultSCFEngine {
 protected:
-  SCFCompute          scf_compute;
-  SCFQed              scf_qed;
-  SCFIter<TensorType> scf_iter;
-  SCFGuess            scf_guess;
-  SCFRestart          scf_restart;
-  SCFIO<TensorType>   scf_output;
-  ECMolden            ec_molden;
-  SCFData             scf_data;
+  SCFCompute<TensorType> scf_compute;
+  SCFQed<TensorType>     scf_qed;
+  SCFIter<TensorType>    scf_iter;
+  SCFGuess<TensorType>   scf_guess;
+  SCFRestart             scf_restart;
+  SCFIO<TensorType>      scf_output;
+  ECMolden               ec_molden;
+  SCFData                scf_data;
 
   std::string files_prefix;
   enum class FileType {
@@ -74,6 +74,7 @@ protected:
   ScalapackInfo scalapack_info;
 
 #if defined(USE_GAUXC)
+  SCFGauxc<TensorType>                         scf_gauxc;
   std::shared_ptr<GauXC::XCIntegrator<Matrix>> gauxc_integrator_ptr;
   double                                       xHF;
   double                                       gauxc_exc = 0;

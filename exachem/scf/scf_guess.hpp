@@ -40,8 +40,9 @@ const std::vector<Real> compute_ao_occupation_vector(size_t Z);
 
 } // namespace scf_guess
 
-class SCFGuess {
-private:
+template<typename T>
+class DefaultSCFGuess {
+protected:
   const std::vector<std::vector<int>> occecp = {
     {0, 0, 1, 0, 1, 2, 0, 1, 2, 0, 1, 3, 2, 0, 1, 3, 2},
     {0, 0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2},
@@ -52,37 +53,42 @@ private:
                                    2, 1, 0, 0, 1, 0, 1, 2, 0, 0, 0, 1, 0};
 
 public:
-  Matrix compute_soad(const std::vector<Atom>& atoms);
-  template<typename TensorType>
-  void compute_dipole_ints(ExecutionContext& ec, const SCFData& spvars, Tensor<TensorType>& tensorX,
-                           Tensor<TensorType>& tensorY, Tensor<TensorType>& tensorZ,
-                           std::vector<libint2::Atom>& atoms, libint2::BasisSet& shells,
-                           libint2::Operator otype);
-  template<typename TensorType>
-  void compute_1body_ints(ExecutionContext& ec, const SCFData& scf_data,
-                          Tensor<TensorType>& tensor1e, std::vector<libint2::Atom>& atoms,
-                          libint2::BasisSet& shells, libint2::Operator otype);
-  template<typename TensorType>
-  void compute_ecp_ints(ExecutionContext& ec, const SCFData& scf_data, Tensor<TensorType>& tensor1e,
-                        std::vector<libecpint::GaussianShell>& shells,
-                        std::vector<libecpint::ECP>&           ecps);
-  template<typename TensorType>
-  void compute_pchg_ints(ExecutionContext& ec, const SCFData& scf_data,
-                         Tensor<TensorType>&                                    tensor1e,
-                         std::vector<std::pair<double, std::array<double, 3>>>& q,
-                         libint2::BasisSet& shells, libint2::Operator otype);
-  template<typename TensorType>
-  void scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, SCFData& scf_data,
-                       ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
-                       EigenTensors& etensors);
+  virtual ~DefaultSCFGuess() = default;
 
-  template<typename TensorType>
-  void compute_sad_guess(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
-                         ScalapackInfo& scalapack_info, EigenTensors& etensors,
-                         TAMMTensors& ttensors);
+  virtual Matrix compute_soad(const std::vector<Atom>& atoms);
 
-  template<typename T, int ndim>
+  virtual void compute_dipole_ints(ExecutionContext& ec, const SCFData& spvars, Tensor<T>& tensorX,
+                                   Tensor<T>& tensorY, Tensor<T>& tensorZ,
+                                   std::vector<libint2::Atom>& atoms, libint2::BasisSet& shells,
+                                   libint2::Operator otype);
+  virtual void compute_1body_ints(ExecutionContext& ec, const SCFData& scf_data,
+                                  Tensor<T>& tensor1e, std::vector<libint2::Atom>& atoms,
+                                  libint2::BasisSet& shells, libint2::Operator otype);
+  virtual void compute_ecp_ints(ExecutionContext& ec, const SCFData& scf_data, Tensor<T>& tensor1e,
+                                std::vector<libecpint::GaussianShell>& shells,
+                                std::vector<libecpint::ECP>&           ecps);
+  virtual void compute_pchg_ints(ExecutionContext& ec, const SCFData& scf_data, Tensor<T>& tensor1e,
+                                 std::vector<std::pair<double, std::array<double, 3>>>& q,
+                                 libint2::BasisSet& shells, libint2::Operator otype);
+  virtual void scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, SCFData& scf_data,
+                               ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors,
+                               EigenTensors& etensors);
+
+  virtual void compute_sad_guess(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
+                                 ScalapackInfo& scalapack_info, EigenTensors& etensors,
+                                 TAMMTensors<T>& ttensors);
+
+  template<int ndim>
   void t2e_hf_helper(const ExecutionContext& ec, tamm::Tensor<T>& ttensor, Matrix& etensor,
                      const std::string& ustr = "");
 };
+
+// Derived class for possible overrides
+template<typename T>
+class SCFGuess: public DefaultSCFGuess<T> {
+public:
+  // using DefaultSCFGuess<T>::DefaultSCFGuess;
+  // Override methods here if needed
+};
+
 } // namespace exachem::scf

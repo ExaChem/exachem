@@ -160,9 +160,8 @@ void exachem::scf::DefaultSCFEngine::qed_tensors_1e(ExecutionContext& ec, ChemEn
     scf_data.ttensors.QED_Qxx, scf_data.ttensors.QED_Qxy, scf_data.ttensors.QED_Qxz,
     scf_data.ttensors.QED_Qyy, scf_data.ttensors.QED_Qyz, scf_data.ttensors.QED_Qzz,
     scf_data.ttensors.QED_1body, scf_data.ttensors.QED_2body);
-  scf_qed.compute_qed_emult_ints<TensorType>(ec, chem_env, scf_data, scf_data.ttensors);
-  if(chem_env.sys_data.do_qed)
-    scf_qed.compute_QED_1body<TensorType>(ec, chem_env, scf_data, scf_data.ttensors);
+  scf_qed.compute_qed_emult_ints(ec, chem_env, scf_data, scf_data.ttensors);
+  if(chem_env.sys_data.do_qed) scf_qed.compute_QED_1body(ec, chem_env, scf_data, scf_data.ttensors);
 } // end of initialize_qed_tensors
 
 void exachem::scf::DefaultSCFEngine::setup_libecpint(
@@ -453,7 +452,7 @@ GauXC::XCIntegrator<Matrix>
 exachem::scf::DefaultSCFEngine::get_gauxc_integrator(ExecutionContext& ec, ChemEnv& chem_env) {
   auto rank = ec.pg().rank();
   if(chem_env.sys_data.is_ks || chem_env.sys_data.do_snK)
-    std::tie(gauxc_integrator_ptr, xHF) = scf::gauxc::setup_gauxc(ec, chem_env, scf_data);
+    std::tie(gauxc_integrator_ptr, xHF) = scf_gauxc.setup_gauxc(ec, chem_env, scf_data);
   else xHF = 1.0;
   auto gauxc_integrator = (chem_env.sys_data.is_ks || chem_env.sys_data.do_snK)
                             ? GauXC::XCIntegrator<Matrix>(std::move(*gauxc_integrator_ptr))
@@ -469,8 +468,8 @@ void exachem::scf::DefaultSCFEngine::add_snk_contribution(
   // Add snK contribution
   if(chem_env.sys_data.do_snK) {
     const auto snK_start = std::chrono::high_resolution_clock::now();
-    scf::gauxc::compute_exx<TensorType>(ec, chem_env, scf_data, scf_data.ttensors,
-                                        scf_data.etensors, gauxc_integrator);
+    scf_gauxc.compute_exx(ec, chem_env, scf_data, scf_data.ttensors, scf_data.etensors,
+                          gauxc_integrator);
     const auto snK_stop = std::chrono::high_resolution_clock::now();
     const auto snK_time =
       std::chrono::duration_cast<std::chrono::duration<double>>((snK_stop - snK_start)).count();
@@ -488,8 +487,8 @@ void exachem::scf::DefaultSCFEngine::compute_update_xc(
   const bool is_ks = chem_env.sys_data.is_ks;
   if(is_ks) {
     const auto xcf_start = std::chrono::high_resolution_clock::now();
-    gauxc_exc            = scf::gauxc::compute_xcf<TensorType>(ec, chem_env, scf_data.ttensors,
-                                                    scf_data.etensors, gauxc_integrator);
+    gauxc_exc =
+      scf_gauxc.compute_xcf(ec, chem_env, scf_data.ttensors, scf_data.etensors, gauxc_integrator);
 
     const auto xcf_stop = std::chrono::high_resolution_clock::now();
     const auto xcf_time =
@@ -686,7 +685,7 @@ void exachem::scf::DefaultSCFEngine::compute_fock_matrix(ExecutionContext& ec, C
     // CHECK
 
     if(chem_env.sys_data.do_qed) {
-      scf_qed.compute_QED_2body<TensorType>(ec, chem_env, scf_data, scf_data.ttensors);
+      scf_qed.compute_QED_2body(ec, chem_env, scf_data, scf_data.ttensors);
     }
   }
   else if(scf_data.lshift > 0) {
@@ -899,8 +898,7 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
     /*** =========================== ***/
     /*** compute 1-e integrals       ***/
     /*** =========================== ***/
-    scf_compute.compute_hamiltonian<TensorType>(ec, scf_data, chem_env, scf_data.ttensors,
-                                                scf_data.etensors);
+    scf_compute.compute_hamiltonian(ec, scf_data, chem_env, scf_data.ttensors, scf_data.etensors);
     if(chem_env.sys_data.is_qed) qed_tensors_1e(ec, chem_env);
     if(chem_env.sys_data.has_ecp) {
       Tensor<TensorType> ECP{tAO, tAO};
@@ -925,7 +923,7 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
       }
       else {
         // if(rank == 0) cout << "pre-computing data for Schwarz bounds... " << endl;
-        SchwarzK = scf_compute.compute_schwarz_ints<>(ec, scf_data, chem_env.shells);
+        SchwarzK = scf_compute.compute_schwarz_ints(ec, scf_data, chem_env.shells);
         if(rank == 0) scf_output.write_scf_mat(SchwarzK, fname[FileType::Schwarz]);
       }
     }
@@ -972,16 +970,16 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
         }
       }
 
-      scf_compute.compute_density<TensorType>(ec, chem_env, scf_data, scalapack_info,
-                                              scf_data.ttensors, scf_data.etensors);
+      scf_compute.compute_density(ec, chem_env, scf_data, scalapack_info, scf_data.ttensors,
+                                  scf_data.etensors);
       // X=C?
 
       ec.pg().barrier();
     }
     else {
       if(rank == 0) cout << "Superposition of Atomic Density Guess ..." << endl;
-      scf_guess.compute_sad_guess<TensorType>(ec, chem_env, scf_data, scalapack_info,
-                                              scf_data.etensors, scf_data.ttensors);
+      scf_guess.compute_sad_guess(ec, chem_env, scf_data, scalapack_info, scf_data.etensors,
+                                  scf_data.ttensors);
 
       ec.pg().barrier();
     }
@@ -1036,7 +1034,7 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
         scf_data.ttensors, scf_data.etensors, scf_data.do_dens_fit);
 
       auto [s1_all, s2_all, ntasks_all] =
-        gather_task_vectors<TensorType>(ec, s1vec, s2vec, ntask_vec);
+        SCFUtil::gather_task_vectors<TensorType>(ec, s1vec, s2vec, ntask_vec);
 
       int tmdim = 0;
       if(rank == 0) {
@@ -1080,7 +1078,7 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
 
       // Add QED contribution
       if(chem_env.sys_data.do_qed) {
-        scf_qed.compute_QED_2body<TensorType>(ec, chem_env, scf_data, scf_data.ttensors);
+        scf_qed.compute_QED_2body(ec, chem_env, scf_data, scf_data.ttensors);
       }
 
 #if defined(USE_GAUXC)
@@ -1148,7 +1146,7 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
 
       // Add QED contribution
       if(chem_env.sys_data.do_qed) {
-        scf_qed.compute_QED_2body<TensorType>(ec, chem_env, scf_data, scf_data.ttensors);
+        scf_qed.compute_QED_2body(ec, chem_env, scf_data, scf_data.ttensors);
       }
 
       std::tie(scf_state.ehf, scf_state.rmsd) = scf_iter.scf_iter_body(

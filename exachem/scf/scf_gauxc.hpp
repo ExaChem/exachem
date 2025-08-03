@@ -21,24 +21,37 @@
 #include "exachem/scf/scf_data.hpp"
 #include "exachem/scf/scf_tensors.hpp"
 
-namespace exachem::scf::gauxc {
+namespace exachem::scf {
 
-std::tuple<std::shared_ptr<GauXC::XCIntegrator<Matrix>>, double>
-setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data);
+template<typename T>
+class DefaultSCFGauxc {
+public:
+  virtual ~DefaultSCFGauxc() = default;
+  virtual std::tuple<std::shared_ptr<GauXC::XCIntegrator<Matrix>>, double>
+  setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data);
 
-GauXC::Molecule make_gauxc_molecule(const std::vector<libint2::Atom>& atoms);
+  virtual GauXC::Molecule make_gauxc_molecule(const std::vector<libint2::Atom>& atoms);
 
-GauXC::BasisSet<double> make_gauxc_basis(const libint2::BasisSet& basis, const double basis_tol);
+  virtual GauXC::BasisSet<double> make_gauxc_basis(const libint2::BasisSet& basis,
+                                                   const double             basis_tol);
 
-template<typename TensorType>
-TensorType compute_xcf(ExecutionContext& ec, ChemEnv& chem_env, exachem::scf::TAMMTensors& ttensors,
-                       exachem::scf::EigenTensors&  etensors,
-                       GauXC::XCIntegrator<Matrix>& xc_integrator);
+  virtual T compute_xcf(ExecutionContext& ec, ChemEnv& chem_env,
+                        exachem::scf::TAMMTensors<T>& ttensors,
+                        exachem::scf::EigenTensors&   etensors,
+                        GauXC::XCIntegrator<Matrix>&  xc_integrator);
 
-template<typename TensorType>
-void compute_exx(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
-                 exachem::scf::TAMMTensors& ttensors, exachem::scf::EigenTensors& etensors,
-                 GauXC::XCIntegrator<Matrix>& xc_integrator);
+  virtual void compute_exx(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
+                           exachem::scf::TAMMTensors<T>& ttensors,
+                           exachem::scf::EigenTensors&   etensors,
+                           GauXC::XCIntegrator<Matrix>&  xc_integrator);
+};
 
-} // namespace exachem::scf::gauxc
+template<typename T>
+class SCFGauxc: public DefaultSCFGauxc<T> {
+  // Inherit all constructors and methods from DefaultSCFGauxc
+  // using DefaultSCFGauxc<T>::DefaultSCFGauxc;
+  // Optionally override methods here
+};
+
+} // namespace exachem::scf
 #endif

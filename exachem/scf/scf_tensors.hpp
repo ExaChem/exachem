@@ -30,74 +30,76 @@ public:
     taskmap; // on all ranks for 4c HF only
 };
 
+template<typename T>
 class TAMMTensors {
 public:
-  std::vector<Tensor<TensorType>> ehf_tamm_hist;
+  std::vector<Tensor<T>> ehf_tamm_hist;
 
-  std::vector<Tensor<TensorType>> diis_hist;
-  std::vector<Tensor<TensorType>> fock_hist;
-  std::vector<Tensor<TensorType>> D_hist;
+  std::vector<Tensor<T>> diis_hist;
+  std::vector<Tensor<T>> fock_hist;
+  std::vector<Tensor<T>> D_hist;
 
-  std::vector<Tensor<TensorType>> diis_beta_hist;
-  std::vector<Tensor<TensorType>> fock_beta_hist;
-  std::vector<Tensor<TensorType>> D_beta_hist;
+  std::vector<Tensor<T>> diis_beta_hist;
+  std::vector<Tensor<T>> fock_beta_hist;
+  std::vector<Tensor<T>> D_beta_hist;
 
-  Tensor<TensorType> ehf_tamm;
-  Tensor<TensorType> ehf_tmp;
-  Tensor<TensorType> ehf_beta_tmp;
+  Tensor<T> ehf_tamm;
+  Tensor<T> ehf_tmp;
+  Tensor<T> ehf_beta_tmp;
 
-  Tensor<TensorType> H1;      // core hamiltonian
-  Tensor<TensorType> S1;      // overlap ints
-  Tensor<TensorType> T1;      // kinetic ints
-  Tensor<TensorType> V1;      // nuclear ints
-  Tensor<TensorType> QED_Dx;  // dipole ints
-  Tensor<TensorType> QED_Dy;  // dipole ints
-  Tensor<TensorType> QED_Dz;  // dipole ints
-  Tensor<TensorType> QED_Qxx; // quadrupole ints
-  Tensor<TensorType> QED_Qxy; // quadrupole ints
-  Tensor<TensorType> QED_Qxz; // quadrupole ints
-  Tensor<TensorType> QED_Qyy; // quadrupole ints
-  Tensor<TensorType> QED_Qyz; // quadrupole ints
-  Tensor<TensorType> QED_Qzz; // quadrupole ints
-  Tensor<TensorType> QED_1body;
-  Tensor<TensorType> QED_2body;
-  Tensor<TensorType> QED_energy;
+  Tensor<T> H1;      // core hamiltonian
+  Tensor<T> S1;      // overlap ints
+  Tensor<T> T1;      // kinetic ints
+  Tensor<T> V1;      // nuclear ints
+  Tensor<T> QED_Dx;  // dipole ints
+  Tensor<T> QED_Dy;  // dipole ints
+  Tensor<T> QED_Dz;  // dipole ints
+  Tensor<T> QED_Qxx; // quadrupole ints
+  Tensor<T> QED_Qxy; // quadrupole ints
+  Tensor<T> QED_Qxz; // quadrupole ints
+  Tensor<T> QED_Qyy; // quadrupole ints
+  Tensor<T> QED_Qyz; // quadrupole ints
+  Tensor<T> QED_Qzz; // quadrupole ints
+  Tensor<T> QED_1body;
+  Tensor<T> QED_2body;
+  Tensor<T> QED_energy;
 
-  Tensor<TensorType> X_alpha;
-  Tensor<TensorType> F_alpha; // H1+F_alpha_tmp
-  Tensor<TensorType> F_beta;
-  Tensor<TensorType> F_alpha_tmp; // computed via call to compute_2bf(...)
-  Tensor<TensorType> F_beta_tmp;
-  Tensor<TensorType> F_BC; // block-cyclic Fock matrix used in the scalapack code path
+  Tensor<T> X_alpha;
+  Tensor<T> F_alpha; // H1+F_alpha_tmp
+  Tensor<T> F_beta;
+  Tensor<T> F_alpha_tmp; // computed via call to compute_2bf(...)
+  Tensor<T> F_beta_tmp;
+  Tensor<T> F_BC; // block-cyclic Fock matrix used in the scalapack code path
   // not allocated, shell tiled. tensor structure used to identify shell blocks in compute_2bf
-  Tensor<TensorType> F_dummy;
-  Tensor<TensorType> VXC_alpha;
-  Tensor<TensorType> VXC_beta;
+  Tensor<T> F_dummy;
+  Tensor<T> VXC_alpha;
+  Tensor<T> VXC_beta;
 
-  Tensor<TensorType> C_alpha;
-  Tensor<TensorType> C_beta;
-  Tensor<TensorType> C_occ_a;
-  Tensor<TensorType> C_occ_b;
-  Tensor<TensorType> C_occ_aT;
-  Tensor<TensorType> C_occ_bT;
+  Tensor<T> C_alpha;
+  Tensor<T> C_beta;
+  Tensor<T> C_occ_a;
+  Tensor<T> C_occ_b;
+  Tensor<T> C_occ_aT;
+  Tensor<T> C_occ_bT;
 
-  Tensor<TensorType> C_alpha_BC;
-  Tensor<TensorType> C_beta_BC;
+  Tensor<T> C_alpha_BC;
+  Tensor<T> C_beta_BC;
 
-  Tensor<TensorType> D_alpha;
-  Tensor<TensorType> D_beta;
-  Tensor<TensorType> D_diff;
-  Tensor<TensorType> D_last_alpha;
-  Tensor<TensorType> D_last_beta;
+  Tensor<T> D_alpha;
+  Tensor<T> D_beta;
+  Tensor<T> D_diff;
+  Tensor<T> D_last_alpha;
+  Tensor<T> D_last_beta;
 
-  Tensor<TensorType> FD_alpha;
-  Tensor<TensorType> FDS_alpha;
-  Tensor<TensorType> FD_beta;
-  Tensor<TensorType> FDS_beta;
+  Tensor<T> FD_alpha;
+  Tensor<T> FDS_alpha;
+  Tensor<T> FD_beta;
+  Tensor<T> FDS_beta;
 
   // DF
-  Tensor<TensorType> xyK; // n,n,ndf
-  Tensor<TensorType> xyZ; // n,n,ndf
-  Tensor<TensorType> Vm1; // ndf,ndf
+  Tensor<T> xyK; // n,n,ndf
+  Tensor<T> xyZ; // n,n,ndf
+  Tensor<T> Vm1; // ndf,ndf
 };
+
 } // namespace exachem::scf

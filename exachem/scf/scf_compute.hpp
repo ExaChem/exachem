@@ -13,58 +13,60 @@
 #include "exachem/scf/scf_common.hpp"
 #include "exachem/scf/scf_guess.hpp"
 using libint2::Atom;
-using TensorType       = double;
 using shellpair_list_t = std::unordered_map<size_t, std::vector<size_t>>;
 using shellpair_data_t =
   std::vector<std::vector<std::shared_ptr<libint2::ShellPair>>>; // in same order as
                                                                  // shellpair_list_t
 
-#pragma once
-
 namespace exachem::scf {
 
-class SCFCompute {
+template<typename T>
+class DefaultSCFCompute {
 public:
-  void compute_shellpair_list(const ExecutionContext& ec, const libint2::BasisSet& shells,
-                              SCFData& scf_data);
-  void compute_trafo(const libint2::BasisSet& shells, EigenTensors& etensors);
-  std::tuple<int, double> compute_NRE(const ExecutionContext&     ec,
-                                      std::vector<libint2::Atom>& atoms);
-  std::tuple<shellpair_list_t, shellpair_data_t>
-       compute_shellpairs(const libint2::BasisSet& bs1,
-                          const libint2::BasisSet& bs2 = libint2::BasisSet(), double threshold = 1e-16);
-  void compute_orthogonalizer(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
-                              ScalapackInfo& scalapack_info, TAMMTensors& ttensors);
+  virtual ~DefaultSCFCompute() = default;
 
-  std::tuple<std::vector<size_t>, std::vector<Tile>, std::vector<Tile>>
+  virtual void compute_shellpair_list(const ExecutionContext& ec, const libint2::BasisSet& shells,
+                                      SCFData& scf_data);
+  virtual void compute_trafo(const libint2::BasisSet& shells, EigenTensors& etensors);
+  virtual std::tuple<int, double> compute_NRE(const ExecutionContext&     ec,
+                                              std::vector<libint2::Atom>& atoms);
+  virtual std::tuple<shellpair_list_t, shellpair_data_t>
+               compute_shellpairs(const libint2::BasisSet& bs1,
+                                  const libint2::BasisSet& bs2 = libint2::BasisSet(), double threshold = 1e-16);
+  virtual void compute_orthogonalizer(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
+                                      ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors);
+
+  virtual std::tuple<std::vector<size_t>, std::vector<Tile>, std::vector<Tile>>
   compute_AO_tiles(const ExecutionContext& ec, ChemEnv& chem_env, libint2::BasisSet& shells,
                    const bool is_df = false);
 
-  void recompute_tilesize(ExecutionContext& ec, ChemEnv& chem_env, bool is_df = false);
+  virtual void recompute_tilesize(ExecutionContext& ec, ChemEnv& chem_env, bool is_df = false);
 
-  template<typename TensorType>
-  void compute_sdens_to_cdens(const libint2::BasisSet& shells, Matrix& Spherical, Matrix& Cartesian,
-                              EigenTensors& etensors);
+  virtual void compute_sdens_to_cdens(const libint2::BasisSet& shells, Matrix& Spherical,
+                                      Matrix& Cartesian, EigenTensors& etensors);
 
-  template<typename TensorType>
-  void compute_cpot_to_spot(const libint2::BasisSet& shells, Matrix& Spherical, Matrix& Cartesian,
-                            EigenTensors& etensors);
+  virtual void compute_cpot_to_spot(const libint2::BasisSet& shells, Matrix& Spherical,
+                                    Matrix& Cartesian, EigenTensors& etensors);
 
-  template<typename TensorType>
-  void compute_hamiltonian(ExecutionContext& ec, const SCFData& scf_data, ChemEnv& chem_env,
-                           TAMMTensors& ttensors, EigenTensors& etensors);
+  virtual void compute_hamiltonian(ExecutionContext& ec, const SCFData& scf_data, ChemEnv& chem_env,
+                                   TAMMTensors<T>& ttensors, EigenTensors& etensors);
 
-  template<typename TensorType>
-  void compute_density(ExecutionContext& ec, ChemEnv& chem_env, const SCFData& scf_data,
-                       ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
-                       EigenTensors& etensors);
+  virtual void compute_density(ExecutionContext& ec, ChemEnv& chem_env, const SCFData& scf_data,
+                               ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors,
+                               EigenTensors& etensors);
 
   template<libint2::Operator Kernel = libint2::Operator::coulomb>
-  Matrix compute_schwarz_ints(ExecutionContext& ec, const SCFData& scf_data,
-                              const libint2::BasisSet& bs1,
-                              const libint2::BasisSet& bs2 = libint2::BasisSet(),
-                              bool use_2norm               = false, // use infty norm by default
-                              typename libint2::operator_traits<Kernel>::oper_params_type params =
-                                libint2::operator_traits<Kernel>::default_params());
+  Matrix
+  compute_schwarz_ints(ExecutionContext& ec, const SCFData& scf_data, const libint2::BasisSet& bs1,
+                       const libint2::BasisSet& bs2 = libint2::BasisSet(), bool use_2norm = false,
+                       typename libint2::operator_traits<Kernel>::oper_params_type params =
+                         libint2::operator_traits<Kernel>::default_params());
 };
+
+template<typename T>
+class SCFCompute: public DefaultSCFCompute<T> {
+public:
+  // Optionally override methods here
+};
+
 } // namespace exachem::scf

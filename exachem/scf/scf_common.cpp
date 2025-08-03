@@ -12,7 +12,7 @@
 #endif
 
 template<typename T>
-std::vector<size_t> exachem::scf::sort_indexes(std::vector<T>& v, bool reverse) {
+std::vector<size_t> exachem::scf::SCFUtil::sort_indexes(std::vector<T>& v, bool reverse) {
   std::vector<size_t> idx(v.size());
   iota(idx.begin(), idx.end(), 0);
   sort(idx.begin(), idx.end(), [&v](size_t x, size_t y) { return v[x] < v[y]; });
@@ -34,13 +34,10 @@ std::vector<size_t> exachem::scf::sort_indexes(std::vector<T>& v, bool reverse) 
 // cols are transformed basis ("orthogonal" AO)
 //
 // A is conditioned to max_condition_number
-std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec, ChemEnv& chem_env,
-                                                            SCFData&       scf_data,
-                                                            ScalapackInfo& scalapack_info,
-                                                            exachem::scf::TAMMTensors& ttensors,
-                                                            bool symmetric, double threshold) {
-  using T = TensorType;
-
+template<typename T>
+std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv(
+  ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data, ScalapackInfo& scalapack_info,
+  exachem::scf::TAMMTensors<T>& ttensors, bool symmetric, double threshold) {
   SystemData& sys_data    = chem_env.sys_data;
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -150,7 +147,7 @@ std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec
 
 #endif
 
-  std::vector<T>::iterator first_above_thresh;
+  typename std::vector<T>::iterator first_above_thresh;
   if(world_rank == 0) {
     // condition_number = std::min(
     //   eps.back() / std::max( eps.front(), std::numeric_limits<double>::min() ),
@@ -205,7 +202,7 @@ std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec
     scf_data.tNortho_bc  = TiledIndexSpace{IndexSpace{range(sys_data.nbf)}, _mb};
     ttensors.X_alpha     = {scf_data.tN_bc, scf_data.tNortho_bc};
     ttensors.X_alpha.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-    Tensor<TensorType>::allocate(&scalapack_info.ec, ttensors.X_alpha);
+    Tensor<T>::allocate(&scalapack_info.ec, ttensors.X_alpha);
   }
 #else
   ttensors.X_alpha = {scf_data.tAO, scf_data.tAO_ortho};
@@ -252,12 +249,11 @@ std::tuple<size_t, double, double> exachem::scf::gensqrtinv(ExecutionContext& ec
 
   return std::make_tuple(size_t(n_cond), condition_number, result_condition_number);
 }
-
-std::tuple<Matrix, size_t, double, double>
-exachem::scf::gensqrtinv_atscf(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
-                               ScalapackInfo& scalapack_info, Tensor<double> S1,
-                               TiledIndexSpace& tao_atom, bool symmetric, double threshold) {
-  using T = double;
+template<typename T>
+std::tuple<Matrix, size_t, double, double> exachem::scf::SCFUtil::gensqrtinv_atscf(
+  ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data, ScalapackInfo& scalapack_info,
+  Tensor<T> S1, TiledIndexSpace& tao_atom, bool symmetric, double threshold) {
+  // using T = double;
 
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -281,7 +277,7 @@ exachem::scf::gensqrtinv_atscf(ExecutionContext& ec, ChemEnv& chem_env, SCFData&
     lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, N, V.data(), N, eps.data());
   }
 
-  std::vector<T>::iterator first_above_thresh;
+  typename std::vector<T>::iterator first_above_thresh;
   if(world_rank == 0) {
     // condition_number = std::min(
     //   eps.back() / std::max( eps.front(), std::numeric_limits<double>::min() ),
@@ -350,10 +346,10 @@ exachem::scf::gensqrtinv_atscf(ExecutionContext& ec, ChemEnv& chem_env, SCFData&
   return std::make_tuple(X, size_t(n_cond), condition_number, result_condition_number);
 }
 
-template<typename TensorType>
+template<typename T>
 std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-exachem::scf::gather_task_vectors(ExecutionContext& ec, std::vector<int>& s1vec,
-                                  std::vector<int>& s2vec, std::vector<int>& ntask_vec) {
+exachem::scf::SCFUtil::gather_task_vectors(ExecutionContext& ec, std::vector<int>& s1vec,
+                                           std::vector<int>& s2vec, std::vector<int>& ntask_vec) {
   const int rank   = ec.pg().rank().value();
   const int nranks = ec.pg().size().value();
 
@@ -402,8 +398,15 @@ exachem::scf::gather_task_vectors(ExecutionContext& ec, std::vector<int>& s1vec,
 }
 
 template std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-exachem::scf::gather_task_vectors<double>(ExecutionContext& ec, std::vector<int>& s1vec,
-                                          std::vector<int>& s2vec, std::vector<int>& ntask_vec);
+exachem::scf::SCFUtil::gather_task_vectors<double>(ExecutionContext& ec, std::vector<int>& s1vec,
+                                                   std::vector<int>& s2vec,
+                                                   std::vector<int>& ntask_vec);
 
-template std::vector<size_t> exachem::scf::sort_indexes<double>(std::vector<double>& v,
-                                                                bool                 reverse);
+template std::vector<size_t> exachem::scf::SCFUtil::sort_indexes<double>(std::vector<double>& v,
+                                                                         bool reverse);
+template std::tuple<Matrix, size_t, double, double> exachem::scf::SCFUtil::gensqrtinv_atscf<double>(
+  ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data, ScalapackInfo& scalapack_info,
+  Tensor<double> S1, TiledIndexSpace& tao_atom, bool symmetric, double threshold);
+template std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv<double>(
+  ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data, ScalapackInfo& scalapack_info,
+  TAMMTensors<double>& ttensors, bool symmetric, double threshold);

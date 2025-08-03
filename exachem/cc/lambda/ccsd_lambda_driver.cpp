@@ -110,14 +110,14 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
   .execute();
   // clang-format on
 
-  scf::SCFData    spvars;
-  scf::SCFCompute scf_compute;
+  scf::SCFData       spvars;
+  scf::SCFCompute<T> scf_compute;
   scf_compute.compute_shellpair_list(ec, chem_env.shells, spvars);
   std::tie(spvars.shell_tile_map, spvars.AO_tiles, spvars.AO_opttiles) =
     scf_compute.compute_AO_tiles(ec, chem_env, chem_env.shells);
 
-  auto          atoms = chem_env.atoms;
-  scf::SCFGuess scf_guess;
+  auto             atoms = chem_env.atoms;
+  scf::SCFGuess<T> scf_guess;
   scf_guess.compute_dipole_ints(ec, spvars, DipX_ao, DipY_ao, DipZ_ao, atoms, chem_env.shells,
                                 libint2::Operator::emultipole1);
 

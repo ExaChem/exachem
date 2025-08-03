@@ -442,8 +442,8 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
   // const TAMM_GA_SIZE northo      = sys_data.nbf;
   const TAMM_GA_SIZE nao = sys_data.nbf_orig;
 
-  SCFData    scf_data; // init vars
-  SCFCompute scf_compute;
+  SCFData                scf_data; // init vars
+  SCFCompute<TensorType> scf_compute;
   std::tie(scf_data.shell_tile_map, scf_data.AO_tiles, scf_data.AO_opttiles) =
     scf_compute.compute_AO_tiles(ec, chem_env, shells);
   scf_compute.compute_shellpair_list(ec, shells, scf_data);
@@ -451,7 +451,7 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
 
   IndexSpace AO{range(0, shells.nbf())};
   scf_data.tAO    = {AO, scf_data.AO_opttiles};
-  Matrix SchwarzK = scf_compute.compute_schwarz_ints<>(ec, scf_data, shells);
+  Matrix SchwarzK = scf_compute.compute_schwarz_ints(ec, scf_data, shells);
 
   auto shell2bf = BasisSetMap::map_shell_to_basis_function(shells);
   auto bf2shell = BasisSetMap::map_basis_function_to_shell(shells);

@@ -84,7 +84,7 @@ void exachem::scf::DefaultSCFIO<T>::write_scf_mat(Matrix& C, const std::string& 
 
 template<typename T>
 void exachem::scf::DefaultSCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_env,
-                                                   TAMMTensors& ttensors, EigenTensors& etensors,
+                                                   TAMMTensors<T>& ttensors, EigenTensors& etensors,
                                                    SCFData&       scf_data,
                                                    ScalapackInfo& scalapack_info) {
   const SystemData& sys_data    = chem_env.sys_data;
@@ -307,9 +307,9 @@ void exachem::scf::DefaultSCFIO<T>::rw_mat_disk(Tensor<T> tensor, std::string tf
 
 template<typename T>
 void exachem::scf::DefaultSCFIO<T>::rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env,
-                                               ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
-                                               EigenTensors& etensors, std::string files_prefix,
-                                               bool read) {
+                                               ScalapackInfo&  scalapack_info,
+                                               TAMMTensors<T>& ttensors, EigenTensors& etensors,
+                                               std::string files_prefix, bool read) {
   const auto rank   = ec.pg().rank();
   const bool is_uhf = chem_env.sys_data.is_unrestricted;
   auto       debug  = chem_env.ioptions.scf_options.debug;

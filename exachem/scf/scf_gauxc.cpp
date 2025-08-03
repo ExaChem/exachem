@@ -10,9 +10,11 @@
 
 #if defined(USE_GAUXC)
 
+namespace exachem::scf {
+template<typename T>
 std::tuple<std::shared_ptr<GauXC::XCIntegrator<Matrix>>, double>
-exachem::scf::gauxc::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
-                                 const SCFData& scf_data) {
+DefaultSCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
+                                const SCFData& scf_data) {
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -204,9 +206,9 @@ exachem::scf::gauxc::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
   if(rank == 0)
     std::cout << std::fixed << std::setprecision(2) << "GauXC setup time: " << gc_time << "s\n";
   return std::make_tuple(integrator_factory.get_shared_instance(gauxc_func, gauxc_lb), xHF);
-};
-
-GauXC::Molecule exachem::scf::gauxc::make_gauxc_molecule(const std::vector<libint2::Atom>& atoms) {
+}
+template<typename T>
+GauXC::Molecule DefaultSCFGauxc<T>::make_gauxc_molecule(const std::vector<libint2::Atom>& atoms) {
   GauXC::Molecule mol;
   mol.resize(atoms.size());
   std::transform(atoms.begin(), atoms.end(), mol.begin(), [](const libint2::Atom& atom) {
@@ -215,9 +217,9 @@ GauXC::Molecule exachem::scf::gauxc::make_gauxc_molecule(const std::vector<libin
   });
   return mol;
 }
-
-GauXC::BasisSet<double> exachem::scf::gauxc::make_gauxc_basis(const libint2::BasisSet& basis,
-                                                              const double             basis_tol) {
+template<typename T>
+GauXC::BasisSet<double> DefaultSCFGauxc<T>::make_gauxc_basis(const libint2::BasisSet& basis,
+                                                             const double             basis_tol) {
   using shell_t = GauXC::Shell<double>;
   using prim_t  = typename shell_t::prim_array;
   using cart_t  = typename shell_t::cart_array;
@@ -247,11 +249,11 @@ GauXC::BasisSet<double> exachem::scf::gauxc::make_gauxc_basis(const libint2::Bas
   return gauxc_basis;
 }
 
-template<typename TensorType>
-void exachem::scf::gauxc::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
-                                      exachem::scf::TAMMTensors&   ttensors,
-                                      exachem::scf::EigenTensors&  etensors,
-                                      GauXC::XCIntegrator<Matrix>& xc_integrator) {
+template<typename T>
+void DefaultSCFGauxc<T>::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
+                                     exachem::scf::TAMMTensors<T>& ttensors,
+                                     exachem::scf::EigenTensors&   etensors,
+                                     GauXC::XCIntegrator<Matrix>&  xc_integrator) {
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -269,15 +271,14 @@ void exachem::scf::gauxc::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, S
   sn_link_settings.k_tol      = scf_options.xc_snK_ktol;
 
 #ifdef GAUXC_HAS_DEVICE
-  exachem::scf::SCFCompute scf_compute;
-  Matrix&                  D_alpha = etensors.D_alpha_cart;
-  Matrix&                  K_alpha = etensors.VXC_alpha_cart;
-  Matrix&                  D_beta  = etensors.D_beta_cart;
-  Matrix&                  K_beta  = etensors.VXC_beta_cart;
-  const libint2::BasisSet& shells  = chem_env.shells;
-  scf_compute.compute_sdens_to_cdens<TensorType>(shells, etensors.D_alpha, D_alpha, etensors);
-  if(is_uhf)
-    scf_compute.compute_sdens_to_cdens<TensorType>(shells, etensors.D_beta, D_beta, etensors);
+  exachem::scf::SCFCompute<T> scf_compute;
+  Matrix&                     D_alpha = etensors.D_alpha_cart;
+  Matrix&                     K_alpha = etensors.VXC_alpha_cart;
+  Matrix&                     D_beta  = etensors.D_beta_cart;
+  Matrix&                     K_beta  = etensors.VXC_beta_cart;
+  const libint2::BasisSet&    shells  = chem_env.shells;
+  scf_compute.compute_sdens_to_cdens(shells, etensors.D_alpha, D_alpha, etensors);
+  if(is_uhf) scf_compute.compute_sdens_to_cdens(shells, etensors.D_beta, D_beta, etensors);
 #else
   Matrix& D_alpha   = etensors.D_alpha;
   Matrix& K_alpha   = etensors.G_alpha;
@@ -287,7 +288,7 @@ void exachem::scf::gauxc::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, S
 
   K_alpha = xc_integrator.eval_exx(factor * D_alpha, sn_link_settings);
 #ifdef GAUXC_HAS_DEVICE
-  scf_compute.compute_cpot_to_spot<TensorType>(shells, etensors.G_alpha, K_alpha, etensors);
+  scf_compute.compute_cpot_to_spot(shells, etensors.G_alpha, K_alpha, etensors);
   K_alpha.resize(0, 0);
   D_alpha.resize(0, 0);
 #endif
@@ -303,7 +304,7 @@ void exachem::scf::gauxc::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, S
   if(is_uhf) {
     K_beta = xc_integrator.eval_exx(factor * D_beta, sn_link_settings);
 #ifdef GAUXC_HAS_DEVICE
-    scf_compute.compute_cpot_to_spot<TensorType>(shells, etensors.G_beta, K_beta, etensors);
+    scf_compute.compute_cpot_to_spot(shells, etensors.G_beta, K_beta, etensors);
     K_beta.resize(0, 0);
     D_beta.resize(0, 0);
 #endif
@@ -319,11 +320,11 @@ void exachem::scf::gauxc::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, S
   }
 }
 
-template<typename TensorType>
-TensorType exachem::scf::gauxc::compute_xcf(ExecutionContext& ec, ChemEnv& chem_env,
-                                            exachem::scf::TAMMTensors&   ttensors,
-                                            exachem::scf::EigenTensors&  etensors,
-                                            GauXC::XCIntegrator<Matrix>& xc_integrator) {
+template<typename T>
+T DefaultSCFGauxc<T>::compute_xcf(ExecutionContext& ec, ChemEnv& chem_env,
+                                  exachem::scf::TAMMTensors<T>& ttensors,
+                                  exachem::scf::EigenTensors&   etensors,
+                                  GauXC::XCIntegrator<Matrix>&  xc_integrator) {
   SystemData& sys_data = chem_env.sys_data;
 
   const bool is_uhf = sys_data.is_unrestricted;
@@ -333,15 +334,14 @@ TensorType exachem::scf::gauxc::compute_xcf(ExecutionContext& ec, ChemEnv& chem_
   double EXC{};
 
 #ifdef GAUXC_HAS_DEVICE
-  exachem::scf::SCFCompute scf_compute;
-  Matrix&                  D_alpha   = etensors.D_alpha_cart;
-  Matrix&                  vxc_alpha = etensors.VXC_alpha_cart;
-  Matrix&                  D_beta    = etensors.D_beta_cart;
-  Matrix&                  vxc_beta  = etensors.VXC_beta_cart;
-  const libint2::BasisSet& shells    = chem_env.shells;
-  scf_compute.compute_sdens_to_cdens<TensorType>(shells, etensors.D_alpha, D_alpha, etensors);
-  if(is_uhf)
-    scf_compute.compute_sdens_to_cdens<TensorType>(shells, etensors.D_beta, D_beta, etensors);
+  exachem::scf::SCFCompute<T> scf_compute;
+  Matrix&                     D_alpha   = etensors.D_alpha_cart;
+  Matrix&                     vxc_alpha = etensors.VXC_alpha_cart;
+  Matrix&                     D_beta    = etensors.D_beta_cart;
+  Matrix&                     vxc_beta  = etensors.VXC_beta_cart;
+  const libint2::BasisSet&    shells    = chem_env.shells;
+  scf_compute.compute_sdens_to_cdens(shells, etensors.D_alpha, D_alpha, etensors);
+  if(is_uhf) scf_compute.compute_sdens_to_cdens(shells, etensors.D_beta, D_beta, etensors);
 #else
   Matrix& D_alpha   = etensors.D_alpha;
   Matrix& vxc_alpha = etensors.G_alpha;
@@ -352,7 +352,7 @@ TensorType exachem::scf::gauxc::compute_xcf(ExecutionContext& ec, ChemEnv& chem_
   if(is_rhf) {
     std::tie(EXC, vxc_alpha) = xc_integrator.eval_exc_vxc(0.5 * D_alpha);
 #ifdef GAUXC_HAS_DEVICE
-    scf_compute.compute_cpot_to_spot<TensorType>(shells, etensors.G_alpha, vxc_alpha, etensors);
+    scf_compute.compute_cpot_to_spot(shells, etensors.G_alpha, vxc_alpha, etensors);
     vxc_alpha.resize(0, 0);
     D_alpha.resize(0, 0);
 #endif
@@ -362,8 +362,8 @@ TensorType exachem::scf::gauxc::compute_xcf(ExecutionContext& ec, ChemEnv& chem_
     std::tie(EXC, vxc_alpha, vxc_beta) =
       xc_integrator.eval_exc_vxc((D_alpha + D_beta), (D_alpha - D_beta));
 #ifdef GAUXC_HAS_DEVICE
-    scf_compute.compute_cpot_to_spot<TensorType>(shells, etensors.G_alpha, vxc_alpha, etensors);
-    scf_compute.compute_cpot_to_spot<TensorType>(shells, etensors.G_beta, vxc_beta, etensors);
+    scf_compute.compute_cpot_to_spot(shells, etensors.G_alpha, vxc_alpha, etensors);
+    scf_compute.compute_cpot_to_spot(shells, etensors.G_beta, vxc_beta, etensors);
     vxc_alpha.resize(0, 0);
     vxc_beta.resize(0, 0);
     D_alpha.resize(0, 0);
@@ -380,14 +380,8 @@ TensorType exachem::scf::gauxc::compute_xcf(ExecutionContext& ec, ChemEnv& chem_
   return EXC;
 }
 
-template double exachem::scf::gauxc::compute_xcf<double>(
-  ExecutionContext& ec, ChemEnv& chem_env, exachem::scf::TAMMTensors& ttensors,
-  exachem::scf::EigenTensors& etensors, GauXC::XCIntegrator<Matrix>& xc_integrator);
+template class DefaultSCFGauxc<double>;
 
-template void exachem::scf::gauxc::compute_exx<double>(ExecutionContext& ec, ChemEnv& chem_env,
-                                                       SCFData&                     scf_data,
-                                                       exachem::scf::TAMMTensors&   ttensors,
-                                                       exachem::scf::EigenTensors&  etensors,
-                                                       GauXC::XCIntegrator<Matrix>& xc_integrator);
+} // namespace exachem::scf
 
 #endif

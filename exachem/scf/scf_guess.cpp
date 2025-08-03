@@ -94,7 +94,8 @@ const std::vector<Real> exachem::scf::scf_guess::compute_ao_occupation_vector(si
 
 // computes Superposition-Of-Atomic-Densities guess for the molecular density matrix
 // in minimal basis; occupies subshells by smearing electrons evenly over the orbitals
-Matrix exachem::scf::SCFGuess::compute_soad(const std::vector<Atom>& atoms) {
+template<typename T>
+Matrix exachem::scf::DefaultSCFGuess<T>::compute_soad(const std::vector<Atom>& atoms) {
   // compute number of atomic orbitals
   size_t natoms = atoms.size();
   size_t offset = 0;
@@ -110,11 +111,11 @@ Matrix exachem::scf::SCFGuess::compute_soad(const std::vector<Atom>& atoms) {
   return D; // we use densities normalized to # of electrons/2
 }
 
-template<typename TensorType>
-void exachem::scf::SCFGuess::compute_dipole_ints(
-  ExecutionContext& ec, const SCFData& spvars, Tensor<TensorType>& tensorX,
-  Tensor<TensorType>& tensorY, Tensor<TensorType>& tensorZ, std::vector<libint2::Atom>& atoms,
-  libint2::BasisSet& shells, libint2::Operator otype) {
+template<typename T>
+void exachem::scf::DefaultSCFGuess<T>::compute_dipole_ints(
+  ExecutionContext& ec, const SCFData& spvars, Tensor<T>& tensorX, Tensor<T>& tensorY,
+  Tensor<T>& tensorZ, std::vector<libint2::Atom>& atoms, libint2::BasisSet& shells,
+  libint2::Operator otype) {
   using libint2::Atom;
   using libint2::BasisSet;
   using libint2::Engine;
@@ -124,7 +125,7 @@ void exachem::scf::SCFGuess::compute_dipole_ints(
   const std::vector<Tile>&   AO_tiles       = spvars.AO_tiles;
   const std::vector<size_t>& shell_tile_map = spvars.shell_tile_map;
 
-  Engine engine(otype, max_nprim(shells), max_l(shells), 0);
+  Engine engine(otype, SCFUtil::max_nprim(shells), SCFUtil::max_l(shells), 0);
 
   // engine.set(otype);
   // auto& buf = (engine.results());
@@ -133,11 +134,11 @@ void exachem::scf::SCFGuess::compute_dipole_ints(
     auto bi0 = blockid[0];
     auto bi1 = blockid[1];
 
-    const TAMM_SIZE         size       = tensorX.block_size(blockid);
-    auto                    block_dims = tensorX.block_dims(blockid);
-    std::vector<TensorType> dbufX(size);
-    std::vector<TensorType> dbufY(size);
-    std::vector<TensorType> dbufZ(size);
+    const TAMM_SIZE size       = tensorX.block_size(blockid);
+    auto            block_dims = tensorX.block_dims(blockid);
+    std::vector<T>  dbufX(size);
+    std::vector<T>  dbufY(size);
+    std::vector<T>  dbufZ(size);
 
     auto bd1 = block_dims[1];
 
@@ -176,9 +177,9 @@ void exachem::scf::SCFGuess::compute_dipole_ints(
         // auto bf2 = shell2bf[s2];
         auto n2 = shells[s2].size();
 
-        std::vector<TensorType> tbufX(n1 * n2);
-        std::vector<TensorType> tbufY(n1 * n2);
-        std::vector<TensorType> tbufZ(n1 * n2);
+        std::vector<T> tbufX(n1 * n2);
+        std::vector<T> tbufY(n1 * n2);
+        std::vector<T> tbufZ(n1 * n2);
 
         // compute shell pair; return is the pointer to the buffer
         const auto& buf = engine.compute(shells[s1], shells[s2]);
@@ -221,12 +222,10 @@ void exachem::scf::SCFGuess::compute_dipole_ints(
   block_for(ec, tensorX(), compute_dipole_ints_lambda);
 }
 
-template<typename TensorType>
-void exachem::scf::SCFGuess::compute_1body_ints(ExecutionContext& ec, const SCFData& scf_data,
-                                                Tensor<TensorType>&         tensor1e,
-                                                std::vector<libint2::Atom>& atoms,
-                                                libint2::BasisSet&          shells,
-                                                libint2::Operator           otype) {
+template<typename T>
+void exachem::scf::DefaultSCFGuess<T>::compute_1body_ints(
+  ExecutionContext& ec, const SCFData& scf_data, Tensor<T>& tensor1e,
+  std::vector<libint2::Atom>& atoms, libint2::BasisSet& shells, libint2::Operator otype) {
   using libint2::Atom;
   using libint2::BasisSet;
   using libint2::Engine;
@@ -236,7 +235,8 @@ void exachem::scf::SCFGuess::compute_1body_ints(ExecutionContext& ec, const SCFD
   const std::vector<Tile>&   AO_tiles       = scf_data.AO_tiles;
   const std::vector<size_t>& shell_tile_map = scf_data.shell_tile_map;
 
-  Engine engine(otype, max_nprim(shells), max_l(shells), 0);
+  Engine engine(otype, exachem::scf::SCFUtil::max_nprim(shells),
+                exachem::scf::SCFUtil::max_l(shells), 0);
 
   // engine.set(otype);
 
@@ -254,9 +254,9 @@ void exachem::scf::SCFGuess::compute_1body_ints(ExecutionContext& ec, const SCFD
     auto bi0 = blockid[0];
     auto bi1 = blockid[1];
 
-    const TAMM_SIZE         size       = tensor1e.block_size(blockid);
-    auto                    block_dims = tensor1e.block_dims(blockid);
-    std::vector<TensorType> dbuf(size);
+    const TAMM_SIZE size       = tensor1e.block_size(blockid);
+    auto            block_dims = tensor1e.block_dims(blockid);
+    std::vector<T>  dbuf(size);
 
     auto bd1 = block_dims[1];
 
@@ -295,7 +295,7 @@ void exachem::scf::SCFGuess::compute_1body_ints(ExecutionContext& ec, const SCFD
         // auto bf2 = shell2bf[s2];
         auto n2 = shells[s2].size();
 
-        std::vector<TensorType> tbuf(n1 * n2);
+        std::vector<T> tbuf(n1 * n2);
 
         // compute shell pair; return is the pointer to the buffer
         engine.compute(shells[s1], shells[s2]);
@@ -320,7 +320,7 @@ void exachem::scf::SCFGuess::compute_1body_ints(ExecutionContext& ec, const SCFD
         }
 
         // if(s1!=s2){
-        //     std::vector<TensorType> ttbuf(n1*n2);
+        //     std::vector<T> ttbuf(n1*n2);
         //     Eigen::Map<Matrix>(ttbuf.data(),n2,n1) = buf_mat.transpose();
         //     // Matrix buf_mat_trans = buf_mat.transpose();
         //     size_t c = 0;
@@ -339,11 +339,10 @@ void exachem::scf::SCFGuess::compute_1body_ints(ExecutionContext& ec, const SCFD
   block_for(ec, tensor1e(), compute_1body_ints_lambda);
 }
 
-template<typename TensorType>
-void exachem::scf::SCFGuess::compute_ecp_ints(ExecutionContext& ec, const SCFData& scf_data,
-                                              Tensor<TensorType>&                    tensor1e,
-                                              std::vector<libecpint::GaussianShell>& shells,
-                                              std::vector<libecpint::ECP>&           ecps) {
+template<typename T>
+void exachem::scf::DefaultSCFGuess<T>::compute_ecp_ints(
+  ExecutionContext& ec, const SCFData& scf_data, Tensor<T>& tensor1e,
+  std::vector<libecpint::GaussianShell>& shells, std::vector<libecpint::ECP>& ecps) {
   const std::vector<Tile>&   AO_tiles       = scf_data.AO_tiles;
   const std::vector<size_t>& shell_tile_map = scf_data.shell_tile_map;
 
@@ -365,9 +364,9 @@ void exachem::scf::SCFGuess::compute_ecp_ints(ExecutionContext& ec, const SCFDat
     auto bi0 = blockid[0];
     auto bi1 = blockid[1];
 
-    const TAMM_SIZE         size       = tensor1e.block_size(blockid);
-    auto                    block_dims = tensor1e.block_dims(blockid);
-    std::vector<TensorType> dbuf(size);
+    const TAMM_SIZE size       = tensor1e.block_size(blockid);
+    auto            block_dims = tensor1e.block_dims(blockid);
+    std::vector<T>  dbuf(size);
 
     auto bd1 = block_dims[1];
 
@@ -406,7 +405,7 @@ void exachem::scf::SCFGuess::compute_ecp_ints(ExecutionContext& ec, const SCFDat
         // auto bf2 = shell2bf[s2];
         auto n2 = 2 * shells[s2].l + 1;
 
-        std::vector<TensorType> tbuf(n1 * n2);
+        std::vector<T> tbuf(n1 * n2);
         // cout << "s1,s2,n1,n2 = "  << s1 << "," << s2 <<
         //       "," << n1 <<"," << n2 <<endl;
 
@@ -448,7 +447,7 @@ void exachem::scf::SCFGuess::compute_ecp_ints(ExecutionContext& ec, const SCFDat
         }
 
         // if(s1!=s2){
-        //     std::vector<TensorType> ttbuf(n1*n2);
+        //     std::vector<T> ttbuf(n1*n2);
         //     Eigen::Map<Matrix>(ttbuf.data(),n2,n1) = buf_mat.transpose();
         //     // Matrix buf_mat_trans = buf_mat.transpose();
         //     size_t c = 0;
@@ -468,9 +467,9 @@ void exachem::scf::SCFGuess::compute_ecp_ints(ExecutionContext& ec, const SCFDat
   delete[] buffer_sph_;
 } // END of compute_ecp_ints
 
-template<typename TensorType>
-void exachem::scf::SCFGuess::compute_pchg_ints(
-  ExecutionContext& ec, const SCFData& scf_data, Tensor<TensorType>& tensor1e,
+template<typename T>
+void exachem::scf::DefaultSCFGuess<T>::compute_pchg_ints(
+  ExecutionContext& ec, const SCFData& scf_data, Tensor<T>& tensor1e,
   std::vector<std::pair<double, std::array<double, 3>>>& q, libint2::BasisSet& shells,
   libint2::Operator otype) {
   using libint2::Atom;
@@ -482,7 +481,8 @@ void exachem::scf::SCFGuess::compute_pchg_ints(
   const std::vector<Tile>&   AO_tiles       = scf_data.AO_tiles;
   const std::vector<size_t>& shell_tile_map = scf_data.shell_tile_map;
 
-  Engine engine(otype, max_nprim(shells), max_l(shells), 0);
+  Engine engine(otype, exachem::scf::SCFUtil::max_nprim(shells),
+                exachem::scf::SCFUtil::max_l(shells), 0);
 
   // engine.set(otype);
   engine.set_params(q);
@@ -493,9 +493,9 @@ void exachem::scf::SCFGuess::compute_pchg_ints(
     auto bi0 = blockid[0];
     auto bi1 = blockid[1];
 
-    const TAMM_SIZE         size       = tensor1e.block_size(blockid);
-    auto                    block_dims = tensor1e.block_dims(blockid);
-    std::vector<TensorType> dbuf(size);
+    const TAMM_SIZE size       = tensor1e.block_size(blockid);
+    auto            block_dims = tensor1e.block_dims(blockid);
+    std::vector<T>  dbuf(size);
 
     auto bd1 = block_dims[1];
 
@@ -534,7 +534,7 @@ void exachem::scf::SCFGuess::compute_pchg_ints(
         // auto bf2 = shell2bf[s2];
         auto n2 = shells[s2].size();
 
-        std::vector<TensorType> tbuf(n1 * n2);
+        std::vector<T> tbuf(n1 * n2);
         // cout << "s1,s2,n1,n2 = "  << s1 << "," << s2 <<
         //       "," << n1 <<"," << n2 <<endl;
 
@@ -565,7 +565,7 @@ void exachem::scf::SCFGuess::compute_pchg_ints(
         }
 
         // if(s1!=s2){
-        //     std::vector<TensorType> ttbuf(n1*n2);
+        //     std::vector<T> ttbuf(n1*n2);
         //     Eigen::Map<Matrix>(ttbuf.data(),n2,n1) = buf_mat.transpose();
         //     // Matrix buf_mat_trans = buf_mat.transpose();
         //     size_t c = 0;
@@ -584,10 +584,12 @@ void exachem::scf::SCFGuess::compute_pchg_ints(
   block_for(ec, tensor1e(), compute_pchg_ints_lambda);
 }
 
-template<typename TensorType>
-void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, SCFData& scf_data,
-                                             ScalapackInfo& scalapack_info, TAMMTensors& ttensors,
-                                             EigenTensors& etensors) {
+template<typename T>
+void exachem::scf::DefaultSCFGuess<T>::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env,
+                                                       SCFData&        scf_data,
+                                                       ScalapackInfo&  scalapack_info,
+                                                       TAMMTensors<T>& ttensors,
+                                                       EigenTensors&   etensors) {
   auto        rank     = sch.ec().pg().rank();
   SystemData& sys_data = chem_env.sys_data;
   // SCFOptions& scf_options = chem_env.ioptions.scf_options;
@@ -887,10 +889,12 @@ void exachem::scf::SCFGuess::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env, 
   }
 }
 
-template<typename TensorType>
-void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& chem_env,
-                                               SCFData& scf_data, ScalapackInfo& scalapack_info,
-                                               EigenTensors& etensors, TAMMTensors& ttensors) {
+template<typename T>
+void exachem::scf::DefaultSCFGuess<T>::compute_sad_guess(ExecutionContext& ec, ChemEnv& chem_env,
+                                                         SCFData&        scf_data,
+                                                         ScalapackInfo&  scalapack_info,
+                                                         EigenTensors&   etensors,
+                                                         TAMMTensors<T>& ttensors) {
   auto ig1 = std::chrono::high_resolution_clock::now();
 
   // bool is_spherical{true};
@@ -1029,8 +1033,8 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
       nelectrons_beta_atom  = nelectrons - nelectrons_alpha_atom;
     }
 
-    auto       s2bf_atom = shells_atom.shell2bf();
-    SCFCompute scf_compute;
+    auto          s2bf_atom = shells_atom.shell2bf();
+    SCFCompute<T> scf_compute;
     std::tie(scf_data.obs_shellpair_list_atom, scf_data.obs_shellpair_data_atom) =
       scf_compute.compute_shellpairs(shells_atom);
     // if(rank == 0) cout << "compute shell pairs for present basis" << endl;
@@ -1108,13 +1112,13 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
     tAOt_atom = {AO_atom, AO_tiles_atom};
 
     // compute core hamiltonian H and overlap S for the atom
-    Tensor<TensorType> H_atom{tAO_atom, tAO_atom};
-    Tensor<TensorType> S_atom{tAO_atom, tAO_atom};
-    Tensor<TensorType> T_atom{tAO_atom, tAO_atom};
-    Tensor<TensorType> V_atom{tAO_atom, tAO_atom};
-    Tensor<TensorType> Q_atom{tAO_atom, tAO_atom};
-    Tensor<TensorType> E_atom{tAO_atom, tAO_atom};
-    Tensor<TensorType>::allocate(&ec, H_atom, S_atom, T_atom, V_atom, Q_atom, E_atom);
+    Tensor<T> H_atom{tAO_atom, tAO_atom};
+    Tensor<T> S_atom{tAO_atom, tAO_atom};
+    Tensor<T> T_atom{tAO_atom, tAO_atom};
+    Tensor<T> V_atom{tAO_atom, tAO_atom};
+    Tensor<T> Q_atom{tAO_atom, tAO_atom};
+    Tensor<T> E_atom{tAO_atom, tAO_atom};
+    Tensor<T>::allocate(&ec, H_atom, S_atom, T_atom, V_atom, Q_atom, E_atom);
     Matrix H_atom_eig = Matrix::Zero(nao_atom, nao_atom);
     Matrix S_atom_eig = Matrix::Zero(nao_atom, nao_atom);
 
@@ -1163,7 +1167,7 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
     }
     else { Scheduler{ec}(Q_atom() = 0.0).execute(); }
 
-    if(has_ecp) { compute_ecp_ints<TensorType>(ec, scf_data, E_atom, libecp_shells, ecps); }
+    if(has_ecp) { compute_ecp_ints(ec, scf_data, E_atom, libecp_shells, ecps); }
     else { Scheduler{ec}(E_atom() = 0.0).execute(); }
 
     // if(rank == 0) cout << "compute one body ints" << endl;
@@ -1180,8 +1184,8 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
 
     // if(rank == 0) cout << "compute H_atom" << endl;
 
-    t2e_hf_helper<TensorType, 2>(ec, H_atom, H_atom_eig, "H1-H-atom");
-    t2e_hf_helper<TensorType, 2>(ec, S_atom, S_atom_eig, "S1-S-atom");
+    t2e_hf_helper<2>(ec, H_atom, H_atom_eig, "H1-H-atom");
+    t2e_hf_helper<2>(ec, S_atom, S_atom_eig, "S1-S-atom");
 
     // if(rank == 0) cout << std::setprecision(6) << "H_atom: " << endl << H_atom_eig << endl
     //                                            << "S_atom: " << endl << S_atom_eig << endl;
@@ -1195,12 +1199,13 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
     assert(S_atom_eig.rows() == S_atom_eig.cols());
 
     // std::tie(X_atom, Xinv, obs_rank, S_condition_number, XtX_condition_number, n_illcond) =
-    //     gensqrtinv(ec, S_atom_eig, false, S_condition_number_threshold);
+    //     exachem::scf::SCFUtil::gensqrtinv<T>(ec, S_atom_eig, false,
+    //     S_condition_number_threshold);
 
     Matrix X_atom;
     std::tie(X_atom, obs_rank, S_condition_number, XtX_condition_number) =
-      gensqrtinv_atscf(ec, chem_env, scf_data, scalapack_info, S_atom, tAO_atom, false,
-                       S_condition_number_threshold);
+      exachem::scf::SCFUtil::gensqrtinv_atscf<T>(ec, chem_env, scf_data, scalapack_info, S_atom,
+                                                 tAO_atom, false, S_condition_number_threshold);
 
     // if(rank == 0) cout << std::setprecision(6) << "X_atom: " << endl << X_atom << endl;
 
@@ -1208,9 +1213,9 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
     // double          precision = std::numeric_limits<double>::epsilon();
     const libint2::BasisSet& obs = shells_atom;
 
-    Matrix             G_a_atom = Matrix::Zero(nao_atom, nao_atom);
-    Matrix             G_b_atom = Matrix::Zero(nao_atom, nao_atom);
-    Tensor<TensorType> F1tmp_atom{tAOt_atom, tAOt_atom}; // not allocated
+    Matrix    G_a_atom = Matrix::Zero(nao_atom, nao_atom);
+    Matrix    G_b_atom = Matrix::Zero(nao_atom, nao_atom);
+    Tensor<T> F1tmp_atom{tAOt_atom, tAOt_atom}; // not allocated
 
     using libint2::BraKet;
     using libint2::Engine;
@@ -1235,7 +1240,7 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
     int        iter_atom         = 0;
     Matrix     D_a_atom_last     = Matrix::Zero(nao_atom, nao_atom);
     Matrix     D_b_atom_last     = Matrix::Zero(nao_atom, nao_atom);
-    auto       SchwarzK          = scf_compute.compute_schwarz_ints<>(ec, scf_data, shells_atom);
+    auto       SchwarzK          = scf_compute.compute_schwarz_ints(ec, scf_data, shells_atom);
     const auto do_schwarz_screen = SchwarzK.cols() != 0 && SchwarzK.rows() != 0;
 
     scf_data.tAO            = tAO;
@@ -1247,10 +1252,10 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
     engine.set_precision(0.0);
     const auto& buf = engine.results();
 
-    Tensor<TensorType> F1tmp_atom2{tAOt_atom, tAOt_atom}; // not allocated
-    Tensor<TensorType> F1tmp1_a_atom2{tAO_atom, tAO_atom};
-    Tensor<TensorType> F1tmp1_b_atom2{tAO_atom, tAO_atom};
-    Tensor<TensorType>::allocate(&ec, F1tmp1_a_atom2, F1tmp1_b_atom2);
+    Tensor<T> F1tmp_atom2{tAOt_atom, tAOt_atom}; // not allocated
+    Tensor<T> F1tmp1_a_atom2{tAO_atom, tAO_atom};
+    Tensor<T> F1tmp1_b_atom2{tAO_atom, tAO_atom};
+    Tensor<T>::allocate(&ec, F1tmp1_a_atom2, F1tmp1_b_atom2);
 
     do {
       ++iter_atom;
@@ -1553,7 +1558,7 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
 
     atom.pop_back();
 
-    Tensor<TensorType>::deallocate(F1tmp1_a_atom2, F1tmp1_b_atom2, H_atom, S_atom);
+    Tensor<T>::deallocate(F1tmp1_a_atom2, F1tmp1_b_atom2, H_atom, S_atom);
   }
 
   // One-shot refinement
@@ -1596,9 +1601,11 @@ void exachem::scf::SCFGuess::compute_sad_guess(ExecutionContext& ec, ChemEnv& ch
               << endl;
 }
 
-template<typename T, int ndim>
-void exachem::scf::SCFGuess::t2e_hf_helper(const ExecutionContext& ec, tamm::Tensor<T>& ttensor,
-                                           Matrix& etensor, const std::string& ustr) {
+template<typename T>
+template<int ndim>
+void exachem::scf::DefaultSCFGuess<T>::t2e_hf_helper(const ExecutionContext& ec,
+                                                     tamm::Tensor<T>& ttensor, Matrix& etensor,
+                                                     const std::string& ustr) {
   const string pstr = "(" + ustr + ")";
 
   const auto rank = ec.pg().rank();
@@ -1616,40 +1623,4 @@ void exachem::scf::SCFGuess::t2e_hf_helper(const ExecutionContext& ec, tamm::Ten
   Hbufv.shrink_to_fit();
 }
 
-template void
-exachem::scf::SCFGuess::compute_sad_guess<double>(ExecutionContext& ec, ChemEnv& chem_env,
-                                                  SCFData& scf_data, ScalapackInfo& scalapack_info,
-                                                  EigenTensors& etensors, TAMMTensors& ttensors);
-
-template void exachem::scf::scf_guess::subshell_occvec<double>(double& occvec, size_t size,
-                                                               size_t& ne);
-
-template const std::vector<double>
-exachem::scf::scf_guess::compute_ao_occupation_vector<double>(size_t Z);
-
-template void exachem::scf::SCFGuess::compute_dipole_ints<double>(
-  ExecutionContext& ec, const SCFData& spvars, Tensor<TensorType>& tensorX,
-  Tensor<TensorType>& tensorY, Tensor<TensorType>& tensorZ, std::vector<libint2::Atom>& atoms,
-  libint2::BasisSet& shells, libint2::Operator otype);
-
-template void exachem::scf::SCFGuess::compute_1body_ints<double>(
-  ExecutionContext& ec, const SCFData& scf_data, Tensor<TensorType>& tensor1e,
-  std::vector<libint2::Atom>& atoms, libint2::BasisSet& shells, libint2::Operator otype);
-
-template void exachem::scf::SCFGuess::compute_pchg_ints<double>(
-  ExecutionContext& ec, const SCFData& scf_data, Tensor<TensorType>& tensor1e,
-  std::vector<std::pair<double, std::array<double, 3>>>& q, libint2::BasisSet& shells,
-  libint2::Operator otype);
-
-template void exachem::scf::SCFGuess::compute_ecp_ints(
-  ExecutionContext& ec, const SCFData& scf_data, Tensor<TensorType>& tensor1e,
-  std::vector<libecpint::GaussianShell>& shells, std::vector<libecpint::ECP>& ecps);
-
-template void exachem::scf::SCFGuess::scf_diagonalize<double>(Scheduler& sch, ChemEnv& chem_env,
-                                                              SCFData&       scf_data,
-                                                              ScalapackInfo& scalapack_info,
-                                                              TAMMTensors&   ttensors,
-                                                              EigenTensors&  etensors);
-template void exachem::scf::SCFGuess::t2e_hf_helper<double, 2>(const ExecutionContext& ec,
-                                                               tamm::Tensor<double>&   ttensor,
-                                                               Matrix& etensor, const std::string&);
+template class exachem::scf::SCFGuess<double>;

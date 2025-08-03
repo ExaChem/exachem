@@ -11,6 +11,8 @@
 #include "exachem/cholesky/cholesky_2e_driver.hpp"
 
 #include <filesystem>
+#include <nwqsim_qflow.hpp>
+
 namespace fs = std::filesystem;
 
 namespace exachem::cc::ducc {
@@ -301,11 +303,11 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   std::vector<T> p_evl_sorted = tamm::diagonal(d_f1);
   if(rank == 0) {
     std::cout << std::endl;
-    std::cout << " Orbital | Energy\n";
-    std::cout << "---------|--------------\n";
+    std::cout << " Orbital | Energy" << std::endl;
+    std::cout << "---------|--------------" << std::endl;
     for(size_t i = 0; i < p_evl_sorted.size(); ++i) {
       std::cout << std::setw(8) << i << " | " << std::fixed << std::setprecision(6) << std::setw(13)
-                << p_evl_sorted[i] << "\n";
+                << p_evl_sorted[i] << std::endl;
     }
     std::cout << std::endl;
   }
@@ -345,7 +347,7 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       //   std::cout << "] | spin orbital combination: [ ";
       //   for(int val: combined) { std::cout << val << " "; }
       //   std::cout << "] | associated energy: " << occ_sum << " " << virt_sum << " " << orb_e_diff
-      //   << "\n";
+      //   << std::endl;
       // }
     }
   }
@@ -356,11 +358,11 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // Print the sorted combinations
   // if(rank == 0) {
-  //   std::cout << "\nSorted combinations based on energy difference:\n";
+  //   std::cout << std::endl << "Sorted combinations based on energy difference:" << std::endl;
   //   for(const auto& pair: combinations_with_energy) {
   //     std::cout << "Combination: [ ";
   //     for(int val: pair.first) { std::cout << val << " "; }
-  //     std::cout << "] | Energy difference: " << pair.second << "\n";
+  //     std::cout << "] | Energy difference: " << pair.second << "" << std::endl;
   //   }
   // }
 
@@ -374,7 +376,7 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     for(size_t i = 0; i < 5 && i < sorted_combinations.size(); ++i) {
       std::cout << "Combination: [ ";
       for(int val: sorted_combinations[i]) { std::cout << val << " "; }
-      std::cout << "]\n";
+      std::cout << "]" << std::endl;
     }
   }
 
@@ -441,12 +443,13 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 }
 
 template<typename T>
-void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
-                         const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
-                         const Tensor<T>& vtijkl, const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
-                         const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
-                         ExecutionHW ex_hw, T shift, IndexVector& occ_int_vec,
-                         IndexVector& virt_int_vec, string& pos_str) {
+std::pair<double, std::vector<std::pair<std::vector<int>, double>>>
+DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
+                    const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
+                    const Tensor<T>& vtijkl, const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
+                    const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
+                    ExecutionHW ex_hw, T shift, IndexVector& occ_int_vec, IndexVector& virt_int_vec,
+                    string& pos_str) {
   const auto   rank   = sch.ec().pg().rank();
   const size_t nactoa = chem_env.ioptions.ccsd_options.nactive_oa;
   // const size_t nactob = chem_env.ioptions.ccsd_options.nactive_ob;
@@ -489,8 +492,13 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
     std::cout << std::endl;
   }
 
-  std::ostringstream ham_str;
-  if(rank == 0) { ham_str << std::setprecision(12) << std::endl; }
+  // Commented out original ham_str approach for reference
+  // std::ostringstream ham_str;
+  // if(rank == 0) { ham_str << std::setprecision(12) << std::endl; }
+
+  std::vector<std::pair<std::string, std::complex<double>>> ham_terms;
+  if(rank == 0) { /* No need for precision setting with new approach */
+  }
 
   // ij
   Matrix ftij_eigen = tamm_to_eigen_matrix(ftij);
@@ -503,7 +511,9 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
         int  xacc_i = std::distance(XACC_order.begin(), it_i);
         int  xacc_j = std::distance(XACC_order.begin(), it_j);
         if(std::abs(value) > 0.00000001) {
-          ham_str << "(" << value << ",0)" << xacc_i << "^ " << xacc_j << " +" << std::endl;
+          // ham_str << "(" << value << ",0)" << xacc_i << "^ " << xacc_j << " +" << std::endl;
+          std::string term_str = std::to_string(xacc_i) + "^ " + std::to_string(xacc_j) + " +";
+          ham_terms.emplace_back(term_str, std::complex<double>(value, 0));
         }
       }
     }
@@ -520,8 +530,12 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
         int  xacc_i = std::distance(XACC_order.begin(), it_i);
         int  xacc_a = std::distance(XACC_order.begin(), it_a);
         if(std::abs(value) > 0.00000001) {
-          ham_str << "(" << value << ",0)" << xacc_i << "^ " << xacc_a << " +" << std::endl;
-          ham_str << "(" << value << ",0)" << xacc_a << "^ " << xacc_i << " +" << std::endl;
+          // ham_str << "(" << value << ",0)" << xacc_i << "^ " << xacc_a << " +" << std::endl;
+          // ham_str << "(" << value << ",0)" << xacc_a << "^ " << xacc_i << " +" << std::endl;
+          std::string term_str1 = std::to_string(xacc_i) + "^ " + std::to_string(xacc_a) + " +";
+          std::string term_str2 = std::to_string(xacc_a) + "^ " + std::to_string(xacc_i) + " +";
+          ham_terms.emplace_back(term_str1, std::complex<double>(value, 0));
+          ham_terms.emplace_back(term_str2, std::complex<double>(value, 0));
         }
       }
     }
@@ -538,7 +552,9 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
         int  xacc_a = std::distance(XACC_order.begin(), it_a);
         int  xacc_b = std::distance(XACC_order.begin(), it_b);
         if(std::abs(value) > 0.00000001) {
-          ham_str << "(" << value << ",0)" << xacc_a << "^ " << xacc_b << " +" << std::endl;
+          // ham_str << "(" << value << ",0)" << xacc_a << "^ " << xacc_b << " +" << std::endl;
+          std::string term_str = std::to_string(xacc_a) + "^ " + std::to_string(xacc_b) + " +";
+          ham_terms.emplace_back(term_str, std::complex<double>(value, 0));
         }
       }
     }
@@ -561,8 +577,12 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
             int  xacc_k = std::distance(XACC_order.begin(), it_k);
             int  xacc_l = std::distance(XACC_order.begin(), it_l);
             if(std::abs(value) > 0.00000001) {
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_i << "^ " << xacc_j << "^ " << xacc_l
-                      << " " << xacc_k << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_i << "^ " << xacc_j << "^ " <<
+              // xacc_l
+              //         << " " << xacc_k << " +" << std::endl;
+              std::string term_str = std::to_string(xacc_i) + "^ " + std::to_string(xacc_j) + "^ " +
+                                     std::to_string(xacc_l) + " " + std::to_string(xacc_k) + " +";
+              ham_terms.emplace_back(term_str, std::complex<double>(value * 0.25, 0));
             }
           }
         }
@@ -587,14 +607,34 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
             int  xacc_k = std::distance(XACC_order.begin(), it_k);
             int  xacc_a = std::distance(XACC_order.begin(), it_a);
             if(std::abs(value) > 0.00000001) {
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_i << "^ " << xacc_j << "^ " << xacc_a
-                      << " " << xacc_k << " +" << std::endl;
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_j << "^ " << xacc_i << "^ " << xacc_k
-                      << " " << xacc_a << " +" << std::endl;
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_k << "^ " << xacc_a << "^ " << xacc_j
-                      << " " << xacc_i << " +" << std::endl;
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_a << "^ " << xacc_k << "^ " << xacc_i
-                      << " " << xacc_j << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_i << "^ " << xacc_j << "^ " <<
+              // xacc_a
+              //         << " " << xacc_k << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_j << "^ " << xacc_i << "^ " <<
+              // xacc_k
+              //         << " " << xacc_a << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_k << "^ " << xacc_a << "^ " <<
+              // xacc_j
+              //         << " " << xacc_i << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_a << "^ " << xacc_k << "^ " <<
+              // xacc_i
+              //         << " " << xacc_j << " +" << std::endl;
+              std::string term_str1 = std::to_string(xacc_i) + "^ " + std::to_string(xacc_j) +
+                                      "^ " + std::to_string(xacc_a) + " " + std::to_string(xacc_k) +
+                                      " +";
+              std::string term_str2 = std::to_string(xacc_j) + "^ " + std::to_string(xacc_i) +
+                                      "^ " + std::to_string(xacc_k) + " " + std::to_string(xacc_a) +
+                                      " +";
+              std::string term_str3 = std::to_string(xacc_k) + "^ " + std::to_string(xacc_a) +
+                                      "^ " + std::to_string(xacc_j) + " " + std::to_string(xacc_i) +
+                                      " +";
+              std::string term_str4 = std::to_string(xacc_a) + "^ " + std::to_string(xacc_k) +
+                                      "^ " + std::to_string(xacc_i) + " " + std::to_string(xacc_j) +
+                                      " +";
+              ham_terms.emplace_back(term_str1, std::complex<double>(value * 0.25, 0));
+              ham_terms.emplace_back(term_str2, std::complex<double>(value * 0.25, 0));
+              ham_terms.emplace_back(term_str3, std::complex<double>(value * 0.25, 0));
+              ham_terms.emplace_back(term_str4, std::complex<double>(value * 0.25, 0));
             }
           }
         }
@@ -619,14 +659,34 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
             int  xacc_j = std::distance(XACC_order.begin(), it_j);
             int  xacc_b = std::distance(XACC_order.begin(), it_b);
             if(std::abs(value) > 0.00000001) {
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_a << "^ " << xacc_i << "^ " << xacc_b
-                      << " " << xacc_j << " +" << std::endl;
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_j << "^ " << xacc_b << "^ " << xacc_i
-                      << " " << xacc_a << " +" << std::endl;
-              ham_str << "(" << value * -0.25 << ",0)" << xacc_i << "^ " << xacc_a << "^ " << xacc_b
-                      << " " << xacc_j << " +" << std::endl;
-              ham_str << "(" << value * -0.25 << ",0)" << xacc_a << "^ " << xacc_i << "^ " << xacc_j
-                      << " " << xacc_b << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_a << "^ " << xacc_i << "^ " <<
+              // xacc_b
+              //         << " " << xacc_j << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_j << "^ " << xacc_b << "^ " <<
+              // xacc_i
+              //         << " " << xacc_a << " +" << std::endl;
+              // ham_str << "(" << value * -0.25 << ",0)" << xacc_i << "^ " << xacc_a << "^ " <<
+              // xacc_b
+              //         << " " << xacc_j << " +" << std::endl;
+              // ham_str << "(" << value * -0.25 << ",0)" << xacc_a << "^ " << xacc_i << "^ " <<
+              // xacc_j
+              //         << " " << xacc_b << " +" << std::endl;
+              std::string term_str1 = std::to_string(xacc_a) + "^ " + std::to_string(xacc_i) +
+                                      "^ " + std::to_string(xacc_b) + " " + std::to_string(xacc_j) +
+                                      " +";
+              std::string term_str2 = std::to_string(xacc_j) + "^ " + std::to_string(xacc_b) +
+                                      "^ " + std::to_string(xacc_i) + " " + std::to_string(xacc_a) +
+                                      " +";
+              std::string term_str3 = std::to_string(xacc_i) + "^ " + std::to_string(xacc_a) +
+                                      "^ " + std::to_string(xacc_b) + " " + std::to_string(xacc_j) +
+                                      " +";
+              std::string term_str4 = std::to_string(xacc_a) + "^ " + std::to_string(xacc_i) +
+                                      "^ " + std::to_string(xacc_j) + " " + std::to_string(xacc_b) +
+                                      " +";
+              ham_terms.emplace_back(term_str1, std::complex<double>(value * 0.25, 0));
+              ham_terms.emplace_back(term_str2, std::complex<double>(value * 0.25, 0));
+              ham_terms.emplace_back(term_str3, std::complex<double>(value * -0.25, 0));
+              ham_terms.emplace_back(term_str4, std::complex<double>(value * -0.25, 0));
             }
           }
         }
@@ -651,10 +711,20 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
             int  xacc_a = std::distance(XACC_order.begin(), it_a);
             int  xacc_b = std::distance(XACC_order.begin(), it_b);
             if(std::abs(value) > 0.00000001) {
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_i << "^ " << xacc_j << "^ " << xacc_b
-                      << " " << xacc_a << " +" << std::endl;
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_a << "^ " << xacc_b << "^ " << xacc_j
-                      << " " << xacc_i << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_i << "^ " << xacc_j << "^ " <<
+              // xacc_b
+              //         << " " << xacc_a << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_a << "^ " << xacc_b << "^ " <<
+              // xacc_j
+              //         << " " << xacc_i << " +" << std::endl;
+              std::string term_str1 = std::to_string(xacc_i) + "^ " + std::to_string(xacc_j) +
+                                      "^ " + std::to_string(xacc_b) + " " + std::to_string(xacc_a) +
+                                      " +";
+              std::string term_str2 = std::to_string(xacc_a) + "^ " + std::to_string(xacc_b) +
+                                      "^ " + std::to_string(xacc_j) + " " + std::to_string(xacc_i) +
+                                      " +";
+              ham_terms.emplace_back(term_str1, std::complex<double>(value * 0.25, 0));
+              ham_terms.emplace_back(term_str2, std::complex<double>(value * 0.25, 0));
             }
           }
         }
@@ -679,14 +749,34 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
             int  xacc_b = std::distance(XACC_order.begin(), it_b);
             int  xacc_c = std::distance(XACC_order.begin(), it_c);
             if(std::abs(value) > 0.00000001) {
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_i << "^ " << xacc_a << "^ " << xacc_c
-                      << " " << xacc_b << " +" << std::endl;
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_a << "^ " << xacc_i << "^ " << xacc_b
-                      << " " << xacc_c << " +" << std::endl;
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_b << "^ " << xacc_c << "^ " << xacc_a
-                      << " " << xacc_i << " +" << std::endl;
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_c << "^ " << xacc_b << "^ " << xacc_i
-                      << " " << xacc_a << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_i << "^ " << xacc_a << "^ " <<
+              // xacc_c
+              //         << " " << xacc_b << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_a << "^ " << xacc_i << "^ " <<
+              // xacc_b
+              //         << " " << xacc_c << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_b << "^ " << xacc_c << "^ " <<
+              // xacc_a
+              //         << " " << xacc_i << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_c << "^ " << xacc_b << "^ " <<
+              // xacc_i
+              //         << " " << xacc_a << " +" << std::endl;
+              std::string term_str1 = std::to_string(xacc_i) + "^ " + std::to_string(xacc_a) +
+                                      "^ " + std::to_string(xacc_c) + " " + std::to_string(xacc_b) +
+                                      " +";
+              std::string term_str2 = std::to_string(xacc_a) + "^ " + std::to_string(xacc_i) +
+                                      "^ " + std::to_string(xacc_b) + " " + std::to_string(xacc_c) +
+                                      " +";
+              std::string term_str3 = std::to_string(xacc_b) + "^ " + std::to_string(xacc_c) +
+                                      "^ " + std::to_string(xacc_a) + " " + std::to_string(xacc_i) +
+                                      " +";
+              std::string term_str4 = std::to_string(xacc_c) + "^ " + std::to_string(xacc_b) +
+                                      "^ " + std::to_string(xacc_i) + " " + std::to_string(xacc_a) +
+                                      " +";
+              ham_terms.emplace_back(term_str1, std::complex<double>(value * 0.25, 0));
+              ham_terms.emplace_back(term_str2, std::complex<double>(value * 0.25, 0));
+              ham_terms.emplace_back(term_str3, std::complex<double>(value * 0.25, 0));
+              ham_terms.emplace_back(term_str4, std::complex<double>(value * 0.25, 0));
             }
           }
         }
@@ -711,8 +801,12 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
             int  xacc_c = std::distance(XACC_order.begin(), it_c);
             int  xacc_d = std::distance(XACC_order.begin(), it_d);
             if(std::abs(value) > 0.00000001) {
-              ham_str << "(" << value * 0.25 << ",0)" << xacc_a << "^ " << xacc_b << "^ " << xacc_d
-                      << " " << xacc_c << " +" << std::endl;
+              // ham_str << "(" << value * 0.25 << ",0)" << xacc_a << "^ " << xacc_b << "^ " <<
+              // xacc_d
+              //         << " " << xacc_c << " +" << std::endl;
+              std::string term_str = std::to_string(xacc_a) + "^ " + std::to_string(xacc_b) + "^ " +
+                                     std::to_string(xacc_d) + " " + std::to_string(xacc_c) + " +";
+              ham_terms.emplace_back(term_str, std::complex<double>(value * 0.25, 0));
             }
           }
         }
@@ -720,24 +814,51 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
     }
   }
 
+  std::pair<double, std::vector<std::pair<std::vector<int>, double>>> results;
+
   // Scalar
   if(rank == 0) {
-    ham_str << "(" << std::setprecision(12) << shift + rep_energy << ", 0)" << std::endl
-            << std::endl;
-    auto          ham_file = files_prefix + ".qflow." + pos_str;
-    std::ofstream ham_fp(ham_file, std::ios::out);
-    ham_fp << ham_str.str();
-    ham_fp.close();
+    // Original scalar term generation:
+    // ham_str << "(" << std::setprecision(12) << shift + rep_energy << ", 0)" << std::endl
+    //         << std::endl;
+
+    // Add scalar term to the vector
+    ham_terms.emplace_back("", std::complex<double>(shift + rep_energy, 0));
+
+    std::cout << std::endl
+              << "======================" << std::endl
+              << "NWQSim Running QFLOW" << std::endl;
+    std::pair<double, std::vector<std::pair<std::vector<int>, double>>> results =
+      qflow_nwqsim(ham_terms, nactoa * 2, "CPU");
+
+    std::cout << "Final Energy: " << results.first << "" << std::endl;
+
+    // Print the vector of pairs
+    std::cout << "Amplititudes:" << std::endl;
+    for(const auto& pair: results.second) {
+      const std::vector<int>& vec = pair.first;
+      double                  val = pair.second;
+
+      std::cout << "  [";
+      for(size_t i = 0; i < vec.size(); ++i) {
+        std::cout << vec[i];
+        if(i < vec.size() - 1) std::cout << ", ";
+      }
+      std::cout << "] -> " << val << "" << std::endl;
+    }
+    std::cout << std::endl
+              << "NWQSim Finishes" << std::endl
+              << "======================" << std::endl;
   }
+  return results;
 }
 
 using T = double;
-template void DUCC_T_QFLOW_Driver<T>(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
-                                     const Tensor<T>& ftij, const Tensor<T>& ftia,
-                                     const Tensor<T>& ftab, const Tensor<T>& vtijkl,
-                                     const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
-                                     const Tensor<T>& vtijab, const Tensor<T>& vtiabc,
-                                     const Tensor<T>& vtabcd, ExecutionHW ex_hw, T shift,
-                                     IndexVector& occ_int_vec, IndexVector& virt_int_vec,
-                                     string& pos_str);
+template std::pair<double, std::vector<std::pair<std::vector<int>, double>>>
+DUCC_T_QFLOW_Driver<T>(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
+                       const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
+                       const Tensor<T>& vtijkl, const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
+                       const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
+                       ExecutionHW ex_hw, T shift, IndexVector& occ_int_vec,
+                       IndexVector& virt_int_vec, string& pos_str);
 } // namespace exachem::cc::ducc

@@ -427,12 +427,7 @@ std::vector<double> cross_product(std::vector<double>& atom0, std::vector<double
 }
 
 Eigen::Vector3d cross_product(Eigen::Vector3d atom0, Eigen::Vector3d atom1) {
-  Eigen::Vector3d product(3, 0);
-  product[0] = atom0[1] * atom1[2] - atom0[2] * atom1[1];
-  product[1] = -(atom0[0] * atom1[2] - atom0[2] * atom1[0]);
-  product[2] = atom0[0] * atom1[1] - atom0[1] * atom1[0];
-  auto obj   = product;
-  return obj;
+  return atom0.cross(atom1);
 }
 
 // auto out_of_plane_angles(ExecutionContext& ec, std::vector<std::vector<double>>& data,

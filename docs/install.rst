@@ -49,9 +49,9 @@ Step 2
    git clone https://github.com/ExaChem/exachem.git
    cd exachem && mkdir build && cd build
    CC=gcc CXX=g++ FC=gfortran cmake -DCMAKE_INSTALL_PREFIX=<exachem-install-path> -DMODULES="CC" ..
-   make -j4
+   make -j4 install
 
-``NOTE:`` The cmake configure line in Steps 1 and 2 should be the same.
+``NOTE:`` The cmake configure line in Steps 1 and 2 should be the exact same.
 
 
 Running the code

@@ -41,6 +41,8 @@ The double unitary coupled-cluster (DUCC) development is supported under FWP 726
 
 Ongoing development of many-body methodologies for molecular polaritonic systems is being funded by FWP 79715, Center for **Ma**ny-Body Methods, Spectroscopies, and Dynamics for Molecular **Pol**aritonic Systems (MAPOL).
 
+Additional support was provided by the **Transferring exascale computational chemistry to cloud computing environment and emerging hardware technologies (TEC4)** project, which is funded by the U.S. Department of Energy, Office of Science, Office of Basic Energy Sciences, the Division of Chemical Sciences, Geosciences, and Biosciences (under FWP 82037). 
+
 The SPEC and MAPOL projects are funded as part of the Computational Chemical Sciences (CCS) program by the U.S. Department of Energy (DOE), Office of Science, Office of Basic Energy Sciences (BES), Division of Chemical Sciences, Geosciences and Biosciences at PNNL. PNNL is a multi-program national laboratory operated by Battelle Memorial Institute for the United States Department of Energy under DOE contract number **DE-AC05-76RL01830**.
 
 Acknowledgements for Computing Resources can be found [here](docs/resource_ack.md).

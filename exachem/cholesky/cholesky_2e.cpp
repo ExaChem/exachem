@@ -491,7 +491,7 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
   const auto  chol_ao_file = files_prefix + ".chol_ao";
   const auto  diag_ao_file = files_prefix + ".diag_ao";
 
-  int64_t cd_nranks = /* std::abs(std::log10(diagtol)) */ nbf / 2; // max cores
+  int64_t cd_nranks = /* std::abs(std::log10(diagtol)) */ nbf / 3; // max cores
   auto    nnodes    = ec.nnodes();
   auto    ppn       = ec.ppn();
   int     cd_nnodes = cd_nranks / ppn;
@@ -543,9 +543,9 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
     Tensor<TensorType>::allocate(&ec_dense, g_d_tamm, g_r_tamm, g_chol_tamm);
 
 #if !defined(USE_UPCXX)
-    cd_tensor_zero(g_d_tamm);
-    cd_tensor_zero(g_r_tamm);
-    cd_tensor_zero(g_chol_tamm);
+    // cd_tensor_zero(g_d_tamm);
+    // cd_tensor_zero(g_r_tamm);
+    // cd_tensor_zero(g_chol_tamm);
 
     auto write_chol_vectors = [&]() {
       write_to_disk(g_d_tamm, diag_ao_file);
@@ -707,14 +707,14 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
     const double schwarz_tol = chem_env.ioptions.scf_options.tol_sch;
     engine.set_precision(engine_precision);
 
+    std::vector<TensorType> k_row(max_cvecs);
+
     while(val_d0 > diagtol && count < max_cvecs) {
       auto bfu        = indx_d0[0];
       auto bfv        = indx_d0[1];
       auto s1         = bf2shell[bfu];
-      auto n1         = shells[s1].size();
       auto s2         = bf2shell[bfv];
       auto n2         = shells[s2].size();
-      auto n12        = n1 * n2;
       auto f1         = bfu - shell2bf[s1];
       auto f2         = bfv - shell2bf[s2];
       auto ind12      = f1 * n2 + f2;
@@ -725,6 +725,8 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
 #endif
 
 #if !defined(CD_USE_PGAS_API)
+      auto n1          = shells[s1].size();
+      auto n12         = n1 * n2;
       auto compute_eri = [&](const IndexVector& blockid) {
         auto bi0 = blockid[0];
         auto bi1 = blockid[1];
@@ -739,37 +741,50 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
         auto s3range_end   = shell_tile_map[bi0];
         if(bi0 > 0) s3range_start = shell_tile_map[bi0 - 1] + 1;
 
+        auto s4range_start = 0l;
+        auto s4range_end   = shell_tile_map[bi1];
+        if(bi1 > 0) s4range_start = shell_tile_map[bi1 - 1] + 1;
+
+        auto curshelloffset_i = 0U;
         for(Index s3 = s3range_start; s3 <= s3range_end; ++s3) {
-          auto n3 = shells[s3].size();
+          auto n3   = shells[s3].size();
+          auto dimi = curshelloffset_i + AO_tiles[s3];
 
-          auto s4range_start = 0l;
-          auto s4range_end   = shell_tile_map[bi1];
-          if(bi1 > 0) s4range_start = shell_tile_map[bi1 - 1] + 1;
+          auto s3spl     = obs_shellpair_list.at(s3);
+          auto sp34_iter = s3spl.begin();
 
+          auto curshelloffset_j = 0U;
           for(Index s4 = s4range_start; s4 <= s4range_end; ++s4) {
             if(s4 > s3) {
-              auto s2spl = obs_shellpair_list[s4];
-              if(std::find(s2spl.begin(), s2spl.end(), s3) == s2spl.end()) continue;
+              auto s4spl = scf_data.obs_shellpair_list[s4];
+              if(std::find(s4spl.begin(), s4spl.end(), s3) == s4spl.end()) {
+                curshelloffset_j += AO_tiles[s4];
+                continue;
+              }
             }
             else {
-              auto s2spl = obs_shellpair_list[s3];
-              if(std::find(s2spl.begin(), s2spl.end(), s4) == s2spl.end()) continue;
+              if(std::find(sp34_iter, s3spl.end(), s4) == s3spl.end()) {
+                curshelloffset_j += AO_tiles[s4];
+                continue;
+              }
             }
+            // const auto* sp34 = sp34_iter->get();
+            ++sp34_iter;
 
-            auto n4 = shells[s4].size();
-            if(schwarz_12 * SchwarzK(s3, s4) < schwarz_tol) continue;
+            if(schwarz_12 * SchwarzK(s3, s4) < schwarz_tol) {
+              curshelloffset_j += AO_tiles[s4];
+              continue;
+            }
 
             // compute shell pair; return is the pointer to the buffer
             engine.compute(shells[s3], shells[s4], shells[s1], shells[s2]);
             const auto* buf_3412 = buf[0];
-            if(buf_3412 == nullptr) continue; // if all integrals screened out, skip to next quartet
+            if(buf_3412 == nullptr) {
+              curshelloffset_j += AO_tiles[s4];
+              continue; // if all integrals screened out, skip to next quartet
+            }
 
-            auto curshelloffset_i = 0U;
-            auto curshelloffset_j = 0U;
-            for(auto x = s3range_start; x < s3; x++) curshelloffset_i += AO_tiles[x];
-            for(auto x = s4range_start; x < s4; x++) curshelloffset_j += AO_tiles[x];
-
-            auto dimi = curshelloffset_i + AO_tiles[s3];
+            auto n4   = shells[s4].size();
             auto dimj = curshelloffset_j + AO_tiles[s4];
 
             for(size_t i = curshelloffset_i; i < dimi; i++) {
@@ -781,7 +796,9 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
                 dbuf[i * bd1 + j] = x;
               }
             }
+            curshelloffset_j += AO_tiles[s4];
           }
+          curshelloffset_i += AO_tiles[s3];
         }
         g_r_tamm.put(blockid, dbuf);
       };
@@ -790,34 +807,36 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
       //    {  compute_eri(blockid); }
       // }
       block_for(ec_dense, g_r_tamm(), compute_eri);
+      ec_dense.pg().barrier();
 
 #else
     for(size_t s3 = 0; s3 != shells.size(); ++s3) {
       auto bf3_first = shell2bf[s3]; // first basis function in this shell
       auto n3        = shells[s3].size();
-
+#if !defined(USE_UPCXX)
+      if(!(lo_r[0] <= cd_ncast<size_t>(bf3_first) && cd_ncast<size_t>(bf3_first) <= hi_r[0]))
+        continue;
       for(size_t s4 = 0; s4 != shells.size(); ++s4) {
+#else
+      for(size_t s4 = 0; s4 != shells.size(); ++s4) {
+#endif
         auto bf4_first = shell2bf[s4];
         auto n4        = shells[s4].size();
         if(schwarz_12 * SchwarzK(s3, s4) < schwarz_tol) continue;
 
 #if defined(USE_UPCXX)
         if(g_r_tamm.is_local_element(0, 0, bf3_first, bf4_first)) {
+          double factor = 1.0;
 #else
-        if(lo_r[0] <= cd_ncast<size_t>(bf3_first) && cd_ncast<size_t>(bf3_first) <= hi_r[0] &&
-           lo_r[1] <= cd_ncast<size_t>(bf4_first) && cd_ncast<size_t>(bf4_first) <= hi_r[1]) {
+        if(lo_r[1] <= cd_ncast<size_t>(bf4_first) && cd_ncast<size_t>(bf4_first) <= hi_r[1]) {
 #endif
-          engine.compute(shells[s3], shells[s4], shells[s1], shells[s2]);
+          // Switching shell order allows unit-stride access
+          engine.compute(shells[s1], shells[s2], shells[s3], shells[s4]);
           const auto* buf_3412 = buf[0];
           if(buf_3412 == nullptr) continue; // if all integrals screened out, skip to next quartet
 
-          std::vector<TensorType> k_eri(n3 * n4);
-          for(decltype(n3) f3 = 0; f3 != n3; ++f3) {
-            for(decltype(n4) f4 = 0; f4 != n4; ++f4) {
-              auto f3412          = f3 * n4 * n12 + f4 * n12 + ind12;
-              k_eri[f3 * n4 + f4] = buf_3412[f3412];
-            }
-          }
+          std::vector<TensorType> k_eri(buf_3412 + ind12 * n3 * n4,
+                                        buf_3412 + ind12 * n3 * n4 + n3 * n4);
 
           int64_t ibflo[4] = {0, 0, cd_ncast<size_t>(bf3_first), cd_ncast<size_t>(bf4_first)};
           int64_t ibfhi[4] = {0, 0, cd_ncast<size_t>(bf3_first + n3 - 1),
@@ -832,7 +851,6 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
         }
       }
     }
-
     ec_dense.pg().barrier();
 #endif
 
@@ -857,8 +875,6 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
     hi_x[2] = indx_d0[1];
     hi_x[3] = count;
 #endif
-
-      std::vector<TensorType> k_row(max_cvecs);
 
 #if !defined(CD_USE_PGAS_API)
       auto update_diagonals = [&](const IndexVector& blockid) {
@@ -969,52 +985,42 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
 
       if(has_gr_data) NGA_Access64(g_r, lo_r.data(), hi_r.data(), &indx_r, ld_r.data());
       if(has_gc_data) NGA_Access64(g_chol, lo_b.data(), hi_b.data(), &indx_b, ld_b.data());
+      if(has_gd_data) NGA_Access64(g_d, lo_d.data(), hi_d.data(), &indx_d, ld_d.data());
 
       if(has_gr_data) {
-        for(decltype(count) icount = 0; icount < count; icount++) {
+        int64_t nj = hi_r[1] - lo_r[1] + 1;
+        // Implemented as a safeguard and for performance?
+        if(nj != ld_r[0] || count < 50) {
           for(int64_t i = 0; i <= hi_r[0] - lo_r[0]; i++) {
+            int64_t ild = i * ld_r[0];
+            int64_t ildld = i * ld_b[1] * ld_b[0];
             for(int64_t j = 0; j <= hi_r[1] - lo_r[1]; j++) {
-              indx_r[i * ld_r[0] + j] -=
-                indx_b[icount + j * ld_b[1] + i * ld_b[1] * ld_b[0]] * k_row[icount];
+              int64_t nij = ild + j;
+              for(decltype(count) icount = 0; icount < count; icount++) {
+                indx_r[nij] -= indx_b[icount + j * ld_b[1] + ildld] * k_row[icount];
+              }
             }
           }
         }
+        else {
+          int64_t nij = ld_b[0] * (hi_r[0] - lo_r[0] + 1);
+          blas::gemv(blas::Layout::RowMajor, blas::Op::NoTrans, nij, (int64_t) count, -1.0, indx_b,
+                     (int64_t) ld_b[1], k_row.data(), 1, 1.0, indx_r, 1);
+        }
       }
 
-      if(has_gc_data) NGA_Release64(g_chol, lo_b.data(), hi_b.data());
-      if(has_gr_data) NGA_Release_update64(g_r, lo_r.data(), hi_r.data());
-
-      if(has_gr_data) NGA_Access64(g_r, lo_r.data(), hi_r.data(), &indx_r, ld_r.data());
-      if(has_gc_data) NGA_Access64(g_chol, lo_b.data(), hi_b.data(), &indx_b, ld_b.data());
-
       if(has_gc_data) {
-        for(auto i = 0; i <= hi_r[0] - lo_r[0]; i++) {
-          for(auto j = 0; j <= hi_r[1] - lo_r[1]; j++) {
-            auto tmp = indx_r[i * ld_r[0] + j] / sqrt(val_d0);
-            indx_b[count + j * ld_b[1] + i * ld_b[1] * ld_b[0]] = tmp;
-          }
-        }
+        double value = 1.0 / sqrt(val_d0);
+        int64_t nij = ld_r[0] * (hi_r[0] - lo_r[0] + 1);
+        blas::scal(nij, value, indx_r, 1);
+        blas::copy(nij, indx_r, 1, indx_b + count, ld_b[1]);
+        for(auto ij = 0; ij < nij; ij++) { indx_d[ij] -= indx_r[ij] * indx_r[ij]; }
       }
 
       if(has_gc_data) NGA_Release_update64(g_chol, lo_b.data(), hi_b.data());
-      if(has_gr_data) NGA_Release64(g_r, lo_r.data(), hi_r.data());
+      if(has_gd_data) NGA_Release_update64(g_d, lo_d.data(), hi_d.data());
+      if(has_gr_data) NGA_Release_update64(g_r, lo_r.data(), hi_r.data());
     }
-
-    if(has_gd_data) NGA_Access64(g_d, lo_d.data(), hi_d.data(), &indx_d, ld_d.data());
-    if(has_gc_data) NGA_Access64(g_chol, lo_b.data(), hi_b.data(), &indx_b, ld_b.data());
-
-    if(has_gd_data) {
-      for(auto i = 0; i <= hi_d[0] - lo_d[0]; i++) {
-        for(auto j = 0; j <= hi_d[1] - lo_d[1]; j++) {
-          auto tmp = indx_b[count + j * ld_b[1] + i * ld_b[1] * ld_b[0]];
-          indx_d[i * ld_d[0] + j] -= tmp * tmp;
-        }
-      }
-    }
-
-    if(has_gc_data) NGA_Release64(g_chol, lo_b.data(), hi_b.data());
-    if(has_gd_data) NGA_Release_update64(g_d, lo_d.data(), hi_d.data());
-
     count++;
 #endif
 #endif

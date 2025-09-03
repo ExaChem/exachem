@@ -141,7 +141,7 @@ jobs:
       if: ${{ matrix.cc == 'clang' && matrix.cxx == 'clang++' && matrix.os[1] == 'ubuntu22' }}
       shell: bash
       run: |
-        module load llvm/11.1.0
+        module load llvm/19.1.2
         echo "CC=$(which clang)" >> $GITHUB_ENV
         echo "CXX=$(which clang++)" >> $GITHUB_ENV
 
@@ -229,7 +229,7 @@ jobs:
         cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES="CC" -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }}
         cd build
         make -j${{ env.EC_NPROC }}
-        # make install
+        make install
         # mkdir -p  ${{ env.exachem_cache_path }} || true
         # rsync -av --exclude="*tamm*" ${{ env.INSTALL_PATH }}/* ${{ env.exachem_cache_path }}/.
 
@@ -259,7 +259,7 @@ jobs:
         UPCXX_CODEMODE=O3 CXX=upcxx cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES=CC -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DUSE_UPCXX=ON -DMPIRUN_EXECUTABLE=${{ env.CI_MPIEXEC }}
         cd build
         UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make -j${{ env.EC_NPROC }}
-
+        UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make install
 
     - name: ctest
       run: |
@@ -267,7 +267,9 @@ jobs:
         export PATH=$PATH:$GITHUB_WORKSPACE/install/bin
         echo "OMP_NUM_THREADS=1" >> $GITHUB_ENV
         # ctest -VV
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUDA_HOME/lib64 || true
         $GITHUB_WORKSPACE/ci/scripts/run_ci $GITHUB_WORKSPACE $GITHUB_WORKSPACE/build/methods_stage/${{ env.INSTALL_PATH }}/methods/ExaChem ${{ env.CI_NRANKS }} ${{ env.CI_MPIEXEC }} ${{ env.UPCXX_MISSING_TESTS }}
+
     # - name: gcovr
     #   run: |
     #     cd $GITHUB_WORKSPACE

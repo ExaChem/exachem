@@ -138,6 +138,7 @@
         "threshold": 1e-6,
         "lshift": 0,
         "ndiis": 5,
+        "tilesize": 50,
         "ccsd_maxiter": 100,
         "nactive_oa": 0,
         "nactive_ob": 0,

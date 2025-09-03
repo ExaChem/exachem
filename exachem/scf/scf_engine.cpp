@@ -657,8 +657,10 @@ bool exachem::scf::DefaultSCFEngine::check_convergence(ExecutionContext& exc, Ch
     scf_state.is_conv = false;
     return false;
   }
+  double ediis_thresh = 10.0 * conve;
+  if(chem_env.sys_data.n_lindep > 0) ediis_thresh *= 10.0;
   if((fabs(scf_state.ediff) > conve) || (fabs(scf_state.rmsd) > convd) ||
-     (fabs(scf_state.ediis) > 10.0 * conve))
+     (fabs(scf_state.ediis) > ediis_thresh))
     return true;
   else return false;
 } // check_convergence

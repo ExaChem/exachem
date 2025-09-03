@@ -74,8 +74,8 @@ using namespace std;
 //
 //      helpers
 //
-#define MAX_NOAB 30
-#define MAX_NVAB 120
+#define MAX_NOAB 50
+#define MAX_NVAB 140
 
 // 9 * (1 + MAX_NOAB + MAX_NVAB) + (MAX_NOAB + MAX_NVAB) * sizeof(int) <= 64KB
 __constant__ int const_s1_exec[9];

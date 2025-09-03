@@ -53,8 +53,8 @@ inline constexpr short NUM_S1_INDEX{6};
 inline constexpr short NUM_ENERGIES{2};
 #define FULL_MASK 0xffffffff
 
-inline constexpr short MAX_NOAB{30};
-inline constexpr short MAX_NVAB{120};
+inline constexpr short MAX_NOAB{50};
+inline constexpr short MAX_NVAB{140};
 
 #ifdef USE_DPCPP
 class ccsd_t_sycl_kernel;

@@ -1,0 +1,36 @@
+{
+  "geometry": {
+      "coordinates": [
+        "Se   -1.87713183   -1.06487690    0.26121977",
+        "H    -1.45330721   -1.12621174   -1.13027871",
+        "H    -3.25753574   -0.79531985   -0.13108814"
+   ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "cc-pvdz",
+    "atom_basis": {
+      "Se": "cc-pwcvdz-pp"
+    },
+    "atom_ecp": {
+      "Se": "cc-pwcvdz-pp"
+    }
+  },
+  "SCF": {
+    "restart": false,
+    "conve": 1e-8,
+    "convd": 1e-7
+  },
+    "CC": {
+      "threshold": 1e-6,
+      "freeze": {
+        "core": 4
+      }
+  },
+  "TASK": {
+    "scf": false,
+    "mp2": false,
+    "cd_2e": false,
+    "ccsd_t": true
+  }  
+}

@@ -9,9 +9,9 @@
 #include "exachem/scf/scf_qed.hpp"
 
 template<typename T>
-void exachem::scf::DefaultSCFQed<T>::qed_functionals_setup(std::vector<double>& params,
-                                                           ChemEnv&             chem_env) {
-  SCFOptions& scf_options = chem_env.ioptions.scf_options;
+void exachem::scf::SCFQed<T>::qed_functionals_setup(std::vector<double>& params,
+                                                    const ChemEnv&       chem_env) const {
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   params[0] = 1.0;
   // SCFOptions& scf_options = scf_options;
@@ -27,26 +27,26 @@ void exachem::scf::DefaultSCFQed<T>::qed_functionals_setup(std::vector<double>& 
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFQed<T>::compute_QED_1body(ExecutionContext& ec, ChemEnv& chem_env,
-                                                       const SCFData&  scf_data,
-                                                       TAMMTensors<T>& ttensors) {
+void exachem::scf::SCFQed<T>::compute_QED_1body(ExecutionContext& ec, const ChemEnv& chem_env,
+                                                const SCFData&  scf_data,
+                                                TAMMTensors<T>& ttensors) const {
   auto [mu, nu] = scf_data.tAO.labels<2>("all");
   Scheduler sch{ec};
 
-  SystemData&                 sys_data    = chem_env.sys_data;
-  SCFOptions&                 scf_options = chem_env.ioptions.scf_options;
-  std::vector<libint2::Atom>& atoms       = chem_env.atoms;
+  const SystemData&                 sys_data    = chem_env.sys_data;
+  const SCFOptions&                 scf_options = chem_env.ioptions.scf_options;
+  const std::vector<libint2::Atom>& atoms       = chem_env.atoms;
 
-  const int                              nmodes  = sys_data.qed_nmodes;
-  const std::vector<double>              lambdas = scf_options.qed_lambdas;
-  const std::vector<std::vector<double>> polvecs = scf_options.qed_polvecs;
+  const int   nmodes  = sys_data.qed_nmodes;
+  const auto& lambdas = scf_options.qed_lambdas;
+  const auto& polvecs = scf_options.qed_polvecs;
 
   // compute nuclear dipole operator
-  std::vector<double> mu_nuc = {0.0, 0.0, 0.0};
-  for(size_t i = 0; i < atoms.size(); i++) {
-    mu_nuc[0] += atoms[i].x * atoms[i].atomic_number;
-    mu_nuc[1] += atoms[i].y * atoms[i].atomic_number;
-    mu_nuc[2] += atoms[i].z * atoms[i].atomic_number;
+  std::array<double, 3> mu_nuc = {0.0, 0.0, 0.0};
+  for(const auto& atom: atoms) {
+    mu_nuc[0] += atom.x * atom.atomic_number;
+    mu_nuc[1] += atom.y * atom.atomic_number;
+    mu_nuc[2] += atom.z * atom.atomic_number;
   }
 
   double s0_scaling = 0.0;
@@ -65,7 +65,7 @@ void exachem::scf::DefaultSCFQed<T>::compute_QED_1body(ExecutionContext& ec, Che
   // clang-format on
 
   for(int i = 0; i < nmodes; i++) {
-    double s1_scaling =
+    const double s1_scaling =
       (mu_nuc[0] * polvecs[i][0] + mu_nuc[1] * polvecs[i][1] + mu_nuc[2] * polvecs[i][2]) *
       lambdas[i] * lambdas[i] / sys_data.nelectrons;
 
@@ -86,27 +86,27 @@ void exachem::scf::DefaultSCFQed<T>::compute_QED_1body(ExecutionContext& ec, Che
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFQed<T>::compute_QED_2body(ExecutionContext& ec, ChemEnv& chem_env,
-                                                       const SCFData&  scf_data,
-                                                       TAMMTensors<T>& ttensors) {
+void exachem::scf::SCFQed<T>::compute_QED_2body(ExecutionContext& ec, const ChemEnv& chem_env,
+                                                const SCFData&  scf_data,
+                                                TAMMTensors<T>& ttensors) const {
   auto [mu, nu, ku] = scf_data.tAO.labels<3>("all");
   Tensor<T> tensor{ttensors.QED_1body.tiled_index_spaces()}; //{tAO, tAO};
   Scheduler sch{ec};
 
-  auto&       atoms       = chem_env.atoms;
-  SystemData& sys_data    = chem_env.sys_data;
-  SCFOptions& scf_options = chem_env.ioptions.scf_options;
+  const auto&       atoms       = chem_env.atoms;
+  const SystemData& sys_data    = chem_env.sys_data;
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
-  const int                              nmodes  = sys_data.qed_nmodes;
-  const std::vector<double>              lambdas = scf_options.qed_lambdas;
-  const std::vector<std::vector<double>> polvecs = scf_options.qed_polvecs;
+  const int   nmodes  = sys_data.qed_nmodes;
+  const auto& lambdas = scf_options.qed_lambdas;
+  const auto& polvecs = scf_options.qed_polvecs;
 
   // compute nuclear dipole operator
-  std::vector<double> mu_nuc = {0.0, 0.0, 0.0};
-  for(size_t i = 0; i < atoms.size(); i++) {
-    mu_nuc[0] += atoms[i].x * atoms[i].atomic_number;
-    mu_nuc[1] += atoms[i].y * atoms[i].atomic_number;
-    mu_nuc[2] += atoms[i].z * atoms[i].atomic_number;
+  std::array<double, 3> mu_nuc = {0.0, 0.0, 0.0};
+  for(const auto& atom: atoms) {
+    mu_nuc[0] += atom.x * atom.atomic_number;
+    mu_nuc[1] += atom.y * atom.atomic_number;
+    mu_nuc[2] += atom.z * atom.atomic_number;
   }
 
   // clang-format off
@@ -116,14 +116,13 @@ void exachem::scf::DefaultSCFQed<T>::compute_QED_2body(ExecutionContext& ec, Che
   // clang-format on
 
   for(int i = 0; i < nmodes; i++) {
-    double mu_nuc_ope = 0.0;
-    mu_nuc_ope =
+    double mu_nuc_ope =
       (mu_nuc[0] * polvecs[i][0] + mu_nuc[1] * polvecs[i][1] + mu_nuc[2] * polvecs[i][2]) *
       lambdas[i] / sys_data.nelectrons;
 
-    double t1 = -0.5 * pow(lambdas[i], 2);
-    double t2 = 0.5 * mu_nuc_ope * lambdas[i];
-    double t3 = -0.5 * pow(mu_nuc_ope, 2);
+    const double t1 = -0.5 * pow(lambdas[i], 2);
+    const double t2 = 0.5 * mu_nuc_ope * lambdas[i];
+    const double t3 = -0.5 * pow(mu_nuc_ope, 2);
 
     // clang-format off
     sch
@@ -148,9 +147,9 @@ void exachem::scf::DefaultSCFQed<T>::compute_QED_2body(ExecutionContext& ec, Che
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFQed<T>::compute_qed_emult_ints(ExecutionContext& ec, ChemEnv& chem_env,
-                                                            const SCFData&  spvars,
-                                                            TAMMTensors<T>& ttensors) {
+void exachem::scf::SCFQed<T>::compute_qed_emult_ints(ExecutionContext& ec, const ChemEnv& chem_env,
+                                                     const SCFData&  spvars,
+                                                     TAMMTensors<T>& ttensors) const {
   using libint2::Atom;
   using libint2::BasisSet;
   using libint2::Engine;
@@ -158,16 +157,16 @@ void exachem::scf::DefaultSCFQed<T>::compute_qed_emult_ints(ExecutionContext& ec
   using libint2::Shell;
 
   // auto& atoms = chem_env.atoms;
-  SystemData&              sys_data    = chem_env.sys_data;
-  SCFOptions&              scf_options = chem_env.ioptions.scf_options;
+  const SystemData&        sys_data    = chem_env.sys_data;
+  const SCFOptions&        scf_options = chem_env.ioptions.scf_options;
   const libint2::BasisSet& shells      = chem_env.shells;
 
   const std::vector<Tile>&   AO_tiles       = spvars.AO_tiles;
   const std::vector<size_t>& shell_tile_map = spvars.shell_tile_map;
 
-  const int                              nmodes  = sys_data.qed_nmodes;
-  const std::vector<double>              lambdas = scf_options.qed_lambdas;
-  const std::vector<std::vector<double>> polvecs = scf_options.qed_polvecs;
+  const int   nmodes  = sys_data.qed_nmodes;
+  const auto& lambdas = scf_options.qed_lambdas;
+  const auto& polvecs = scf_options.qed_polvecs;
 
   Engine engine(Operator::emultipole2, max_nprim(shells), max_l(shells), 0);
 
@@ -176,8 +175,8 @@ void exachem::scf::DefaultSCFQed<T>::compute_qed_emult_ints(ExecutionContext& ec
   // auto& buf = (engine.results());
 
   auto compute_qed_emult_ints_lambda = [&](const IndexVector& blockid) {
-    auto bi0 = blockid[0];
-    auto bi1 = blockid[1];
+    const auto bi0 = blockid[0];
+    const auto bi1 = blockid[1];
 
     const TAMM_SIZE size       = ttensors.QED_Dx.block_size(blockid);
     auto            block_dims = ttensors.QED_Dx.block_dims(blockid);
@@ -192,8 +191,8 @@ void exachem::scf::DefaultSCFQed<T>::compute_qed_emult_ints(ExecutionContext& ec
     //  block_dims[0] << ", " << block_dims[1] << endl;
 
     // auto s1 = blockid[0];
-    auto                  s1range_end   = shell_tile_map[bi0];
-    decltype(s1range_end) s1range_start = 0l;
+    const auto                                 s1range_end   = shell_tile_map[bi0];
+    std::remove_const_t<decltype(s1range_end)> s1range_start = 0l;
     if(bi0 > 0) s1range_start = shell_tile_map[bi0 - 1] + 1;
 
     // cout << "s1-start,end = " << s1range_start << ", " << s1range_end << endl;
@@ -202,8 +201,8 @@ void exachem::scf::DefaultSCFQed<T>::compute_qed_emult_ints(ExecutionContext& ec
       // this shell
       auto n1 = shells[s1].size();
 
-      auto                  s2range_end   = shell_tile_map[bi1];
-      decltype(s2range_end) s2range_start = 0l;
+      const auto                                 s2range_end   = shell_tile_map[bi1];
+      std::remove_const_t<decltype(s2range_end)> s2range_start = 0l;
       if(bi1 > 0) s2range_start = shell_tile_map[bi1 - 1] + 1;
 
       // cout << "s2-start,end = " << s2range_start << ", " << s2range_end << endl;
@@ -224,7 +223,7 @@ void exachem::scf::DefaultSCFQed<T>::compute_qed_emult_ints(ExecutionContext& ec
         }
 
         // auto bf2 = shell2bf[s2];
-        auto n2 = shells[s2].size();
+        const auto n2 = shells[s2].size();
 
         std::vector<T> tbufX(n1 * n2);
         std::vector<T> tbufY(n1 * n2);
@@ -274,9 +273,9 @@ void exachem::scf::DefaultSCFQed<T>::compute_qed_emult_ints(ExecutionContext& ec
         for(auto x = s1range_start; x < s1; x++) curshelloffset_i += AO_tiles[x];
         for(auto x = s2range_start; x < s2; x++) curshelloffset_j += AO_tiles[x];
 
-        size_t c    = 0;
-        auto   dimi = curshelloffset_i + AO_tiles[s1];
-        auto   dimj = curshelloffset_j + AO_tiles[s2];
+        size_t     c    = 0;
+        const auto dimi = curshelloffset_i + AO_tiles[s1];
+        const auto dimj = curshelloffset_j + AO_tiles[s2];
 
         for(size_t i = curshelloffset_i; i < dimi; i++) {
           for(size_t j = curshelloffset_j; j < dimj; j++, c++) {
@@ -307,5 +306,4 @@ void exachem::scf::DefaultSCFQed<T>::compute_qed_emult_ints(ExecutionContext& ec
   block_for(ec, ttensors.QED_Dx(), compute_qed_emult_ints_lambda);
 }
 
-template class exachem::scf::DefaultSCFQed<double>;
 template class exachem::scf::SCFQed<double>;

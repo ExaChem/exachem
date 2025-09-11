@@ -13,8 +13,8 @@
 namespace exachem::scf {
 template<typename T>
 std::tuple<std::shared_ptr<GauXC::XCIntegrator<Matrix>>, double>
-DefaultSCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
-                                const SCFData& scf_data) {
+SCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
+                         const SCFData& scf_data) const {
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -25,18 +25,18 @@ DefaultSCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
   // const bool is_ks      = sys_data.is_ks;
   // const bool is_qed     = sys_data.is_qed;
   // const bool do_qed     = sys_data.do_qed;
-  auto rank = ec.pg().rank();
+  const auto rank = ec.pg().rank();
 
-  auto gc1 = std::chrono::high_resolution_clock::now();
+  const auto gc1 = std::chrono::high_resolution_clock::now();
 
-  auto gauxc_mol   = make_gauxc_molecule(atoms);
-  auto gauxc_basis = make_gauxc_basis(shells, scf_options.xc_basis_tol);
-  auto polar       = is_rhf ? ExchCXX::Spin::Unpolarized : ExchCXX::Spin::Polarized;
+  const auto gauxc_mol   = make_gauxc_molecule(atoms);
+  const auto gauxc_basis = make_gauxc_basis(shells, scf_options.xc_basis_tol);
+  const auto polar       = is_rhf ? ExchCXX::Spin::Unpolarized : ExchCXX::Spin::Polarized;
 
   auto xc_radang_size = scf_options.xc_radang_size;
   auto xc_grid_str    = scf_options.xc_grid_type;
   std::transform(xc_grid_str.begin(), xc_grid_str.end(), xc_grid_str.begin(), ::tolower);
-  std::map<std::string, GauXC::AtomicGridSizeDefault> grid_map = {
+  const std::map<std::string, GauXC::AtomicGridSizeDefault> grid_map = {
     {"fine", GauXC::AtomicGridSizeDefault::FineGrid},
     {"ultrafine", GauXC::AtomicGridSizeDefault::UltraFineGrid},
     {"superfine", GauXC::AtomicGridSizeDefault::SuperFineGrid},
@@ -201,14 +201,14 @@ DefaultSCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
   auto gc2     = std::chrono::high_resolution_clock::now();
   auto gc_time = std::chrono::duration_cast<std::chrono::duration<double>>((gc2 - gc1)).count();
 
-  double xHF = dummy_xc ? 1.0 : (gauxc_func.is_hyb() ? gauxc_func.hyb_exx() : 0.0);
+  const double xHF = dummy_xc ? 1.0 : (gauxc_func.is_hyb() ? gauxc_func.hyb_exx() : 0.0);
 
   if(rank == 0)
     std::cout << std::fixed << std::setprecision(2) << "GauXC setup time: " << gc_time << "s\n";
   return std::make_tuple(integrator_factory.get_shared_instance(gauxc_func, gauxc_lb), xHF);
 }
 template<typename T>
-GauXC::Molecule DefaultSCFGauxc<T>::make_gauxc_molecule(const std::vector<libint2::Atom>& atoms) {
+GauXC::Molecule SCFGauxc<T>::make_gauxc_molecule(const std::vector<libint2::Atom>& atoms) const {
   GauXC::Molecule mol;
   mol.resize(atoms.size());
   std::transform(atoms.begin(), atoms.end(), mol.begin(), [](const libint2::Atom& atom) {
@@ -218,13 +218,13 @@ GauXC::Molecule DefaultSCFGauxc<T>::make_gauxc_molecule(const std::vector<libint
   return mol;
 }
 template<typename T>
-GauXC::BasisSet<double> DefaultSCFGauxc<T>::make_gauxc_basis(const libint2::BasisSet& basis,
-                                                             const double             basis_tol) {
-  using shell_t = GauXC::Shell<double>;
+GauXC::BasisSet<T> SCFGauxc<T>::make_gauxc_basis(const libint2::BasisSet& basis,
+                                                 const double             basis_tol) const {
+  using shell_t = GauXC::Shell<T>;
   using prim_t  = typename shell_t::prim_array;
   using cart_t  = typename shell_t::cart_array;
 
-  GauXC::BasisSet<double> gauxc_basis;
+  GauXC::BasisSet<T> gauxc_basis;
   for(const auto& shell: basis) {
     prim_t prim_array, coeff_array;
     cart_t origin;
@@ -250,10 +250,10 @@ GauXC::BasisSet<double> DefaultSCFGauxc<T>::make_gauxc_basis(const libint2::Basi
 }
 
 template<typename T>
-void DefaultSCFGauxc<T>::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
-                                     exachem::scf::TAMMTensors<T>& ttensors,
-                                     exachem::scf::EigenTensors&   etensors,
-                                     GauXC::XCIntegrator<Matrix>&  xc_integrator) {
+void SCFGauxc<T>::compute_exx(ExecutionContext& ec, const ChemEnv& chem_env,
+                              const SCFData& scf_data, exachem::scf::TAMMTensors<T>& ttensors,
+                              exachem::scf::EigenTensors&  etensors,
+                              GauXC::XCIntegrator<Matrix>& xc_integrator) const {
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -263,8 +263,8 @@ void DefaultSCFGauxc<T>::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, SC
 
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;
-  auto       rank0  = ec.pg().rank() == 0;
-  auto       factor = is_rhf ? 0.5 * scf_data.xHF : scf_data.xHF;
+  const bool rank0  = ec.pg().rank() == 0;
+  const auto factor = is_rhf ? 0.5 * scf_data.xHF : scf_data.xHF;
 
   GauXC::IntegratorSettingsSNLinK sn_link_settings;
   sn_link_settings.energy_tol = scf_options.xc_snK_etol;
@@ -321,15 +321,15 @@ void DefaultSCFGauxc<T>::compute_exx(ExecutionContext& ec, ChemEnv& chem_env, SC
 }
 
 template<typename T>
-T DefaultSCFGauxc<T>::compute_xcf(ExecutionContext& ec, ChemEnv& chem_env,
-                                  exachem::scf::TAMMTensors<T>& ttensors,
-                                  exachem::scf::EigenTensors&   etensors,
-                                  GauXC::XCIntegrator<Matrix>&  xc_integrator) {
-  SystemData& sys_data = chem_env.sys_data;
+T SCFGauxc<T>::compute_xcf(ExecutionContext& ec, const ChemEnv& chem_env,
+                           exachem::scf::TAMMTensors<T>& ttensors,
+                           exachem::scf::EigenTensors&   etensors,
+                           GauXC::XCIntegrator<Matrix>&  xc_integrator) const {
+  const SystemData& sys_data = chem_env.sys_data;
 
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;
-  auto       rank0  = ec.pg().rank() == 0;
+  const bool rank0  = ec.pg().rank() == 0;
 
   double EXC{};
 
@@ -380,7 +380,7 @@ T DefaultSCFGauxc<T>::compute_xcf(ExecutionContext& ec, ChemEnv& chem_env,
   return EXC;
 }
 
-template class DefaultSCFGauxc<double>;
+template class SCFGauxc<double>;
 
 } // namespace exachem::scf
 

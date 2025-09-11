@@ -67,8 +67,8 @@ void setup_scalapack_info(tamm::ExecutionContext& ec, ChemEnv& chem_env,
   if(mb_ > N / scalapack_info.npr) {
     mb_ = std::ceil(N / scalapack_info.npr);
     // find closest power of 2
-    int mb_log = (int) std::log2(mb_);
-    mb_        = (int) std::pow(2, mb_log);
+    int mb_log = static_cast<int>(std::log2(mb_));
+    mb_        = static_cast<int>(std::pow(2, mb_log));
 
     scf_options.scalapack_nb = mb_;
 

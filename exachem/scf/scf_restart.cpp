@@ -9,8 +9,9 @@
 #include "exachem/scf/scf_restart.hpp"
 
 // Originally scf_restart_test
-void exachem::scf::DefaultSCFRestart::run(const ExecutionContext& ec, ChemEnv& chem_env,
-                                          std::string files_prefix) {
+template<typename T>
+void exachem::scf::SCFRestart<T>::run(const ExecutionContext& ec, ChemEnv& chem_env,
+                                      const std::string& files_prefix) const {
   const bool restart = chem_env.ioptions.scf_options.restart || chem_env.ioptions.scf_options.noscf;
   const auto rank    = ec.pg().rank();
 
@@ -51,13 +52,15 @@ void exachem::scf::DefaultSCFRestart::run(const ExecutionContext& ec, ChemEnv& c
       chem_env.write_run_context(); // write here as well in case we kill an SCF run midway
   }
 }
-
-void exachem::scf::DefaultSCFRestart::run(ExecutionContext& ec, ChemEnv& chem_env,
-                                          ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors,
-                                          EigenTensors& etensors, std::string files_prefix) {
+template<typename T>
+void exachem::scf::SCFRestart<T>::run(ExecutionContext& ec, const ChemEnv& chem_env,
+                                      ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors,
+                                      EigenTensors&      etensors,
+                                      const std::string& files_prefix) const {
   const auto N      = chem_env.sys_data.nbf_orig;
   const auto Northo = N - chem_env.sys_data.n_lindep;
   EXPECTS(Northo == chem_env.sys_data.nbf);
-  SCFIO<TensorType> scf_io;
+  SCFIO<T> scf_io;
   scf_io.rw_md_disk(ec, chem_env, scalapack_info, ttensors, etensors, files_prefix, true);
 }
+template class exachem::scf::SCFRestart<double>;

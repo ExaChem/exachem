@@ -15,27 +15,28 @@
 namespace exachem::scf {
 
 template<typename T>
-class DefaultSCFQed {
+class SCFQed {
 public:
-  virtual ~DefaultSCFQed() = default;
-  virtual void qed_functionals_setup(std::vector<double>& params, ChemEnv& chem_env);
+  SCFQed() = default;
+  // Virtual destructor because this is a polymorphic class
+  virtual ~SCFQed() = default;
 
-  virtual void compute_QED_1body(ExecutionContext& ec, ChemEnv& chem_env, const SCFData& scf_data,
-                                 TAMMTensors<T>& ttensors);
+  SCFQed(const SCFQed&)                = default;
+  SCFQed& operator=(const SCFQed&)     = default;
+  SCFQed(SCFQed&&) noexcept            = default;
+  SCFQed& operator=(SCFQed&&) noexcept = default;
 
-  virtual void compute_QED_2body(ExecutionContext& ec, ChemEnv& chem_env, const SCFData& scf_data,
-                                 TAMMTensors<T>& ttensors);
+  // Virtual interface functions
+  virtual void qed_functionals_setup(std::vector<double>& params, const ChemEnv& chem_env) const;
 
-  virtual void compute_qed_emult_ints(ExecutionContext& ec, ChemEnv& chem_env,
-                                      const SCFData& spvars, TAMMTensors<T>& ttensors);
+  virtual void compute_QED_1body(ExecutionContext& ec, const ChemEnv& chem_env,
+                                 const SCFData& scf_data, TAMMTensors<T>& ttensors) const;
+
+  virtual void compute_QED_2body(ExecutionContext& ec, const ChemEnv& chem_env,
+                                 const SCFData& scf_data, TAMMTensors<T>& ttensors) const;
+
+  virtual void compute_qed_emult_ints(ExecutionContext& ec, const ChemEnv& chem_env,
+                                      const SCFData& scf_data, TAMMTensors<T>& ttensors) const;
 };
 
-template<typename T>
-class SCFQed: public DefaultSCFQed<T> {
-public:
-  using DefaultSCFQed<T>::qed_functionals_setup;
-  using DefaultSCFQed<T>::compute_QED_1body;
-  using DefaultSCFQed<T>::compute_QED_2body;
-  using DefaultSCFQed<T>::compute_qed_emult_ints;
-};
 } // namespace exachem::scf

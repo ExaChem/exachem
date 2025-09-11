@@ -10,19 +10,20 @@
 #include "exachem/common/options/parser_utils.hpp"
 
 template<typename T>
-double exachem::scf::DefaultSCFIO<T>::tt_trace(ExecutionContext& ec, Tensor<T>& T1, Tensor<T>& T2) {
+double exachem::scf::SCFIO<T>::tt_trace(ExecutionContext& ec, const Tensor<T>& T1,
+                                        const Tensor<T>& T2) const {
   Tensor<T> tensor{T1.tiled_index_spaces()};
   Tensor<T>::allocate(&ec, tensor);
   const TiledIndexSpace tis_ao = T1.tiled_index_spaces()[0];
-  auto [mu, nu, ku]            = tis_ao.labels<3>("all");
+  const auto [mu, nu, ku]      = tis_ao.labels<3>("all");
   Scheduler{ec}(tensor(mu, nu) = T1(mu, ku) * T2(ku, nu)).execute();
-  double trace = tamm::trace(tensor);
+  const double trace = tamm::trace(tensor);
   Tensor<T>::deallocate(tensor);
   return trace;
 }
 
 template<typename T>
-Matrix exachem::scf::DefaultSCFIO<T>::read_scf_mat(const std::string& matfile) {
+Matrix exachem::scf::SCFIO<T>::read_scf_mat(const std::string& matfile) const {
   std::string mname = fs::path(matfile).extension();
   mname.erase(0, 1); // remove "."
 
@@ -47,19 +48,19 @@ Matrix exachem::scf::DefaultSCFIO<T>::read_scf_mat(const std::string& matfile) {
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFIO<T>::write_scf_mat(Matrix& C, const std::string& matfile) {
+void exachem::scf::SCFIO<T>::write_scf_mat(const Matrix& C, const std::string& matfile) const {
   std::string mname = fs::path(matfile).extension();
   mname.erase(0, 1); // remove "."
 
-  const auto  N      = C.rows();
-  const auto  Northo = C.cols();
-  TensorType* buf    = C.data();
+  const auto        N      = C.rows();
+  const auto        Northo = C.cols();
+  const TensorType* buf    = C.data();
 
   /* Create a file. */
-  hid_t file_id = H5Fcreate(matfile.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+  const hid_t file_id = H5Fcreate(matfile.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
-  hsize_t tsize        = N * Northo;
-  hid_t   dataspace_id = H5Screate_simple(1, &tsize, NULL);
+  const hsize_t tsize        = N * Northo;
+  hid_t         dataspace_id = H5Screate_simple(1, &tsize, NULL);
 
   /* Create dataset. */
   hid_t dataset_id = H5Dcreate(file_id, mname.c_str(), get_hdf5_dt<T>(), dataspace_id, H5P_DEFAULT,
@@ -69,10 +70,10 @@ void exachem::scf::DefaultSCFIO<T>::write_scf_mat(Matrix& C, const std::string& 
 
   /* Create and write attribute information - dims */
   std::vector<int64_t> rdims{N, Northo};
-  hsize_t              attr_size      = rdims.size();
+  const hsize_t        attr_size      = rdims.size();
   auto                 attr_dataspace = H5Screate_simple(1, &attr_size, NULL);
-  auto attr_dataset = H5Dcreate(file_id, "rdims", H5T_NATIVE_INT64, attr_dataspace, H5P_DEFAULT,
-                                H5P_DEFAULT, H5P_DEFAULT);
+  const auto           attr_dataset = H5Dcreate(file_id, "rdims", H5T_NATIVE_INT64, attr_dataspace,
+                                                H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   H5Dwrite(attr_dataset, H5T_NATIVE_INT64, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdims.data());
   H5Dclose(attr_dataset);
   H5Sclose(attr_dataspace);
@@ -83,10 +84,10 @@ void exachem::scf::DefaultSCFIO<T>::write_scf_mat(Matrix& C, const std::string& 
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_env,
-                                                   TAMMTensors<T>& ttensors, EigenTensors& etensors,
-                                                   SCFData&       scf_data,
-                                                   ScalapackInfo& scalapack_info) {
+void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_env,
+                                            TAMMTensors<T>& ttensors, EigenTensors& etensors,
+                                            const SCFData& scf_data,
+                                            ScalapackInfo& scalapack_info) const {
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -121,11 +122,11 @@ void exachem::scf::DefaultSCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv
       }
       else { energy_qed = scf_data.eqed; }
 
-      Tensor<double> X_a;
+      Tensor<T> X_a;
 
 #if defined(USE_SCALAPACK)
       X_a = {scf_data.tAO, scf_data.tAO_ortho};
-      Tensor<double>::allocate(&ec, X_a);
+      Tensor<T>::allocate(&ec, X_a);
       if(scalapack_info.pg.is_valid()) { tamm::from_block_cyclic_tensor(ttensors.X_alpha, X_a); }
 #else
       X_a = ttensors.X_alpha;
@@ -134,9 +135,9 @@ void exachem::scf::DefaultSCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv
       energy_qed_et              = 0.0;
       std::vector<double> polvec = {0.0, 0.0, 0.0};
       Scheduler           sch{ec};
-      Tensor<double>      ehf_tmp{scf_data.tAO, scf_data.tAO};
-      Tensor<double>      QED_Qxx{scf_data.tAO, scf_data.tAO};
-      Tensor<double>      QED_Qyy{scf_data.tAO, scf_data.tAO};
+      Tensor<T>           ehf_tmp{scf_data.tAO, scf_data.tAO};
+      Tensor<T>           QED_Qxx{scf_data.tAO, scf_data.tAO};
+      Tensor<T>           QED_Qyy{scf_data.tAO, scf_data.tAO};
       sch.allocate(ehf_tmp, QED_Qxx, QED_Qyy).execute();
 
       for(int i = 0; i < sys_data.qed_nmodes; i++) {
@@ -161,7 +162,7 @@ void exachem::scf::DefaultSCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv
       sch.deallocate(ehf_tmp, QED_Qxx, QED_Qyy).execute();
 
 #if defined(USE_SCALAPACK)
-      Tensor<double>::deallocate(X_a);
+      Tensor<T>::deallocate(X_a);
 #endif
     }
   }
@@ -186,42 +187,43 @@ void exachem::scf::DefaultSCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv
     std::cout << "1e energy         = " << energy_1e << endl;
     std::cout << "2e energy         = " << energy_2e << std::endl;
 
-    chem_env.sys_data.results["output"]["SCF"]["NE_1e"]      = NE_1e;
-    chem_env.sys_data.results["output"]["SCF"]["kinetic_1e"] = kinetic_1e;
-    chem_env.sys_data.results["output"]["SCF"]["energy_1e"]  = energy_1e;
-    chem_env.sys_data.results["output"]["SCF"]["energy_2e"]  = energy_2e;
+    auto& scf_results         = chem_env.sys_data.results["output"]["SCF"];
+    scf_results["NE_1e"]      = NE_1e;
+    scf_results["kinetic_1e"] = kinetic_1e;
+    scf_results["energy_1e"]  = energy_1e;
+    scf_results["energy_2e"]  = energy_2e;
 
     if(is_qed) {
       std::cout << "QED energy        = " << energy_qed << std::endl;
       std::cout << "QED eT energy     = " << energy_qed_et << std::endl;
-      chem_env.sys_data.results["output"]["SCF"]["energy_qed"]    = energy_qed;
-      chem_env.sys_data.results["output"]["SCF"]["energy_qed_et"] = energy_qed_et;
+      scf_results["energy_qed"]    = energy_qed;
+      scf_results["energy_qed_et"] = energy_qed_et;
     }
   }
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFIO<T>::print_mulliken(ChemEnv& chem_env, Matrix& D, Matrix& D_beta,
-                                                   Matrix& S) {
-  std::vector<Atom>&   atoms    = chem_env.atoms;
-  std::vector<ECAtom>& ec_atoms = chem_env.ec_atoms;
-  libint2::BasisSet&   shells   = chem_env.shells;
-  bool                 is_uhf   = chem_env.sys_data.is_unrestricted;
+void exachem::scf::SCFIO<T>::print_mulliken(ChemEnv& chem_env, const Matrix& D,
+                                            const Matrix& D_beta, const Matrix& S) const {
+  auto&                      atoms    = chem_env.atoms;
+  const std::vector<ECAtom>& ec_atoms = chem_env.ec_atoms;
+  auto&                      shells   = chem_env.shells;
+  const bool                 is_uhf   = chem_env.sys_data.is_unrestricted;
 
   BasisSetMap bsm(atoms, shells);
 
-  const int                        natoms = ec_atoms.size();
-  std::vector<double>              cs_acharge(natoms, 0);
-  std::vector<double>              os_acharge(natoms, 0);
-  std::vector<double>              net_acharge(natoms, 0);
-  std::vector<std::vector<double>> cs_charge_shell(natoms);
-  std::vector<std::vector<double>> os_charge_shell(natoms);
-  std::vector<std::vector<double>> net_charge_shell(natoms);
+  const int                   natoms = static_cast<int>(ec_atoms.size());
+  std::vector<T>              cs_acharge(natoms, 0);
+  std::vector<T>              os_acharge(natoms, 0);
+  std::vector<T>              net_acharge(natoms, 0);
+  std::vector<std::vector<T>> cs_charge_shell(natoms);
+  std::vector<std::vector<T>> os_charge_shell(natoms);
+  std::vector<std::vector<T>> net_charge_shell(natoms);
 
   int j = 0;
   for(auto x = 0; x < natoms; x++) { // loop over atoms
-    auto atom_shells = bsm.atominfo[x].shells;
-    auto nshells     = atom_shells.size(); // #shells for atom x
+    const auto atom_shells = bsm.atominfo[x].shells;
+    const auto nshells     = atom_shells.size(); // #shells for atom x
     cs_charge_shell[x].resize(nshells);
     if(is_uhf) os_charge_shell[x].resize(nshells);
     for(size_t s = 0; s < nshells; s++) { // loop over each shell for atom x
@@ -251,13 +253,13 @@ void exachem::scf::DefaultSCFIO<T>::print_mulliken(ChemEnv& chem_env, Matrix& D,
       net_charge_shell[x].resize(cs_charge_shell[x].size());
       net_acharge[x] = cs_acharge[x] + os_acharge[x];
       std::transform(cs_charge_shell[x].begin(), cs_charge_shell[x].end(),
-                     os_charge_shell[x].begin(), net_charge_shell[x].begin(), std::plus<double>());
+                     os_charge_shell[x].begin(), net_charge_shell[x].begin(), std::plus<T>());
     }
   }
   const auto mksp = std::string(5, ' ');
 
-  auto print_ma = [&](const std::string dtype, std::vector<double>& acharge,
-                      std::vector<std::vector<double>>& charge_shell) {
+  auto print_ma = [&](const std::string& dtype, const std::vector<T>& acharge,
+                      const std::vector<std::vector<T>>& charge_shell) {
     std::cout << std::endl
               << mksp << "Mulliken analysis of the " << dtype << " density" << std::endl;
     std::cout << mksp << std::string(50, '-') << std::endl << std::endl;
@@ -273,7 +275,7 @@ void exachem::scf::DefaultSCFIO<T>::print_mulliken(ChemEnv& chem_env, Matrix& D,
                 << e_symbol << " " << std::setw(3) << std::right << Z << mksp << std::fixed
                 << std::setprecision(2) << std::right << " " << std::setw(5) << acharge[x] << mksp
                 << "  " << std::right;
-      for(auto csx: charge_shell[x]) std::cout << std::setw(5) << csx << " ";
+      for(const auto csx: charge_shell[x]) std::cout << std::setw(5) << csx << " ";
       std::cout << std::endl;
     }
   };
@@ -285,8 +287,8 @@ void exachem::scf::DefaultSCFIO<T>::print_mulliken(ChemEnv& chem_env, Matrix& D,
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFIO<T>::rw_mat_disk(Tensor<T> tensor, std::string tfilename,
-                                                bool profile, bool read) {
+void exachem::scf::SCFIO<T>::rw_mat_disk(Tensor<T> tensor, const std::string& tfilename,
+                                         bool profile, bool read) const {
 #if !defined(USE_SERIAL_IO)
   if(read) read_from_disk<T>(tensor, tfilename, true, {}, profile);
   else write_to_disk<T>(tensor, tfilename, true, profile);
@@ -306,18 +308,18 @@ void exachem::scf::DefaultSCFIO<T>::rw_mat_disk(Tensor<T> tensor, std::string tf
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFIO<T>::rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env,
-                                               ScalapackInfo&  scalapack_info,
-                                               TAMMTensors<T>& ttensors, EigenTensors& etensors,
-                                               std::string files_prefix, bool read) {
+void exachem::scf::SCFIO<T>::rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env,
+                                        ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors,
+                                        EigenTensors& etensors, const std::string& files_prefix,
+                                        bool read) const {
   const auto rank   = ec.pg().rank();
   const bool is_uhf = chem_env.sys_data.is_unrestricted;
-  auto       debug  = chem_env.ioptions.scf_options.debug;
+  const auto debug  = chem_env.ioptions.scf_options.debug;
 
-  std::string movecsfile_alpha  = files_prefix + ".alpha.movecs";
-  std::string densityfile_alpha = files_prefix + ".alpha.density";
-  std::string movecsfile_beta   = files_prefix + ".beta.movecs";
-  std::string densityfile_beta  = files_prefix + ".beta.density";
+  const std::string movecsfile_alpha  = files_prefix + ".alpha.movecs";
+  const std::string densityfile_alpha = files_prefix + ".alpha.density";
+  const std::string movecsfile_beta   = files_prefix + ".beta.movecs";
+  const std::string densityfile_beta  = files_prefix + ".beta.density";
 
   if(!read) {
 #if defined(USE_SCALAPACK)
@@ -372,5 +374,4 @@ void exachem::scf::DefaultSCFIO<T>::rw_md_disk(ExecutionContext& ec, const ChemE
 }
 
 // Explicit template instantiations
-template class exachem::scf::DefaultSCFIO<double>;
 template class exachem::scf::SCFIO<double>;

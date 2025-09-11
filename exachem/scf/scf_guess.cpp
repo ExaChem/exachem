@@ -18,9 +18,9 @@
 /// @param[in] size the size of the subshell
 /// @param[in,out] ne the number of electrons, on return contains the number of
 /// "remaining" electrons
-template<typename Real>
-void exachem::scf::scf_guess::subshell_occvec(Real& occvec, size_t size, size_t& ne) {
-  const auto ne_alloc = (ne > 2 * size) ? 2 * size : ne;
+template<typename T>
+void exachem::scf::SCFGuess<T>::subshell_occvec(T& occvec, size_t size, size_t& ne) {
+  const auto ne_alloc = std::min(ne, 2 * size);
   ne -= ne_alloc;
   occvec += ne_alloc;
 }
@@ -28,10 +28,10 @@ void exachem::scf::scf_guess::subshell_occvec(Real& occvec, size_t size, size_t&
 /// @brief computes the number of electrons is s, p, d, and f shells
 /// @return occupation vector corresponding to the ground state electronic
 ///         configuration of a neutral atom with atomic number \c Z
-template<typename Real>
-const std::vector<Real> exachem::scf::scf_guess::compute_ao_occupation_vector(size_t Z) {
-  std::vector<Real> occvec(4, 0.0);
-  size_t            num_of_electrons = Z; // # of electrons to allocate
+template<typename T>
+const std::vector<T> exachem::scf::SCFGuess<T>::compute_ao_occupation_vector(size_t Z) {
+  std::vector<T> occvec(4, 0.0);
+  size_t         num_of_electrons = Z; // # of electrons to allocate
 
   // neutral atom electronic configurations from NIST:
   // http://www.nist.gov/pml/data/images/illo_for_2014_PT_1.PNG
@@ -95,16 +95,16 @@ const std::vector<Real> exachem::scf::scf_guess::compute_ao_occupation_vector(si
 // computes Superposition-Of-Atomic-Densities guess for the molecular density matrix
 // in minimal basis; occupies subshells by smearing electrons evenly over the orbitals
 template<typename T>
-Matrix exachem::scf::DefaultSCFGuess<T>::compute_soad(const std::vector<Atom>& atoms) {
+Matrix exachem::scf::SCFGuess<T>::compute_soad(const std::vector<Atom>& atoms) {
   // compute number of atomic orbitals
-  size_t natoms = atoms.size();
-  size_t offset = 0;
+  const size_t natoms = atoms.size();
+  size_t       offset = 0;
 
   // compute the minimal basis density
   Matrix D = Matrix::Zero(natoms, 4);
   for(const auto& atom: atoms) {
     const auto Z      = atom.atomic_number;
-    const auto occvec = scf_guess::compute_ao_occupation_vector(Z);
+    const auto occvec = compute_ao_occupation_vector(Z);
     for(int i = 0; i < 4; ++i) D(offset, i) = occvec[i];
     ++offset;
   }
@@ -112,10 +112,12 @@ Matrix exachem::scf::DefaultSCFGuess<T>::compute_soad(const std::vector<Atom>& a
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFGuess<T>::compute_dipole_ints(
-  ExecutionContext& ec, const SCFData& spvars, Tensor<T>& tensorX, Tensor<T>& tensorY,
-  Tensor<T>& tensorZ, std::vector<libint2::Atom>& atoms, libint2::BasisSet& shells,
-  libint2::Operator otype) {
+void exachem::scf::SCFGuess<T>::compute_dipole_ints(ExecutionContext& ec, const SCFData& spvars,
+                                                    Tensor<T>& tensorX, Tensor<T>& tensorY,
+                                                    Tensor<T>& tensorZ,
+                                                    const std::vector<libint2::Atom>& /*atoms*/,
+                                                    const libint2::BasisSet& shells,
+                                                    libint2::Operator        otype) {
   using libint2::Atom;
   using libint2::BasisSet;
   using libint2::Engine;
@@ -131,11 +133,11 @@ void exachem::scf::DefaultSCFGuess<T>::compute_dipole_ints(
   // auto& buf = (engine.results());
 
   auto compute_dipole_ints_lambda = [&](const IndexVector& blockid) {
-    auto bi0 = blockid[0];
-    auto bi1 = blockid[1];
+    const auto bi0 = blockid[0];
+    const auto bi1 = blockid[1];
 
     const TAMM_SIZE size       = tensorX.block_size(blockid);
-    auto            block_dims = tensorX.block_dims(blockid);
+    const auto      block_dims = tensorX.block_dims(blockid);
     std::vector<T>  dbufX(size);
     std::vector<T>  dbufY(size);
     std::vector<T>  dbufZ(size);
@@ -223,9 +225,11 @@ void exachem::scf::DefaultSCFGuess<T>::compute_dipole_ints(
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFGuess<T>::compute_1body_ints(
-  ExecutionContext& ec, const SCFData& scf_data, Tensor<T>& tensor1e,
-  std::vector<libint2::Atom>& atoms, libint2::BasisSet& shells, libint2::Operator otype) {
+void exachem::scf::SCFGuess<T>::compute_1body_ints(ExecutionContext& ec, const SCFData& scf_data,
+                                                   Tensor<T>&                        tensor1e,
+                                                   const std::vector<libint2::Atom>& atoms,
+                                                   const libint2::BasisSet&          shells,
+                                                   libint2::Operator                 otype) const {
   using libint2::Atom;
   using libint2::BasisSet;
   using libint2::Engine;
@@ -258,7 +262,7 @@ void exachem::scf::DefaultSCFGuess<T>::compute_1body_ints(
     auto            block_dims = tensor1e.block_dims(blockid);
     std::vector<T>  dbuf(size);
 
-    auto bd1 = block_dims[1];
+    const auto bd1 = block_dims[1];
 
     // auto s1 = blockid[0];
     auto                  s1range_end   = shell_tile_map[bi0];
@@ -293,7 +297,7 @@ void exachem::scf::DefaultSCFGuess<T>::compute_1body_ints(
         }
 
         // auto bf2 = shell2bf[s2];
-        auto n2 = shells[s2].size();
+        const auto n2 = shells[s2].size();
 
         std::vector<T> tbuf(n1 * n2);
 
@@ -311,9 +315,9 @@ void exachem::scf::DefaultSCFGuess<T>::compute_1body_ints(
         for(auto x = s1range_start; x < s1; x++) curshelloffset_i += AO_tiles[x];
         for(auto x = s2range_start; x < s2; x++) curshelloffset_j += AO_tiles[x];
 
-        size_t c    = 0;
-        auto   dimi = curshelloffset_i + AO_tiles[s1];
-        auto   dimj = curshelloffset_j + AO_tiles[s2];
+        size_t     c    = 0;
+        const auto dimi = curshelloffset_i + AO_tiles[s1];
+        const auto dimj = curshelloffset_j + AO_tiles[s2];
 
         for(size_t i = curshelloffset_i; i < dimi; i++) {
           for(size_t j = curshelloffset_j; j < dimj; j++, c++) { dbuf[i * bd1 + j] = tbuf[c]; }
@@ -340,17 +344,17 @@ void exachem::scf::DefaultSCFGuess<T>::compute_1body_ints(
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFGuess<T>::compute_ecp_ints(
+void exachem::scf::SCFGuess<T>::compute_ecp_ints(
   ExecutionContext& ec, const SCFData& scf_data, Tensor<T>& tensor1e,
-  std::vector<libecpint::GaussianShell>& shells, std::vector<libecpint::ECP>& ecps) {
+  const std::vector<libecpint::GaussianShell>& shells, const std::vector<libecpint::ECP>& ecps) {
   const std::vector<Tile>&   AO_tiles       = scf_data.AO_tiles;
   const std::vector<size_t>& shell_tile_map = scf_data.shell_tile_map;
 
   int maxam     = 0;
   int ecp_maxam = 0;
-  for(auto shell: shells)
+  for(const auto& shell: shells)
     if(shell.l > maxam) maxam = shell.l;
-  for(auto ecp: ecps)
+  for(const auto& ecp: ecps)
     if(ecp.L > ecp_maxam) ecp_maxam = ecp.L;
 
   size_t  size_       = (maxam + 1) * (maxam + 2) * (maxam + 1) * (maxam + 2) / 4;
@@ -361,14 +365,14 @@ void exachem::scf::DefaultSCFGuess<T>::compute_ecp_ints(
   libecpint::ECPIntegral engine(maxam, ecp_maxam, 0, 1e-17, 1024, 2048);
 
   auto compute_ecp_ints_lambda = [&](const IndexVector& blockid) {
-    auto bi0 = blockid[0];
-    auto bi1 = blockid[1];
+    const auto bi0 = blockid[0];
+    const auto bi1 = blockid[1];
 
     const TAMM_SIZE size       = tensor1e.block_size(blockid);
     auto            block_dims = tensor1e.block_dims(blockid);
     std::vector<T>  dbuf(size);
 
-    auto bd1 = block_dims[1];
+    const auto bd1 = block_dims[1];
 
     // auto s1 = blockid[0];
     auto                  s1range_end   = shell_tile_map[bi0];
@@ -403,7 +407,7 @@ void exachem::scf::DefaultSCFGuess<T>::compute_ecp_ints(
         }
 
         // auto bf2 = shell2bf[s2];
-        auto n2 = 2 * shells[s2].l + 1;
+        const auto n2 = 2 * shells[s2].l + 1;
 
         std::vector<T> tbuf(n1 * n2);
         // cout << "s1,s2,n1,n2 = "  << s1 << "," << s2 <<
@@ -434,9 +438,9 @@ void exachem::scf::DefaultSCFGuess<T>::compute_ecp_ints(
         for(auto x = s1range_start; x < s1; x++) curshelloffset_i += AO_tiles[x];
         for(auto x = s2range_start; x < s2; x++) curshelloffset_j += AO_tiles[x];
 
-        size_t c    = 0;
-        auto   dimi = curshelloffset_i + AO_tiles[s1];
-        auto   dimj = curshelloffset_j + AO_tiles[s2];
+        size_t     c    = 0;
+        const auto dimi = curshelloffset_i + AO_tiles[s1];
+        const auto dimj = curshelloffset_j + AO_tiles[s2];
 
         // cout << "curshelloffset_i,curshelloffset_j,dimi,dimj = "  << curshelloffset_i << "," <<
         // curshelloffset_j <<
@@ -468,9 +472,9 @@ void exachem::scf::DefaultSCFGuess<T>::compute_ecp_ints(
 } // END of compute_ecp_ints
 
 template<typename T>
-void exachem::scf::DefaultSCFGuess<T>::compute_pchg_ints(
+void exachem::scf::SCFGuess<T>::compute_pchg_ints(
   ExecutionContext& ec, const SCFData& scf_data, Tensor<T>& tensor1e,
-  std::vector<std::pair<double, std::array<double, 3>>>& q, libint2::BasisSet& shells,
+  const std::vector<std::pair<double, std::array<double, 3>>>& q, const libint2::BasisSet& shells,
   libint2::Operator otype) {
   using libint2::Atom;
   using libint2::BasisSet;
@@ -487,11 +491,11 @@ void exachem::scf::DefaultSCFGuess<T>::compute_pchg_ints(
   // engine.set(otype);
   engine.set_params(q);
 
-  auto& buf = (engine.results());
+  const auto& buf = (engine.results());
 
   auto compute_pchg_ints_lambda = [&](const IndexVector& blockid) {
-    auto bi0 = blockid[0];
-    auto bi1 = blockid[1];
+    const auto bi0 = blockid[0];
+    const auto bi1 = blockid[1];
 
     const TAMM_SIZE size       = tensor1e.block_size(blockid);
     auto            block_dims = tensor1e.block_dims(blockid);
@@ -508,7 +512,7 @@ void exachem::scf::DefaultSCFGuess<T>::compute_pchg_ints(
     for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
       // auto bf1 = shell2bf[s1]; //shell2bf[s1]; // first basis function in
       // this shell
-      auto n1 = shells[s1].size();
+      const auto n1 = shells[s1].size();
 
       auto                  s2range_end   = shell_tile_map[bi1];
       decltype(s2range_end) s2range_start = 0l;
@@ -532,7 +536,7 @@ void exachem::scf::DefaultSCFGuess<T>::compute_pchg_ints(
         }
 
         // auto bf2 = shell2bf[s2];
-        auto n2 = shells[s2].size();
+        const auto n2 = shells[s2].size();
 
         std::vector<T> tbuf(n1 * n2);
         // cout << "s1,s2,n1,n2 = "  << s1 << "," << s2 <<
@@ -552,9 +556,9 @@ void exachem::scf::DefaultSCFGuess<T>::compute_pchg_ints(
         for(auto x = s1range_start; x < s1; x++) curshelloffset_i += AO_tiles[x];
         for(auto x = s2range_start; x < s2; x++) curshelloffset_j += AO_tiles[x];
 
-        size_t c    = 0;
-        auto   dimi = curshelloffset_i + AO_tiles[s1];
-        auto   dimj = curshelloffset_j + AO_tiles[s2];
+        size_t     c    = 0;
+        const auto dimi = curshelloffset_i + AO_tiles[s1];
+        const auto dimj = curshelloffset_j + AO_tiles[s2];
 
         // cout << "curshelloffset_i,curshelloffset_j,dimi,dimj = "  << curshelloffset_i << "," <<
         // curshelloffset_j <<
@@ -585,13 +589,11 @@ void exachem::scf::DefaultSCFGuess<T>::compute_pchg_ints(
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFGuess<T>::scf_diagonalize(Scheduler& sch, ChemEnv& chem_env,
-                                                       SCFData&        scf_data,
-                                                       ScalapackInfo&  scalapack_info,
-                                                       TAMMTensors<T>& ttensors,
-                                                       EigenTensors&   etensors) {
-  auto        rank     = sch.ec().pg().rank();
-  SystemData& sys_data = chem_env.sys_data;
+void exachem::scf::SCFGuess<T>::scf_diagonalize(Scheduler& sch, const ChemEnv& chem_env,
+                                                SCFData& scf_data, ScalapackInfo& scalapack_info,
+                                                TAMMTensors<T>& ttensors, EigenTensors& etensors) {
+  auto              rank     = sch.ec().pg().rank();
+  const SystemData& sys_data = chem_env.sys_data;
   // SCFOptions& scf_options = chem_env.ioptions.scf_options;
   // const bool debug      = scf_options.debug && rank==0;
 
@@ -679,14 +681,14 @@ void exachem::scf::DefaultSCFGuess<T>::scf_diagonalize(Scheduler& sch, ChemEnv& 
       // Set parameters
       elpa_set(handle, "na", Northo, &error);
       elpa_set(handle, "nev", Northo, &error);
-      elpa_set(handle, "local_nrows", (int) na_rows, &error);
-      elpa_set(handle, "local_ncols", (int) na_cols, &error);
-      elpa_set(handle, "nblk", (int) mb, &error);
+      elpa_set(handle, "local_nrows", static_cast<int> na_rows, &error);
+      elpa_set(handle, "local_ncols", static_cast<int> na_cols, &error);
+      elpa_set(handle, "nblk", static_cast<int> mb, &error);
       elpa_set(handle, "mpi_comm_parent", scalapack_info.pg.comm_c2f(), &error);
-      elpa_set(handle, "process_row", (int) grid.ipr(), &error);
-      elpa_set(handle, "process_col", (int) grid.ipc(), &error);
+      elpa_set(handle, "process_row", static_cast<int> grid.ipr(), &error);
+      elpa_set(handle, "process_col", static_cast<int> grid.ipc(), &error);
 #if defined(USE_CUDA)
-      elpa_set(handle, "nvidia-gpu", (int) 1, &error);
+      elpa_set(handle, "nvidia-gpu", static_cast<int> 1, &error);
       // elpa_set(handle, "use_gpu_id", 1, &error);
 #endif
       error = elpa_setup(handle);
@@ -771,14 +773,14 @@ void exachem::scf::DefaultSCFGuess<T>::scf_diagonalize(Scheduler& sch, ChemEnv& 
         // Set parameters
         elpa_set(handle, "na", Northo, &error);
         elpa_set(handle, "nev", Northo, &error);
-        elpa_set(handle, "local_nrows", (int) na_rows, &error);
-        elpa_set(handle, "local_ncols", (int) na_cols, &error);
-        elpa_set(handle, "nblk", (int) mb, &error);
+        elpa_set(handle, "local_nrows", static_cast<int> na_rows, &error);
+        elpa_set(handle, "local_ncols", static_cast<int> na_cols, &error);
+        elpa_set(handle, "nblk", static_cast<int> mb, &error);
         elpa_set(handle, "mpi_comm_parent", scalapack_info.pg.comm_c2f(), &error);
-        elpa_set(handle, "process_row", (int) grid.ipr(), &error);
-        elpa_set(handle, "process_col", (int) grid.ipc(), &error);
+        elpa_set(handle, "process_row", static_cast<int> grid.ipr(), &error);
+        elpa_set(handle, "process_col", static_cast<int> grid.ipc(), &error);
 #if defined(USE_CUDA)
-        elpa_set(handle, "nvidia-gpu", (int) 1, &error);
+        elpa_set(handle, "nvidia-gpu", static_cast<int> 1, &error);
         // elpa_set(handle, "use_gpu_id", 1, &error);
 #endif
         error = elpa_setup(handle);
@@ -890,17 +892,16 @@ void exachem::scf::DefaultSCFGuess<T>::scf_diagonalize(Scheduler& sch, ChemEnv& 
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFGuess<T>::compute_sad_guess(ExecutionContext& ec, ChemEnv& chem_env,
-                                                         SCFData&        scf_data,
-                                                         ScalapackInfo&  scalapack_info,
-                                                         EigenTensors&   etensors,
-                                                         TAMMTensors<T>& ttensors) {
+void exachem::scf::SCFGuess<T>::compute_sad_guess(ExecutionContext& ec, ChemEnv& chem_env,
+                                                  SCFData& scf_data, ScalapackInfo& scalapack_info,
+                                                  EigenTensors&   etensors,
+                                                  TAMMTensors<T>& ttensors) {
   auto ig1 = std::chrono::high_resolution_clock::now();
 
   // bool is_spherical{true};
-  SystemData&                       sys_data    = chem_env.sys_data;
-  SCFOptions&                       scf_options = chem_env.ioptions.scf_options;
-  std::vector<ECAtom>&              ec_atoms    = chem_env.ec_atoms;
+  const SystemData&                 sys_data    = chem_env.sys_data;
+  const SCFOptions&                 scf_options = chem_env.ioptions.scf_options;
+  const std::vector<ECAtom>&        ec_atoms    = chem_env.ec_atoms;
   const std::vector<libint2::Atom>& atoms       = chem_env.atoms;
 
   const libint2::BasisSet& shells_tot = chem_env.shells;
@@ -995,11 +996,20 @@ void exachem::scf::DefaultSCFGuess<T>::compute_sad_guess(ExecutionContext& ec, C
 
     // Modify occupations if ecp is present
     if(has_ecp) {
-      int ncore = k.ecp_nelec;
-
+      int                    ncore  = k.ecp_nelec;
+      const std::vector<int> nelecp = {0,  2,  4,  10, 12, 18, 22, 28, 30, 36, 40,  46,  48,
+                                       54, 60, 62, 68, 72, 78, 80, 86, 92, 94, 100, 104, 110};
       // Obtain the type of ECP depending on ncore
       size_t index = std::distance(nelecp.begin(), std::find(nelecp.begin(), nelecp.end(), ncore));
       if(index > nelecp.size()) tamm_terminate("Error: ECP type not compatiable");
+
+      const std::vector<std::vector<int>> occecp = {
+        {0, 0, 1, 0, 1, 2, 0, 1, 2, 0, 1, 3, 2, 0, 1, 3, 2},
+        {0, 0, 1, 0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2},
+        {0, 0, 1, 0, 2, 1, 0, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1}};
+
+      const std::vector<int> iecp = {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1,
+                                     2, 1, 0, 0, 1, 0, 1, 2, 0, 0, 0, 1, 0};
 
       // Start removing electrons according to occupations
       for(size_t i = 0; i < occecp[iecp[index]].size(); ++i) {
@@ -1033,7 +1043,7 @@ void exachem::scf::DefaultSCFGuess<T>::compute_sad_guess(ExecutionContext& ec, C
       nelectrons_beta_atom  = nelectrons - nelectrons_alpha_atom;
     }
 
-    auto          s2bf_atom = shells_atom.shell2bf();
+    const auto    s2bf_atom = shells_atom.shell2bf();
     SCFCompute<T> scf_compute;
     std::tie(scf_data.obs_shellpair_list_atom, scf_data.obs_shellpair_data_atom) =
       scf_compute.compute_shellpairs(shells_atom);
@@ -1061,13 +1071,13 @@ void exachem::scf::DefaultSCFGuess<T>::compute_sad_guess(ExecutionContext& ec, C
       if(l > 3) continue;                // No atom has electrons in shells with l > 3
       if(_occ_atom_a(l) < 0.1) continue; // No more electrons to be added
 
-      double nocc_a = std::min(_occ_atom_a(l) / norb, 1.0);
-      double nocc_b = std::min(_occ_atom_b(l) / norb, 1.0);
+      const double nocc_a = std::min(_occ_atom_a(l) / norb, 1.0);
+      const double nocc_b = std::min(_occ_atom_b(l) / norb, 1.0);
       _occ_atom_a(l) -= nocc_a * norb;
       _occ_atom_b(l) -= nocc_b * norb;
 
-      int bf1 = s2bf_atom[ishell];
-      int bf2 = bf1 + 2 * l;
+      const int bf1 = s2bf_atom[ishell];
+      int       bf2 = bf1 + 2 * l;
       for(int ibf = bf1; ibf <= bf2; ++ibf) {
         D_a_atom(ibf, ibf) = nocc_a;
         D_b_atom(ibf, ibf) = nocc_b;
@@ -1086,7 +1096,7 @@ void exachem::scf::DefaultSCFGuess<T>::compute_sad_guess(ExecutionContext& ec, C
     if(tile_size_atom < nao_atom * 0.05) tile_size_atom = std::ceil(nao_atom * 0.05);
 
     std::vector<Tile> AO_tiles_atom;
-    for(auto s: shells_atom) AO_tiles_atom.push_back(s.size());
+    for(const auto& s: shells_atom) AO_tiles_atom.push_back(s.size());
 
     tamm::Tile          est_ts_atom = 0;
     std::vector<Tile>   AO_opttiles_atom;
@@ -1135,7 +1145,7 @@ void exachem::scf::DefaultSCFGuess<T>::compute_sad_guess(ExecutionContext& ec, C
     std::vector<libecpint::ECP>           ecps;
     std::vector<libecpint::GaussianShell> libecp_shells;
     if(has_ecp) {
-      for(auto shell: shells_atom) {
+      for(const auto& shell: shells_atom) {
         std::array<double, 3>    O = {shell.O[0], shell.O[1], shell.O[2]};
         libecpint::GaussianShell newshell(O, shell.contr[0].l);
         for(size_t iprim = 0; iprim < shell.alpha.size(); iprim++)
@@ -1224,8 +1234,8 @@ void exachem::scf::DefaultSCFGuess<T>::compute_sad_guess(ExecutionContext& ec, C
     auto shell2bf = obs.shell2bf();
 
     // Form intial guess of Fock matrix and Density matrix for the present basis
-    auto Ft_a_atom = H_atom_eig;
-    auto Ft_b_atom = H_atom_eig;
+    const auto Ft_a_atom = H_atom_eig;
+    const auto Ft_b_atom = H_atom_eig;
 
     // if(rank == 0) cout << std::setprecision(6) << "Ft_a_atom: " << endl << Ft_a_atom << endl;
 
@@ -1451,16 +1461,16 @@ void exachem::scf::DefaultSCFGuess<T>::compute_sad_guess(ExecutionContext& ec, C
         // Alpha
         for(size_t imo = 0; imo < nao_atom; ++imo) {
           // Check how many electrons are left to add
-          double _nelec = _occ_atom_a.sum();
+          const double _nelec = _occ_atom_a.sum();
           if(_nelec < 0.1) break;
 
           // Check to which shell the orbital belongs to
-          int                 lang = -1;
-          std::vector<double> normang_a(4, 0.0);
+          int            lang = -1;
+          std::vector<T> normang_a(4, 0.0);
           for(size_t ishell = 0; ishell < obs.size(); ++ishell) {
-            int l   = obs[ishell].contr[0].l;
-            int bf1 = shell2bf[ishell];
-            int bf2 = bf1 + obs[ishell].size() - 1;
+            const int l   = obs[ishell].contr[0].l;
+            const int bf1 = shell2bf[ishell];
+            const int bf2 = bf1 + obs[ishell].size() - 1;
             if(l > 3) continue;
             for(int ibf = bf1; ibf <= bf2; ++ibf) {
               normang_a[l] += C_a_atom(ibf, imo) * C_a_atom(ibf, imo);
@@ -1478,7 +1488,7 @@ void exachem::scf::DefaultSCFGuess<T>::compute_sad_guess(ExecutionContext& ec, C
           if(_occ_atom_a(lang) < 0.1) continue;
 
           // Distribute electrons evenly in all degenerate orbitals
-          double _nocc = std::min(_occ_atom_a(lang) / (2.0 * lang + 1.0), 1.0);
+          const double _nocc = std::min(_occ_atom_a(lang) / (2.0 * lang + 1.0), 1.0);
           for(int j = 0; j < 2 * lang + 1; ++j) {
             _occ_atom_a(lang) -= _nocc;
             // D_a_atom += _nocc * C_a_atom.col(imo + j) * C_a_atom.col(imo + j).transpose();
@@ -1492,16 +1502,17 @@ void exachem::scf::DefaultSCFGuess<T>::compute_sad_guess(ExecutionContext& ec, C
         occvec.setZero();
         for(size_t imo = 0; imo < nao_atom; ++imo) {
           // Check how many electrons are left to add
-          double _nelec = _occ_atom_b.sum();
+          const double _nelec = _occ_atom_b.sum();
           if(_nelec < 0.1) break;
 
           // Check to which shell the orbital belongs to
           int                 lang = -1;
           std::vector<double> normang_b(4, 0.0);
           for(size_t ishell = 0; ishell < obs.size(); ++ishell) {
-            int l   = obs[ishell].contr[0].l;
-            int bf1 = shell2bf[ishell];
-            int bf2 = bf1 + obs[ishell].size() - 1;
+            const auto& shell = obs[ishell];
+            const int   l     = shell.contr[0].l;
+            const int   bf1   = shell2bf[ishell];
+            const int   bf2   = bf1 + shell.size() - 1;
             if(l > 3) continue;
             for(int ibf = bf1; ibf <= bf2; ++ibf) {
               normang_b[l] += C_b_atom(ibf, imo) * C_b_atom(ibf, imo);
@@ -1535,8 +1546,8 @@ void exachem::scf::DefaultSCFGuess<T>::compute_sad_guess(ExecutionContext& ec, C
         }
       }
 
-      auto D_a_diff = D_a_atom - D_a_atom_last;
-      auto D_b_diff = D_b_atom - D_b_atom_last;
+      const auto D_a_diff = D_a_atom - D_a_atom_last;
+      const auto D_b_diff = D_b_atom - D_b_atom_last;
       D_a_atom -= 0.3 * D_a_diff;
       D_b_atom -= 0.3 * D_b_diff;
       rmsd_a_atom = std::max(D_a_diff.norm(), D_b_diff.norm());
@@ -1603,9 +1614,8 @@ void exachem::scf::DefaultSCFGuess<T>::compute_sad_guess(ExecutionContext& ec, C
 
 template<typename T>
 template<int ndim>
-void exachem::scf::DefaultSCFGuess<T>::t2e_hf_helper(const ExecutionContext& ec,
-                                                     tamm::Tensor<T>& ttensor, Matrix& etensor,
-                                                     const std::string& ustr) {
+void exachem::scf::SCFGuess<T>::t2e_hf_helper(const ExecutionContext& ec, tamm::Tensor<T>& ttensor,
+                                              Matrix& etensor, const std::string& ustr) {
   const string pstr = "(" + ustr + ")";
 
   const auto rank = ec.pg().rank();

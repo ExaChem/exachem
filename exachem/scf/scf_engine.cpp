@@ -12,7 +12,7 @@
 #include "exachem/common/options/parser_utils.hpp"
 #include <functional>
 
-exachem::scf::DefaultSCFEngine::DefaultSCFEngine(ExecutionContext& exc, ChemEnv& chem_env) {
+exachem::scf::SCFEngine::SCFEngine(ExecutionContext& exc, ChemEnv& chem_env) {
   chem_env.sys_data.nbf                                     = chem_env.shells.nbf();
   chem_env.sys_data.nbf_orig                                = chem_env.sys_data.nbf;
   chem_env.sys_data.results["output"]["system_info"]["nbf"] = chem_env.sys_data.nbf;
@@ -27,7 +27,7 @@ exachem::scf::DefaultSCFEngine::DefaultSCFEngine(ExecutionContext& exc, ChemEnv&
 
 } // initialize_variables
 
-void exachem::scf::DefaultSCFEngine::initialize_scf_vars_and_tensors(ChemEnv& chem_env) {
+void exachem::scf::SCFEngine::initialize_scf_vars_and_tensors(ChemEnv& chem_env) {
   const int N     = chem_env.shells.nbf();
   scf_data.lshift = chem_env.ioptions.scf_options.lshift;
   if(!chem_env.ioptions.scf_options.dfbasis.empty()) scf_data.do_dens_fit = true;
@@ -45,15 +45,16 @@ void exachem::scf::DefaultSCFEngine::initialize_scf_vars_and_tensors(ChemEnv& ch
   }
 }
 
-void exachem::scf::DefaultSCFEngine::setup_file_paths(const ChemEnv& chem_env) {
-  std::string files_dir = chem_env.workspace_dir + chem_env.ioptions.scf_options.scf_type + "/scf";
-  files_prefix          = files_dir + "/" + chem_env.sys_data.output_file_prefix;
+void exachem::scf::SCFEngine::setup_file_paths(const ChemEnv& chem_env) {
+  const std::string files_dir =
+    chem_env.workspace_dir + chem_env.ioptions.scf_options.scf_type + "/scf";
+  files_prefix = files_dir + "/" + chem_env.sys_data.output_file_prefix;
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
   for(const auto& [tag, ext]: ext_type) { fname[tag] = files_prefix + ext; }
 }
 
-void exachem::scf::DefaultSCFEngine::reset_tolerences(ExecutionContext& exc, ChemEnv& chem_env) {
-  auto         rank = exc.pg().rank();
+void exachem::scf::SCFEngine::reset_tolerences(ExecutionContext& exc, ChemEnv& chem_env) {
+  const auto   rank = exc.pg().rank();
   const double fock_precision =
     std::min(chem_env.ioptions.scf_options.tol_sch, 1e-2 * chem_env.ioptions.scf_options.conve);
 
@@ -85,10 +86,10 @@ void exachem::scf::DefaultSCFEngine::reset_tolerences(ExecutionContext& exc, Che
 #endif
 } // reset_tolerences
 
-void exachem::scf::DefaultSCFEngine::write_dplot_data(ExecutionContext& ec, ChemEnv& chem_env) {
-  auto       dplot_opt = chem_env.ioptions.dplot_options;
-  const bool is_uhf    = chem_env.sys_data.is_unrestricted;
-  auto       rank      = ec.pg().rank();
+void exachem::scf::SCFEngine::write_dplot_data(ExecutionContext& ec, ChemEnv& chem_env) {
+  const auto& dplot_opt = chem_env.ioptions.dplot_options;
+  const bool  is_uhf    = chem_env.sys_data.is_unrestricted;
+  const auto  rank      = ec.pg().rank();
 
   // if(dplot_opt.density == "spin") // TODO
   // else plot total density by default when cube=true
@@ -141,7 +142,7 @@ void exachem::scf::DefaultSCFEngine::write_dplot_data(ExecutionContext& ec, Chem
 
 } // write_dplot_data
 
-void exachem::scf::DefaultSCFEngine::qed_tensors_1e(ExecutionContext& ec, ChemEnv& chem_env) {
+void exachem::scf::SCFEngine::qed_tensors_1e(ExecutionContext& ec, const ChemEnv& chem_env) {
   const TiledIndexSpace& tAO  = scf_data.tAO;
   scf_data.ttensors.QED_Dx    = {tAO, tAO};
   scf_data.ttensors.QED_Dy    = {tAO, tAO};
@@ -164,13 +165,13 @@ void exachem::scf::DefaultSCFEngine::qed_tensors_1e(ExecutionContext& ec, ChemEn
   if(chem_env.sys_data.do_qed) scf_qed.compute_QED_1body(ec, chem_env, scf_data, scf_data.ttensors);
 } // end of initialize_qed_tensors
 
-void exachem::scf::DefaultSCFEngine::setup_libecpint(
+void exachem::scf::SCFEngine::setup_libecpint(
   ExecutionContext& exc, ChemEnv& chem_env, std::vector<libecpint::ECP>& ecps,
   std::vector<libecpint::GaussianShell>& libecp_shells) {
   if(chem_env.sys_data.has_ecp) {
-    for(auto shell: chem_env.shells) {
-      std::array<double, 3>    O = {shell.O[0], shell.O[1], shell.O[2]};
-      libecpint::GaussianShell newshell(O, shell.contr[0].l);
+    for(const auto& shell: chem_env.shells) {
+      const std::array<double, 3> O = {shell.O[0], shell.O[1], shell.O[2]};
+      libecpint::GaussianShell    newshell(O, shell.contr[0].l);
       for(size_t iprim = 0; iprim < shell.alpha.size(); iprim++)
         newshell.addPrim(shell.alpha[iprim], shell.contr[0].coeff[iprim]);
       libecp_shells.push_back(newshell);
@@ -178,13 +179,14 @@ void exachem::scf::DefaultSCFEngine::setup_libecpint(
 
     for(size_t i = 0; i < chem_env.ec_atoms.size(); i++) {
       if(chem_env.ec_atoms[i].has_ecp) {
-        int maxam = *std::max_element(chem_env.ec_atoms[i].ecp_ams.begin(),
-                                      chem_env.ec_atoms[i].ecp_ams.end());
+        const int maxam = *std::max_element(chem_env.ec_atoms[i].ecp_ams.begin(),
+                                            chem_env.ec_atoms[i].ecp_ams.end());
         std::replace(chem_env.ec_atoms[i].ecp_ams.begin(), chem_env.ec_atoms[i].ecp_ams.end(), -1,
                      maxam + 1);
 
-        std::array<double, 3> O = {chem_env.atoms[i].x, chem_env.atoms[i].y, chem_env.atoms[i].z};
-        libecpint::ECP        newecp(O.data());
+        const std::array<double, 3> O = {chem_env.atoms[i].x, chem_env.atoms[i].y,
+                                         chem_env.atoms[i].z};
+        libecpint::ECP              newecp(O.data());
         for(size_t iprim = 0; iprim < chem_env.ec_atoms[i].ecp_coeffs.size(); iprim++) {
           newecp.addPrimitive(
             chem_env.ec_atoms[i].ecp_ns[iprim], chem_env.ec_atoms[i].ecp_ams[iprim],
@@ -197,10 +199,10 @@ void exachem::scf::DefaultSCFEngine::setup_libecpint(
 
 } // setup_libECPint
 
-void exachem::scf::DefaultSCFEngine::scf_orthogonalizer(ExecutionContext& ec, ChemEnv& chem_env) {
-  const int N    = chem_env.shells.nbf();
-  auto      rank = ec.pg().rank();
-  Scheduler sch{ec};
+void exachem::scf::SCFEngine::scf_orthogonalizer(ExecutionContext& ec, ChemEnv& chem_env) {
+  const int  N    = chem_env.shells.nbf();
+  const auto rank = ec.pg().rank();
+  Scheduler  sch{ec};
   if(N >= chem_env.ioptions.scf_options.restart_size && fs::exists(fname[FileType::Ortho]) &&
      fs::exists(fname[FileType::OrthoJson])) {
     if(rank == 0) {
@@ -276,7 +278,7 @@ void exachem::scf::DefaultSCFEngine::scf_orthogonalizer(ExecutionContext& ec, Ch
 
 } // scf_orthogonalizer
 
-void exachem::scf::DefaultSCFEngine::declare_main_tensors(ExecutionContext& ec, ChemEnv& chem_env) {
+void exachem::scf::SCFEngine::declare_main_tensors(ExecutionContext& ec, const ChemEnv& chem_env) {
   const TiledIndexSpace& tAO  = scf_data.tAO;
   const TiledIndexSpace& tAOt = scf_data.tAOt;
 
@@ -345,8 +347,8 @@ void exachem::scf::DefaultSCFEngine::declare_main_tensors(ExecutionContext& ec, 
 
 } // declare main tensors
 
-void exachem::scf::DefaultSCFEngine::deallocate_main_tensors(ExecutionContext& ec,
-                                                             ChemEnv&          chem_env) {
+void exachem::scf::SCFEngine::deallocate_main_tensors(ExecutionContext& ec,
+                                                      const ChemEnv&    chem_env) {
   for(auto x: scf_data.ttensors.ehf_tamm_hist) Tensor<TensorType>::deallocate(x);
 
   for(auto x: scf_data.ttensors.diis_hist) Tensor<TensorType>::deallocate(x);
@@ -391,8 +393,8 @@ void exachem::scf::DefaultSCFEngine::deallocate_main_tensors(ExecutionContext& e
 
 } // deallocate_main_tensors
 
-void exachem::scf::DefaultSCFEngine::scf_final_io(ExecutionContext& ec, ChemEnv& chem_env) {
-  auto rank = ec.pg().rank();
+void exachem::scf::SCFEngine::scf_final_io(ExecutionContext& ec, const ChemEnv& chem_env) {
+  const auto rank = ec.pg().rank();
 
   if(!chem_env.ioptions.scf_options.noscf) {
     if(rank == 0) cout << "writing orbitals and density to disk ... ";
@@ -423,8 +425,7 @@ void exachem::scf::DefaultSCFEngine::scf_final_io(ExecutionContext& ec, ChemEnv&
   }
 } // scf_final_io
 
-void exachem::scf::DefaultSCFEngine::setup_tiled_index_space(ExecutionContext& exc,
-                                                             ChemEnv&          chem_env) {
+void exachem::scf::SCFEngine::setup_tiled_index_space(ExecutionContext& exc, ChemEnv& chem_env) {
   // Setup tiled index spaces
   IndexSpace AO;
   // auto      rank = exc.pg().rank();
@@ -448,9 +449,9 @@ void exachem::scf::DefaultSCFEngine::setup_tiled_index_space(ExecutionContext& e
 } // setup_tiled_index_space
 
 #if defined(USE_GAUXC)
-GauXC::XCIntegrator<Matrix>
-exachem::scf::DefaultSCFEngine::get_gauxc_integrator(ExecutionContext& ec, ChemEnv& chem_env) {
-  auto rank = ec.pg().rank();
+GauXC::XCIntegrator<Matrix> exachem::scf::SCFEngine::get_gauxc_integrator(ExecutionContext& ec,
+                                                                          const ChemEnv& chem_env) {
+  const auto rank = ec.pg().rank();
   if(chem_env.sys_data.is_ks || chem_env.sys_data.do_snK)
     std::tie(gauxc_integrator_ptr, xHF) = scf_gauxc.setup_gauxc(ec, chem_env, scf_data);
   else xHF = 1.0;
@@ -462,9 +463,9 @@ exachem::scf::DefaultSCFEngine::get_gauxc_integrator(ExecutionContext& ec, ChemE
   return gauxc_integrator;
 } // get_gauxc_integrator
 
-void exachem::scf::DefaultSCFEngine::add_snk_contribution(
-  ExecutionContext& ec, ChemEnv& chem_env, GauXC::XCIntegrator<Matrix>& gauxc_integrator) {
-  auto rank = ec.pg().rank();
+void exachem::scf::SCFEngine::add_snk_contribution(ExecutionContext& ec, const ChemEnv& chem_env,
+                                                   GauXC::XCIntegrator<Matrix>& gauxc_integrator) {
+  const auto rank = ec.pg().rank();
   // Add snK contribution
   if(chem_env.sys_data.do_snK) {
     const auto snK_start = std::chrono::high_resolution_clock::now();
@@ -473,17 +474,17 @@ void exachem::scf::DefaultSCFEngine::add_snk_contribution(
     const auto snK_stop = std::chrono::high_resolution_clock::now();
     const auto snK_time =
       std::chrono::duration_cast<std::chrono::duration<double>>((snK_stop - snK_start)).count();
-    auto debug = chem_env.ioptions.scf_options.debug;
+    const auto debug = chem_env.ioptions.scf_options.debug;
     if(rank == 0 && debug)
       std::cout << std::fixed << std::setprecision(2) << "snK: " << snK_time << "s, ";
   }
 } // add_nk_contribution
 
-void exachem::scf::DefaultSCFEngine::compute_update_xc(
-  ExecutionContext& ec, ChemEnv& chem_env, GauXC::XCIntegrator<Matrix>& gauxc_integrator,
-  double& ehf) {
+void exachem::scf::SCFEngine::compute_update_xc(ExecutionContext& ec, const ChemEnv& chem_env,
+                                                GauXC::XCIntegrator<Matrix>& gauxc_integrator,
+                                                double&                      ehf) {
   Scheduler  sch{ec};
-  auto       rank  = ec.pg().rank();
+  const auto rank  = ec.pg().rank();
   const bool is_ks = chem_env.sys_data.is_ks;
   if(is_ks) {
     const auto xcf_start = std::chrono::high_resolution_clock::now();
@@ -493,7 +494,7 @@ void exachem::scf::DefaultSCFEngine::compute_update_xc(
     const auto xcf_stop = std::chrono::high_resolution_clock::now();
     const auto xcf_time =
       std::chrono::duration_cast<std::chrono::duration<double>>((xcf_stop - xcf_start)).count();
-    auto debug = chem_env.ioptions.scf_options.debug;
+    const auto debug = chem_env.ioptions.scf_options.debug;
     if(rank == 0 && debug)
       std::cout << std::fixed << std::setprecision(2) << "xcf: " << xcf_time << "s, ";
     if(chem_env.sys_data.is_qed && !chem_env.sys_data.do_qed) { scf_data.eqed = gauxc_exc; }
@@ -519,7 +520,7 @@ void exachem::scf::DefaultSCFEngine::compute_update_xc(
 
 #endif
 
-void exachem::scf::DefaultSCFEngine::process_molden_data(ExecutionContext& ec, ChemEnv& chem_env) {
+void exachem::scf::SCFEngine::process_molden_data(ExecutionContext& ec, ChemEnv& chem_env) {
   ec_molden.check_molden(chem_env.ioptions.scf_options.moldenfile);
   if(ec_molden.molden_file_valid) ec_molden.read_geom_molden(chem_env);
   if(ec_molden.molden_exists && ec_molden.molden_file_valid) {
@@ -533,9 +534,8 @@ void exachem::scf::DefaultSCFEngine::process_molden_data(ExecutionContext& ec, C
 
 } // process_molden_data
 
-void exachem::scf::DefaultSCFEngine::setup_density_fitting(ExecutionContext& exc,
-                                                           ChemEnv&          chem_env) {
-  auto rank = exc.pg().rank();
+void exachem::scf::SCFEngine::setup_density_fitting(ExecutionContext& exc, ChemEnv& chem_env) {
+  const auto rank = exc.pg().rank();
   if(scf_data.do_dens_fit) {
     scf_data.dfbs = libint2::BasisSet(chem_env.ioptions.scf_options.dfbasis, chem_env.atoms);
 
@@ -560,14 +560,14 @@ void exachem::scf::DefaultSCFEngine::setup_density_fitting(ExecutionContext& exc
 
 } // setup_density_fitting
 
-double exachem::scf::DefaultSCFEngine::calculate_diis_error(bool is_uhf, size_t ndiis) {
+double exachem::scf::SCFEngine::calculate_diis_error(bool is_uhf, size_t ndiis) const {
   double lediis = pow(tamm::norm(scf_data.ttensors.diis_hist[ndiis - 1]), 2);
   if(is_uhf) { lediis += pow(tamm::norm(scf_data.ttensors.diis_beta_hist[ndiis - 1]), 2); }
   return lediis;
 } // calculate_diis_energy
 
-void exachem::scf::DefaultSCFEngine::reset_fock_and_save_last_density(ExecutionContext& exc,
-                                                                      ChemEnv&          chem_env) {
+void exachem::scf::SCFEngine::reset_fock_and_save_last_density(ExecutionContext& exc,
+                                                               ChemEnv&          chem_env) {
   // clang-format off
   Scheduler sch{exc};
 sch (scf_data.ttensors.F_alpha_tmp() = 0)
@@ -584,10 +584,10 @@ sch (scf_data.ttensors.F_alpha_tmp() = 0)
   }
 } // reset_fock_density
 
-void exachem::scf::DefaultSCFEngine::handle_energy_bumps(ExecutionContext& exc, ChemEnv& chem_env,
-                                                         SCFIterationState& scf_state) {
+void exachem::scf::SCFEngine::handle_energy_bumps(ExecutionContext& exc, const ChemEnv& chem_env,
+                                                  SCFIterationState& scf_state) {
   const bool is_uhf = chem_env.sys_data.is_unrestricted;
-  auto       rank   = exc.pg().rank();
+  const auto rank   = exc.pg().rank();
 
   if(scf_state.ediff > 0.0) scf_state.nbumps += 1;
 
@@ -609,10 +609,10 @@ void exachem::scf::DefaultSCFEngine::handle_energy_bumps(ExecutionContext& exc, 
   }
 } // handle_energy_bumps()
 
-void exachem::scf::DefaultSCFEngine::print_write_iteration(ExecutionContext& exc, ChemEnv& chem_env,
-                                                           double             loop_time,
-                                                           SCFIterationState& scf_state) {
-  auto rank = exc.pg().rank();
+void exachem::scf::SCFEngine::print_write_iteration(ExecutionContext& exc, ChemEnv& chem_env,
+                                                    double             loop_time,
+                                                    SCFIterationState& scf_state) {
+  const auto rank = exc.pg().rank();
   if(rank == 0) {
     std::cout << std::setw(4) << std::right << scf_state.iter << "  " << std::setw(10);
     if(chem_env.ioptions.scf_options.debug) {
@@ -649,10 +649,10 @@ void exachem::scf::DefaultSCFEngine::print_write_iteration(ExecutionContext& exc
 
 } // print_energy_iteration
 
-bool exachem::scf::DefaultSCFEngine::check_convergence(ExecutionContext& exc, ChemEnv& chem_env,
-                                                       SCFIterationState& scf_state) {
-  double conve = chem_env.ioptions.scf_options.conve;
-  double convd = chem_env.ioptions.scf_options.convd;
+bool exachem::scf::SCFEngine::check_convergence(ExecutionContext& exc, const ChemEnv& chem_env,
+                                                SCFIterationState& scf_state) {
+  const double conve = chem_env.ioptions.scf_options.conve;
+  const double convd = chem_env.ioptions.scf_options.convd;
   if(scf_state.iter >= static_cast<size_t>(chem_env.ioptions.scf_options.maxiter)) {
     scf_state.is_conv = false;
     return false;
@@ -665,11 +665,10 @@ bool exachem::scf::DefaultSCFEngine::check_convergence(ExecutionContext& exc, Ch
   else return false;
 } // check_convergence
 
-void exachem::scf::DefaultSCFEngine::compute_fock_matrix(ExecutionContext& ec, ChemEnv& chem_env,
-                                                         bool is_uhf, const bool do_schwarz_screen,
-                                                         Matrix& SchwarzK, const size_t& max_nprim4,
-                                                         std::vector<size_t>& shell2bf,
-                                                         bool&                is_3c_init) {
+void exachem::scf::SCFEngine::compute_fock_matrix(ExecutionContext& ec, const ChemEnv& chem_env,
+                                                  bool is_uhf, const bool do_schwarz_screen,
+                                                  Matrix& SchwarzK, const size_t& max_nprim4,
+                                                  std::vector<size_t>& shell2bf, bool& is_3c_init) {
   Scheduler sch{ec};
   if(chem_env.sys_data.is_ks) { // or rohf
     sch(scf_data.ttensors.F_alpha_tmp() = 0).execute();
@@ -713,16 +712,15 @@ void exachem::scf::DefaultSCFEngine::compute_fock_matrix(ExecutionContext& ec, C
 } // compute_fock_matrix
 
 std::tuple<Tensor<TensorType>, Tensor<TensorType>, TiledIndexSpace>
-exachem::scf::DefaultSCFEngine::update_movecs(ExecutionContext& ec, ChemEnv& chem_env) {
-  auto               rank = ec.pg().rank();
-  IndexSpace         AO_ortho;
-  TiledIndexSpace    tAO_ortho;
-  Tensor<TensorType> C_alpha_tamm, C_beta_tamm;
-  Scheduler          schg{ec};
-  AO_ortho     = {range(0, (size_t) (chem_env.sys_data.nbf_orig - chem_env.sys_data.n_lindep))};
-  tAO_ortho    = {AO_ortho, chem_env.ioptions.scf_options.AO_tilesize};
-  C_alpha_tamm = {scf_data.tAO, tAO_ortho};
-  C_beta_tamm  = {scf_data.tAO, tAO_ortho};
+exachem::scf::SCFEngine::update_movecs(ExecutionContext& ec, ChemEnv& chem_env) {
+  const auto       rank = ec.pg().rank();
+  const IndexSpace AO_ortho{
+    range(0, (size_t) (chem_env.sys_data.nbf_orig - chem_env.sys_data.n_lindep))};
+  const TiledIndexSpace tAO_ortho{AO_ortho, chem_env.ioptions.scf_options.AO_tilesize};
+  Tensor<TensorType>    C_alpha_tamm, C_beta_tamm;
+  Scheduler             schg{ec};
+  C_alpha_tamm                = {scf_data.tAO, tAO_ortho};
+  C_beta_tamm                 = {scf_data.tAO, tAO_ortho};
   scf_data.ttensors.VXC_alpha = Tensor<TensorType>{scf_data.tAO, scf_data.tAO};
   if(chem_env.sys_data.is_unrestricted)
     scf_data.ttensors.VXC_beta = Tensor<TensorType>{scf_data.tAO, scf_data.tAO};
@@ -760,8 +758,8 @@ exachem::scf::DefaultSCFEngine::update_movecs(ExecutionContext& ec, ChemEnv& che
 /* ↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓↑↓
  */
 
-void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
-  auto              rank = exc.pg().rank();
+void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
+  const auto        rank = exc.pg().rank();
   SCFIterationState scf_state;
   auto              hf_t1 = std::chrono::high_resolution_clock::now();
   process_molden_data(exc, chem_env);
@@ -1002,12 +1000,12 @@ void exachem::scf::DefaultSCFEngine::run(ExecutionContext& exc, ChemEnv& chem_en
       tamm_to_eigen_tensor(scf_data.ttensors.S1, S);
       if(chem_env.sys_data.is_restricted)
         cout << "debug #electrons       = "
-             << (int) std::round((scf_data.etensors.D_alpha * S).trace()) << endl;
+             << static_cast<int>(std::round((scf_data.etensors.D_alpha * S).trace())) << endl;
       if(chem_env.sys_data.is_unrestricted) {
         cout << "debug #alpha electrons = "
-             << (int) std::round((scf_data.etensors.D_alpha * S).trace()) << endl;
+             << static_cast<int>(std::round((scf_data.etensors.D_alpha * S).trace())) << endl;
         cout << "debug #beta  electrons = "
-             << (int) std::round((scf_data.etensors.D_beta * S).trace()) << endl;
+             << static_cast<int>(std::round((scf_data.etensors.D_beta * S).trace())) << endl;
       }
     }
     if(rank == 0 && !chem_env.ioptions.scf_options.noscf) {

@@ -18,16 +18,16 @@ namespace exachem::scf {
 void scf_driver(ExecutionContext& ec, ChemEnv& chem_env) { scf(ec, chem_env); }
 
 void scf(ExecutionContext& ec, ChemEnv& chem_env) {
-  auto rank = ec.pg().rank();
+  const auto rank = ec.pg().rank();
 
-  auto hf_t1 = std::chrono::high_resolution_clock::now();
+  const auto hf_t1 = std::chrono::high_resolution_clock::now();
 
   SCFEngine scf_engine(ec, chem_env);
   scf_engine.run(ec, chem_env);
 
-  auto hf_t2 = std::chrono::high_resolution_clock::now();
+  const auto hf_t2 = std::chrono::high_resolution_clock::now();
 
-  double hf_time =
+  const double hf_time =
     std::chrono::duration_cast<std::chrono::duration<double>>((hf_t2 - hf_t1)).count();
 
   ec.flush_and_sync();

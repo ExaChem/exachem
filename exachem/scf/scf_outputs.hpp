@@ -18,33 +18,35 @@
 namespace exachem::scf {
 
 template<typename T>
-class DefaultSCFIO {
+class SCFIO {
 protected:
-  double tt_trace(ExecutionContext& ec, Tensor<T>& T1, Tensor<T>& T2);
+  virtual double tt_trace(ExecutionContext& ec, const Tensor<T>& T1, const Tensor<T>& T2) const;
 
 public:
-  virtual ~DefaultSCFIO() = default;
+  SCFIO()                            = default;
+  virtual ~SCFIO()                   = default;
+  SCFIO(const SCFIO&)                = default;
+  SCFIO& operator=(const SCFIO&)     = default;
+  SCFIO(SCFIO&&) noexcept            = default;
+  SCFIO& operator=(SCFIO&&) noexcept = default;
 
   // Matrix I/O routines
-  virtual Matrix read_scf_mat(const std::string& matfile);
-  virtual void   write_scf_mat(Matrix& C, const std::string& matfile);
+  virtual Matrix read_scf_mat(const std::string& matfile) const;
+  virtual void   write_scf_mat(const Matrix& C, const std::string& matfile) const;
 
   // SCF I/O routines
   virtual void rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env,
                           ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors,
-                          EigenTensors& etensors, std::string files_prefix, bool read = false);
+                          EigenTensors& etensors, const std::string& files_prefix,
+                          bool read = false) const;
 
-  virtual void rw_mat_disk(Tensor<T> tensor, std::string tfilename, bool profile,
-                           bool read = false);
-  virtual void print_mulliken(ChemEnv& chem_env, Matrix& D, Matrix& D_beta, Matrix& S);
+  virtual void rw_mat_disk(Tensor<T> tensor, const std::string& tfilename, bool profile,
+                           bool read = false) const;
+  virtual void print_mulliken(ChemEnv& chem_env, const Matrix& D, const Matrix& D_beta,
+                              const Matrix& S) const;
   virtual void print_energies(ExecutionContext& ec, ChemEnv& chem_env, TAMMTensors<T>& ttensors,
-                              EigenTensors& etensors, SCFData& scf_data,
-                              ScalapackInfo& scalapack_info);
-};
-
-template<typename T>
-class SCFIO: public DefaultSCFIO<T> {
-  // Optionally override methods here
+                              EigenTensors& etensors, const SCFData& scf_data,
+                              ScalapackInfo& scalapack_info) const;
 };
 
 } // namespace exachem::scf

@@ -7,7 +7,7 @@
  */
 
 #include "v2tensors.hpp"
-
+using T = double;
 // ---------------------------------- class V2TensorSetup -------------------------------
 
 template<typename T>

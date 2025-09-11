@@ -9,7 +9,7 @@
 #pragma once
 
 #include "tamm/tamm.hpp"
-using T = double;
+
 using namespace tamm;
 
 namespace exachem::cholesky_2e {

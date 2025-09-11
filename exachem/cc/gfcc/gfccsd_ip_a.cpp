@@ -7,7 +7,7 @@
  */
 
 #include "exachem/cc/gfcc/gfccsd_ip.hpp"
-
+using T = double;
 namespace exachem::cc::gfcc {
 
 template<typename T>

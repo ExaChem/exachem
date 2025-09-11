@@ -12,7 +12,7 @@
 #endif
 
 template<typename T>
-std::vector<size_t> exachem::scf::SCFUtil::sort_indexes(std::vector<T>& v, bool reverse) {
+std::vector<size_t> exachem::scf::SCFUtil::sort_indexes(const std::vector<T>& v, bool reverse) {
   std::vector<size_t> idx(v.size());
   iota(idx.begin(), idx.end(), 0);
   sort(idx.begin(), idx.end(), [&v](size_t x, size_t y) { return v[x] < v[y]; });
@@ -43,8 +43,8 @@ std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv(
 
   Scheduler sch{ec};
   // auto world = ec.pg().comm();
-  int world_rank = ec.pg().rank().value();
-  int world_size = ec.pg().size().value();
+  const int world_rank = ec.pg().rank().value();
+  const int world_size = ec.pg().size().value();
 
   int64_t       n_cond{}, n_illcond{};
   double        condition_number{}, result_condition_number{};
@@ -95,16 +95,16 @@ std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv(
       auto [na_rows, na_cols] = (*blockcyclic_dist).get_local_dims(N, N);
 
       // Set parameters
-      elpa_set(handle, "na", (int) N, &error);
-      elpa_set(handle, "nev", (int) N, &error);
-      elpa_set(handle, "local_nrows", (int) na_rows, &error);
-      elpa_set(handle, "local_ncols", (int) na_cols, &error);
-      elpa_set(handle, "nblk", (int) mb, &error);
+      elpa_set(handle, "na", static_cast<int> N, &error);
+      elpa_set(handle, "nev", static_cast<int> N, &error);
+      elpa_set(handle, "local_nrows", static_cast<int> na_rows, &error);
+      elpa_set(handle, "local_ncols", static_cast<int> na_cols, &error);
+      elpa_set(handle, "nblk", static_cast<int> mb, &error);
       elpa_set(handle, "mpi_comm_parent", scalapack_info.pg.comm_c2f(), &error);
-      elpa_set(handle, "process_row", (int) grid.ipr(), &error);
-      elpa_set(handle, "process_col", (int) grid.ipc(), &error);
+      elpa_set(handle, "process_row", static_cast<int> grid.ipr(), &error);
+      elpa_set(handle, "process_col", static_cast<int> grid.ipc(), &error);
 #if defined(USE_CUDA)
-      elpa_set(handle, "nvidia-gpu", (int) 1, &error);
+      elpa_set(handle, "nvidia-gpu", static_cast<int> 1, &error);
       // elpa_set(handle, "use_gpu_id", 1, &error);
 #endif
       error = elpa_setup(handle);
@@ -250,17 +250,17 @@ std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv(
   return std::make_tuple(size_t(n_cond), condition_number, result_condition_number);
 }
 template<typename T>
-std::tuple<Matrix, size_t, double, double> exachem::scf::SCFUtil::gensqrtinv_atscf(
-  ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data, ScalapackInfo& scalapack_info,
-  Tensor<T> S1, TiledIndexSpace& tao_atom, bool symmetric, double threshold) {
-  // using T = double;
-
-  SCFOptions& scf_options = chem_env.ioptions.scf_options;
+std::tuple<Matrix, size_t, double, double>
+exachem::scf::SCFUtil::gensqrtinv_atscf(ExecutionContext& ec, const ChemEnv& chem_env,
+                                        const SCFData& scf_data, ScalapackInfo& scalapack_info,
+                                        Tensor<T> S1, TiledIndexSpace& tao_atom, bool symmetric,
+                                        double threshold) {
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   Scheduler sch{ec};
   // auto world = ec.pg().comm();
-  int world_rank = ec.pg().rank().value();
-  int world_size = ec.pg().size().value();
+  const int world_rank = ec.pg().rank().value();
+  const int world_size = ec.pg().size().value();
 
   int64_t       n_cond{}, n_illcond{};
   double        condition_number{}, result_condition_number{};
@@ -348,8 +348,9 @@ std::tuple<Matrix, size_t, double, double> exachem::scf::SCFUtil::gensqrtinv_ats
 
 template<typename T>
 std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-exachem::scf::SCFUtil::gather_task_vectors(ExecutionContext& ec, std::vector<int>& s1vec,
-                                           std::vector<int>& s2vec, std::vector<int>& ntask_vec) {
+exachem::scf::SCFUtil::gather_task_vectors(ExecutionContext& ec, const std::vector<int>& s1vec,
+                                           const std::vector<int>& s2vec,
+                                           const std::vector<int>& ntask_vec) {
   const int rank   = ec.pg().rank().value();
   const int nranks = ec.pg().size().value();
 
@@ -357,9 +358,9 @@ exachem::scf::SCFUtil::gather_task_vectors(ExecutionContext& ec, std::vector<int
   std::vector<int> s2_count(nranks);
   std::vector<int> nt_count(nranks);
 
-  int s1vec_size = (int) s1vec.size();
-  int s2vec_size = (int) s2vec.size();
-  int ntvec_size = (int) ntask_vec.size();
+  const int s1vec_size = static_cast<int>(s1vec.size());
+  const int s2vec_size = static_cast<int>(s2vec.size());
+  const int ntvec_size = static_cast<int>(ntask_vec.size());
 
   // Root gathers number of elements at each rank.
   ec.pg().gather(&s1vec_size, s1_count.data(), 0);
@@ -398,15 +399,17 @@ exachem::scf::SCFUtil::gather_task_vectors(ExecutionContext& ec, std::vector<int
 }
 
 template std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-exachem::scf::SCFUtil::gather_task_vectors<double>(ExecutionContext& ec, std::vector<int>& s1vec,
-                                                   std::vector<int>& s2vec,
-                                                   std::vector<int>& ntask_vec);
+exachem::scf::SCFUtil::gather_task_vectors<double>(ExecutionContext&       ec,
+                                                   const std::vector<int>& s1vec,
+                                                   const std::vector<int>& s2vec,
+                                                   const std::vector<int>& ntask_vec);
 
-template std::vector<size_t> exachem::scf::SCFUtil::sort_indexes<double>(std::vector<double>& v,
-                                                                         bool reverse);
+template std::vector<size_t>
+exachem::scf::SCFUtil::sort_indexes<double>(const std::vector<double>& v, bool reverse);
 template std::tuple<Matrix, size_t, double, double> exachem::scf::SCFUtil::gensqrtinv_atscf<double>(
-  ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data, ScalapackInfo& scalapack_info,
-  Tensor<double> S1, TiledIndexSpace& tao_atom, bool symmetric, double threshold);
+  ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data,
+  ScalapackInfo& scalapack_info, Tensor<double> S1, TiledIndexSpace& tao_atom, bool symmetric,
+  double threshold);
 template std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv<double>(
   ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data, ScalapackInfo& scalapack_info,
   TAMMTensors<double>& ttensors, bool symmetric, double threshold);

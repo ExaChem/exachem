@@ -9,8 +9,8 @@
 #include "exachem/scf/scf_iter.hpp"
 
 template<typename T>
-std::tuple<T, T> exachem::scf::DefaultSCFIter<T>::scf_iter_body(
-  ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const int& iter,
+std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
+  ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info, const int& iter,
   SCFData& scf_data, TAMMTensors<T>& ttensors, EigenTensors& etensors
 #if defined(USE_GAUXC)
   ,
@@ -18,8 +18,8 @@ std::tuple<T, T> exachem::scf::DefaultSCFIter<T>::scf_iter_body(
 #endif
 ) {
 
-  SystemData& sys_data    = chem_env.sys_data;
-  SCFOptions& scf_options = chem_env.ioptions.scf_options;
+  const SystemData& sys_data    = chem_env.sys_data;
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   const bool   is_uhf = sys_data.is_unrestricted;
   const bool   is_rhf = sys_data.is_restricted;
@@ -50,10 +50,10 @@ std::tuple<T, T> exachem::scf::DefaultSCFIter<T>::scf_iter_body(
   const int64_t          N   = sys_data.nbf_orig;
   const TiledIndexSpace& tAO = scf_data.tAO;
 
-  auto rank          = ec.pg().rank();
-  auto debug         = scf_options.debug;
-  auto [mu, nu, ku]  = tAO.labels<3>("all");
-  const int max_hist = scf_options.diis_hist;
+  const auto rank         = ec.pg().rank();
+  const auto debug        = scf_options.debug;
+  const auto [mu, nu, ku] = tAO.labels<3>("all");
+  const int max_hist      = scf_options.diis_hist;
 
   double ehf = 0.0;
 
@@ -217,13 +217,13 @@ std::tuple<T, T> exachem::scf::DefaultSCFIter<T>::scf_iter_body(
     (D_diff() -= D_last_alpha_tamm())
     .execute();
   // clang-format on
-  rmsd = norm(D_diff) / (double) (1.0 * N);
+  rmsd = norm(D_diff) / static_cast<double>(1.0 * N);
 
   if(is_uhf) {
     // clang-format off
     sch(D_diff() = D_beta_tamm())(D_diff() -= D_last_beta_tamm()).execute();
     // clang-format on
-    rmsd += norm(D_diff) / (double) (1.0 * N);
+    rmsd += norm(D_diff) / static_cast<double>(1.0 * N);
   }
 
   const auto   damp  = scf_options.damp;
@@ -252,16 +252,16 @@ std::tuple<T, T> exachem::scf::DefaultSCFIter<T>::scf_iter_body(
 
 template<typename T>
 std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
-exachem::scf::DefaultSCFIter<T>::compute_2bf_taskinfo(
-  ExecutionContext& ec, ChemEnv& chem_env, const SCFData& scf_data, const bool do_schwarz_screen,
-  const std::vector<size_t>& shell2bf, const Matrix& SchwarzK, const size_t& max_nprim4,
-  TAMMTensors<T>& ttensors, EigenTensors& etensors, const bool cs1s2) {
+exachem::scf::SCFIter<T>::compute_2bf_taskinfo(
+  ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data,
+  const bool do_schwarz_screen, const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
+  const size_t& max_nprim4, TAMMTensors<T>& ttensors, EigenTensors& etensors, const bool cs1s2) {
   Matrix&    D       = etensors.D_alpha;
   Matrix&    D_beta  = etensors.D_beta;
   Tensor<T>& F_dummy = ttensors.F_dummy;
 
-  SystemData&              sys_data    = chem_env.sys_data;
-  SCFOptions&              scf_options = chem_env.ioptions.scf_options;
+  const SystemData&        sys_data    = chem_env.sys_data;
+  const SCFOptions&        scf_options = chem_env.ioptions.scf_options;
   const libint2::BasisSet& obs         = chem_env.shells;
 
   double fock_precision = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
@@ -277,12 +277,12 @@ exachem::scf::DefaultSCFIter<T>::compute_2bf_taskinfo(
   std::vector<int> ntask_vec;
 
   auto comp_2bf_lambda = [&](IndexVector blockid) {
-    auto s1        = blockid[0];
-    auto sp12_iter = scf_data.obs_shellpair_data.at(s1).begin();
+    const auto s1        = blockid[0];
+    auto       sp12_iter = scf_data.obs_shellpair_data.at(s1).begin();
 
-    auto s2     = blockid[1];
-    auto s2spl  = scf_data.obs_shellpair_list.at(s1);
-    auto s2_itr = std::find(s2spl.begin(), s2spl.end(), s2);
+    const auto s2     = blockid[1];
+    const auto s2spl  = scf_data.obs_shellpair_list.at(s1);
+    const auto s2_itr = std::find(s2spl.begin(), s2spl.end(), s2);
     if(s2_itr == s2spl.end()) return;
     auto s2_pos = std::distance(s2spl.begin(), s2_itr);
 
@@ -293,7 +293,7 @@ exachem::scf::DefaultSCFIter<T>::compute_2bf_taskinfo(
 
     size_t taskid = 0;
 
-    for(decltype(s1) s3 = 0; s3 <= s1; ++s3) {
+    for(std::remove_const_t<decltype(s1)> s3 = 0; s3 <= s1; ++s3) {
       const auto Dnorm123 =
         do_schwarz_screen ? std::max(D_shblk_norm(s1, s3), std::max(D_shblk_norm(s2, s3), Dnorm12))
                           : 0.;
@@ -333,17 +333,17 @@ exachem::scf::DefaultSCFIter<T>::compute_2bf_taskinfo(
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFIter<T>::compute_3c_ints(ExecutionContext& ec, ChemEnv& chem_env,
-                                                      const SCFData& scf_data, Tensor<T>& xyZ) {
+void exachem::scf::SCFIter<T>::compute_3c_ints(ExecutionContext& ec, const ChemEnv& chem_env,
+                                               const SCFData& scf_data, Tensor<T>& xyZ) {
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
 
-  SCFOptions&              scf_options = chem_env.ioptions.scf_options;
+  const SCFOptions&        scf_options = chem_env.ioptions.scf_options;
   const libint2::BasisSet& obs         = chem_env.shells;
 
-  auto                       rank           = ec.pg().rank();
-  auto                       debug          = scf_options.debug;
+  const auto                 rank           = ec.pg().rank();
+  const auto                 debug          = scf_options.debug;
   const std::vector<Tile>&   AO_tiles       = scf_data.AO_tiles;
   const std::vector<size_t>& shell_tile_map = scf_data.shell_tile_map;
 
@@ -366,29 +366,29 @@ void exachem::scf::DefaultSCFIter<T>::compute_3c_ints(ExecutionContext& ec, Chem
   const auto& results     = engine.results();
 
   auto compute_2body_fock_dfC_lambda = [&](const IndexVector& blockid) {
-    auto bi0 = blockid[0];
-    auto bi1 = blockid[1];
-    auto bi2 = blockid[2];
+    const auto bi0 = blockid[0];
+    const auto bi1 = blockid[1];
+    const auto bi2 = blockid[2];
 
     const TAMM_SIZE size       = xyZ.block_size(blockid);
-    auto            block_dims = xyZ.block_dims(blockid);
+    const auto      block_dims = xyZ.block_dims(blockid);
     std::vector<T>  dbuf(size);
 
-    auto bd1 = block_dims[1];
-    auto bd2 = block_dims[2];
+    const auto bd1 = block_dims[1];
+    const auto bd2 = block_dims[2];
 
-    auto s0range_end = df_shell_tile_map[bi2];
+    const auto s0range_end = df_shell_tile_map[bi2];
     // auto n0 = dfbs[s0].size();
-    auto                  s1range_end   = shell_tile_map[bi0];
-    decltype(s1range_end) s1range_start = 0l;
+    const auto                                 s1range_end   = shell_tile_map[bi0];
+    std::remove_const_t<decltype(s1range_end)> s1range_start = 0l;
     if(bi0 > 0) s1range_start = shell_tile_map[bi0 - 1] + 1;
 
     tamm::Tile curshelloffset_i = 0U;
     for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
       // auto n1 = shells[s1].size();
-      auto                  dimi          = curshelloffset_i + AO_tiles[s1];
-      auto                  s2range_end   = shell_tile_map[bi1];
-      decltype(s2range_end) s2range_start = 0l;
+      const auto                                 dimi          = curshelloffset_i + AO_tiles[s1];
+      const auto                                 s2range_end   = shell_tile_map[bi1];
+      std::remove_const_t<decltype(s2range_end)> s2range_start = 0l;
 
       if(bi1 > 0) s2range_start = shell_tile_map[bi1 - 1] + 1;
 
@@ -398,8 +398,8 @@ void exachem::scf::DefaultSCFIter<T>::compute_3c_ints(ExecutionContext& ec, Chem
         // auto n2 = shells[s2].size();
         // auto n123 = n0*n1*n2;
         // std::vector<T> tbuf(n123);
-        auto                  dimj          = curshelloffset_j + AO_tiles[s2];
-        decltype(s0range_end) s0range_start = 0l;
+        auto                                       dimj          = curshelloffset_j + AO_tiles[s2];
+        std::remove_const_t<decltype(s0range_end)> s0range_start = 0l;
         if(bi2 > 0) s0range_start = df_shell_tile_map[bi2 - 1] + 1;
 
         tamm::Tile curshelloffset_k = 0U;
@@ -437,15 +437,14 @@ void exachem::scf::DefaultSCFIter<T>::compute_3c_ints(ExecutionContext& ec, Chem
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFIter<T>::compute_2c_ints(ExecutionContext& ec, ChemEnv& chem_env,
-                                                      EigenTensors&   etensors,
-                                                      const SCFData&  scf_data,
-                                                      TAMMTensors<T>& ttensors) {
+void exachem::scf::SCFIter<T>::compute_2c_ints(ExecutionContext& ec, const ChemEnv& chem_env,
+                                               EigenTensors& etensors, const SCFData& scf_data,
+                                               TAMMTensors<T>& ttensors) {
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
 
-  SCFOptions& scf_options = chem_env.ioptions.scf_options;
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   const libint2::BasisSet&   dfbs              = scf_data.dfbs;
   const std::vector<Tile>&   dfAO_tiles        = scf_data.dfAO_tiles;
@@ -471,11 +470,11 @@ void exachem::scf::DefaultSCFIter<T>::compute_2c_ints(ExecutionContext& ec, Chem
   dfNorm.setZero();
 
   auto compute_2body_2index_ints_lambda = [&](const IndexVector& blockid) {
-    auto bi0 = blockid[0];
-    auto bi1 = blockid[1];
+    const auto bi0 = blockid[0];
+    const auto bi1 = blockid[1];
 
     const TAMM_SIZE size       = Vm1.block_size(blockid);
-    auto            block_dims = Vm1.block_dims(blockid);
+    const auto      block_dims = Vm1.block_dims(blockid);
     std::vector<T>  dbuf(size);
 
     auto                  bd1           = block_dims[1];
@@ -518,9 +517,9 @@ void exachem::scf::DefaultSCFIter<T>::compute_2c_ints(ExecutionContext& ec, Chem
         for(decltype(s1) x = s1range_start; x < s1; x++) curshelloffset_i += dfAO_tiles[x];
         for(decltype(s2) x = s2range_start; x < s2; x++) curshelloffset_j += dfAO_tiles[x];
 
-        size_t c    = 0;
-        auto   dimi = curshelloffset_i + dfAO_tiles[s1];
-        auto   dimj = curshelloffset_j + dfAO_tiles[s2];
+        size_t     c    = 0;
+        const auto dimi = curshelloffset_i + dfAO_tiles[s1];
+        const auto dimj = curshelloffset_j + dfAO_tiles[s2];
         for(auto i = curshelloffset_i; i < dimi; i++)
           for(auto j = curshelloffset_j; j < dimj; j++, c++) dbuf[i * bd1 + j] = tbuf[c];
 
@@ -534,23 +533,22 @@ void exachem::scf::DefaultSCFIter<T>::compute_2c_ints(ExecutionContext& ec, Chem
   };
   block_for(ec, Vm1(), compute_2body_2index_ints_lambda);
 
-  std::vector<double> norms(dfbs.size());
+  std::vector<T> norms(dfbs.size());
   ec.pg().allreduce(&dfNorm(0), norms.data(), dfbs.size(), tamm::ReduceOp::sum);
   for(size_t s1 = 0; s1 < dfbs.size(); ++s1) dfNorm(s1) = norms[s1];
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFIter<T>::init_ri(ExecutionContext& ec, ChemEnv& chem_env,
-                                              ScalapackInfo& scalapack_info,
-                                              const SCFData& scf_data, EigenTensors& etensors,
-                                              TAMMTensors<T>& ttensors) {
-  SystemData& sys_data    = chem_env.sys_data;
-  SCFOptions& scf_options = chem_env.ioptions.scf_options;
+void exachem::scf::SCFIter<T>::init_ri(ExecutionContext& ec, const ChemEnv& chem_env,
+                                       ScalapackInfo& scalapack_info, const SCFData& scf_data,
+                                       EigenTensors& etensors, TAMMTensors<T>& ttensors) {
+  const SystemData& sys_data    = chem_env.sys_data;
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   const auto ndf    = sys_data.ndf;
   const bool direct = scf_data.direct_df;
-  auto       rank   = ec.pg().rank();
-  auto       debug  = scf_options.debug;
+  const auto rank   = ec.pg().rank();
+  const auto debug  = scf_options.debug;
 
   auto mu = scf_data.mu, nu = scf_data.nu, ku = scf_data.ku;
   auto d_mu = scf_data.d_mu, d_nu = scf_data.d_nu, d_ku = scf_data.d_ku;
@@ -573,7 +571,7 @@ void exachem::scf::DefaultSCFIter<T>::init_ri(ExecutionContext& ec, ChemEnv& che
   Matrix         V;
   std::vector<T> eps(ndf);
 
-  auto ig1 = std::chrono::high_resolution_clock::now();
+  const auto ig1 = std::chrono::high_resolution_clock::now();
 
   Tensor<T> v_tmp{scf_data.tdfAO, scf_data.tdfAO};
   Tensor<T> eps_tamm{scf_data.tdfAO};
@@ -621,14 +619,14 @@ void exachem::scf::DefaultSCFIter<T>::init_ri(ExecutionContext& ec, ChemEnv& che
       // Set parameters
       elpa_set(handle, "na", ndf, &error);
       elpa_set(handle, "nev", ndf, &error);
-      elpa_set(handle, "local_nrows", (int) na_rows, &error);
-      elpa_set(handle, "local_ncols", (int) na_cols, &error);
-      elpa_set(handle, "nblk", (int) mb, &error);
+      elpa_set(handle, "local_nrows", static_cast<int> na_rows, &error);
+      elpa_set(handle, "local_ncols", static_cast<int> na_cols, &error);
+      elpa_set(handle, "nblk", static_cast<int> mb, &error);
       elpa_set(handle, "mpi_comm_parent", scalapack_info.pg.comm_c2f(), &error);
-      elpa_set(handle, "process_row", (int) grid.ipr(), &error);
-      elpa_set(handle, "process_col", (int) grid.ipc(), &error);
+      elpa_set(handle, "process_row", static_cast<int> grid.ipr(), &error);
+      elpa_set(handle, "process_col", static_cast<int> grid.ipc(), &error);
 #if defined(USE_CUDA)
-      elpa_set(handle, "nvidia-gpu", (int) 1, &error);
+      elpa_set(handle, "nvidia-gpu", static_cast<int> 1, &error);
       // elpa_set(handle, "use_gpu_id", 1, &error);
 #endif
       error = elpa_setup(handle);
@@ -705,18 +703,18 @@ void exachem::scf::DefaultSCFIter<T>::init_ri(ExecutionContext& ec, ChemEnv& che
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, ChemEnv& chem_env,
-                                                            const SCFData&             scf_data,
-                                                            const std::vector<size_t>& shell2bf,
-                                                            TAMMTensors<T>&            ttensors,
-                                                            EigenTensors&              etensors,
-                                                            const Matrix&              SchwarzK) {
+void exachem::scf::SCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, const ChemEnv& chem_env,
+                                                     const SCFData&             scf_data,
+                                                     const std::vector<size_t>& shell2bf,
+                                                     TAMMTensors<T>&            ttensors,
+                                                     EigenTensors&              etensors,
+                                                     const Matrix&              SchwarzK) {
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
 
-  SystemData& sys_data    = chem_env.sys_data;
-  SCFOptions& scf_options = chem_env.ioptions.scf_options;
+  const SystemData& sys_data    = chem_env.sys_data;
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   Scheduler sch{ec};
   // ExecutionHW exhw = ec.exhw();
@@ -727,7 +725,7 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec
   const bool is_uhf = sys_data.is_unrestricted;
   // const bool is_spherical = (scf_options.gaussian_type == "spherical");
 
-  auto rank = ec.pg().rank();
+  const auto rank = ec.pg().rank();
 
   const auto               ndf         = sys_data.ndf;
   const libint2::BasisSet& dfbs        = scf_data.dfbs;
@@ -927,19 +925,21 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec
 };
 
 template<typename T>
-void exachem::scf::DefaultSCFIter<T>::compute_2bf_ri(
-  ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const SCFData& scf_data,
-  const std::vector<size_t>& shell2bf, TAMMTensors<T>& ttensors, EigenTensors& etensors,
-  bool& is_3c_init, double xHF) {
-  SystemData& sys_data    = chem_env.sys_data;
-  SCFOptions& scf_options = chem_env.ioptions.scf_options;
+void exachem::scf::SCFIter<T>::compute_2bf_ri(ExecutionContext& ec, const ChemEnv& chem_env,
+                                              ScalapackInfo&             scalapack_info,
+                                              const SCFData&             scf_data,
+                                              const std::vector<size_t>& shell2bf,
+                                              TAMMTensors<T>& ttensors, EigenTensors& etensors,
+                                              bool& is_3c_init, double xHF) {
+  const SystemData& sys_data    = chem_env.sys_data;
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;
   const bool do_snK = sys_data.do_snK;
 
-  auto rank  = ec.pg().rank();
-  auto debug = scf_options.debug;
+  const auto rank  = ec.pg().rank();
+  const auto debug = scf_options.debug;
 
   auto mu = scf_data.mu, nu = scf_data.nu, ku = scf_data.ku;
   auto d_mu = scf_data.d_mu, d_nu = scf_data.d_nu, d_ku = scf_data.d_ku;
@@ -1014,15 +1014,15 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf_ri(
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFIter<T>::compute_2bf(
-  ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info, const SCFData& scf_data,
-  const bool do_schwarz_screen, const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
-  const size_t& max_nprim4, TAMMTensors<T>& ttensors, EigenTensors& etensors, bool& is_3c_init,
-  const bool do_density_fitting, double xHF) {
+void exachem::scf::SCFIter<T>::compute_2bf(
+  ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info,
+  const SCFData& scf_data, const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
+  const Matrix& SchwarzK, const size_t& max_nprim4, TAMMTensors<T>& ttensors,
+  EigenTensors& etensors, bool& is_3c_init, const bool do_density_fitting, double xHF) {
   using libint2::Operator;
 
-  SystemData&              sys_data    = chem_env.sys_data;
-  SCFOptions&              scf_options = chem_env.ioptions.scf_options;
+  const SystemData&        sys_data    = chem_env.sys_data;
+  const SCFOptions&        scf_options = chem_env.ioptions.scf_options;
   Scheduler                sch{ec};
   const libint2::BasisSet& obs = chem_env.shells;
 
@@ -1041,10 +1041,10 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf(
   Tensor<T>& F_alpha_tmp = ttensors.F_alpha_tmp;
   Tensor<T>& F_beta_tmp  = ttensors.F_beta_tmp;
 
-  double fock_precision = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
-  auto   rank           = ec.pg().rank();
-  auto   N              = sys_data.nbf_orig;
-  auto   debug          = scf_options.debug;
+  const double fock_precision = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
+  const auto   rank           = ec.pg().rank();
+  const auto   N              = sys_data.nbf_orig;
+  const auto   debug          = scf_options.debug;
 
   auto   do_t1 = std::chrono::high_resolution_clock::now();
   Matrix D_shblk_norm;
@@ -1069,18 +1069,18 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf(
   Matrix K2_alpha(shblk, N), K2_beta(shblk, N);
 
   auto comp_2bf_lambda = [&](IndexVector blockid) {
-    auto s1        = blockid[0];
-    auto bf1_first = shell2bf[s1];
-    auto n1        = obs[s1].size();
-    auto sp12_iter = scf_data.obs_shellpair_data.at(s1).begin();
+    const auto s1        = blockid[0];
+    const auto bf1_first = shell2bf[s1];
+    const auto n1        = obs[s1].size();
+    auto       sp12_iter = scf_data.obs_shellpair_data.at(s1).begin();
 
     auto s2     = blockid[1];
     auto s2spl  = scf_data.obs_shellpair_list.at(s1);
     auto s2_itr = std::find(s2spl.begin(), s2spl.end(), s2);
     if(s2_itr == s2spl.end()) return;
-    auto s2_pos    = std::distance(s2spl.begin(), s2_itr);
-    auto bf2_first = shell2bf[s2];
-    auto n2        = obs[s2].size();
+    auto       s2_pos    = std::distance(s2spl.begin(), s2_itr);
+    auto       bf2_first = shell2bf[s2];
+    const auto n2        = obs[s2].size();
 
     std::advance(sp12_iter, s2_pos);
     const auto* sp12 = sp12_iter->get();
@@ -1103,9 +1103,9 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf(
     D12.block(0, 0, n1, n2) = D.block(bf1_first, bf2_first, n1, n2);
     if(is_uhf) D12.block(0, 0, n1, n2) += D_beta.block(bf1_first, bf2_first, n1, n2);
 
-    for(decltype(s1) s3 = 0; s3 <= s1; ++s3) {
-      auto bf3_first = shell2bf[s3];
-      auto n3        = obs[s3].size();
+    for(std::remove_const_t<decltype(s1)> s3 = 0; s3 <= s1; ++s3) {
+      auto       bf3_first = shell2bf[s3];
+      const auto n3        = obs[s3].size();
 
       const auto Dnorm123 =
         do_schwarz_screen ? std::max(D_shblk_norm(s1, s3), std::max(D_shblk_norm(s2, s3), Dnorm12))
@@ -1140,8 +1140,8 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf(
             continue;
         }
 
-        auto bf4_first = shell2bf[s4];
-        auto n4        = obs[s4].size();
+        auto       bf4_first = shell2bf[s4];
+        const auto n4        = obs[s4].size();
 
         // For Coulomb part
         D34.block(0, 0, n3, n4) = D.block(bf3_first, bf4_first, n3, n4);
@@ -1149,10 +1149,10 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf(
 
         // compute the permutational degeneracy (i.e. # of equivalents) of
         // the given shell set
-        auto s12_deg    = (s1 == s2) ? 1 : 2;
-        auto s34_deg    = (s3 == s4) ? 1 : 2;
-        auto s12_34_deg = (s1 == s3) ? (s2 == s4 ? 1 : 2) : 2;
-        auto s1234_deg  = s12_deg * s34_deg * s12_34_deg;
+        const auto s12_deg    = (s1 == s2) ? 1 : 2;
+        const auto s34_deg    = (s3 == s4) ? 1 : 2;
+        const auto s12_34_deg = (s1 == s3) ? (s2 == s4 ? 1 : 2) : 2;
+        const auto s1234_deg  = s12_deg * s34_deg * s12_34_deg;
 
         // prescale the integrals inside Libint
         engine.prescale_by(0.5 * s1234_deg);
@@ -1179,13 +1179,13 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf(
 
         // J and K for closed-shell calculations
         if(doK && is_rhf) {
-          for(decltype(n1) f1 = 0, f1234 = 0; f1 != n1; ++f1) {
+          for(std::remove_const_t<decltype(n1)> f1 = 0, f1234 = 0; f1 != n1; ++f1) {
             const auto bf1 = f1 + bf1_first;
-            for(decltype(n2) f2 = 0; f2 != n2; ++f2) {
+            for(std::remove_const_t<decltype(n2)> f2 = 0; f2 != n2; ++f2) {
               const auto bf2 = f2 + bf2_first;
-              for(decltype(n3) f3 = 0; f3 != n3; ++f3) {
+              for(std::remove_const_t<decltype(n3)> f3 = 0; f3 != n3; ++f3) {
                 const auto bf3 = f3 + bf3_first;
-                for(decltype(n4) f4 = 0; f4 != n4; ++f4, ++f1234) {
+                for(std::remove_const_t<decltype(n4)> f4 = 0; f4 != n4; ++f4, ++f1234) {
                   const auto bf4               = f4 + bf4_first;
                   auto       value_scal_by_deg = buf_1234[f1234];
                   J12(f1, f2) += D34(f3, f4) * value_scal_by_deg;
@@ -1202,13 +1202,13 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf(
           }
         }
         else if(doK && is_uhf) {
-          for(decltype(n1) f1 = 0, f1234 = 0; f1 != n1; ++f1) {
+          for(std::remove_const_t<decltype(n1)> f1 = 0, f1234 = 0; f1 != n1; ++f1) {
             const auto bf1 = f1 + bf1_first;
-            for(decltype(n2) f2 = 0; f2 != n2; ++f2) {
+            for(std::remove_const_t<decltype(n2)> f2 = 0; f2 != n2; ++f2) {
               const auto bf2 = f2 + bf2_first;
-              for(decltype(n3) f3 = 0; f3 != n3; ++f3) {
+              for(std::remove_const_t<decltype(n3)> f3 = 0; f3 != n3; ++f3) {
                 const auto bf3 = f3 + bf3_first;
-                for(decltype(n4) f4 = 0; f4 != n4; ++f4, ++f1234) {
+                for(std::remove_const_t<decltype(n4)> f4 = 0; f4 != n4; ++f4, ++f1234) {
                   const auto bf4               = f4 + bf4_first;
                   auto       value_scal_by_deg = buf_1234[f1234];
                   auto       J34               = D12(f1, f2) * value_scal_by_deg;
@@ -1232,11 +1232,11 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf(
           }
         }
         else if(is_rhf) {
-          for(decltype(n1) f1 = 0, f1234 = 0; f1 != n1; ++f1) {
-            for(decltype(n2) f2 = 0; f2 != n2; ++f2) {
-              for(decltype(n3) f3 = 0; f3 != n3; ++f3) {
+          for(std::remove_const_t<decltype(n1)> f1 = 0, f1234 = 0; f1 != n1; ++f1) {
+            for(std::remove_const_t<decltype(n2)> f2 = 0; f2 != n2; ++f2) {
+              for(std::remove_const_t<decltype(n3)> f3 = 0; f3 != n3; ++f3) {
                 const auto bf3 = f3 + bf3_first;
-                for(decltype(n4) f4 = 0; f4 != n4; ++f4, ++f1234) {
+                for(std::remove_const_t<decltype(n4)> f4 = 0; f4 != n4; ++f4, ++f1234) {
                   const auto bf4               = f4 + bf4_first;
                   auto       value_scal_by_deg = buf_1234[f1234];
                   J12(f1, f2) += D34(f3, f4) * value_scal_by_deg;
@@ -1247,11 +1247,11 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf(
           }
         }
         else if(is_uhf) {
-          for(decltype(n1) f1 = 0, f1234 = 0; f1 != n1; ++f1) {
-            for(decltype(n2) f2 = 0; f2 != n2; ++f2) {
-              for(decltype(n3) f3 = 0; f3 != n3; ++f3) {
+          for(std::remove_const_t<decltype(n1)> f1 = 0, f1234 = 0; f1 != n1; ++f1) {
+            for(std::remove_const_t<decltype(n2)> f2 = 0; f2 != n2; ++f2) {
+              for(std::remove_const_t<decltype(n3)> f3 = 0; f3 != n3; ++f3) {
                 const auto bf3 = f3 + bf3_first;
-                for(decltype(n4) f4 = 0; f4 != n4; ++f4, ++f1234) {
+                for(std::remove_const_t<decltype(n4)> f4 = 0; f4 != n4; ++f4, ++f1234) {
                   const auto bf4               = f4 + bf4_first;
                   auto       value_scal_by_deg = buf_1234[f1234];
                   auto       J34               = D12(f1, f2) * value_scal_by_deg;
@@ -1325,10 +1325,10 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf(
     }
   } // end density fitting
 
-  auto [mu, nu]      = scf_data.tAO.labels<2>("all");
-  Tensor<T>& H1      = ttensors.H1;
-  Tensor<T>& F_alpha = ttensors.F_alpha;
-  Tensor<T>& F_beta  = ttensors.F_beta;
+  const auto [mu, nu] = scf_data.tAO.labels<2>("all");
+  Tensor<T>& H1       = ttensors.H1;
+  Tensor<T>& F_alpha  = ttensors.F_alpha;
+  Tensor<T>& F_beta   = ttensors.F_beta;
 
   // symmetrize the result
   // clang-format off
@@ -1351,20 +1351,20 @@ void exachem::scf::DefaultSCFIter<T>::compute_2bf(
 }
 
 template<typename T>
-void exachem::scf::DefaultSCFIter<T>::scf_diis(
-  ExecutionContext& ec, ChemEnv& chem_env, const TiledIndexSpace& tAO, Tensor<T> F_alpha,
+void exachem::scf::SCFIter<T>::scf_diis(
+  ExecutionContext& ec, const ChemEnv& chem_env, const TiledIndexSpace& tAO, Tensor<T> F_alpha,
   Tensor<T> F_beta, Tensor<T> err_mat_alpha, Tensor<T> err_mat_beta, int iter, int max_hist,
   const SCFData& scf_data, const int n_lindep, std::vector<Tensor<T>>& diis_hist_alpha,
   std::vector<Tensor<T>>& diis_hist_beta, std::vector<Tensor<T>>& fock_hist_alpha,
   std::vector<Tensor<T>>& fock_hist_beta) {
   using Vector = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
-  tamm::Scheduler sch{ec};
-  SystemData&     sys_data = chem_env.sys_data;
-  bool const      is_uhf   = sys_data.is_unrestricted;
+  tamm::Scheduler   sch{ec};
+  const SystemData& sys_data = chem_env.sys_data;
+  bool const        is_uhf   = sys_data.is_unrestricted;
 
-  auto rank  = ec.pg().rank().value();
-  auto ndiis = scf_data.idiis;
+  const auto rank  = ec.pg().rank().value();
+  const auto ndiis = scf_data.idiis;
 
   if(ndiis > max_hist) {
     auto maxe = 0;
@@ -1393,7 +1393,7 @@ void exachem::scf::DefaultSCFIter<T>::scf_diis(
     }
   }
   else {
-    if(ndiis == (int) (max_hist / 2) && n_lindep > 1) {
+    if(ndiis == static_cast<int>(max_hist / 2) && n_lindep > 1) {
       for(auto x: diis_hist_alpha) Tensor<T>::deallocate(x);
       for(auto x: fock_hist_alpha) Tensor<T>::deallocate(x);
       diis_hist_alpha.clear();
@@ -1424,7 +1424,7 @@ void exachem::scf::DefaultSCFIter<T>::scf_diis(
 
   Matrix         A;
   Vector         b;
-  int            idim = std::min((int) diis_hist_alpha.size(), max_hist);
+  int            idim = std::min(static_cast<int>(diis_hist_alpha.size()), max_hist);
   int64_t        info = -1;
   int64_t        N    = idim + 1;
   std::vector<T> X;

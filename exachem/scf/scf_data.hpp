@@ -12,7 +12,6 @@
 #include "exachem/scf/scf_tensors.hpp"
 #include <libecpint.hpp>
 
-using namespace tamm;
 using shellpair_list_t = std::unordered_map<size_t, std::vector<size_t>>;
 using shellpair_data_t =
   std::vector<std::vector<std::shared_ptr<libint2::ShellPair>>>; // in same order as

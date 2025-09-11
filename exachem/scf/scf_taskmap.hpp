@@ -30,38 +30,36 @@ public:
 };
 
 // list of loads as a class
-class DefaultLoads {
+class Loads {
 public:
   EDGE_T            nLoads;
   NODE_T            maxS1;
   NODE_T            maxS2;
   std::vector<Load> loadList;
 
-  DefaultLoads() {
+  Loads() {
     maxS1 = 1;
     maxS2 = 1;
   }
-
-  DefaultLoads(EDGE_T nloads) {
+  explicit Loads(EDGE_T nloads) {
     maxS1  = 1;
     maxS2  = 1;
     nLoads = nloads;
     loadList.reserve(nLoads);
   }
 
+  virtual ~Loads() = default;
+  // Delete copy (expensive due to std::vector)
+  Loads(const Loads&)            = delete;
+  Loads& operator=(const Loads&) = delete;
+  // Allow move (efficient)
+  Loads(Loads&&) noexcept            = default;
+  Loads& operator=(Loads&&) noexcept = default;
+
   virtual void readLoads(std::vector<NODE_T>& s1_all, std::vector<NODE_T>& s2_all,
                          std::vector<VAL_T> ntasks_all);
   virtual void simpleLoadBal(NODE_T nMachine);
   virtual void
   createTaskMap(Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& taskmap);
-
-  virtual ~DefaultLoads() = default;
-};
-
-class Loads: public DefaultLoads {
-public:
-  Loads(): DefaultLoads() {}
-  Loads(EDGE_T nloads): DefaultLoads(nloads) {}
-  // Optionally override virtual methods here
 };
 } // namespace exachem::scf

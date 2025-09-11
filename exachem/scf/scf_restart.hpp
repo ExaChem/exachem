@@ -12,26 +12,24 @@
 #include "exachem/common/ec_molden.hpp"
 #include "exachem/scf/scf_outputs.hpp"
 #include "exachem/scf/scf_tensors.hpp"
-using namespace tamm;
 
 namespace exachem::scf {
-class DefaultSCFRestart {
+template<typename T>
+class SCFRestart {
 public:
-  virtual ~DefaultSCFRestart() = default;
-  virtual void run(const ExecutionContext& ec, ChemEnv& chem_env, std::string files_prefix);
-  virtual void run(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-                   TAMMTensors<T>& ttensors, EigenTensors& etensors, std::string files_prefix);
-};
+  SCFRestart()          = default;
+  virtual ~SCFRestart() = default;
 
-class SCFRestart: public DefaultSCFRestart {
-public:
-  void run(const ExecutionContext& ec, ChemEnv& chem_env, std::string files_prefix) {
-    DefaultSCFRestart::run(ec, chem_env, files_prefix);
-  }
+  SCFRestart(const SCFRestart&)            = default;
+  SCFRestart& operator=(const SCFRestart&) = default;
 
-  void run(ExecutionContext& ec, ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-           TAMMTensors<T>& ttensors, EigenTensors& etensors, std::string files_prefix) override {
-    DefaultSCFRestart::run(ec, chem_env, scalapack_info, ttensors, etensors, files_prefix);
-  }
+  SCFRestart(SCFRestart&&) noexcept            = default;
+  SCFRestart& operator=(SCFRestart&&) noexcept = default;
+
+  virtual void run(const ExecutionContext& ec, ChemEnv& chem_env,
+                   const std::string& files_prefix) const;
+  virtual void run(ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info,
+                   TAMMTensors<T>& ttensors, EigenTensors& etensors,
+                   const std::string& files_prefix) const;
 };
 } // namespace exachem::scf

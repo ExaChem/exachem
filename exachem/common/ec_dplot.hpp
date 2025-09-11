@@ -321,9 +321,9 @@ private:
              << spacing[2] << std::endl;
     for(size_t iatom = 0; iatom < atoms.size(); iatom++) {
       cubefile << std::setw(3) << atoms[iatom].atomic_number << " " << std::setw(10)
-               << (double) atoms[iatom].atomic_number << " " << std::setw(10) << atoms[iatom].x
-               << " " << std::setw(10) << atoms[iatom].y << " " << std::setw(10) << atoms[iatom].z
-               << std::endl;
+               << static_cast<double>(atoms[iatom].atomic_number) << " " << std::setw(10)
+               << atoms[iatom].x << " " << std::setw(10) << atoms[iatom].y << " " << std::setw(10)
+               << atoms[iatom].z << std::endl;
     }
     cubefile << std::scientific << std::setprecision(6);
   }
@@ -348,10 +348,10 @@ private:
     const std::vector<double> spacing{space, space, space};
     const std::vector<double> minim{xmin - padding, ymin - padding, zmin - padding};
     const std::vector<double> maxim{xmax + padding, ymax + padding, zmax + padding};
-    const std::vector<int>    npoints{(int) std::ceil((maxim[0] - minim[0]) / spacing[0]),
-                                   (int) std::ceil((maxim[1] - minim[1]) / spacing[1]),
-                                   (int) std::ceil((maxim[2] - minim[2]) / spacing[2])};
-    const std::vector<int>    batches{
+    const std::vector<int> npoints{static_cast<int>(std::ceil((maxim[0] - minim[0]) / spacing[0])),
+                                   static_cast<int>(std::ceil((maxim[1] - minim[1]) / spacing[1])),
+                                   static_cast<int>(std::ceil((maxim[2] - minim[2]) / spacing[2]))};
+    const std::vector<int> batches{
       npoints[0] % batch_size == 0 ? npoints[0] / batch_size : npoints[0] / batch_size + 1,
       npoints[1] % batch_size == 0 ? npoints[1] / batch_size : npoints[1] / batch_size + 1,
       npoints[2] % batch_size == 0 ? npoints[2] / batch_size : npoints[2] / batch_size + 1};

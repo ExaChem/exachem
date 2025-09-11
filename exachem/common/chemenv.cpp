@@ -153,7 +153,7 @@ void ChemEnv::sinfo() {
   ec.flush_and_sync();
 }
 
-Matrix ChemEnv::compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A) {
+Matrix ChemEnv::compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A) const {
   const auto nsh = obs.size();
   Matrix     Ash = Matrix::Zero(nsh, nsh);
 

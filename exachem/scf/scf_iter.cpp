@@ -619,14 +619,14 @@ void exachem::scf::SCFIter<T>::init_ri(ExecutionContext& ec, const ChemEnv& chem
       // Set parameters
       elpa_set(handle, "na", ndf, &error);
       elpa_set(handle, "nev", ndf, &error);
-      elpa_set(handle, "local_nrows", static_cast<int> na_rows, &error);
-      elpa_set(handle, "local_ncols", static_cast<int> na_cols, &error);
-      elpa_set(handle, "nblk", static_cast<int> mb, &error);
+      elpa_set(handle, "local_nrows", static_cast<int>(na_rows), &error);
+      elpa_set(handle, "local_ncols", static_cast<int>(na_cols), &error);
+      elpa_set(handle, "nblk", static_cast<int>(mb), &error);
       elpa_set(handle, "mpi_comm_parent", scalapack_info.pg.comm_c2f(), &error);
-      elpa_set(handle, "process_row", static_cast<int> grid.ipr(), &error);
-      elpa_set(handle, "process_col", static_cast<int> grid.ipc(), &error);
+      elpa_set(handle, "process_row", static_cast<int>(grid.ipr()), &error);
+      elpa_set(handle, "process_col", static_cast<int>(grid.ipc()), &error);
 #if defined(USE_CUDA)
-      elpa_set(handle, "nvidia-gpu", static_cast<int> 1, &error);
+      elpa_set(handle, "nvidia-gpu", static_cast<int>(1), &error);
       // elpa_set(handle, "use_gpu_id", 1, &error);
 #endif
       error = elpa_setup(handle);

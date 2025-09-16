@@ -57,7 +57,7 @@ SCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
   std::transform(xc_radquad_str.begin(), xc_radquad_str.end(), xc_radquad_str.begin(), ::tolower);
   std::map<std::string, GauXC::RadialQuad> radquad_map = {
     {"mk", GauXC::RadialQuad::MuraKnowles},
-    {"ta", GauXC::RadialQuad::TreutlerAldrichs},
+    {"ta", GauXC::RadialQuad::TreutlerAhlrichs},
     {"mhl", GauXC::RadialQuad::MurrayHandyLaming}};
 
   auto gauxc_molgrid =
@@ -201,7 +201,15 @@ SCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
   auto gc2     = std::chrono::high_resolution_clock::now();
   auto gc_time = std::chrono::duration_cast<std::chrono::duration<double>>((gc2 - gc1)).count();
 
-  const double xHF = dummy_xc ? 1.0 : (gauxc_func.is_hyb() ? gauxc_func.hyb_exx() : 0.0);
+  if(gauxc_func.is_epc() || gauxc_func.is_range_separated()) {
+    if(rank == 0) {
+      std::string err_msg =
+        "Range-separated hybrid and epc functionals are not currently supported";
+      tamm_terminate(err_msg);
+    }
+  }
+  // TODO: Add logic to use alpha, beta, and omega values for range-separated hybrid functionals
+  const double xHF = dummy_xc ? 1.0 : (gauxc_func.is_hyb() ? gauxc_func.hyb_exx().alpha : 0.0);
 
   if(rank == 0)
     std::cout << std::fixed << std::setprecision(2) << "GauXC setup time: " << gc_time << "s\n";

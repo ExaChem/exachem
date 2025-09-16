@@ -150,6 +150,8 @@ jobs:
       shell: bash
       run: |
         echo "LA_VENDOR=OpenBLAS" >> $GITHUB_ENV
+        echo "CC=gcc-14" >> $GITHUB_ENV
+        echo "CXX=g++-14" >> $GITHUB_ENV
 
     - name: Cache install steps (backend = ga)
       if: ${{ matrix.backend == 'ga' }}

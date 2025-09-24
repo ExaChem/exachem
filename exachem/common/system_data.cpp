@@ -11,7 +11,10 @@
 void SystemData::print() {
   std::cout << "scf_type = " << scf_type_string << std::endl;
   if(is_restricted) std::cout << "Closed-Shell SCF" << std::endl;
-  if(is_unrestricted) std::cout << "Open-Shell SCF" << std::endl;
+  if(is_unrestricted) {
+    if(is_cuscf) { std::cout << "Constrained Unrestricted SCF" << std::endl; }
+    else { std::cout << "Open-Shell SCF" << std::endl; }
+  }
   if(is_restricted_os) std::cout << "Restricted Open-Shell SCF" << std::endl;
   if(is_ks) std::cout << "KS-DFT Enabled" << std::endl;
   if(do_snK) std::cout << "snK Enabled" << std::endl;

@@ -27,7 +27,7 @@ void ParseSCFOptions::parse_check(json& jinput) {
     "debug","scf_type", "n_lindep","restart_size","scalapack_nb",
     "scalapack_np_row", "scalapack_np_col", "ext_data_path", "PRINT",
     "qed_omegas", "qed_lambdas", "qed_volumes", "qed_polvecs",
-    "direct_df", "DFT", "comments"};
+    "direct_df", "DFT", "cuscf", "comments"};
   const std::vector<std::string> valid_dft{"xc_pruning_scheme", "xc_rad_quad", "xc_batch_size", 
     "xc_snK_etol", "xc_snK_ktol", "xc_weight_scheme", "xc_exec_space", "snK", "xc_type", 
     "xc_lb_kernel", "xc_mw_kernel", "xc_int_kernel", "xc_red_kernel", "xc_lwd_kernel", 
@@ -70,6 +70,7 @@ void ParseSCFOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(scf_options.noscf, jscf, "noscf");
   parse_option<bool>(scf_options.debug, jscf, "debug");
   parse_option<std::string>(scf_options.scf_type, jscf, "scf_type");
+  parse_option<bool>(scf_options.cuscf, jscf, "cuscf");
   parse_option<bool>(scf_options.direct_df, jscf, "direct_df");
   parse_option<bool>(scf_options.molden, jscf, "molden");
   parse_option<std::string>(scf_options.moldenfile, jscf, "moldenfile");

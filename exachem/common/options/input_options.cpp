@@ -32,6 +32,7 @@ void SCFOptions::print() {
   }
 
   print_option("scf_type", scf_type, 18);
+  print_option("cuscf", cuscf, 18);
 
   // QED
   print_vec("qed_omegas", qed_omegas, 17);

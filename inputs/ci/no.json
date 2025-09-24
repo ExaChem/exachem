@@ -1,0 +1,33 @@
+{
+  "geometry": {
+    "coordinates": [
+      "n 0 0   -1.034",
+      "O 0 0    1.034"
+    ],
+    "units": "bohr"
+  },
+  "basis": {
+    "basisset": "def2-tzvp"
+  },
+  "SCF": {
+    "conve": 1e-8,
+    "restart": false,
+    "multiplicity": 2,
+    "scf_type": "unrestricted",
+    "cuscf": true
+  },
+  "CD": {
+    "diagtol": 1e-08
+  },
+  "CC": {
+    "threshold": 1e-06,
+    "writet": true
+  },
+  "TASK": {
+    "scf": true,
+    "mp2": false,
+    "cd_2e": false,
+    "ccsd": false,
+    "ccsd_t": false
+  }  
+}

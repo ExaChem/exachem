@@ -26,6 +26,9 @@ protected:
                         std::vector<Tensor<T>>& fock_hist_alpha,
                         std::vector<Tensor<T>>& fock_hist_beta);
 
+  virtual void scf_cuscf(ExecutionContext& ec, const ChemEnv& chem_env, SCFData& scf_data,
+                         ScalapackInfo& scalapack_info);
+
   virtual void compute_2bf_ri(ExecutionContext& ec, const ChemEnv& chem_env,
                               ScalapackInfo& scalapack_info, const SCFData& scf_data,
                               const std::vector<size_t>& shell2bf, TAMMTensors<T>& ttensors,

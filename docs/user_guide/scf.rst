@@ -36,6 +36,7 @@ The values listed below are the defaults where few options are automatically adj
    "restart": false,
    "noscf": false,
    "scf_type": "restricted",
+   "cuscf": false,
    "direct_df": false,    
    "DFT": {
       "snK": false,
@@ -114,7 +115,9 @@ The values listed below are the defaults where few options are automatically adj
    * :strong:`restricted`: for closed-shell restricted Hartree-Fock (RHF) calculation
    * :strong:`unrestricted`: for spin-unrestricted Hartree-Fock (UHF) calculation
 
-:direct_df: ``[default=false]`` Requests the direct computation of the density-fitted Coulomb contribution. Works only for pure Kohn-Sham fnctionals (no exact exchange) and with a provided ``df_basisset`` (see :ref:`Basis set options <Basis>`).
+:cuscf: ``[default=false]`` Use the constrained unrestricted SCF approach (`10.1063/1.3503173 <https://doi.org/10.1063/1.3503173>`), a variant of restricted-open shell calculations that starts from an unrestricted ansatz. Has no effect for `restricted` calculations.
+
+:direct_df: ``[default=false]`` Requests the direct computation of the density-fitted Coulomb contribution. Works only for pure Kohn-Sham functionals (no exact exchange) and with a provided ``df_basisset`` (see :ref:`Basis set options <Basis>`).
 
 :snK: ``[default=false]`` Computes the exact exchange contribution using the seminumerical approach implemented in `GauXC`.
 

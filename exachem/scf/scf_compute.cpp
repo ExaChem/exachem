@@ -552,6 +552,39 @@ std::tuple<shellpair_list_t, shellpair_data_t> exachem::scf::SCFCompute<T>::comp
 } // END of compute_shellpairs()
 
 template<typename T>
+std::pair<double, double> exachem::scf::SCFCompute<T>::compute_s2(ExecutionContext& ec,
+                                                                  const ChemEnv&    chem_env,
+                                                                  const SCFData& scf_data) const {
+  const auto [mu, nu, ku] = scf_data.tAO.labels<3>("all");
+  const double nalpha     = static_cast<double>(chem_env.sys_data.nelectrons_alpha);
+  const double nbeta      = static_cast<double>(chem_env.sys_data.nelectrons_beta);
+
+  double s2    = (nalpha - nbeta) / 2.0;
+  double exact = s2 * (s2 + 1);
+  s2           = exact + nbeta;
+
+  tamm::Scheduler sch{ec};
+
+  Tensor<T> SD_alpha{scf_data.tAO, scf_data.tAO};
+  Tensor<T> SD_beta{scf_data.tAO, scf_data.tAO};
+  Tensor<T> s2_tamm{};
+
+  sch
+    .allocate(SD_alpha, SD_beta, s2_tamm)(SD_alpha(mu, nu) = scf_data.ttensors.S1(mu, ku) *
+                                                             scf_data.ttensors.D_alpha(ku, nu))(
+      SD_beta(mu, nu) = SD_alpha(mu, ku) * scf_data.ttensors.S1(ku, nu))(
+      s2_tamm() = SD_beta(mu, nu) * scf_data.ttensors.D_beta(mu, nu))
+    .execute();
+
+  s2 -= get_scalar(s2_tamm);
+
+  Tensor<T>::deallocate(SD_alpha, SD_beta, s2_tamm);
+
+  // Round S2 to four decimal places
+  return std::make_pair(std::round(s2 * 10000.0) / 10000.0, exact);
+}
+
+template<typename T>
 template<libint2::Operator Kernel>
 Matrix exachem::scf::SCFCompute<T>::compute_schwarz_ints(
   ExecutionContext& ec, const SCFData& scf_data, const libint2::BasisSet& bs1,

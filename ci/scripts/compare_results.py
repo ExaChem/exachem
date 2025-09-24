@@ -73,6 +73,7 @@ for ref_file in ref_files:
     with open(cur_res_path+"/"+cur_file) as cur_json_file:
         cur_data = json.load(cur_json_file)    
 
+    print(cur_file)
     scf_threshold = ref_data["input"]["SCF"]["conve"]
     ref_scf_energy = ref_data["output"]["SCF"]["final_energy"]
     cur_scf_energy = cur_data["output"]["SCF"]["final_energy"]
@@ -231,6 +232,13 @@ for ref_file in ref_files:
                     rcheck &= False
                     
             if not rcheck: sys.exit(1)
+
+    if "S2" in ref_data["output"]["SCF"]:
+        ref_s2 = ref_data["output"]["SCF"]["S2"]
+        cur_s2 = cur_data["output"]["SCF"]["S2"]
+        if not isclose(ref_s2, cur_s2, 1e-4):
+          print("ERROR: <S2> values do not match. reference: " + str(ref_s2) + ", current: " + str(cur_s2))
+          sys.exit(1)
     
     print(" ... OK")
 

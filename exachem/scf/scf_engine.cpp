@@ -396,6 +396,8 @@ void exachem::scf::SCFEngine::deallocate_main_tensors(ExecutionContext& ec,
                                    scf_data.ttensors.F_beta_tmp, scf_data.ttensors.ehf_beta_tmp,
                                    scf_data.ttensors.FD_beta, scf_data.ttensors.FDS_beta);
 
+  if(chem_env.sys_data.is_cuscf) Tensor<TensorType>::deallocate(scf_data.ttensors.Xm1);
+
 } // deallocate_main_tensors
 
 void exachem::scf::SCFEngine::scf_final_io(ExecutionContext& ec, const ChemEnv& chem_env) {
@@ -1197,6 +1199,19 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
         cout << std::string(50, '*') << endl;
       }
     }
+
+    // Compute and write <S^2> for unrestricted calculations
+    if(chem_env.sys_data.is_unrestricted) {
+      std::pair<double, double> s2 = scf_compute.compute_s2(ec, chem_env, scf_data);
+      if(rank == 0) {
+        cout << std::setprecision(4) << endl
+             << " <S^2> = " << s2.first << "  (Exact = " << s2.second << ")" << endl
+             << std::setprecision(13);
+        chem_env.sys_data.results["output"]["SCF"]["S2"] = s2.first;
+      }
+      else if(rank == 0) { chem_env.sys_data.results["output"]["SCF"]["S2"] = 0.0; }
+    }
+
     if(chem_env.ioptions.dplot_options.cube) write_dplot_data(ec, chem_env);
 
     compute_fock_matrix(ec, chem_env, is_uhf, do_schwarz_screen, SchwarzK, max_nprim4, shell2bf,

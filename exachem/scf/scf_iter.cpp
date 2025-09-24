@@ -21,9 +21,10 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
-  const bool   is_uhf = sys_data.is_unrestricted;
-  const bool   is_rhf = sys_data.is_restricted;
-  const double lshift = scf_data.lshift;
+  const bool   is_uhf   = sys_data.is_unrestricted;
+  const bool   is_rhf   = sys_data.is_restricted;
+  const bool   is_cuscf = sys_data.is_cuscf;
+  const double lshift   = scf_data.lshift;
 
   Tensor<T>& H1       = ttensors.H1;
   Tensor<T>& S1       = ttensors.S1;
@@ -128,6 +129,8 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
     sch.execute();
   }
 #endif
+
+  if(is_cuscf) scf_cuscf(ec, chem_env, scf_data, scalapack_info);
 
   Tensor<T> err_mat_alpha_tamm{tAO, tAO};
   Tensor<T> err_mat_beta_tamm{tAO, tAO};
@@ -1549,6 +1552,158 @@ void exachem::scf::SCFIter<T>::scf_diis(
   }
   // sch(F() += 0.5 * D()); //level shift
   sch.execute();
+}
+
+template<typename T>
+void exachem::scf::SCFIter<T>::scf_cuscf(ExecutionContext& ec, const ChemEnv& chem_env,
+                                         SCFData& scf_data, ScalapackInfo& scalapack_info) {
+  tamm::Scheduler sch{ec};
+
+  const auto    rank    = ec.pg().rank();
+  const int64_t Northo  = chem_env.sys_data.nbf;
+  const int     nalpha  = chem_env.sys_data.nelectrons_alpha;
+  const int     nbeta   = chem_env.sys_data.nelectrons_beta;
+  const size_t  ndouble = std::min(nalpha, nbeta);
+  const size_t  nsingle = std::max(nalpha, nbeta) - ndouble;
+  // const size_t  nvirtual = Northo - ndouble - nsingle;
+
+  std::vector<double> eps(Northo, 0.0);
+  Tensor<T>&          S1         = scf_data.ttensors.S1;
+  Tensor<T>&          D_alpha    = scf_data.ttensors.D_alpha;
+  Tensor<T>&          D_beta     = scf_data.ttensors.D_beta;
+  Tensor<T>&          Xm1        = scf_data.ttensors.Xm1;
+  Tensor<T>           D_cuscf    = {scf_data.tAO, scf_data.tAO};
+  Tensor<T>           D_ortho    = {scf_data.tAO_ortho, scf_data.tAO_ortho};
+  Tensor<T>           V_ortho    = {scf_data.tAO_ortho, scf_data.tAO_ortho};
+  Tensor<T>           CNOS       = {scf_data.tAO, scf_data.tAO_ortho};
+  Tensor<T>           tmp_ortho  = {scf_data.tAO, scf_data.tAO_ortho};
+  Tensor<T>&          scratch    = CNOS;
+  Tensor<T>&          F_alpha    = scf_data.ttensors.F_alpha;
+  Tensor<T>&          F_beta     = scf_data.ttensors.F_beta;
+  Tensor<T>&          F_delta    = D_cuscf;
+  Tensor<T>&          F_delta_NO = D_ortho;
+#if defined(USE_SCALAPACK)
+  Tensor<T> X_comp = {scf_data.tAO, scf_data.tAO_ortho};
+  sch.allocate(X_comp).execute();
+  if(scalapack_info.pg.is_valid()) {
+    Tensor<T> X_dense = from_block_cyclic_tensor(scf_data.ttensors.X_alpha);
+    from_dense_tensor(X_dense, X_comp);
+    Tensor<T>::deallocate(X_dense);
+  }
+  ec.pg().barrier();
+#else
+  Tensor<T>& X_comp = scf_data.ttensors.X_alpha;
+#endif
+  Matrix P_MO(Northo, Northo);
+
+  auto [mu_o, nu_o] = scf_data.tAO_ortho.labels<2>("all");
+  auto [mu, nu, ku] = scf_data.tAO.labels<3>("all");
+
+  // clang-format off
+  sch.allocate(D_cuscf, D_ortho, tmp_ortho)
+    (D_cuscf()  = 0.5 * D_alpha())
+    (D_cuscf() += 0.5 * D_beta())
+    (tmp_ortho(mu, mu_o) = D_cuscf(mu, nu) * Xm1(nu, mu_o))
+    (D_ortho(mu_o, nu_o) = Xm1(mu, mu_o) * tmp_ortho(mu, nu_o))
+    .execute();
+  // clang-format on
+
+#if defined(USE_SCALAPACK)
+  sch.allocate(V_ortho).execute();
+  if(scalapack_info.pg.is_valid()) {
+    Tensor<T> D_ortho_BC = {scf_data.tNortho_bc, scf_data.tNortho_bc};
+    Tensor<T> V_ortho_BC = {scf_data.tNortho_bc, scf_data.tNortho_bc};
+    D_ortho_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
+    V_ortho_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
+    Tensor<T>::allocate(&scalapack_info.ec, D_ortho_BC, V_ortho_BC);
+
+    blacspp::Grid*                  blacs_grid       = scalapack_info.blacs_grid.get();
+    scalapackpp::BlockCyclicDist2D* blockcyclic_dist = scalapack_info.blockcyclic_dist.get();
+
+    auto desc_lambda = [&](const int64_t M, const int64_t N) {
+      auto [M_loc, N_loc] = (*blockcyclic_dist).get_local_dims(M, N);
+      return (*blockcyclic_dist).descinit_noerror(M, N, M_loc);
+    };
+
+    const auto& grid = *blacs_grid;
+    if(grid.ipr() >= 0 and grid.ipc() >= 0) {
+      auto desc         = desc_lambda(Northo, Northo);
+      auto D_ortho_lptr = D_ortho_BC.access_local_buf();
+      auto V_ortho_lptr = V_ortho_BC.access_local_buf();
+
+      tamm::to_block_cyclic_tensor(D_ortho, D_ortho_BC);
+      scalapack_info.pg.barrier();
+
+      scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, Northo, D_ortho_lptr, 1,
+                          1, desc, eps.data(), V_ortho_lptr, 1, 1, desc);
+    }
+    scalapack_info.pg.barrier();
+    Tensor<T> V_dense = from_block_cyclic_tensor(V_ortho_BC);
+    from_dense_tensor(V_dense, V_ortho);
+    scalapack_info.pg.barrier();
+
+    Tensor<T>::deallocate(D_ortho_BC, V_ortho_BC);
+    Tensor<T>::deallocate(V_dense);
+  }
+  ec.pg().barrier();
+  if(rank == 0) tamm_to_eigen_tensor(V_ortho, P_MO);
+  ec.pg().barrier();
+
+  Tensor<T>::deallocate(V_ortho);
+#else
+  if(rank == 0) {
+    tamm_to_eigen_tensor(D_ortho, P_MO);
+    lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, Northo, P_MO.data(), Northo, eps.data());
+  }
+#endif
+  if(rank == 0) {
+    Matrix P_MO_reversed = P_MO.transpose().rowwise().reverse();
+    eigen_to_tamm_tensor(D_ortho, P_MO_reversed);
+  }
+  ec.pg().barrier();
+
+  // clang-format off
+  sch.allocate(CNOS)
+      (CNOS(mu, mu_o) = X_comp(mu, nu_o) * D_ortho(nu_o, mu_o))
+      (F_delta()  = 0.5 * F_alpha())
+      (F_delta() -= 0.5 * F_beta())
+      (tmp_ortho(mu, mu_o) = F_delta(mu, nu) * CNOS(nu, mu_o))
+      (F_delta_NO(mu_o, nu_o) = -1.0 * CNOS(mu, mu_o) * tmp_ortho(mu, nu_o))
+      (tmp_ortho(mu, mu_o) = S1(mu, nu) * CNOS(nu, mu_o))
+      .execute();
+  // clang-format on
+  ec.pg().barrier();
+
+  auto lambda_update = [&](Tensor<T> tensor, const IndexVector& blockid, span<T> buf) {
+    auto      block_dims    = tensor.block_dims(blockid);
+    auto      block_offsets = tensor.block_offsets(blockid);
+    TAMM_SIZE c             = 0;
+    for(size_t imo = block_offsets[0]; imo < block_offsets[0] + block_dims[0]; imo++) {
+      for(size_t jmo = block_offsets[1]; jmo < block_offsets[1] + block_dims[1]; jmo++, c++) {
+        if((imo < ndouble && jmo >= ndouble + nsingle) ||
+           (jmo < ndouble && imo >= ndouble + nsingle)) {
+          continue;
+        }
+        else { buf[c] = 0.0; }
+      }
+    }
+  };
+  tamm::update_tensor_general(F_delta_NO, lambda_update);
+  ec.pg().barrier();
+
+  // clang-format off
+  sch
+    (scratch(mu, nu_o) = tmp_ortho(mu, mu_o) * F_delta_NO(mu_o, nu_o))
+    (F_delta(mu, nu) = scratch(mu, mu_o) * tmp_ortho(nu, mu_o))
+    (F_alpha() += F_delta())
+    (F_beta() -= F_delta())
+    .deallocate(CNOS, tmp_ortho, D_cuscf, D_ortho)
+    .execute();
+  // clang-format on
+#if defined(USE_SCALAPACK)
+  Tensor<T>::deallocate(X_comp);
+#endif
+  ec.pg().barrier();
 }
 
 template class exachem::scf::SCFIter<double>;

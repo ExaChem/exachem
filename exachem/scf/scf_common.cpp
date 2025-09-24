@@ -231,8 +231,8 @@ std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv(
 #endif
 
   Tensor<T> X_comp{scf_data.tAO, scf_data.tAO_ortho};
-  auto      mu   = scf_data.tAO.label("all");
-  auto      mu_o = scf_data.tAO_ortho.label("all");
+  auto [mu, nu] = scf_data.tAO.labels<2>("all");
+  auto mu_o     = scf_data.tAO_ortho.label("all");
 
 #if defined(USE_SCALAPACK)
   sch.allocate(X_comp).execute();
@@ -244,6 +244,17 @@ std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv(
 
 #if defined(USE_SCALAPACK)
   if(scalapack_info.pg.is_valid()) { tamm::to_block_cyclic_tensor(X_comp, ttensors.X_alpha); }
+#endif
+
+  if(sys_data.is_cuscf) {
+    ttensors.Xm1 = {scf_data.tAO, scf_data.tAO_ortho};
+    // clang-format off
+    sch.allocate(ttensors.Xm1)
+      (ttensors.Xm1(mu, mu_o) = ttensors.S1(mu, nu) * X_comp(nu, mu_o)).execute();
+    // clang-format on
+  }
+
+#if defined(USE_SCALAPACK)
   sch.deallocate(X_comp).execute();
 #endif
 

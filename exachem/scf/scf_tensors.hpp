@@ -68,6 +68,7 @@ public:
   Tensor<T> QED_energy;
 
   Tensor<T> X_alpha;
+  Tensor<T> Xm1;
   Tensor<T> F_alpha; // H1+F_alpha_tmp
   Tensor<T> F_beta;
   Tensor<T> F_alpha_tmp; // computed via call to compute_2bf(...)

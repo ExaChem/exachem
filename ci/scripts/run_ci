@@ -73,6 +73,9 @@ $MPIEXEC $EXE_PATH $CHEM_INP/ozone_td.json
 #DFT
 $MPIEXEC $EXE_PATH $CHEM_INP/cr2.json
 
+#CUSCF
+$MPIEXEC $EXE_PATH $CHEM_INP/no.json
+
 cp *_files/restricted/json/*.json .
 cp *_files/unrestricted/json/*.json .
 python3 $CHEM_SRC/ci/scripts/compare_results.py $CHEM_SRC/ci/reference_output/ . $UPCXX

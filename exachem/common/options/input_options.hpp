@@ -109,6 +109,7 @@ public:
   bool     sad{true};
   bool     direct_df{false};
   bool     snK{false};
+  bool     cuscf{false};   // Constrained Unrestricted SCF (type of restricted open-shell)
   int  restart_size{2000}; // read/write orthogonalizer, schwarz, etc matrices when N>=restart_size
   int  scalapack_nb{256};
   int  nnodes{1};

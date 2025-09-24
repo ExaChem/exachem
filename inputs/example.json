@@ -64,6 +64,7 @@
         "restart": false,
         "noscf": false,
         "scf_type": "restricted",
+        "cuscf": false,
         "direct_df": false,    
         "DFT": {
           "snK": false,

@@ -15,6 +15,7 @@ void IniSystemData::initialize(ChemEnv& chem_env) {
   chem_env.sys_data.is_restricted_os = false;
   chem_env.sys_data.is_ks            = false;
   chem_env.sys_data.is_qed           = false;
+  chem_env.sys_data.is_cuscf         = false;
   chem_env.sys_data.do_qed           = false;
   chem_env.sys_data.do_snK           = false;
   chem_env.sys_data.freeze_atomic    = false;
@@ -29,6 +30,7 @@ void IniSystemData::initialize(ChemEnv& chem_env) {
   else if(scf_options.scf_type == "unrestricted") {
     chem_env.sys_data.focc            = 2;
     chem_env.sys_data.is_unrestricted = true;
+    if(scf_options.cuscf) chem_env.sys_data.is_cuscf = true;
   }
   else if(scf_options.scf_type == "restricted_os") {
     chem_env.sys_data.focc             = -1;

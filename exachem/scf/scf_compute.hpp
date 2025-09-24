@@ -64,6 +64,9 @@ public:
                                const SCFData& scf_data, ScalapackInfo& scalapack_info,
                                TAMMTensors<T>& ttensors, EigenTensors& etensors) const;
 
+  virtual std::pair<double, double> compute_s2(ExecutionContext& ec, const ChemEnv& chem_env,
+                                               const SCFData& scf_data) const;
+
   template<libint2::Operator Kernel = libint2::Operator::coulomb>
   Matrix
   compute_schwarz_ints(ExecutionContext& ec, const SCFData& scf_data, const libint2::BasisSet& bs1,

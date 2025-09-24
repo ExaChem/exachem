@@ -13,7 +13,9 @@
 // clang-format off
 #if defined(ENABLE_CC)
 #include "exachem/cc/ccsd/cd_ccsd_os_ann.hpp"
-//#include "exachem/cc/ccsd/ccsd_canonical.hpp"
+// #include "exachem/cc/ccsd/ccsd_canonical.hpp"
+#include "exachem/cc/ccsd/qed/qed_ccsd_cs.hpp"
+#include "exachem/cc/ccsd/qed/qed_ccsd_os.hpp"
 #include "exachem/cc/ccsd_t/ccsd_t_fused_driver.hpp"
 #include "exachem/cc/lambda/ccsd_lambda.hpp"
 #include "exachem/cc/eom/eomccsd_opt.hpp"

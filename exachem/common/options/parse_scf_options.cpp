@@ -141,6 +141,22 @@ void ParseSCFOptions::parse(ChemEnv& chem_env) {
       tamm_terminate("INPUT FILE ERROR: SCF option xc_grid_type should be one of [Fine, "
                      "UltraFine, SuperFine, GM3, GM5]");
   }
+
+  {
+    const auto qed_omegas  = !scf_options.qed_omegas.empty();
+    const auto qed_volumes = !scf_options.qed_volumes.empty();
+    const auto qed_lambdas = !scf_options.qed_lambdas.empty();
+    const auto qed_polvecs = !scf_options.qed_polvecs.empty();
+
+    const bool is_qed = qed_omegas || qed_volumes || qed_lambdas || qed_polvecs;
+    if(is_qed) {
+      const bool is_valid = qed_omegas && qed_lambdas && qed_polvecs;
+      if(!is_valid) {
+        tamm_terminate("INPUT FILE ERROR: SCF QED options qed_omegas, qed_lambdas, and qed_polvecs "
+                       "must be specified together");
+      }
+    }
+  }
 }
 
 void ParseSCFOptions::update_common_options(ChemEnv& chem_env) {

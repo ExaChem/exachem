@@ -155,12 +155,15 @@ void exachem::scf::SCFEngine::qed_tensors_1e(ExecutionContext& ec, const ChemEnv
   scf_data.ttensors.QED_Qzz   = {tAO, tAO};
   scf_data.ttensors.QED_1body = {tAO, tAO};
   scf_data.ttensors.QED_2body = {tAO, tAO};
+  if(chem_env.sys_data.is_unrestricted) { scf_data.ttensors.QED_2body_beta = {tAO, tAO}; }
 
   Tensor<TensorType>::allocate(
     &ec, scf_data.ttensors.QED_Dx, scf_data.ttensors.QED_Dy, scf_data.ttensors.QED_Dz,
     scf_data.ttensors.QED_Qxx, scf_data.ttensors.QED_Qxy, scf_data.ttensors.QED_Qxz,
     scf_data.ttensors.QED_Qyy, scf_data.ttensors.QED_Qyz, scf_data.ttensors.QED_Qzz,
     scf_data.ttensors.QED_1body, scf_data.ttensors.QED_2body);
+  if(chem_env.sys_data.is_unrestricted)
+    Tensor<TensorType>::allocate(&ec, scf_data.ttensors.QED_2body_beta);
   scf_qed.compute_qed_emult_ints(ec, chem_env, scf_data, scf_data.ttensors);
   if(chem_env.sys_data.do_qed) scf_qed.compute_QED_1body(ec, chem_env, scf_data, scf_data.ttensors);
 } // end of initialize_qed_tensors
@@ -375,6 +378,8 @@ void exachem::scf::SCFEngine::deallocate_main_tensors(ExecutionContext& ec,
       scf_data.ttensors.QED_Qxx, scf_data.ttensors.QED_Qxy, scf_data.ttensors.QED_Qxz,
       scf_data.ttensors.QED_Qyy, scf_data.ttensors.QED_Qyz, scf_data.ttensors.QED_Qzz,
       scf_data.ttensors.QED_1body, scf_data.ttensors.QED_2body);
+    if(chem_env.sys_data.is_unrestricted)
+      Tensor<TensorType>::deallocate(scf_data.ttensors.QED_2body_beta);
   }
 
   Tensor<TensorType>::deallocate(

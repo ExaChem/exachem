@@ -109,12 +109,13 @@ void exachem::scf::SCFQed<T>::compute_QED_2body(ExecutionContext& ec, const Chem
     mu_nuc[2] += atom.z * atom.atomic_number;
   }
 
+  // alpha block
+
   // clang-format off
   sch
     .allocate(tensor)
     (ttensors.QED_2body(mu,nu) = 0.0);
   // clang-format on
-
   for(int i = 0; i < nmodes; i++) {
     double mu_nuc_ope =
       (mu_nuc[0] * polvecs[i][0] + mu_nuc[1] * polvecs[i][1] + mu_nuc[2] * polvecs[i][2]) *
@@ -138,9 +139,55 @@ void exachem::scf::SCFQed<T>::compute_QED_2body(ExecutionContext& ec, const Chem
     // clang-format on
   }
 
+  // if restricted reference, add to Fock matrix and we are done
+  if(chem_env.sys_data.is_restricted) {
+    // clang-format off
+    sch
+      (ttensors.F_alpha(mu,nu) += ttensors.QED_2body(mu,nu))
+      .deallocate(tensor).execute();
+    // clang-format on
+    return;
+  }
+  else {
+    // else build beta block and add to F_alpha and F_beta
+    // clang-format off
+    sch
+      (ttensors.F_alpha(mu,nu) += 2*ttensors.QED_2body(mu,nu))
+      .execute();
+    // clang-format on
+  }
+
+  // clang-format off
+  sch(ttensors.QED_2body_beta(mu,nu) = 0.0).execute();
+  // clang-format on
+
+  for(int i = 0; i < nmodes; i++) {
+    double mu_nuc_ope = 0.0;
+    mu_nuc_ope =
+      (mu_nuc[0] * polvecs[i][0] + mu_nuc[1] * polvecs[i][1] + mu_nuc[2] * polvecs[i][2]) *
+      lambdas[i] / sys_data.nelectrons;
+
+    double t1 = -0.5 * pow(lambdas[i], 2);
+    double t2 = 0.5 * mu_nuc_ope * lambdas[i];
+    double t3 = -0.5 * pow(mu_nuc_ope, 2);
+
+    // clang-format off
+    sch
+      (tensor()  = polvecs[i][0]*ttensors.QED_Dx())
+      (tensor() += polvecs[i][1]*ttensors.QED_Dy())
+      (tensor() += polvecs[i][2]*ttensors.QED_Dz())
+      (ttensors.ehf_beta_tmp(mu,nu)  = tensor(mu,ku)*ttensors.D_last_beta(ku,nu))
+      (ttensors.QED_2body_beta(mu,nu)    += t1*ttensors.ehf_beta_tmp(mu,ku)*tensor(ku,nu))
+      (ttensors.QED_2body_beta(mu,nu)    += t2*ttensors.ehf_beta_tmp(mu,ku)*ttensors.S1(ku,nu))
+      (ttensors.QED_2body_beta(mu,nu)    += t2*ttensors.S1(mu,ku)*ttensors.ehf_beta_tmp(nu,ku))
+      (ttensors.ehf_beta_tmp(mu,nu)  = t3*ttensors.S1(mu,ku)*ttensors.D_beta(ku,nu))
+      (ttensors.QED_2body_beta(mu,nu)    += ttensors.ehf_beta_tmp(mu,ku)*ttensors.S1(ku,nu));
+    // clang-format on
+  }
+
   // clang-format off
   sch
-    (ttensors.F_alpha(mu,nu) += ttensors.QED_2body(mu,nu))
+    (ttensors.F_beta(mu,nu) += 2*ttensors.QED_2body_beta(mu,nu))
     .deallocate(tensor)
     .execute();
   // clang-format on

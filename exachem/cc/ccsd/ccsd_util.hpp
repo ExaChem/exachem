@@ -42,6 +42,24 @@ std::pair<double, double> rest(ExecutionContext& ec, const TiledIndexSpace& MO, 
                                const TAMM_SIZE& nob, bool transpose = false);
 
 template<typename T>
+std::pair<double, double> rest3(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1,
+                                Tensor<T>& d_r2, Tensor<T>& d_r3, Tensor<T>& d_t1, Tensor<T>& d_t2,
+                                Tensor<T>& d_t3, Tensor<T>& de, Tensor<T>& d_r1_residual,
+                                Tensor<T>& d_r2_residual, std::vector<T>& p_evl_sorted, T zshiftl,
+                                const TAMM_SIZE& noa, const TAMM_SIZE& nob, bool transpose = false);
+
+template<typename T>
+std::pair<double, double>
+rest_qed(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1, Tensor<T>& d_r2,
+         Tensor<T>& d_r1_1p, Tensor<T>& d_r2_1p, Tensor<T>& d_r1_2p, Tensor<T>& d_r2_2p,
+         Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_t1_1p, Tensor<T>& d_t2_1p,
+         Tensor<T>& d_t1_2p, Tensor<T>& d_t2_2p, Tensor<T>& de, Tensor<T>& d_r1_residual,
+         Tensor<T>& d_r2_residual, Tensor<T>& d_r1_1p_residual, Tensor<T>& d_r2_1p_residual,
+         Tensor<T>& d_r1_2p_residual, Tensor<T>& d_r2_2p_residual, std::vector<T>& p_evl_sorted,
+         T zshiftl, double omega, const TAMM_SIZE& noa, const TAMM_SIZE& nob,
+         bool transpose = false);
+
+template<typename T>
 std::pair<double, double>
 rest_cs(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1, Tensor<T>& d_r2,
         Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& de, Tensor<T>& d_r1_residual,
@@ -55,6 +73,16 @@ std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vect
            std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>>
 setupTensors(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndiis,
              bool ccsd_restart = false);
+
+template<typename T>
+std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>,
+           Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>,
+           std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>,
+           std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>,
+           std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>,
+           std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>>
+setupTensors_qed(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndiis,
+                 bool ccsd_restart = false);
 
 template<typename T>
 std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vector<Tensor<T>>,

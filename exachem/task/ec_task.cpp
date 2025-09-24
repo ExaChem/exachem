@@ -142,7 +142,13 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
 #if defined(ENABLE_CC)
   else if(task.mp2) mp2::cd_mp2(ec, chem_env);
   else if(task.cd_2e) cholesky_2e::cholesky_2e_driver(ec, chem_env);
-  else if(task.ccsd) { cc::ccsd::cd_ccsd_driver(ec, chem_env); }
+  else if(task.ccsd) {
+    if(chem_env.sys_data.do_qed) {
+      if(chem_env.sys_data.is_unrestricted) cc::qed_ccsd_os::qed_driver(ec, chem_env);
+      else cc::qed_ccsd_cs::qed_driver(ec, chem_env);
+    }
+    else cc::ccsd::cd_ccsd_driver(ec, chem_env);
+  }
   else if(task.ccsd_t) cc::ccsd_t::ccsd_t_driver(ec, chem_env);
   else if(task.cc2) cc2::cd_cc2_driver(ec, chem_env);
   else if(task.ccsd_lambda) cc::ccsd_lambda::ccsd_lambda_driver(ec, chem_env);

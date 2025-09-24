@@ -177,7 +177,69 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
     NE_1e += tt_trace(ec, ttensors.D_last_beta, ttensors.V1);
     energy_1e += tt_trace(ec, ttensors.D_last_beta, ttensors.H1);
     energy_2e += 0.5 * tt_trace(ec, ttensors.D_last_beta, ttensors.F_beta_tmp);
-    if(is_ks) { energy_2e += scf_data.exc; }
+    if(is_ks) {
+      if((!is_qed) || (is_qed && do_qed)) { energy_2e += scf_data.exc; }
+    }
+    if(is_qed) {
+      if(do_qed) {
+        energy_qed = tt_trace(ec, ttensors.D_last_alpha, ttensors.QED_1body);
+        energy_qed += tt_trace(ec, ttensors.D_last_alpha, ttensors.QED_2body);
+        energy_qed += tt_trace(ec, ttensors.D_last_beta, ttensors.QED_2body_beta);
+      }
+      else { energy_qed = scf_data.eqed; }
+
+      Tensor<double> X_a;
+
+#if defined(USE_SCALAPACK)
+      X_a = {scf_data.tAO, scf_data.tAO_ortho};
+      Tensor<double>::allocate(&ec, X_a);
+      if(scalapack_info.pg.is_valid()) { tamm::from_block_cyclic_tensor(ttensors.X_alpha, X_a); }
+#else
+      X_a = ttensors.X_alpha;
+#endif
+
+      energy_qed_et              = 0.0;
+      std::vector<double> polvec = {0.0, 0.0, 0.0};
+      Scheduler           sch{ec};
+      Tensor<double>      ehf_tmp{scf_data.tAO, scf_data.tAO};
+      Tensor<double>      ehf_beta_tmp{scf_data.tAO, scf_data.tAO};
+      Tensor<double>      QED_Qxx{scf_data.tAO, scf_data.tAO};
+      Tensor<double>      QED_Qyy{scf_data.tAO, scf_data.tAO};
+      sch.allocate(ehf_tmp, ehf_beta_tmp, QED_Qxx, QED_Qyy).execute();
+
+      for(int i = 0; i < sys_data.qed_nmodes; i++) {
+        polvec = scf_options.qed_polvecs[i];
+
+        // clang-format off
+        sch
+          (ehf_tmp("i", "j")  = X_a("i", "k") * X_a("j", "k"))
+          (ehf_tmp("i", "j") -= 0.5 * ttensors.D_last_alpha("i", "j"))
+          (QED_Qxx("i", "j")  = polvec[0] * ttensors.QED_Dx("i", "j"))
+          (QED_Qxx("i", "j") += polvec[1] * ttensors.QED_Dy("i", "j"))
+          (QED_Qxx("i", "j") += polvec[2] * ttensors.QED_Dz("i", "j"))
+          (QED_Qyy("i", "j")  = QED_Qxx("i", "k") * ehf_tmp("k", "j"))
+          (ehf_tmp("i", "j")  = QED_Qyy("i", "k") * QED_Qxx("k", "j"))
+          
+          (ehf_beta_tmp("i", "j")  = X_a("i", "k") * X_a("j", "k"))
+          (ehf_beta_tmp("i", "j") -= 0.5 * ttensors.D_last_beta("i", "j"))
+          (QED_Qxx("i", "j")  = polvec[0] * ttensors.QED_Dx("i", "j"))
+          (QED_Qxx("i", "j") += polvec[1] * ttensors.QED_Dy("i", "j"))
+          (QED_Qxx("i", "j") += polvec[2] * ttensors.QED_Dz("i", "j"))
+          (QED_Qyy("i", "j")  = QED_Qxx("i", "k") * ehf_beta_tmp("k", "j"))
+          (ehf_beta_tmp("i", "j")  = QED_Qyy("i", "k") * QED_Qxx("k", "j"))
+          .execute();
+        // clang-format on
+
+        const double coupl_strength = pow(scf_options.qed_lambdas[i], 2);
+        energy_qed_et += coupl_strength * tt_trace(ec, ttensors.D_last_alpha, ttensors.ehf_tmp);
+        energy_qed_et += coupl_strength * tt_trace(ec, ttensors.D_last_beta, ttensors.ehf_beta_tmp);
+      }
+      sch.deallocate(ehf_tmp, ehf_beta_tmp, QED_Qxx, QED_Qyy).execute();
+
+#if defined(USE_SCALAPACK)
+      Tensor<double>::deallocate(X_a);
+#endif
+    }
   }
 
   if(ec.pg().rank() == 0) {

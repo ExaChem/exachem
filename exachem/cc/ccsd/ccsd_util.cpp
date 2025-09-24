@@ -127,6 +127,102 @@ std::pair<double, double> rest(ExecutionContext& ec, const TiledIndexSpace& MO, 
 }
 
 template<typename T>
+std::pair<double, double> rest3(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1,
+                                Tensor<T>& d_r2, Tensor<T>& d_r3, Tensor<T>& d_t1, Tensor<T>& d_t2,
+                                Tensor<T>& d_t3, Tensor<T>& de, Tensor<T>& d_r1_residual,
+                                Tensor<T>& d_r2_residual, std::vector<T>& p_evl_sorted, T zshiftl,
+                                const TAMM_SIZE& noa, const TAMM_SIZE& nob, bool transpose) {
+  T         residual, energy;
+  Scheduler sch{ec};
+  // Tensor<T> d_r1_residual{}, d_r2_residual{};
+  // Tensor<T>::allocate(&ec,d_r1_residual, d_r2_residual);
+  // clang-format off
+  sch
+    (d_r1_residual() = d_r1()  * d_r1())
+    (d_r2_residual() = d_r2()  * d_r2())
+    .execute();
+  // clang-format on
+
+  auto l0 = [&]() {
+    T r1     = get_scalar(d_r1_residual);
+    T r2     = get_scalar(d_r2_residual);
+    r1       = 0.5 * std::sqrt(r1);
+    r2       = 0.5 * std::sqrt(r2);
+    energy   = get_scalar(de);
+    residual = std::max(r1, r2);
+  };
+
+  auto l1 = [&]() { jacobi(ec, d_r1, d_t1, -1.0 * zshiftl, transpose, p_evl_sorted, noa, nob); };
+  auto l2 = [&]() { jacobi(ec, d_r2, d_t2, -2.0 * zshiftl, transpose, p_evl_sorted, noa, nob); };
+  auto l3 = [&]() { jacobi(ec, d_r3, d_t3, -2.0 * zshiftl, transpose, p_evl_sorted, noa, nob); };
+
+  l0();
+  l1();
+  l2();
+  l3();
+
+  // Tensor<T>::deallocate(d_r1_residual, d_r2_residual);
+
+  return {residual, energy};
+}
+
+template<typename T>
+std::pair<double, double>
+rest_qed(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1, Tensor<T>& d_r2,
+         Tensor<T>& d_r1_1p, Tensor<T>& d_r2_1p, Tensor<T>& d_r1_2p, Tensor<T>& d_r2_2p,
+         Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_t1_1p, Tensor<T>& d_t2_1p,
+         Tensor<T>& d_t1_2p, Tensor<T>& d_t2_2p, Tensor<T>& de, Tensor<T>& d_r1_residual,
+         Tensor<T>& d_r2_residual, Tensor<T>& d_r1_1p_residual, Tensor<T>& d_r2_1p_residual,
+         Tensor<T>& d_r1_2p_residual, Tensor<T>& d_r2_2p_residual, std::vector<T>& p_evl_sorted,
+         T zshiftl, double omega, const TAMM_SIZE& noa, const TAMM_SIZE& nob, bool transpose) {
+  T         residual, energy; //, residual1, residual2, residual3, residual4;
+  Scheduler sch{ec};
+  // Tensor<T> d_r1_residual{}, d_r2_residual{};
+  // Tensor<T>::allocate(&ec,d_r1_residual, d_r2_residual);
+  // clang-format off
+   sch
+    (d_r1_residual()     =    d_r1() *    d_r1())
+    (d_r2_residual()     =    d_r2() *    d_r2())
+    (d_r1_1p_residual()  = d_r1_1p() * d_r1_1p())
+    (d_r2_1p_residual()  = d_r2_1p() * d_r2_1p())
+    (d_r1_2p_residual()  = d_r1_2p() * d_r1_2p())
+    (d_r2_2p_residual()  = d_r2_2p() * d_r2_2p())
+    .execute();
+
+   auto l0 = [&]() {
+    T r1    = 0.5 * std::sqrt(get_scalar(d_r1_residual));
+    T r2    = 0.5 * std::sqrt(get_scalar(d_r2_residual));
+    T r1_1p = 0.5 * std::sqrt(get_scalar(d_r1_1p_residual));
+    T r2_1p = 0.5 * std::sqrt(get_scalar(d_r2_1p_residual));
+    T r1_2p = 0.5 * std::sqrt(get_scalar(d_r1_2p_residual));
+    T r2_2p = 0.5 * std::sqrt(get_scalar(d_r2_2p_residual));
+    energy = get_scalar(de);
+    residual = std::max({r1, r2, r1_1p, r2_1p, r1_2p, r2_2p});
+  };
+
+  auto l1    = [&]() { jacobi(ec, d_r1, d_t1, -1.0 * zshiftl, transpose, p_evl_sorted, noa, nob); };
+  auto l2    = [&]() { jacobi(ec, d_r2, d_t2, -2.0 * zshiftl, transpose, p_evl_sorted, noa, nob); };
+  auto l1_1p = [&]() { jacobi(ec, d_r1_1p, d_t1_1p, -1.0 * zshiftl - omega, transpose, p_evl_sorted, noa, nob); };
+  auto l2_1p = [&]() { jacobi(ec, d_r2_1p, d_t2_1p, -2.0 * zshiftl - omega, transpose, p_evl_sorted, noa, nob); };
+  auto l1_2p = [&]() { jacobi(ec, d_r1_2p, d_t1_2p, -1.0 * zshiftl - 2.0*omega, transpose, p_evl_sorted, noa, nob); };
+  auto l2_2p = [&]() { jacobi(ec, d_r2_2p, d_t2_2p, -2.0 * zshiftl - 2.0*omega, transpose, p_evl_sorted, noa, nob); };
+
+
+  l0();
+  l1();
+  l2();
+  l1_1p();
+  l2_1p();
+  l1_2p();
+  l2_2p();
+
+  // Tensor<T>::deallocate(d_r1_residual, d_r2_residual);
+
+  return {residual, energy};
+}
+
+
+template<typename T>
 std::pair<double, double>
 rest_cs(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1, Tensor<T>& d_r2,
         Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& de, Tensor<T>& d_r1_residual,
@@ -227,6 +323,81 @@ setupTensors(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndii
   // clang-format on
 
   return std::make_tuple(p_evl_sorted, d_t1, d_t2, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s);
+}
+
+template<typename T>
+std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>,
+           Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>,
+           std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>,
+           std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>,
+           std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>,
+           std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>>
+setupTensors_qed(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndiis,
+                 bool ccsd_restart) {
+  // auto rank = ec.pg().rank();
+
+  TiledIndexSpace O = MO("occ");
+  TiledIndexSpace V = MO("virt");
+
+  std::vector<T> p_evl_sorted = tamm::diagonal(d_f1);
+
+  std::vector<Tensor<T>> d_r1s, d_r2s, d_r1_1ps, d_r2_1ps, d_r1_2ps, d_r2_2ps, d_t1s, d_t2s,
+    d_t1_1ps, d_t2_1ps, d_t1_2ps, d_t2_2ps;
+
+  Tensor<T> d_r1{{V, O}, {1, 1}};
+  Tensor<T> d_r2{{V, V, O, O}, {2, 2}};
+  Tensor<T> d_r0_1p{};
+  Tensor<T> d_r1_1p{{V, O}, {1, 1}};
+  Tensor<T> d_r2_1p{{V, V, O, O}, {2, 2}};
+  Tensor<T> d_r0_2p{};
+  Tensor<T> d_r1_2p{{V, O}, {1, 1}};
+  Tensor<T> d_r2_2p{{V, V, O, O}, {2, 2}};
+
+  if(!ccsd_restart) {
+    for(decltype(ndiis) i = 0; i < ndiis; i++) {
+      d_r1s.push_back(Tensor<T>{{V, O}, {1, 1}});
+      d_r2s.push_back(Tensor<T>{{V, V, O, O}, {2, 2}});
+      d_r1_1ps.push_back(Tensor<T>{{V, O}, {1, 1}});
+      d_r2_1ps.push_back(Tensor<T>{{V, V, O, O}, {2, 2}});
+      d_r1_2ps.push_back(Tensor<T>{{V, O}, {1, 1}});
+      d_r2_2ps.push_back(Tensor<T>{{V, V, O, O}, {2, 2}});
+      d_t1s.push_back(Tensor<T>{{V, O}, {1, 1}});
+      d_t2s.push_back(Tensor<T>{{V, V, O, O}, {2, 2}});
+      d_t1_1ps.push_back(Tensor<T>{{V, O}, {1, 1}});
+      d_t2_1ps.push_back(Tensor<T>{{V, V, O, O}, {2, 2}});
+      d_t1_2ps.push_back(Tensor<T>{{V, O}, {1, 1}});
+      d_t2_2ps.push_back(Tensor<T>{{V, V, O, O}, {2, 2}});
+      Tensor<T>::allocate(&ec, d_r1s[i], d_r2s[i], d_r1_1ps[i], d_r2_1ps[i], d_r1_2ps[i],
+                          d_r2_2ps[i], d_t1s[i], d_t2s[i], d_t1_1ps[i], d_t2_1ps[i], d_t1_2ps[i],
+                          d_t2_2ps[i]);
+    }
+    Tensor<T>::allocate(&ec, d_r1, d_r2, d_r0_1p, d_r1_1p, d_r2_1p, d_r0_2p, d_r1_2p, d_r2_2p);
+  }
+
+  Tensor<T> d_t1{{V, O}, {1, 1}};
+  Tensor<T> d_t2{{V, V, O, O}, {2, 2}};
+  Tensor<T> d_t1_1p{{V, O}, {1, 1}};
+  Tensor<T> d_t2_1p{{V, V, O, O}, {2, 2}};
+  Tensor<T> d_t1_2p{{V, O}, {1, 1}};
+  Tensor<T> d_t2_2p{{V, V, O, O}, {2, 2}};
+
+  Tensor<T>::allocate(&ec, d_t1, d_t2, d_t1_1p, d_t2_1p, d_t1_2p, d_t2_2p);
+
+  // clang-format off
+  Scheduler{ec}
+  (d_t1() = 0)
+  (d_t2() = 0)
+  (d_t1_1p() = 0)
+  (d_t2_1p() = 0)
+  (d_t1_2p() = 0)
+  (d_t2_2p() = 0)
+  .execute();
+  // clang-format on
+
+  return std::make_tuple(p_evl_sorted, d_t1, d_t2, d_t1_1p, d_t2_1p, d_t1_2p, d_t2_2p, d_r1, d_r2,
+                         d_r0_1p, d_r1_1p, d_r2_1p, d_r0_2p, d_r1_2p, d_r2_2p, d_r1s, d_r2s,
+                         d_r1_1ps, d_r2_1ps, d_r1_2ps, d_r2_2ps, d_t1s, d_t2s, d_t1_1ps, d_t2_1ps,
+                         d_t1_2ps, d_t2_2ps);
 }
 
 template<typename T>
@@ -408,6 +579,22 @@ template std::pair<double, double> rest<T>(ExecutionContext& ec, const TiledInde
                                            const TAMM_SIZE& nob, bool transpose);
 
 template std::pair<double, double>
+rest3<T>(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1, Tensor<T>& d_r2,
+         Tensor<T>& d_r3, Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_t3, Tensor<T>& de,
+         Tensor<T>& d_r1_residual, Tensor<T>& d_r2_residual, std::vector<T>& p_evl_sorted,
+         double zshiftl, const TAMM_SIZE& noa, const TAMM_SIZE& nob, bool transpose);
+
+template std::pair<double, double>
+rest_qed<T>(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1, Tensor<T>& d_r2,
+            Tensor<T>& d_r1_1p, Tensor<T>& d_r2_1p, Tensor<T>& d_r1_2p, Tensor<T>& d_r2_2p,
+            Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_t1_1p, Tensor<T>& d_t2_1p,
+            Tensor<T>& d_t1_2p, Tensor<T>& d_t2_2p, Tensor<T>& de, Tensor<T>& d_r1_residual,
+            Tensor<T>& d_r2_residual, Tensor<T>& d_r1_1p_residual, Tensor<T>& d_r2_1p_residual,
+            Tensor<T>& d_r1_2p_residual, Tensor<T>& d_r2_2p_residual, std::vector<T>& p_evl_sorted,
+            double zshiftl, double omega, const TAMM_SIZE& noa, const TAMM_SIZE& nob,
+            bool transpose);
+
+template std::pair<double, double>
 rest_cs<T>(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_r1, Tensor<T>& d_r2,
            Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& de, Tensor<T>& d_r1_residual,
            Tensor<T>& d_r2_residual, std::vector<T>& p_evl_sorted, double zshiftl,
@@ -418,6 +605,15 @@ template std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>,
                     std::vector<Tensor<T>>>
 setupTensors<T>(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndiis,
                 bool ccsd_restart);
+
+template std::tuple<
+  std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>,
+  Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>,
+  std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>,
+  std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>,
+  std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>>
+setupTensors_qed(ExecutionContext& ec, TiledIndexSpace& MO, Tensor<T> d_f1, int ndiis,
+                 bool ccsd_restart);
 
 template std::tuple<std::vector<T>, Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>,
                     std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>,

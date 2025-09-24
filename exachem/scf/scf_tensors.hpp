@@ -60,8 +60,11 @@ public:
   Tensor<T> QED_Qyy; // quadrupole ints
   Tensor<T> QED_Qyz; // quadrupole ints
   Tensor<T> QED_Qzz; // quadrupole ints
+
+  // QED tensors
   Tensor<T> QED_1body;
   Tensor<T> QED_2body;
+  Tensor<T> QED_2body_beta;
   Tensor<T> QED_energy;
 
   Tensor<T> X_alpha;

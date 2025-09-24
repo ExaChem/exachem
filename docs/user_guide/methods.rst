@@ -8,5 +8,6 @@ Quantum Mechanical Methods
     scf
     cholesky_decomposition
     coupledcluster
+    qed
     gfcc/gfcc
     bibliography

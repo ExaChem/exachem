@@ -51,10 +51,10 @@ public:
   std::string t1file;
   std::string t2file;
   std::string t3file;
-  std::string t2_11file;
-  std::string t2_21file;
-  std::string t2_12file;
-  std::string t2_22file;
+  std::string t1_1pfile;
+  std::string t2_1pfile;
+  std::string t1_2pfile;
+  std::string t2_2pfile;
 
   std::string full_t1file;
   std::string full_t2file;
@@ -72,10 +72,10 @@ public:
     this->full_t1file = files_prefix + ".full_t1amp";
     this->full_t2file = files_prefix + ".full_t2amp";
 
-    this->t2_11file = files_prefix + ".t2_11amp";
-    this->t2_21file = files_prefix + ".t2_21amp";
-    this->t2_12file = files_prefix + ".t2_12amp";
-    this->t2_22file = files_prefix + ".t2_22amp";
+    this->t1_1pfile = files_prefix + ".t1_1pamp";
+    this->t2_1pfile = files_prefix + ".t2_1pamp";
+    this->t1_2pfile = files_prefix + ".t1_2pamp";
+    this->t2_2pfile = files_prefix + ".t2_2pamp";
   }
 
   struct Keep {

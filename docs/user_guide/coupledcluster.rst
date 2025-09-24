@@ -44,6 +44,9 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
    }   
   }
 
+.. note::
+
+   Setting the QED options in SCF block of the input file enables QED-CCSD calculations.
 
 :threshold: ``[default=1e-6]`` Specifies the convergence threshold of iterative solutions of amplitude equations. The threshold refers to the norm of residual, namely, the deviation from the amplitude equations.
 

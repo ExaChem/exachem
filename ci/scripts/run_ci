@@ -34,6 +34,7 @@ export OMP_NUM_THREADS=1
 
 #QED-CCSD
 $MPIEXEC $EXE_PATH $CHEM_INP/h2o_qed.json
+$MPIEXEC $EXE_PATH $CHEM_INP/h2o_qed_os.json
 
 #CCSD
 $MPIEXEC $EXE_PATH $CHEM_INP/butanol2.json

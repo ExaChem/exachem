@@ -3,7 +3,10 @@ import math
 from argparse import ArgumentParser
 from argparse import ArgumentDefaultsHelpFormatter
 
-#python ccsd_advisor.py -oa 99 -ob 94 -va 394 -vb 399 -cv 4027 -ppn 4 -ram 512 -gpn 4 -gram 40 -ctype uhf -diis 5 -nranks 10 -cache 8 -ts 32
+#python ccsd_advisor.py -oa 99 -ob 94 -va 394 -vb 399 -cv 4027 -ppn 4 -ram 512 -gpn 4 -gram 40 -ctype uhf -diis 5 -nnodes_t 10 -cache 8 -ts 40
+
+# nnodes_t: Optionally specify number of nodes for (T) to check if the calculation fits in memory.
+# If not specified, minimum number of nodes required for (T) is printed. Note that the (T) memory requirements vary with the number of nodes (nnodes_t), number of processes per node (ppn), the tilesize (ts) and the cache size (cache).
 
 def get_mo_tiles(noa,nob,nva,nvb,ts):
     est_nt = math.ceil(1.0 * noa / ts)
@@ -47,10 +50,12 @@ def parseargs(argv=None):
     parser.add_argument('-ram', '--cpu_memory', type=int, required=True, help='CPU Memory per node in GiB')
     parser.add_argument('-gram','--gpu_memory', type=int, required=True, help='Memory per GPU in GiB')
 
-    parser.add_argument('-ctype',  '--scf_type',   type=str, default="rhf", help='RHF/UHF')
-    parser.add_argument('-diis',   '--diis'    ,   type=int, default=5,  help='#diis')
-    parser.add_argument('-cache',  '--cache_size', type=int, default=8,  help='(T) cache size')
-    parser.add_argument('-ts', '--ccsdt_tilesize', type=int, default=32, help='(T) tilesize')
+    parser.add_argument('-ctype',     '--scf_type',       type=str,  default="rhf", help='RHF/UHF')
+    parser.add_argument('-diis',      '--diis'    ,       type=int,  default=5,     help='#diis')
+    parser.add_argument('-nnodes_t',  '--nnodes_t',       type=int,  default=None,  help='(T) number of nodes')
+    parser.add_argument('-cache',     '--cache_size',     type=int,  default=8,     help='(T) cache size')
+    parser.add_argument('-ts',        '--ccsdt_tilesize', type=int,  default=40,    help='(T) tilesize')
+    parser.add_argument('-skip_ccsd', '--skip_ccsd',      type=bool, default=False, help='#skip_ccsd')
 
     # Process arguments
     args = parser.parse_args()
@@ -288,7 +293,7 @@ for nc in nodecounts:
 
 
 # (T)
-ccsdt_tilesize = ccsdt_tilesize*1.0
+ccsdt_tilesize = ccsdt_tilesize
 
 d_t1 = r1_vo
 #add "abba", "baab", "baba"
@@ -297,7 +302,7 @@ d_t2 = r2_vvoo + v_alpha*v_beta*o_beta*o_alpha + v_beta*v_alpha*o_alpha*o_beta \
 
 ccsd_t_mem = d_f1 + d_t1 + d_t2
 
-skip_ccsd=False
+skip_ccsd=cc_args.skip_ccsd
 
 if not skip_ccsd:
     ccsd_t_mem += d_t1 + d_t2
@@ -342,11 +347,10 @@ def ft_mem(i,j,k,l) :
 ccsd_t_mem += ft_mem(O,O,V,V)+ft_mem(O,O,O,V)+ft_mem(O,V,V,V)
 ccsd_t_mem = (ccsd_t_mem * 8.0) / gib
 
-noa = math.ceil(o_alpha/ccsdt_tilesize)
-nob = math.ceil(o_beta/ccsdt_tilesize)
-nva = math.ceil(v_alpha/ccsdt_tilesize)
-nvb = math.ceil(v_beta/ccsdt_tilesize)
-# print (noa,nob,nva,nvb)
+noa = o_alpha//ccsdt_tilesize + (1 if o_alpha % ccsdt_tilesize!=0 else 0)
+nob = o_beta//ccsdt_tilesize + (1 if o_beta % ccsdt_tilesize!=0 else 0)
+nva = v_alpha//ccsdt_tilesize + (1 if v_alpha % ccsdt_tilesize!=0 else 0)
+nvb = v_beta//ccsdt_tilesize + (1 if v_beta % ccsdt_tilesize!=0 else 0)
 
 # Can be < ccsdt_tilesize for small problems
 max_hdim = ccsdt_tilesize
@@ -361,31 +365,62 @@ size_T_d1_v2 = max_d1_kernels_pertask * (max_pdim) * (max_hdim * max_hdim * max_
 size_T_d2_t2 = max_d2_kernels_pertask * (max_pdim * max_pdim) * (max_hdim * max_hdim)
 size_T_d2_v2 = max_d2_kernels_pertask * (max_pdim * max_pdim * max_pdim) * (max_hdim)
 
+# base (T) memory required for input tensors
+ccsd_t_mem_base = 2*round(ccsd_t_mem,2) # 2 for posix shared mem
+
+# Calculate per-rank memory requirements (independent of nranks_t)
 extra_buf_mem_per_rank = size_T_s1_t1 + size_T_s1_v2 + size_T_d1_t2 + size_T_d1_v2 + size_T_d2_t2 + size_T_d2_v2
-extra_buf_mem_per_rank     = extra_buf_mem_per_rank * 8 / gib
-total_extra_buf_mem = extra_buf_mem_per_rank * nranks
+extra_buf_mem_per_rank = extra_buf_mem_per_rank * 8 / gib
 
 cache_buf_size = ccsdt_tilesize * ccsdt_tilesize * ccsdt_tilesize * ccsdt_tilesize * 8 # bytes
 cache_mem_per_rank  = (ccsdt_tilesize * ccsdt_tilesize * 8 + cache_buf_size) * cache_size # s1 t1+v2
 cache_mem_per_rank += (noa+nob + nva+nvb) * 2 * cache_size * cache_buf_size # d1,d2 t2+v2
 cache_mem_per_rank  = cache_mem_per_rank / gib
-total_cache_mem = cache_mem_per_rank * nranks # GiB
 
-ccsd_t_mem = 2*round(ccsd_t_mem,2) # 2 for posix shared mem
-total_cache_mem = round(total_cache_mem,2)
-total_extra_buf_mem = round(total_extra_buf_mem,2)
+def get_min_nodes_req(total_ccsd_t_mem):
+    nnodes_req = (total_ccsd_t_mem//cpu_mem) + (1 if total_ccsd_t_mem % cpu_mem > 0 else 0)
+    return int(nnodes_req)
 
-total_ccsd_t_mem = ccsd_t_mem + total_extra_buf_mem + total_cache_mem
-total_ccsd_t_mem = round(total_ccsd_t_mem,2)
+def get_ccsd_t_mem(nranks_t):
+    total_extra_buf_mem = extra_buf_mem_per_rank * nranks_t
+    total_cache_mem = cache_mem_per_rank * nranks_t
+    total_ccsd_t_mem = ccsd_t_mem_base + total_extra_buf_mem + total_cache_mem
+    return total_ccsd_t_mem,total_extra_buf_mem,total_cache_mem
 
-print("\nTotal CPU memory required for (T) calculation: " + str(total_ccsd_t_mem) + " GiB" + ", Min nodes required: " + str(math.ceil(total_ccsd_t_mem/cpu_mem)))
-print("-- memory required for the input tensors: " + str(ccsd_t_mem) + " GiB")
-print("-- memory required for intermediate buffers: " + str(total_extra_buf_mem) + " GiB")
-cache_msg = "-- memory required for caching t1,t2,v2 blocks"
-if total_cache_mem > (ccsd_t_mem + total_extra_buf_mem) / 2.0:
-    cache_msg += " (set cache_size option to a lower value to reduce this " \
-                     "memory requirement further)"
-print(cache_msg + ": " + str(total_cache_mem) + " GiB")
+def check_t_mem_requirement(nnodes_given,nranks_t_new):
+    total_ccsd_t_mem,_,_ = get_ccsd_t_mem(nranks_t_new)
+    nnodes_required_real = get_min_nodes_req(total_ccsd_t_mem)
+    # print("nnodes_required_real, given: ", nnodes_required_real, nnodes_given)
+    if nnodes_required_real <= nnodes_given: return True
+    return False
+
+# Auto-determine minimum nranks_t
+def determine_minimum_nranks_t():
+    # Start with minimum estimate based on input tensors only
+    nnodes_min = get_min_nodes_req(ccsd_t_mem_base) 
+    nranks_t = nnodes_min * ppn
+    
+    # Update nranks_t until a suitable number of nodes satisfying the memory requirements is found
+    max_iterations = 100
+    for i in range(max_iterations):
+        # Calculate total memory with current nranks_t
+        total_ccsd_t_mem,_,_ = get_ccsd_t_mem(nranks_t)
+
+        # Calculate required nodes and ranks
+        nnodes_required = get_min_nodes_req(total_ccsd_t_mem)
+        nranks_t_new = nnodes_required * ppn
+        
+        # Check if the collective memory on the nodes are actually sufficient
+        if check_t_mem_requirement(nnodes_required,nranks_t_new):
+            break
+                
+        nranks_t = nranks_t_new
+    
+    return nranks_t
+
+print("\n\n(T) Memory Analysis")
+print("-"*50)
+print("Given tilesize, cache_size = " + str(ccsdt_tilesize) + ", " + str(cache_size))
 
 T=ccsdt_tilesize
 nbf=o_alpha+v_alpha
@@ -395,4 +430,42 @@ t_gpu_mem=9*T*T*T*T*nbf*16
 t_gpu_mem=9*(T*T + T*T*T*T + 2*2*nbf*T*T*T) * 8
 t_gpu_mem=str(round(t_gpu_mem/gib,2))
 
-print("(T): memory required on a single gpu = " + t_gpu_mem + " GiB")
+print("- Memory required on a single gpu = " + t_gpu_mem + " GiB\n")
+
+total_ccsd_t_mem,total_extra_buf_mem,total_cache_mem = 0,0,0
+
+def print_ccsd_memory_stats(nnodes_t,total_ccsd_t_mem,total_extra_buf_mem,total_cache_mem):
+    total_cache_mem = round(total_cache_mem,2)
+    total_extra_buf_mem = round(total_extra_buf_mem,2)
+    total_ccsd_t_mem = round(total_ccsd_t_mem,2)
+
+    print(f"\nTotal CPU memory required for (T) calculation on {nnodes_t} nodes: {total_ccsd_t_mem} GiB")
+    print(f"-- memory required for the input tensors: {ccsd_t_mem_base} GiB")
+    print(f"-- memory required for intermediate buffers: {total_extra_buf_mem} GiB")
+    cache_msg = "-- memory required for caching t1,t2,v2 blocks"
+    if total_cache_mem > (ccsd_t_mem_base + total_extra_buf_mem) / 2.0:
+        cache_msg += " (set cache_size option to a lower value to reduce this " \
+                        "memory requirement further)"
+    print(f"{cache_msg}: {total_cache_mem} GiB\n")
+
+nnodes_t = cc_args.nnodes_t
+
+if nnodes_t is not None:
+    nranks_t = nnodes_t * ppn
+    total_ccsd_t_mem,total_extra_buf_mem,total_cache_mem = get_ccsd_t_mem(nranks_t)
+    print(f"Given #nodes for (T) = {nnodes_t}")
+    print_ccsd_memory_stats(nnodes_t,total_ccsd_t_mem,total_extra_buf_mem,total_cache_mem)
+    if nnodes_t < get_min_nodes_req(total_ccsd_t_mem):
+        nranks_t = determine_minimum_nranks_t()
+        total_ccsd_t_mem,total_extra_buf_mem,total_cache_mem = get_ccsd_t_mem(nranks_t)
+        nnodes_min = get_min_nodes_req(total_ccsd_t_mem)
+        print(f"\n[WARNING] Minimum #nodes required for (T) using given tilesize {ccsdt_tilesize}, cache_size {cache_size} = {nnodes_min}")
+        print_ccsd_memory_stats(nnodes_min,total_ccsd_t_mem,total_extra_buf_mem,total_cache_mem)
+else:
+    nranks_t = determine_minimum_nranks_t()
+    total_ccsd_t_mem,total_extra_buf_mem,total_cache_mem = get_ccsd_t_mem(nranks_t)
+    nnodes_min = get_min_nodes_req(total_ccsd_t_mem)
+    print(f"Minimum #nodes required for (T) =  {nnodes_min}")
+    print_ccsd_memory_stats(nnodes_min,total_ccsd_t_mem,total_extra_buf_mem,total_cache_mem)
+
+

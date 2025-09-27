@@ -8,3 +8,4 @@ ExaChem User Guide
  
     basic_options
     methods
+    benchmarks/benchmarks.rst      

@@ -77,7 +77,8 @@ Spherical-harmonic (5 *d*, 7 *f*, 9 *g*, ...) angular functions are utilized by 
 
 :atom_ecp: For ECPs only. Specify the ECP basis set for individual atoms. The specified file should follow the NWChem format from the basis set exchange website. Parsing of the ECP basis set expects to find a ``<basisset>.ecp`` file in NWChem format and located at ``$LIBINT_DATA_PATH/basis`` or ``<libint2_install_prefix>/share/libint/<libint2_version>/basis`` (if ``LIBINT_DATA_PATH`` is not defined). The corresponding basis files are expected to contain the ECP block. Only the ECP block of these basis files is parsed and everthing else is ignored.
 
-..  :df_basisset: Used to specify the auxiliary basisset for density fitting.
+.. note:: All basis sets from the Basis Set Exchange (BSE) are already installed by ExaChem and are available for use. If you wish to add your own custom basis set files to be used in any of the basis options documented in this section, they should be copied to the ``$LIBINT_DATA_PATH/basis`` folder mentioned above. Spaces are not allowed in the basis set filenames. Replace a space with an underscore in the filename when copying a custom basis set file to the ``$LIBINT_DATA_PATH/basis`` folder. However, the basis set name in the input json file can be specified with or without the space. In addition, for custom augmented basis set files, the filenames must start with the prefix ``ec-`` (e.g. ``ec-aug-cc-pvdz.g94`` or ``ec-aug-cc-pvdz.ecp``). The basis set name in the input json file can be specified with or without the ``ec-`` prefix.
+
 
 .. _TASK:
 

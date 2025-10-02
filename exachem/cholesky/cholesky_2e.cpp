@@ -503,6 +503,12 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
          << "  --> Number of nodes, mpi ranks per node: " << cd_nnodes << ", " << ppn << endl;
   }
 
+  ExecutionContext gec_dense{ec.pg(), DistributionKind::dense, MemoryManagerKind::ga};
+
+  Tensor<TensorType> g_chol_tamm_global{tAO, tAO, tCI};
+  g_chol_tamm_global.set_dense();
+  Tensor<TensorType>::allocate(&gec_dense, g_chol_tamm_global);
+
 #if defined(CD_THROTTLE)
   ProcGroup pg_cd = ProcGroup::create_subgroup(ec.pg(), cd_nranks);
 #endif
@@ -511,7 +517,7 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
   Tensor<TensorType> g_r_tamm{tAO, tAO};
   Tensor<TensorType> g_chol_tamm{tAO, tAO, tCI};
 
-  double cd_mem_req       = sum_tensor_sizes(g_d_tamm, g_r_tamm, g_chol_tamm);
+  double cd_mem_req       = sum_tensor_sizes(g_d_tamm, g_r_tamm, g_chol_tamm, g_chol_tamm_global);
   auto   check_cd_mem_req = [&](const std::string mstep) {
     if(ec.print())
       std::cout << "- CPU memory required for " << mstep << ": " << std::fixed
@@ -1044,8 +1050,7 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
     if(write_cv.first && nbf > 1000) write_chol_vectors();
 #endif
 
-    write_to_disk(g_chol_tamm, chol_ao_file);
-    Tensor<TensorType>::deallocate(g_d_tamm, g_r_tamm, g_chol_tamm);
+    Tensor<TensorType>::deallocate(g_d_tamm, g_r_tamm);
 
     auto cd_t4 = std::chrono::high_resolution_clock::now();
     cd_time    = std::chrono::duration_cast<std::chrono::duration<double>>((cd_t4 - cd_t3)).count();
@@ -1056,23 +1061,19 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
                 << endl;
     }
 
+    tamm::copy_dense_tensor(g_chol_tamm, g_chol_tamm_global);
+    Tensor<TensorType>::deallocate(g_chol_tamm);
+
 #if defined(CD_THROTTLE)
     ec_cd.flush_and_sync();
     ec_dense.flush_and_sync();
     ec_cd.pg().destroy_coll();
   } // if(cd_throttle)
 
-  ExecutionContext ec_dense{ec.pg(), DistributionKind::dense, MemoryManagerKind::ga};
 #endif
 
   ec.pg().barrier();
   ec.pg().broadcast(&count, 0);
-
-  Tensor<TensorType> g_chol_tamm1{tAO, tAO, tCI};
-  g_chol_tamm1.set_dense();
-  Tensor<TensorType>::allocate(&ec_dense, g_chol_tamm1);
-  read_from_disk(g_chol_tamm1, chol_ao_file);
-  fs::remove(chol_ao_file);
 
   update_sysdata(ec, chem_env, tMO, is_mso);
 
@@ -1082,7 +1083,7 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
   TiledIndexSpace    tCIp{CIp, static_cast<tamm::Tile>(itile_size)};
   Tensor<TensorType> g_chol_ao_tamm{tAO, tAO, tCIp};
 
-  cd_mem_req -= sum_tensor_sizes(g_d_tamm, g_r_tamm);
+  cd_mem_req -= sum_tensor_sizes(g_d_tamm, g_r_tamm, g_chol_tamm);
   cd_mem_req += sum_tensor_sizes(g_chol_ao_tamm);
   check_cd_mem_req("resizing the ao cholesky tensor");
 
@@ -1105,10 +1106,10 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
 
     std::vector<TensorType> sbuf(dsize);
 #ifdef USE_UPCXX
-    g_chol_tamm1.get_raw(lo, hi, sbuf.data());
+    g_chol_tamm_global.get_raw(lo, hi, sbuf.data());
 #else
     int64_t   ld[2]  = {cd_ncast<size_t>(block_dims[1]), cd_ncast<size_t>(block_dims[2])};
-    const int g_chol = g_chol_tamm1.ga_handle();
+    const int g_chol = g_chol_tamm_global.ga_handle();
     NGA_Get64(g_chol, &lo[1], &hi[1], sbuf.data(), ld);
 #endif
 
@@ -1128,15 +1129,15 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
     if(rank == 0) eigen_to_tamm_tensor(lcao, lcao_new);
   }
 
-  Tensor<TensorType>::deallocate(g_chol_tamm1);
-  ec_dense.flush_and_sync();
+  Tensor<TensorType>::deallocate(g_chol_tamm_global);
+  gec_dense.flush_and_sync();
 
   Tensor<TensorType> CholVpr_tmp{tMO, tAO, tCIp};
   Tensor<TensorType> CholVpr_tamm{{tMO, tMO, tCIp},
                                   {SpinPosition::upper, SpinPosition::lower, SpinPosition::ignore}};
   Tensor<TensorType>::allocate(&ec, CholVpr_tmp);
 
-  cd_mem_req -= sum_tensor_sizes(g_chol_tamm);
+  cd_mem_req -= sum_tensor_sizes(g_chol_tamm_global);
   cd_mem_req += sum_tensor_sizes(CholVpr_tmp);
   check_cd_mem_req("ao2mo transformation");
 

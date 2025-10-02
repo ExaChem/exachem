@@ -1,15 +1,3 @@
-!----------------------------------------------------------------------
-! Basis Set Exchange
-! Version v0.9
-! https://www.basissetexchange.org
-!----------------------------------------------------------------------
-!   Basis set: Sapporo-DZP
-! Description: Sapporo-DZP [deprecated]
-!        Role: orbital
-!     Version: 1  (Data from T. Noro)
-!----------------------------------------------------------------------
-
-****
 H     0
 S    3   1.00
      13.0107003              0.0334855

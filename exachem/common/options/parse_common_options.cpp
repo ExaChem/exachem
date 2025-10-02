@@ -17,6 +17,8 @@ std::map<std::string, std::string> get_atom_basis_map(ChemEnv& chem_env, const j
   for(auto& [element_symbol, basis_string]: jatom_basis.items()) {
     std::string _basis_string = basis_string;
     txt_utils::to_lower(_basis_string);
+    if(_basis_string.find("aug") == 0) { _basis_string = std::string("ec-") + _basis_string; }
+    std::replace(_basis_string.begin(), _basis_string.end(), ' ', '_');
     atom_basis_map[element_symbol] = _basis_string;
   }
   return atom_basis_map;
@@ -36,6 +38,10 @@ void ParseCommonOptions::parse(ChemEnv& chem_env) {
   parse_option<std::string>(common_options.dfbasis, jinput["basis"], "df_basisset");
 
   txt_utils::to_lower(common_options.basis);
+  std::replace(common_options.basis.begin(), common_options.basis.end(), ' ', '_');
+  if(common_options.basis.find("aug") == 0) {
+    common_options.basis = std::string("ec-") + common_options.basis;
+  }
 
   json                               jatom_basis    = jinput["basis"]["atom_basis"];
   std::map<std::string, std::string> atom_basis_map = get_atom_basis_map(chem_env, jatom_basis);

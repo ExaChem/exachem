@@ -1,16 +1,3 @@
-!----------------------------------------------------------------------
-! Basis Set Exchange
-! Version 0.10
-! https://www.basissetexchange.org
-!----------------------------------------------------------------------
-!   Basis set: 6-311+G**
-! Description: VTZ Valence Triple Zeta: 3 Funct.'s/Valence AO with
-!                    diffuse on heavy atoms, polarization on all atoms
-!        Role: orbital
-!     Version: 0  (Data from the Original Basis Set Exchange)
-!----------------------------------------------------------------------
-
-****
 H     0
 S    3   1.00
      33.86500                0.0254938

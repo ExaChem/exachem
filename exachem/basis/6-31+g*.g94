@@ -1,16 +1,3 @@
-!----------------------------------------------------------------------
-! Basis Set Exchange
-! Version 0.10
-! https://www.basissetexchange.org
-!----------------------------------------------------------------------
-!   Basis set: 6-31+G*
-! Description: 6-31G + diffuse and polarization functions on heavy
-!                    atoms
-!        Role: orbital
-!     Version: 1  (Data from Gaussian 09/GAMESS)
-!----------------------------------------------------------------------
-
-****
 H     0
 S    3   1.00
       0.1873113696D+02       0.3349460434D-01

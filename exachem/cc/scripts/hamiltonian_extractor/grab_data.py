@@ -80,8 +80,8 @@ def _extract_output_data(output_file, data):
                     data.energy_shift = float(ln_segments[3])
                 elif ln_segments[:3] == ['Full', 'SCF', 'Energy:']:
                     full_scf = float(ln_segments[3])
-                elif ln_segments[:3] == ['Bare', 'SCF', 'Energy:']:
-                    bare_scf = float(ln_segments[3])
+                elif ln_segments[:5] == ['Bare', 'Active', 'Space', 'SCF', 'Energy:']:
+                    bare_scf = float(ln_segments[5])
                 elif ln_segments[:1] == ['ducc_lvl']:
                     data.n_orbitals = data.n_occ_alpha + data.n_virt_alpha
                     data.one_body = np.zeros((data.n_orbitals, data.n_orbitals))

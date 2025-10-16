@@ -28,13 +28,12 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
 void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
 template<typename T>
-std::pair<double, std::vector<std::pair<std::vector<int>, double>>>
-DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
-                    const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
-                    const Tensor<T>& vtijkl, const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
-                    const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
-                    ExecutionHW ex_hw, T shift, IndexVector& occ_int_vec, IndexVector& virt_int_vec,
-                    string& pos_str);
+void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
+                         const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
+                         const Tensor<T>& vtijkl, const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
+                         const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
+                         ExecutionHW ex_hw, T shift, IndexVector& occ_int_vec,
+                         IndexVector& virt_int_vec, string& pos_str);
 #endif
 
 } // namespace exachem::cc::ducc

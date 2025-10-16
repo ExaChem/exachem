@@ -1,7 +1,6 @@
 """
 Full Configuration Interaction (FCI) solver implementation.
 """
-from pyscf import fci
 import numpy as np
 from typing import Dict, Tuple, Optional
 
@@ -17,7 +16,11 @@ def parse_fci_vector(ci_vecmat: np.ndarray, orbs: int, electrons: int, threshold
     Returns:
         Dictionary mapping occupation strings to amplitudes
     """
-    from pyscf.fci import cistring
+    try:
+        from pyscf.fci import cistring
+    except ImportError:
+        raise ImportError("PySCF is required for parsing FCI vectors. Please install it using 'pip install pyscf'.")
+    
     conf_bin = cistring.gen_strings4orblist(list(range(orbs)), electrons//2)
 
     OCCMAP = {('0', '0'): '0',
@@ -59,6 +62,12 @@ def solve_fci(data, n_roots: int = 1, threshold: float = 0.001, max_space: int =
     Returns:
         Tuple of (energies, CI vectors)
     """
+    # Import pyscf only when needed
+    try:
+        from pyscf import fci
+    except ImportError:
+        raise ImportError("PySCF is required for FCI calculations. Please install it using 'pip install pyscf'.")
+    
     # Set up FCI solver
     solver = fci.direct_nosym.FCISolver()
     

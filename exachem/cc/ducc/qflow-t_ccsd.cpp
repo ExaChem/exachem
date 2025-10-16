@@ -247,12 +247,12 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   cc_context.compute.set(true, true); // compute ft12 and v2 in full
   exachem::cc::ccsd::cd_ccsd_driver(ec, chem_env);
 
-  // TiledIndexSpace&           MO        = chem_env.is_context.MSO;
-  TiledIndexSpace&           CI        = chem_env.is_context.CI;
-  Tensor<T>                  d_f1      = chem_env.cd_context.d_f1;
-  Tensor<T>                  cholVpr   = chem_env.cd_context.cholV2;
-  Tensor<T>                  d_t1      = chem_env.cc_context.d_t1_full;
-  Tensor<T>                  d_t2      = chem_env.cc_context.d_t2_full;
+  TiledIndexSpace& MO      = chem_env.is_context.MSO;
+  TiledIndexSpace& CI      = chem_env.is_context.CI;
+  Tensor<T>        d_f1    = chem_env.cd_context.d_f1;
+  Tensor<T>        cholVpr = chem_env.cd_context.cholV2;
+  // Tensor<T>                  d_t1      = chem_env.cc_context.d_t1_full;
+  // Tensor<T>                  d_t2      = chem_env.cc_context.d_t2_full;
   cholesky_2e::V2Tensors<T>& v2tensors = chem_env.cd_context.v2tensors;
 
   const int   rank = ec.pg().rank().value();
@@ -262,18 +262,25 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   // auto [MO_AS, total_orbitals1] = setupMOIS_QFlow(ec, chem_env, occ_int_vec, virt_int_vec);
 
   // const TiledIndexSpace& N = MO_AS("all");
-  // const TiledIndexSpace& O = MO_AS("occ");
-  // const TiledIndexSpace& V = MO_AS("virt");
+  const TiledIndexSpace& O = MO("occ");
+  const TiledIndexSpace& V = MO("virt");
 
-  // Tensor<T> cholVpr_UT = {{N, N, CI}, {SpinPosition::upper, SpinPosition::lower,
-  // SpinPosition::ignore}}; sch.allocate(cholVpr_UT).execute(); retile_tamm_tensor(cholVpr,
-  // cholVpr_UT); cholesky_2e::V2Tensors<T>& v2tensors_UT = cholesky_2e::setupV2Tensors<T>(ec,
-  // cholVpr_UT, ex_hw); free_tensors(cholVpr, cholVpr_UT);
+  // Tensor<T> cholVpr_sub = {{N, N, CI}, {SpinPosition::upper, SpinPosition::lower,
+  // SpinPosition::ignore}}; sch.allocate(cholVpr_sub).execute(); retile_tamm_tensor(cholVpr,
+  // cholVpr_sub); cholesky_2e::V2Tensors<T>& v2tensors_sub = cholesky_2e::setupV2Tensors<T>(ec,
+  // cholVpr_sub, ex_hw); free_tensors(cholVpr, cholVpr_sub);
 
-  // Tensor<T> dt1_full_ut = Tensor<T>{{V, O}, {1, 1}};
-  // Tensor<T> dt2_full_ut = Tensor<T>{{V, V, O, O}, {2, 2}};
-  // sch.allocate(dt1_full_ut, dt2_full_ut).execute();
+  // Global amplitudes are transformed to dense tensors so they can addresses
+  ExecutionContext ec_dense{ec.pg(), DistributionKind::dense, MemoryManagerKind::ga};
 
+  Tensor<T> dt1 = Tensor<T>{{V, O}, {1, 1}};
+  Tensor<T> dt2 = Tensor<T>{{V, V, O, O}, {2, 2}};
+  sch.allocate(dt1, dt2).execute();
+
+  Tensor<T> dt1_global = to_dense_tensor(ec_dense, dt1);
+  Tensor<T> dt2_global = to_dense_tensor(ec_dense, dt2);
+
+  free_tensors(dt1, dt2);
   // Tensor<T> d_f1_full = Tensor<T>{{N, N}, {1, 1}};
   // sch.allocate(d_f1_full).execute();
   // retile_tamm_tensor(d_f1, d_f1_full);
@@ -312,8 +319,8 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     std::cout << std::endl;
   }
 
-  // Combine occ_combinations and occ_combinations in all ways
-  // The are combined with the sum of orbtital energies
+  // Combine occ_combinations and virt_combinations in all ways
+  // They are combined with the sum of orbital energies
   std::vector<std::pair<std::vector<int>, double>> combinations_with_energy;
 
   for(const auto& occ_set: occ_combinations) {
@@ -383,6 +390,11 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   // Main loop
   for(int cycle = 0; cycle < cycles; ++cycle) {
     if(rank == 0) std::cout << "Cycle " << cycle + 1 << " of " << cycles << std::endl;
+
+    // Initialize empty sets for this cycle
+    std::set<std::pair<size_t, size_t>>                  updated_t1;
+    std::set<std::tuple<size_t, size_t, size_t, size_t>> updated_t2;
+
     for(size_t pos = 0; pos < sorted_combinations.size(); ++pos) {
       const auto& combination = sorted_combinations[pos];
       if(rank == 0) {
@@ -407,35 +419,83 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       const TiledIndexSpace& V = MO_AS("virt");
 
       // Retile tensors to the new MO index space
-      Tensor<T> cholVpr_UT{{N, N, CI},
-                           {SpinPosition::upper, SpinPosition::lower, SpinPosition::ignore}};
-      sch.allocate(cholVpr_UT).execute();
-      retile_tamm_tensor(cholVpr, cholVpr_UT);
-      cholesky_2e::V2Tensors<T> v2tensors_UT =
-        cholesky_2e::setupV2Tensors<T>(ec, cholVpr_UT, ex_hw);
-      free_tensors(cholVpr_UT);
+      Tensor<T> cholVpr_sub{{N, N, CI},
+                            {SpinPosition::upper, SpinPosition::lower, SpinPosition::ignore}};
+      sch.allocate(cholVpr_sub).execute();
+      retile_tamm_tensor(cholVpr, cholVpr_sub);
+      cholesky_2e::V2Tensors<T> v2tensors_sub =
+        cholesky_2e::setupV2Tensors<T>(ec, cholVpr_sub, ex_hw);
+      free_tensors(cholVpr_sub);
 
-      Tensor<T> dt1_full_ut = Tensor<T>{{V, O}, {1, 1}};
-      Tensor<T> dt2_full_ut = Tensor<T>{{V, V, O, O}, {2, 2}};
-      sch.allocate(dt1_full_ut, dt2_full_ut).execute();
+      Tensor<T> dt1_sub = Tensor<T>{{V, O}, {1, 1}};
+      Tensor<T> dt2_sub = Tensor<T>{{V, V, O, O}, {2, 2}};
+      sch.allocate(dt1_sub, dt2_sub).execute();
 
       // Initialize T1 and T2
-      sch(dt1_full_ut() = 0.0)(dt2_full_ut() = 0.0).execute(ex_hw);
+      from_dense_tensor(dt1_global, dt1_sub);
+      from_dense_tensor(dt2_global, dt2_sub);
+      // sch(dt1_sub() = 0.0)(dt2_sub() = 0.0).execute(ex_hw);
 
-      Tensor<T> d_f1_UT = Tensor<T>{{N, N}, {1, 1}};
-      sch.allocate(d_f1_UT).execute();
-      retile_tamm_tensor(d_f1, d_f1_UT);
+      Tensor<T> d_f1_sub = Tensor<T>{{N, N}, {1, 1}};
+      sch.allocate(d_f1_sub).execute();
+      retile_tamm_tensor(d_f1, d_f1_sub);
 
       // Call DUCC
-      DUCC_T_CCSD_Driver<T>(chem_env, ec, MO_AS, dt1_full_ut, dt2_full_ut, d_f1_UT, v2tensors_UT,
+      DUCC_T_CCSD_Driver<T>(chem_env, ec, MO_AS, dt1_sub, dt2_sub, d_f1_sub, v2tensors_sub,
                             occ_int_vec, virt_int_vec, pos_str);
 
-      free_tensors(d_f1_UT, dt1_full_ut, dt2_full_ut);
+      // Get QFlow results
+      auto& qflow_results = chem_env.sys_data.results["output"]["QFlow"]["results"];
+
+      // Get XACC ordering
+      auto xacc_order = qflow_results["xacc_order"].get<std::vector<int>>();
+      std::cout << "XACC Ordering: ";
+      for(const auto& idx: xacc_order) { std::cout << idx << " "; }
+      std::cout << std::endl;
+
+      // // Get amplitudes
+      // std::cout << "QFlow Amplitudes:" << std::endl;
+      // for(const auto& amp : qflow_results["amplitudes"]) {
+      //     std::cout << "  [";
+      //     for(size_t i = 0; i < amp["indices"].size(); ++i) {
+      //         std::cout << amp["indices"][i];
+      //         if(i < amp["indices"].size() - 1) std::cout << ", ";
+      //     }
+      //     std::cout << "] -> " << amp["value"].get<double>() << std::endl;
+      // }
+
+      for(const auto& amp: qflow_results["amplitudes"]) {
+        if(amp["indices"].size() == 2) {
+          size_t v      = xacc_order[amp["indices"][1]];
+          size_t o      = xacc_order[amp["indices"][0]];
+          auto   t1_key = std::make_pair(v, o);
+          if(updated_t1.find(t1_key) == updated_t1.end()) {
+            updated_t1.insert(t1_key);
+            update_tensor_val(dt1_global, {v, o}, amp["value"].get<double>());
+          }
+        }
+        else if(amp["indices"].size() == 4) {
+          // Could be 3,2,1,0 ordering
+          size_t v1     = xacc_order[amp["indices"][3]];
+          size_t v2     = xacc_order[amp["indices"][2]];
+          size_t o1     = xacc_order[amp["indices"][0]];
+          size_t o2     = xacc_order[amp["indices"][1]];
+          auto   t2_key = std::make_tuple(v1, v2, o1, o2);
+          if(updated_t2.find(t2_key) == updated_t2.end()) {
+            updated_t2.insert(t2_key);
+            update_tensor_val(dt2_global, {v1, v2, o1, o2}, amp["value"].get<double>());
+          }
+        }
+      }
+
+      free_tensors(d_f1_sub, dt1_sub, dt2_sub);
     }
   }
 
   v2tensors.deallocate();
-  free_tensors(cholVpr, d_t1, d_t2, d_f1);
+  // free_tensors(cholVpr, d_t1, d_t2, d_f1);
+  free_tensors(cholVpr, d_f1);
+  Tensor<T>::deallocate(dt1_global, dt2_global);
 
   print_memory_usage<T>(ec.pg().rank().value(), "DUCC Memory Stats");
 
@@ -443,18 +503,18 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 }
 
 template<typename T>
-std::pair<double, std::vector<std::pair<std::vector<int>, double>>>
-DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
-                    const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
-                    const Tensor<T>& vtijkl, const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
-                    const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
-                    ExecutionHW ex_hw, T shift, IndexVector& occ_int_vec, IndexVector& virt_int_vec,
-                    string& pos_str) {
+void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
+                         const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
+                         const Tensor<T>& vtijkl, const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
+                         const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
+                         ExecutionHW ex_hw, T shift, IndexVector& occ_int_vec,
+                         IndexVector& virt_int_vec, string& pos_str) {
   const auto   rank   = sch.ec().pg().rank();
   const size_t nactoa = chem_env.ioptions.ccsd_options.nactive_oa;
   // const size_t nactob = chem_env.ioptions.ccsd_options.nactive_ob;
   const size_t nactva = chem_env.ioptions.ccsd_options.nactive_va;
   // const size_t nactvb = chem_env.ioptions.ccsd_options.nactive_vb;
+  SystemData& sys_data     = chem_env.sys_data;
   std::string files_prefix = chem_env.get_files_prefix("", "ducc");
   auto        rep_energy   = chem_env.scf_context.nuc_repl_energy;
 
@@ -825,13 +885,32 @@ DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO
     // Add scalar term to the vector
     ham_terms.emplace_back("", std::complex<double>(shift + rep_energy, 0));
 
-    std::cout << std::endl
+    std::cout << std::setprecision(6) << std::endl
               << "======================" << std::endl
               << "NWQSim Running QFLOW" << std::endl;
     std::pair<double, std::vector<std::pair<std::vector<int>, double>>> results =
       qflow_nwqsim(ham_terms, nactoa * 2, "CPU");
 
-    std::cout << "Final Energy: " << results.first << "" << std::endl;
+    // Store results in sys_data.results for use elsewhere in the code
+    sys_data.results["output"]["QFlow"]["results"]["energy"] = results.first;
+
+    // Store amplitudes in sys_data.results
+    nlohmann::json amplitudes_json = nlohmann::json::array();
+    for(const auto& pair: results.second) {
+      const std::vector<int>& vec = pair.first;
+      double                  val = pair.second;
+
+      nlohmann::json amp_entry;
+      amp_entry["indices"] = vec;
+      amp_entry["value"]   = val;
+      amplitudes_json.push_back(amp_entry);
+    }
+    sys_data.results["output"]["QFlow"]["results"]["amplitudes"] = amplitudes_json;
+
+    // Store XACC_order in sys_data.results
+    sys_data.results["output"]["QFlow"]["results"]["xacc_order"] = XACC_order;
+
+    std::cout << std::setprecision(10) << "Final Energy: " << results.first << "" << std::endl;
 
     // Print the vector of pairs
     std::cout << "Amplititudes:" << std::endl;
@@ -850,15 +929,15 @@ DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO
               << "NWQSim Finishes" << std::endl
               << "======================" << std::endl;
   }
-  return results;
 }
 
 using T = double;
-template std::pair<double, std::vector<std::pair<std::vector<int>, double>>>
-DUCC_T_QFLOW_Driver<T>(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
-                       const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
-                       const Tensor<T>& vtijkl, const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
-                       const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
-                       ExecutionHW ex_hw, T shift, IndexVector& occ_int_vec,
-                       IndexVector& virt_int_vec, string& pos_str);
+template void DUCC_T_QFLOW_Driver<T>(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
+                                     const Tensor<T>& ftij, const Tensor<T>& ftia,
+                                     const Tensor<T>& ftab, const Tensor<T>& vtijkl,
+                                     const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
+                                     const Tensor<T>& vtijab, const Tensor<T>& vtiabc,
+                                     const Tensor<T>& vtabcd, ExecutionHW ex_hw, T shift,
+                                     IndexVector& occ_int_vec, IndexVector& virt_int_vec,
+                                     string& pos_str);
 } // namespace exachem::cc::ducc

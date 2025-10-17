@@ -7,6 +7,7 @@ set(CCSD_T_INCLUDES
     ${CCSD_T_SRCDIR}/ccsd_t_common.hpp
     ${CCSD_T_SRCDIR}/ccsd_t_fused_driver.hpp
     ${CCSD_T_SRCDIR}/fused_common.hpp
+    ${CCSD_T_SRCDIR}/ccsd_t.hpp
     ${CCSD_T_SRCDIR}/ccsd_t_all_fused_singles.hpp
     ${CCSD_T_SRCDIR}/ccsd_t_all_fused_doubles1.hpp
     ${CCSD_T_SRCDIR}/ccsd_t_all_fused_doubles2.hpp

@@ -11,6 +11,117 @@
 #include "exachem/cc/gfcc/gfccsd_internal.hpp"
 
 namespace exachem::cc::gfcc {
+
+template<typename T>
+class GFCCSD_EA_A {
+public:
+  // Constructor
+  GFCCSD_EA_A() = default;
+
+  // Destructor
+  virtual ~GFCCSD_EA_A() = default;
+
+  GFCCSD_EA_A(const GFCCSD_EA_A&)            = default;
+  GFCCSD_EA_A& operator=(const GFCCSD_EA_A&) = default;
+  GFCCSD_EA_A(GFCCSD_EA_A&&)                 = default;
+  GFCCSD_EA_A& operator=(GFCCSD_EA_A&&)      = default;
+
+  /**
+   * @brief Y1 contraction for alpha spin in electron affinity GF-CCSD
+   */
+  virtual void
+  gfccsd_y1_a(/* ExecutionContext& ec, */
+              Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_a,
+              const Tensor<T>& t1_a, const Tensor<T>& t1_b, const Tensor<T>& t2_aaaa,
+              const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
+              const Tensor<std::complex<T>>& y1_a, const Tensor<std::complex<T>>& y2_aaa,
+              const Tensor<std::complex<T>>& y2_bab, const Tensor<T>& f1, const Tensor<T>& iy1_a,
+              const Tensor<T>& iy1_2_1_a, const Tensor<T>& iy1_2_1_b, const Tensor<T>& v2ijab_aaaa,
+              const Tensor<T>& v2ijab_abab, const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b,
+              const Tensor<T>& cholVV_a, const TiledIndexSpace& CI, const TiledIndexSpace& gf_tis,
+              bool has_tis, bool debug = false);
+
+  /**
+   * @brief Y2 contraction for alpha spin in electron affinity GF-CCSD
+   */
+  virtual void
+  gfccsd_y2_a(/* ExecutionContext& ec, */
+              Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_aaa,
+              Tensor<std::complex<T>>& i0_bab, const Tensor<T>& t1_a, const Tensor<T>& t1_b,
+              const Tensor<T>& t2_aaaa, const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
+              const Tensor<std::complex<T>>& y1_a, const Tensor<std::complex<T>>& y2_aaa,
+              const Tensor<std::complex<T>>& y2_bab, const Tensor<T>& f1, const Tensor<T>& iy1_1_a,
+              const Tensor<T>& iy1_1_b, const Tensor<T>& iy1_2_1_a, const Tensor<T>& iy1_2_1_b,
+              const Tensor<T>& iy2_a, const Tensor<T>& iy2_b, const Tensor<T>& iy3_1_aaaa,
+              const Tensor<T>& iy3_1_baba, const Tensor<T>& iy3_1_abba, const Tensor<T>& iy3_1_2_a,
+              const Tensor<T>& iy3_1_2_b, const Tensor<T>& iy3_aaaa, const Tensor<T>& iy3_bbbb,
+              const Tensor<T>& iy3_baba, const Tensor<T>& iy3_baab, const Tensor<T>& iy3_abba,
+              const Tensor<T>& iy4_1_aaaa, const Tensor<T>& iy4_1_baab, const Tensor<T>& iy4_1_baba,
+              const Tensor<T>& iy4_1_bbbb, const Tensor<T>& iy4_1_abba, const Tensor<T>& iy4_2_aaaa,
+              const Tensor<T>& iy4_2_abba, const Tensor<T>& iy5_aaaa, const Tensor<T>& iy5_baab,
+              const Tensor<T>& iy5_bbbb, const Tensor<T>& iy5_baba, const Tensor<T>& iy5_abba,
+              const Tensor<T>& iy6_a, const Tensor<T>& iy6_b, const Tensor<T>& cholOO_a,
+              const Tensor<T>& cholOO_b, const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b,
+              const Tensor<T>& cholVV_a, const Tensor<T>& cholVV_b, const Tensor<T>& v2ijab_aaaa,
+              const Tensor<T>& v2ijab_abab, const TiledIndexSpace& CI,
+              const TiledIndexSpace& gf_tis, bool has_tis, bool debug = false);
+};
+
+template<typename T>
+class GFCCSD_EA_B {
+public:
+  GFCCSD_EA_B() = default;
+
+  virtual ~GFCCSD_EA_B() = default;
+
+  GFCCSD_EA_B(const GFCCSD_EA_B&)            = default;
+  GFCCSD_EA_B& operator=(const GFCCSD_EA_B&) = default;
+  GFCCSD_EA_B(GFCCSD_EA_B&&)                 = default;
+
+  // Move assignment operator
+  GFCCSD_EA_B& operator=(GFCCSD_EA_B&&) = default;
+
+  /**
+   * @brief Y1 contraction for beta spin in electron affinity GF-CCSD
+   */
+  virtual void
+  gfccsd_y1_b(/* ExecutionContext& ec, */
+              Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_b,
+              const Tensor<T>& t1_a, const Tensor<T>& t1_b, const Tensor<T>& t2_aaaa,
+              const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
+              const Tensor<std::complex<T>>& y1_b, const Tensor<std::complex<T>>& y2_bbb,
+              const Tensor<std::complex<T>>& y2_aba, const Tensor<T>& f1, const Tensor<T>& iy1_b,
+              const Tensor<T>& iy1_2_1_a, const Tensor<T>& iy1_2_1_b, const Tensor<T>& v2ijab_bbbb,
+              const Tensor<T>& v2ijab_abab, const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b,
+              const Tensor<T>& cholVV_b, const TiledIndexSpace& CI, const TiledIndexSpace& gf_tis,
+              bool has_tis, bool debug = false);
+
+  /**
+   * @brief Y2 contraction for beta spin in electron affinity GF-CCSD
+   */
+  virtual void
+  gfccsd_y2_b(/* ExecutionContext& ec, */
+              Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_bbb,
+              Tensor<std::complex<T>>& i0_aba, const Tensor<T>& t1_a, const Tensor<T>& t1_b,
+              const Tensor<T>& t2_aaaa, const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
+              const Tensor<std::complex<T>>& y1_b, const Tensor<std::complex<T>>& y2_bbb,
+              const Tensor<std::complex<T>>& y2_aba, const Tensor<T>& f1, const Tensor<T>& iy1_1_a,
+              const Tensor<T>& iy1_1_b, const Tensor<T>& iy1_2_1_a, const Tensor<T>& iy1_2_1_b,
+              const Tensor<T>& iy2_a, const Tensor<T>& iy2_b, const Tensor<T>& iy3_1_bbbb,
+              const Tensor<T>& iy3_1_abab, const Tensor<T>& iy3_1_baab, const Tensor<T>& iy3_1_2_a,
+              const Tensor<T>& iy3_1_2_b, const Tensor<T>& iy3_aaaa, const Tensor<T>& iy3_bbbb,
+              const Tensor<T>& iy3_abab, const Tensor<T>& iy3_baab, const Tensor<T>& iy3_abba,
+              const Tensor<T>& iy4_1_aaaa, const Tensor<T>& iy4_1_baab, const Tensor<T>& iy4_1_bbbb,
+              const Tensor<T>& iy4_1_abba, const Tensor<T>& iy4_1_abab, const Tensor<T>& iy4_2_bbbb,
+              const Tensor<T>& iy4_2_baab, const Tensor<T>& iy5_aaaa, const Tensor<T>& iy5_baab,
+              const Tensor<T>& iy5_bbbb, const Tensor<T>& iy5_abab, const Tensor<T>& iy5_abba,
+              const Tensor<T>& iy6_a, const Tensor<T>& iy6_b, const Tensor<T>& cholOO_a,
+              const Tensor<T>& cholOO_b, const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b,
+              const Tensor<T>& cholVV_a, const Tensor<T>& cholVV_b, const Tensor<T>& v2ijab_bbbb,
+              const Tensor<T>& v2ijab_abab, const TiledIndexSpace& CI,
+              const TiledIndexSpace& gf_tis, bool has_tis, bool debug = false);
+};
+
 #if 0
   template<typename T>
   void gfccsd_driver_ea_a(
@@ -57,17 +168,18 @@ namespace exachem::cc::gfcc {
 } // namespace exachem::cc::gfcc
 
 template<typename T>
-void gfccsd_y1_a(/* ExecutionContext& ec, */
-                 Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_a,
-                 const Tensor<T>& t1_a, const Tensor<T>& t1_b, const Tensor<T>& t2_aaaa,
-                 const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
-                 const Tensor<std::complex<T>>& y1_a, const Tensor<std::complex<T>>& y2_aaa,
-                 const Tensor<std::complex<T>>& y2_bab, const Tensor<T>& f1, const Tensor<T>& iy1_a,
-                 const Tensor<T>& iy1_2_1_a, const Tensor<T>& iy1_2_1_b,
-                 const Tensor<T>& v2ijab_aaaa, const Tensor<T>& v2ijab_abab,
-                 const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b, const Tensor<T>& cholVV_a,
-                 const TiledIndexSpace& CI, const TiledIndexSpace& gf_tis, bool has_tis,
-                 bool debug = false) {
+void exachem::cc::gfcc::GFCCSD_EA_A<
+  T>::gfccsd_y1_a(/* ExecutionContext& ec, */
+                  Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_a,
+                  const Tensor<T>& t1_a, const Tensor<T>& t1_b, const Tensor<T>& t2_aaaa,
+                  const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
+                  const Tensor<std::complex<T>>& y1_a, const Tensor<std::complex<T>>& y2_aaa,
+                  const Tensor<std::complex<T>>& y2_bab, const Tensor<T>& f1,
+                  const Tensor<T>& iy1_a, const Tensor<T>& iy1_2_1_a, const Tensor<T>& iy1_2_1_b,
+                  const Tensor<T>& v2ijab_aaaa, const Tensor<T>& v2ijab_abab,
+                  const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b, const Tensor<T>& cholVV_a,
+                  const TiledIndexSpace& CI, const TiledIndexSpace& gf_tis, bool has_tis,
+                  bool debug) {
   using ComplexTensor = Tensor<std::complex<T>>;
   TiledIndexSpace o_alpha, v_alpha, o_beta, v_beta;
 
@@ -160,17 +272,18 @@ void gfccsd_y1_a(/* ExecutionContext& ec, */
 }
 
 template<typename T>
-void gfccsd_y1_b(/* ExecutionContext& ec, */
-                 Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_b,
-                 const Tensor<T>& t1_a, const Tensor<T>& t1_b, const Tensor<T>& t2_aaaa,
-                 const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
-                 const Tensor<std::complex<T>>& y1_b, const Tensor<std::complex<T>>& y2_bbb,
-                 const Tensor<std::complex<T>>& y2_aba, const Tensor<T>& f1, const Tensor<T>& iy1_b,
-                 const Tensor<T>& iy1_2_1_a, const Tensor<T>& iy1_2_1_b,
-                 const Tensor<T>& v2ijab_bbbb, const Tensor<T>& v2ijab_abab,
-                 const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b, const Tensor<T>& cholVV_b,
-                 const TiledIndexSpace& CI, const TiledIndexSpace& gf_tis, bool has_tis,
-                 bool debug = false) {
+void exachem::cc::gfcc::GFCCSD_EA_B<
+  T>::gfccsd_y1_b(/* ExecutionContext& ec, */
+                  Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_b,
+                  const Tensor<T>& t1_a, const Tensor<T>& t1_b, const Tensor<T>& t2_aaaa,
+                  const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
+                  const Tensor<std::complex<T>>& y1_b, const Tensor<std::complex<T>>& y2_bbb,
+                  const Tensor<std::complex<T>>& y2_aba, const Tensor<T>& f1,
+                  const Tensor<T>& iy1_b, const Tensor<T>& iy1_2_1_a, const Tensor<T>& iy1_2_1_b,
+                  const Tensor<T>& v2ijab_bbbb, const Tensor<T>& v2ijab_abab,
+                  const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b, const Tensor<T>& cholVV_b,
+                  const TiledIndexSpace& CI, const TiledIndexSpace& gf_tis, bool has_tis,
+                  bool debug) {
   using ComplexTensor = Tensor<std::complex<T>>;
   TiledIndexSpace o_alpha, v_alpha, o_beta, v_beta;
 
@@ -245,28 +358,30 @@ void gfccsd_y1_b(/* ExecutionContext& ec, */
 }
 
 template<typename T>
-void gfccsd_y2_a(/* ExecutionContext& ec, */
-                 Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_aaa,
-                 Tensor<std::complex<T>>& i0_bab, const Tensor<T>& t1_a, const Tensor<T>& t1_b,
-                 const Tensor<T>& t2_aaaa, const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
-                 const Tensor<std::complex<T>>& y1_a, const Tensor<std::complex<T>>& y2_aaa,
-                 const Tensor<std::complex<T>>& y2_bab, const Tensor<T>& f1,
-                 const Tensor<T>& iy1_1_a, const Tensor<T>& iy1_1_b, const Tensor<T>& iy1_2_1_a,
-                 const Tensor<T>& iy1_2_1_b, const Tensor<T>& iy2_a, const Tensor<T>& iy2_b,
-                 const Tensor<T>& iy3_1_aaaa, const Tensor<T>& iy3_1_baba,
-                 const Tensor<T>& iy3_1_abba, const Tensor<T>& iy3_1_2_a,
-                 const Tensor<T>& iy3_1_2_b, const Tensor<T>& iy3_aaaa, const Tensor<T>& iy3_bbbb,
-                 const Tensor<T>& iy3_baba, const Tensor<T>& iy3_baab, const Tensor<T>& iy3_abba,
-                 const Tensor<T>& iy4_1_aaaa, const Tensor<T>& iy4_1_baab,
-                 const Tensor<T>& iy4_1_baba, const Tensor<T>& iy4_1_bbbb,
-                 const Tensor<T>& iy4_1_abba, const Tensor<T>& iy4_2_aaaa,
-                 const Tensor<T>& iy4_2_abba, const Tensor<T>& iy5_aaaa, const Tensor<T>& iy5_baab,
-                 const Tensor<T>& iy5_bbbb, const Tensor<T>& iy5_baba, const Tensor<T>& iy5_abba,
-                 const Tensor<T>& iy6_a, const Tensor<T>& iy6_b, const Tensor<T>& cholOO_a,
-                 const Tensor<T>& cholOO_b, const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b,
-                 const Tensor<T>& cholVV_a, const Tensor<T>& cholVV_b, const Tensor<T>& v2ijab_aaaa,
-                 const Tensor<T>& v2ijab_abab, const TiledIndexSpace& CI,
-                 const TiledIndexSpace& gf_tis, bool has_tis, bool debug = false) {
+void exachem::cc::gfcc::GFCCSD_EA_A<
+  T>::gfccsd_y2_a(/* ExecutionContext& ec, */
+                  Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_aaa,
+                  Tensor<std::complex<T>>& i0_bab, const Tensor<T>& t1_a, const Tensor<T>& t1_b,
+                  const Tensor<T>& t2_aaaa, const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
+                  const Tensor<std::complex<T>>& y1_a, const Tensor<std::complex<T>>& y2_aaa,
+                  const Tensor<std::complex<T>>& y2_bab, const Tensor<T>& f1,
+                  const Tensor<T>& iy1_1_a, const Tensor<T>& iy1_1_b, const Tensor<T>& iy1_2_1_a,
+                  const Tensor<T>& iy1_2_1_b, const Tensor<T>& iy2_a, const Tensor<T>& iy2_b,
+                  const Tensor<T>& iy3_1_aaaa, const Tensor<T>& iy3_1_baba,
+                  const Tensor<T>& iy3_1_abba, const Tensor<T>& iy3_1_2_a,
+                  const Tensor<T>& iy3_1_2_b, const Tensor<T>& iy3_aaaa, const Tensor<T>& iy3_bbbb,
+                  const Tensor<T>& iy3_baba, const Tensor<T>& iy3_baab, const Tensor<T>& iy3_abba,
+                  const Tensor<T>& iy4_1_aaaa, const Tensor<T>& iy4_1_baab,
+                  const Tensor<T>& iy4_1_baba, const Tensor<T>& iy4_1_bbbb,
+                  const Tensor<T>& iy4_1_abba, const Tensor<T>& iy4_2_aaaa,
+                  const Tensor<T>& iy4_2_abba, const Tensor<T>& iy5_aaaa, const Tensor<T>& iy5_baab,
+                  const Tensor<T>& iy5_bbbb, const Tensor<T>& iy5_baba, const Tensor<T>& iy5_abba,
+                  const Tensor<T>& iy6_a, const Tensor<T>& iy6_b, const Tensor<T>& cholOO_a,
+                  const Tensor<T>& cholOO_b, const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b,
+                  const Tensor<T>& cholVV_a, const Tensor<T>& cholVV_b,
+                  const Tensor<T>& v2ijab_aaaa, const Tensor<T>& v2ijab_abab,
+                  const TiledIndexSpace& CI, const TiledIndexSpace& gf_tis, bool has_tis,
+                  bool debug) {
   using ComplexTensor = Tensor<std::complex<T>>;
   TiledIndexSpace o_alpha, v_alpha, o_beta, v_beta;
 
@@ -600,28 +715,30 @@ void gfccsd_y2_a(/* ExecutionContext& ec, */
 }
 
 template<typename T>
-void gfccsd_y2_b(/* ExecutionContext& ec, */
-                 Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_bbb,
-                 Tensor<std::complex<T>>& i0_aba, const Tensor<T>& t1_a, const Tensor<T>& t1_b,
-                 const Tensor<T>& t2_aaaa, const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
-                 const Tensor<std::complex<T>>& y1_b, const Tensor<std::complex<T>>& y2_bbb,
-                 const Tensor<std::complex<T>>& y2_aba, const Tensor<T>& f1,
-                 const Tensor<T>& iy1_1_a, const Tensor<T>& iy1_1_b, const Tensor<T>& iy1_2_1_a,
-                 const Tensor<T>& iy1_2_1_b, const Tensor<T>& iy2_a, const Tensor<T>& iy2_b,
-                 const Tensor<T>& iy3_1_bbbb, const Tensor<T>& iy3_1_abab,
-                 const Tensor<T>& iy3_1_baab, const Tensor<T>& iy3_1_2_a,
-                 const Tensor<T>& iy3_1_2_b, const Tensor<T>& iy3_aaaa, const Tensor<T>& iy3_bbbb,
-                 const Tensor<T>& iy3_abab, const Tensor<T>& iy3_baab, const Tensor<T>& iy3_abba,
-                 const Tensor<T>& iy4_1_aaaa, const Tensor<T>& iy4_1_baab,
-                 const Tensor<T>& iy4_1_bbbb, const Tensor<T>& iy4_1_abba,
-                 const Tensor<T>& iy4_1_abab, const Tensor<T>& iy4_2_bbbb,
-                 const Tensor<T>& iy4_2_baab, const Tensor<T>& iy5_aaaa, const Tensor<T>& iy5_baab,
-                 const Tensor<T>& iy5_bbbb, const Tensor<T>& iy5_abab, const Tensor<T>& iy5_abba,
-                 const Tensor<T>& iy6_a, const Tensor<T>& iy6_b, const Tensor<T>& cholOO_a,
-                 const Tensor<T>& cholOO_b, const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b,
-                 const Tensor<T>& cholVV_a, const Tensor<T>& cholVV_b, const Tensor<T>& v2ijab_bbbb,
-                 const Tensor<T>& v2ijab_abab, const TiledIndexSpace& CI,
-                 const TiledIndexSpace& gf_tis, bool has_tis, bool debug = false) {
+void exachem::cc::gfcc::GFCCSD_EA_B<
+  T>::gfccsd_y2_b(/* ExecutionContext& ec, */
+                  Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_bbb,
+                  Tensor<std::complex<T>>& i0_aba, const Tensor<T>& t1_a, const Tensor<T>& t1_b,
+                  const Tensor<T>& t2_aaaa, const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
+                  const Tensor<std::complex<T>>& y1_b, const Tensor<std::complex<T>>& y2_bbb,
+                  const Tensor<std::complex<T>>& y2_aba, const Tensor<T>& f1,
+                  const Tensor<T>& iy1_1_a, const Tensor<T>& iy1_1_b, const Tensor<T>& iy1_2_1_a,
+                  const Tensor<T>& iy1_2_1_b, const Tensor<T>& iy2_a, const Tensor<T>& iy2_b,
+                  const Tensor<T>& iy3_1_bbbb, const Tensor<T>& iy3_1_abab,
+                  const Tensor<T>& iy3_1_baab, const Tensor<T>& iy3_1_2_a,
+                  const Tensor<T>& iy3_1_2_b, const Tensor<T>& iy3_aaaa, const Tensor<T>& iy3_bbbb,
+                  const Tensor<T>& iy3_abab, const Tensor<T>& iy3_baab, const Tensor<T>& iy3_abba,
+                  const Tensor<T>& iy4_1_aaaa, const Tensor<T>& iy4_1_baab,
+                  const Tensor<T>& iy4_1_bbbb, const Tensor<T>& iy4_1_abba,
+                  const Tensor<T>& iy4_1_abab, const Tensor<T>& iy4_2_bbbb,
+                  const Tensor<T>& iy4_2_baab, const Tensor<T>& iy5_aaaa, const Tensor<T>& iy5_baab,
+                  const Tensor<T>& iy5_bbbb, const Tensor<T>& iy5_abab, const Tensor<T>& iy5_abba,
+                  const Tensor<T>& iy6_a, const Tensor<T>& iy6_b, const Tensor<T>& cholOO_a,
+                  const Tensor<T>& cholOO_b, const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b,
+                  const Tensor<T>& cholVV_a, const Tensor<T>& cholVV_b,
+                  const Tensor<T>& v2ijab_bbbb, const Tensor<T>& v2ijab_abab,
+                  const TiledIndexSpace& CI, const TiledIndexSpace& gf_tis, bool has_tis,
+                  bool debug) {
   using ComplexTensor = Tensor<std::complex<T>>;
   TiledIndexSpace o_alpha, v_alpha, o_beta, v_beta;
 
@@ -903,4 +1020,107 @@ void gfccsd_y2_b(/* ExecutionContext& ec, */
                  i2_7_baa, i0_temp_bbb, i0_temp_aab, i0_temp_aba);
 
   if(debug) sch.execute();
+}
+
+// Backward compatibility wrapper functions
+template<typename T>
+void gfccsd_y1_a(/* ExecutionContext& ec, */
+                 Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_a,
+                 const Tensor<T>& t1_a, const Tensor<T>& t1_b, const Tensor<T>& t2_aaaa,
+                 const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
+                 const Tensor<std::complex<T>>& y1_a, const Tensor<std::complex<T>>& y2_aaa,
+                 const Tensor<std::complex<T>>& y2_bab, const Tensor<T>& f1, const Tensor<T>& iy1_a,
+                 const Tensor<T>& iy1_2_1_a, const Tensor<T>& iy1_2_1_b,
+                 const Tensor<T>& v2ijab_aaaa, const Tensor<T>& v2ijab_abab,
+                 const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b, const Tensor<T>& cholVV_a,
+                 const TiledIndexSpace& CI, const TiledIndexSpace& gf_tis, bool has_tis,
+                 bool debug = false) {
+  exachem::cc::gfcc::GFCCSD_EA_A<T> gfccsd_ea_a;
+  gfccsd_ea_a.gfccsd_y1_a(sch, MO, i0_a, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, y1_a, y2_aaa,
+                          y2_bab, f1, iy1_a, iy1_2_1_a, iy1_2_1_b, v2ijab_aaaa, v2ijab_abab,
+                          cholOV_a, cholOV_b, cholVV_a, CI, gf_tis, has_tis, debug);
+}
+
+template<typename T>
+void gfccsd_y1_b(/* ExecutionContext& ec, */
+                 Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_b,
+                 const Tensor<T>& t1_a, const Tensor<T>& t1_b, const Tensor<T>& t2_aaaa,
+                 const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
+                 const Tensor<std::complex<T>>& y1_b, const Tensor<std::complex<T>>& y2_bbb,
+                 const Tensor<std::complex<T>>& y2_aba, const Tensor<T>& f1, const Tensor<T>& iy1_b,
+                 const Tensor<T>& iy1_2_1_a, const Tensor<T>& iy1_2_1_b,
+                 const Tensor<T>& v2ijab_bbbb, const Tensor<T>& v2ijab_abab,
+                 const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b, const Tensor<T>& cholVV_b,
+                 const TiledIndexSpace& CI, const TiledIndexSpace& gf_tis, bool has_tis,
+                 bool debug = false) {
+  exachem::cc::gfcc::GFCCSD_EA_B<T> gfccsd_ea_b;
+  gfccsd_ea_b.gfccsd_y1_b(sch, MO, i0_b, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, y1_b, y2_bbb,
+                          y2_aba, f1, iy1_b, iy1_2_1_a, iy1_2_1_b, v2ijab_bbbb, v2ijab_abab,
+                          cholOV_a, cholOV_b, cholVV_b, CI, gf_tis, has_tis, debug);
+}
+
+template<typename T>
+void gfccsd_y2_a(/* ExecutionContext& ec, */
+                 Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_aaa,
+                 Tensor<std::complex<T>>& i0_bab, const Tensor<T>& t1_a, const Tensor<T>& t1_b,
+                 const Tensor<T>& t2_aaaa, const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
+                 const Tensor<std::complex<T>>& y1_a, const Tensor<std::complex<T>>& y2_aaa,
+                 const Tensor<std::complex<T>>& y2_bab, const Tensor<T>& f1,
+                 const Tensor<T>& iy1_1_a, const Tensor<T>& iy1_1_b, const Tensor<T>& iy1_2_1_a,
+                 const Tensor<T>& iy1_2_1_b, const Tensor<T>& iy2_a, const Tensor<T>& iy2_b,
+                 const Tensor<T>& iy3_1_aaaa, const Tensor<T>& iy3_1_baba,
+                 const Tensor<T>& iy3_1_abba, const Tensor<T>& iy3_1_2_a,
+                 const Tensor<T>& iy3_1_2_b, const Tensor<T>& iy3_aaaa, const Tensor<T>& iy3_bbbb,
+                 const Tensor<T>& iy3_baba, const Tensor<T>& iy3_baab, const Tensor<T>& iy3_abba,
+                 const Tensor<T>& iy4_1_aaaa, const Tensor<T>& iy4_1_baab,
+                 const Tensor<T>& iy4_1_baba, const Tensor<T>& iy4_1_bbbb,
+                 const Tensor<T>& iy4_1_abba, const Tensor<T>& iy4_2_aaaa,
+                 const Tensor<T>& iy4_2_abba, const Tensor<T>& iy5_aaaa, const Tensor<T>& iy5_baab,
+                 const Tensor<T>& iy5_bbbb, const Tensor<T>& iy5_baba, const Tensor<T>& iy5_abba,
+                 const Tensor<T>& iy6_a, const Tensor<T>& iy6_b, const Tensor<T>& cholOO_a,
+                 const Tensor<T>& cholOO_b, const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b,
+                 const Tensor<T>& cholVV_a, const Tensor<T>& cholVV_b, const Tensor<T>& v2ijab_aaaa,
+                 const Tensor<T>& v2ijab_abab, const TiledIndexSpace& CI,
+                 const TiledIndexSpace& gf_tis, bool has_tis, bool debug = false) {
+  exachem::cc::gfcc::GFCCSD_EA_A<T> gfccsd_ea_a;
+  gfccsd_ea_a.gfccsd_y2_a(
+    sch, MO, i0_aaa, i0_bab, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, y1_a, y2_aaa, y2_bab, f1,
+    iy1_1_a, iy1_1_b, iy1_2_1_a, iy1_2_1_b, iy2_a, iy2_b, iy3_1_aaaa, iy3_1_baba, iy3_1_abba,
+    iy3_1_2_a, iy3_1_2_b, iy3_aaaa, iy3_bbbb, iy3_baba, iy3_baab, iy3_abba, iy4_1_aaaa, iy4_1_baab,
+    iy4_1_baba, iy4_1_bbbb, iy4_1_abba, iy4_2_aaaa, iy4_2_abba, iy5_aaaa, iy5_baab, iy5_bbbb,
+    iy5_baba, iy5_abba, iy6_a, iy6_b, cholOO_a, cholOO_b, cholOV_a, cholOV_b, cholVV_a, cholVV_b,
+    v2ijab_aaaa, v2ijab_abab, CI, gf_tis, has_tis, debug);
+}
+
+template<typename T>
+void gfccsd_y2_b(/* ExecutionContext& ec, */
+                 Scheduler& sch, const TiledIndexSpace& MO, Tensor<std::complex<T>>& i0_bbb,
+                 Tensor<std::complex<T>>& i0_aba, const Tensor<T>& t1_a, const Tensor<T>& t1_b,
+                 const Tensor<T>& t2_aaaa, const Tensor<T>& t2_bbbb, const Tensor<T>& t2_abab,
+                 const Tensor<std::complex<T>>& y1_b, const Tensor<std::complex<T>>& y2_bbb,
+                 const Tensor<std::complex<T>>& y2_aba, const Tensor<T>& f1,
+                 const Tensor<T>& iy1_1_a, const Tensor<T>& iy1_1_b, const Tensor<T>& iy1_2_1_a,
+                 const Tensor<T>& iy1_2_1_b, const Tensor<T>& iy2_a, const Tensor<T>& iy2_b,
+                 const Tensor<T>& iy3_1_bbbb, const Tensor<T>& iy3_1_abab,
+                 const Tensor<T>& iy3_1_baab, const Tensor<T>& iy3_1_2_a,
+                 const Tensor<T>& iy3_1_2_b, const Tensor<T>& iy3_aaaa, const Tensor<T>& iy3_bbbb,
+                 const Tensor<T>& iy3_abab, const Tensor<T>& iy3_baab, const Tensor<T>& iy3_abba,
+                 const Tensor<T>& iy4_1_aaaa, const Tensor<T>& iy4_1_baab,
+                 const Tensor<T>& iy4_1_bbbb, const Tensor<T>& iy4_1_abba,
+                 const Tensor<T>& iy4_1_abab, const Tensor<T>& iy4_2_bbbb,
+                 const Tensor<T>& iy4_2_baab, const Tensor<T>& iy5_aaaa, const Tensor<T>& iy5_baab,
+                 const Tensor<T>& iy5_bbbb, const Tensor<T>& iy5_abab, const Tensor<T>& iy5_abba,
+                 const Tensor<T>& iy6_a, const Tensor<T>& iy6_b, const Tensor<T>& cholOO_a,
+                 const Tensor<T>& cholOO_b, const Tensor<T>& cholOV_a, const Tensor<T>& cholOV_b,
+                 const Tensor<T>& cholVV_a, const Tensor<T>& cholVV_b, const Tensor<T>& v2ijab_bbbb,
+                 const Tensor<T>& v2ijab_abab, const TiledIndexSpace& CI,
+                 const TiledIndexSpace& gf_tis, bool has_tis, bool debug = false) {
+  exachem::cc::gfcc::GFCCSD_EA_B<T> gfccsd_ea_b;
+  gfccsd_ea_b.gfccsd_y2_b(
+    sch, MO, i0_bbb, i0_aba, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, y1_b, y2_bbb, y2_aba, f1,
+    iy1_1_a, iy1_1_b, iy1_2_1_a, iy1_2_1_b, iy2_a, iy2_b, iy3_1_bbbb, iy3_1_abab, iy3_1_baab,
+    iy3_1_2_a, iy3_1_2_b, iy3_aaaa, iy3_bbbb, iy3_abab, iy3_baab, iy3_abba, iy4_1_aaaa, iy4_1_baab,
+    iy4_1_bbbb, iy4_1_abba, iy4_1_abab, iy4_2_bbbb, iy4_2_baab, iy5_aaaa, iy5_baab, iy5_bbbb,
+    iy5_abab, iy5_abba, iy6_a, iy6_b, cholOO_a, cholOO_b, cholOV_a, cholOV_b, cholVV_a, cholVV_b,
+    v2ijab_bbbb, v2ijab_abab, CI, gf_tis, has_tis, debug);
 }

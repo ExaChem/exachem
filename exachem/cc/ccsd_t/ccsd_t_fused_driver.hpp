@@ -17,6 +17,7 @@
 #include "exachem/cc/ccsd_t/ccsd_t_common.hpp"
 
 namespace exachem::cc::ccsd_t {
+
 void ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env);
 }
 
@@ -46,7 +47,6 @@ inline int checkCudaKernelCompatible(bool r0) {
     return cuda_driver;
   }
 
-  //
   int driver_major = version / 1000;
   int driver_minor = (version - (driver_major * 1000)) / 10;
   if(r0)
@@ -58,17 +58,44 @@ inline int checkCudaKernelCompatible(bool r0) {
 }
 #endif
 
-//
 template<typename T>
-std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
+class CCSD_T_Fused_Driver {
+public:
+  CCSD_T_Fused_Driver() = default;
+
+  virtual ~CCSD_T_Fused_Driver() = default;
+
+  CCSD_T_Fused_Driver(const CCSD_T_Fused_Driver&)            = default;
+  CCSD_T_Fused_Driver& operator=(const CCSD_T_Fused_Driver&) = default;
+  CCSD_T_Fused_Driver(CCSD_T_Fused_Driver&&)                 = default;
+  CCSD_T_Fused_Driver& operator=(CCSD_T_Fused_Driver&&)      = default;
+
+  virtual std::tuple<T, T, double, double>
+  execute(ChemEnv& chem_env, ExecutionContext& ec, std::vector<int>& k_spin,
+          const TiledIndexSpace& MO, Tensor<T>& d_t1, Tensor<T>& d_t2,
+          exachem::cholesky_2e::V2Tensors<T>& d_v2, std::vector<T>& k_evl_sorted, T hf_ccsd_energy,
+          bool is_restricted, LRUCache<Index, std::vector<T>>& cache_s1t,
+          LRUCache<Index, std::vector<T>>& cache_s1v, LRUCache<Index, std::vector<T>>& cache_d1t,
+          LRUCache<Index, std::vector<T>>& cache_d1v, LRUCache<Index, std::vector<T>>& cache_d2t,
+          LRUCache<Index, std::vector<T>>& cache_d2v, bool seq_h3b = false,
+          bool tilesize_opt = true);
+
+  virtual void calculate_performance_ops(ChemEnv& chem_env, ExecutionContext& ec,
+                                         std::vector<int>& k_spin, const TiledIndexSpace& MO,
+                                         std::vector<T>& k_evl_sorted, double hf_ccsd_energy,
+                                         bool is_restricted, long double& total_num_ops,
+                                         bool seq_h3b = false);
+};
+
+template<typename T>
+std::tuple<T, T, double, double> CCSD_T_Fused_Driver<T>::execute(
   ChemEnv& chem_env, ExecutionContext& ec, std::vector<int>& k_spin, const TiledIndexSpace& MO,
   Tensor<T>& d_t1, Tensor<T>& d_t2, exachem::cholesky_2e::V2Tensors<T>& d_v2,
   std::vector<T>& k_evl_sorted, T hf_ccsd_energy, bool is_restricted,
   LRUCache<Index, std::vector<T>>& cache_s1t, LRUCache<Index, std::vector<T>>& cache_s1v,
   LRUCache<Index, std::vector<T>>& cache_d1t, LRUCache<Index, std::vector<T>>& cache_d1v,
   LRUCache<Index, std::vector<T>>& cache_d2t, LRUCache<Index, std::vector<T>>& cache_d2v,
-  bool seq_h3b = false, bool tilesize_opt = true) {
-  //
+  bool seq_h3b, bool tilesize_opt) {
   auto rank     = ec.pg().rank().value();
   bool nodezero = rank == 0;
 
@@ -338,7 +365,7 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   size_t current_task             = 0;
   size_t last_reported_percentage = 0;
 
-  for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) { //
+  for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) {
     for(size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
       for(size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
         for(size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
@@ -511,7 +538,6 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
   auto total_t_time =
     std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
 
-  //
   next = ac->fetch_add(0, 1);
   ac->deallocate();
   delete ac;
@@ -520,11 +546,12 @@ std::tuple<T, T, double, double> ccsd_t_fused_driver_new(
 }
 
 template<typename T>
-void ccsd_t_fused_driver_calculator_ops(ChemEnv& chem_env, ExecutionContext& ec,
-                                        std::vector<int>& k_spin, const TiledIndexSpace& MO,
-                                        std::vector<T>& k_evl_sorted, double hf_ccsd_energy,
-                                        bool is_restricted, long double& total_num_ops,
-                                        bool seq_h3b = false) {
+void CCSD_T_Fused_Driver<T>::calculate_performance_ops(ChemEnv& chem_env, ExecutionContext& ec,
+                                                       std::vector<int>&      k_spin,
+                                                       const TiledIndexSpace& MO,
+                                                       std::vector<T>&        k_evl_sorted,
+                                                       double hf_ccsd_energy, bool is_restricted,
+                                                       long double& total_num_ops, bool seq_h3b) {
   auto rank = ec.pg().rank().value();
 
   Index noab = MO("occ").num_tiles();
@@ -548,15 +575,13 @@ void ccsd_t_fused_driver_calculator_ops(ChemEnv& chem_env, ExecutionContext& ec,
     for(size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
       for(size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
         for(size_t t_p6b = t_p5b; t_p6b < noab + nvab; t_p6b++) {
-          for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) { //
+          for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) {
             for(size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
               for(size_t t_h3b = t_h2b; t_h3b < noab; t_h3b++) {
-                //
                 if((k_spin[t_p4b] + k_spin[t_p5b] + k_spin[t_p6b]) ==
                    (k_spin[t_h1b] + k_spin[t_h2b] + k_spin[t_h3b])) {
                   if((!is_restricted) || (k_spin[t_p4b] + k_spin[t_p5b] + k_spin[t_p6b] +
                                           k_spin[t_h1b] + k_spin[t_h2b] + k_spin[t_h3b]) <= 8) {
-                    //
                     double factor = 1.0;
                     if(is_restricted) factor = 2.0;
                     if((t_p4b == t_p5b) && (t_p5b == t_p6b)) { factor /= 6.0; }
@@ -565,7 +590,6 @@ void ccsd_t_fused_driver_calculator_ops(ChemEnv& chem_env, ExecutionContext& ec,
                     if((t_h1b == t_h2b) && (t_h2b == t_h3b)) { factor /= 6.0; }
                     else if((t_h1b == t_h2b) || (t_h2b == t_h3b)) { factor /= 2.0; }
 
-                    //
                     list_tasks.push_back(
                       std::make_tuple(t_h1b, t_h2b, t_h3b, t_p4b, t_p5b, t_p6b, factor));
                   }
@@ -583,7 +607,6 @@ void ccsd_t_fused_driver_calculator_ops(ChemEnv& chem_env, ExecutionContext& ec,
         for(size_t t_p6b = t_p5b; t_p6b < noab + nvab; t_p6b++) {
           for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) {
             for(size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
-              //
               for(size_t t_h3b = t_h2b; t_h3b < noab; t_h3b++) {
                 if((k_spin[t_p4b] + k_spin[t_p5b] + k_spin[t_p6b]) ==
                    (k_spin[t_h1b] + k_spin[t_h2b] + k_spin[t_h3b])) {
@@ -591,14 +614,13 @@ void ccsd_t_fused_driver_calculator_ops(ChemEnv& chem_env, ExecutionContext& ec,
                                           k_spin[t_h1b] + k_spin[t_h2b] + k_spin[t_h3b]) <= 8) {
                     double factor = 1.0;
                     if(is_restricted) factor = 2.0;
-                    //
+
                     if((t_p4b == t_p5b) && (t_p5b == t_p6b)) { factor /= 6.0; }
                     else if((t_p4b == t_p5b) || (t_p5b == t_p6b)) { factor /= 2.0; }
 
                     if((t_h1b == t_h2b) && (t_h2b == t_h3b)) { factor /= 6.0; }
                     else if((t_h1b == t_h2b) || (t_h2b == t_h3b)) { factor /= 2.0; }
 
-                    //
                     list_tasks.push_back(
                       std::make_tuple(t_h1b, t_h2b, t_h3b, t_p4b, t_p5b, t_p6b, factor));
                   }

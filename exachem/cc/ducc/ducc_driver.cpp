@@ -15,7 +15,8 @@ namespace fs = std::filesystem;
 
 namespace exachem::cc::ducc {
 
-void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
+// Member function implementation
+void DUCCDriver::execute(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
 
   CCContext& cc_context      = chem_env.cc_context;
@@ -32,11 +33,12 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   free_tensors(cholVpr);
 
-  IndexVector occ_int_vec;
-  IndexVector virt_int_vec;
-  std::string pos_str;
-  DUCC_T_CCSD_Driver<T>(chem_env, ec, MO, d_t1, d_t2, d_f1, v2tensors, occ_int_vec, virt_int_vec,
-                        pos_str);
+  IndexVector                                       occ_int_vec;
+  IndexVector                                       virt_int_vec;
+  std::string                                       pos_str;
+  exachem::cc::ducc::internal::DUCCInternal<double> ducc_internal;
+  ducc_internal.DUCC_T_CCSD_Driver(chem_env, ec, MO, d_t1, d_t2, d_f1, v2tensors, occ_int_vec,
+                                   virt_int_vec, pos_str);
 
   v2tensors.deallocate();
   free_tensors(d_t1, d_t2, d_f1);
@@ -44,6 +46,12 @@ void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   print_memory_usage<T>(ec.pg().rank().value(), "DUCC Memory Stats");
 
   ec.flush_and_sync();
+}
+
+// Wrapper function for backward compatibility
+void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env) {
+  DUCCDriver driver;
+  driver.execute(ec, chem_env);
 }
 
 } // namespace exachem::cc::ducc

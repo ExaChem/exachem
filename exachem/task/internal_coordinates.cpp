@@ -16,15 +16,16 @@
 #include <queue>
 #include <unordered_set>
 
-std::vector<double> atom_radii_int = {
+namespace exachem::task {
+
+// Initialize the static member variable with proper scope
+std::vector<double> InternalCoordinateUtils::atom_radii_int = {
   0.38, 0.32, 1.34, 0.9,  0.82, 0.77, 0.75, 0.73, 0.71, 0.69, 1.54, 1.3,  1.18, 1.11, 1.06,
   1.02, 0.99, 0.97, 1.96, 1.74, 1.44, 1.36, 1.25, 1.27, 1.39, 1.25, 1.26, 1.21, 1.38, 1.31,
   1.26, 1.22, 1.19, 1.16, 1.14, 1.1,  2.11, 1.92, 1.62, 1.48, 1.37, 1.45, 1.56, 1.26, 1.35,
   1.31, 1.53, 1.48, 1.44, 1.41, 1.38, 1.35, 1.33, 1.3,  2.25, 1.98, 1.69, 0.00, 0.00, 0.00,
   0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 1.6,  1.5,  1.38, 1.46, 1.59,
   1.28, 1.37, 1.28, 1.44, 1.49, 1.48, 1.47, 1.46, 0.00, 0.00, 1.45};
-
-namespace exachem::task {
 
 InternalCoordinate::InternalCoordinate(int _i, int _j, double _value) {
   type  = "Bond";
@@ -74,9 +75,9 @@ double InternalCoordinate::hessian_component(Eigen::MatrixXd rho) {
   return -1.0;
 }
 
-InternalCoordinate InternalCoordinates::operator[](int idx) { return coords[idx]; }
+InternalCoordinate InternalCoordinates::operator[](int idx) const { return coords[idx]; }
 
-int InternalCoordinates::size() { return coords.size(); }
+int InternalCoordinates::size() const { return static_cast<int>(coords.size()); }
 
 void InternalCoordinates::push_back(InternalCoordinate coord) { coords.push_back(coord); }
 
@@ -167,7 +168,7 @@ void InternalCoordinates::print(ExecutionContext& ec) {
   }
 }
 
-double angle_eval(Eigen::MatrixXd coords, bool _, int i, int j, int k) {
+double InternalCoordinateUtils::angle_eval(Eigen::MatrixXd coords, bool _, int i, int j, int k) {
   Eigen::RowVectorXd v1 = (coords.row(i) - coords.row(j)) * exachem::constants::ang2bohr;
   Eigen::RowVectorXd v2 = (coords.row(k) - coords.row(j)) * exachem::constants::ang2bohr;
 
@@ -178,7 +179,8 @@ double angle_eval(Eigen::MatrixXd coords, bool _, int i, int j, int k) {
   return phi;
 }
 
-std::tuple<std::vector<std::vector<int>>, Eigen::MatrixXd> get_clusters(const Eigen::MatrixXd& C) {
+std::tuple<std::vector<std::vector<int>>, Eigen::MatrixXd>
+InternalCoordinateUtils::get_clusters(const Eigen::MatrixXd& C) {
   int n = C.rows();
   std::vector<std::vector<int>>
     clusters; // Vector to hold the clusters (each cluster is a list of node indices)
@@ -235,10 +237,13 @@ std::tuple<std::vector<std::vector<int>>, Eigen::MatrixXd> get_clusters(const Ei
 // look into why pyberny wasn't calculating them
 InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool torsions) {
   InternalCoordinates coords;
-  auto                data_mat  = exachem::task::process_geometry(ec, chem_env);
-  int                 num_atoms = data_mat.size();
-  auto bonds = exachem::task::process_bond_lengths(ec, num_atoms, data_mat, atom_radii_int);
-  auto apuv  = exachem::task::calculate_atom_pair_unit_vector(data_mat, bonds, num_atoms);
+  GeometryAnalyzer    geom; // local analyzer instance
+
+  auto data_mat  = geom.process_geometry(ec, chem_env);
+  int  num_atoms = data_mat.size();
+  auto bonds =
+    geom.process_bond_lengths(ec, num_atoms, data_mat, InternalCoordinateUtils::atom_radii_int);
+  auto apuv = geom.calculate_atom_pair_unit_vector(data_mat, bonds, num_atoms);
 
   std::vector<int> atomic_numbers;
   Eigen::MatrixXd  geometry(chem_env.ec_atoms.size(), 3);
@@ -266,15 +271,15 @@ InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool
   Eigen::MatrixXd bondmatrix(num_atoms, num_atoms);
   for(int i = 0; i < num_atoms; i++) {
     for(int j = 0; j < num_atoms; j++) {
-      double length = exachem::task::single_bond_length_optimize(ec, num_atoms, data_mat, i, j, 1.3,
-                                                                 atom_radii_int);
+      double length = geom.single_bond_length_optimize(ec, num_atoms, data_mat, i, j, 1.3,
+                                                       InternalCoordinateUtils::atom_radii_int);
       if(i != j && length != 0.0) { bondmatrix(i, j) = 1.0; }
       else { bondmatrix(i, j) = 0.0; }
     }
   }
 
   std::tuple<std::vector<std::vector<int>>, Eigen::MatrixXd> cluster_pair =
-    get_clusters(bondmatrix);
+    InternalCoordinateUtils::get_clusters(bondmatrix);
   auto fragments = std::get<0>(cluster_pair);
   auto C         = std::get<1>(cluster_pair);
   auto C_total   = C;
@@ -284,16 +289,17 @@ InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool
     for(int i = 0; i < num_atoms; i++) {
       for(int j = 0; j < num_atoms; j++) {
         if(bondmatrix(i, j) != 1.0) {
-          double length = exachem::task::single_bond_length_optimize(ec, num_atoms, data_mat, i, j,
-                                                                     3e50, atom_radii_int);
-          if((!C_total(i, j)) && (length < atom_radii_int[data_mat[i][0] - 1] +
-                                             atom_radii_int[data_mat[j][0] - 1] + shift)) {
+          double length = geom.single_bond_length_optimize(ec, num_atoms, data_mat, i, j, 3e50,
+                                                           InternalCoordinateUtils::atom_radii_int);
+          if((!C_total(i, j)) &&
+             (length < InternalCoordinateUtils::atom_radii_int[data_mat[i][0] - 1] +
+                         InternalCoordinateUtils::atom_radii_int[data_mat[j][0] - 1] + shift)) {
             bondmatrix(i, j) = 1.0;
           }
         }
       }
     }
-    auto temp_cluster_pair = get_clusters(bondmatrix);
+    auto temp_cluster_pair = InternalCoordinateUtils::get_clusters(bondmatrix);
     C_total                = std::get<1>(temp_cluster_pair);
     shift++;
   }
@@ -302,8 +308,8 @@ InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool
   for(int i = 0; i < num_atoms; i++) {
     for(int j = i; j < num_atoms; j++) {
       if(bondmatrix(i, j) == 1.0) {
-        double length = exachem::task::single_bond_length_optimize(ec, num_atoms, data_mat, i, j,
-                                                                   3e50, atom_radii_int);
+        double length = geom.single_bond_length_optimize(ec, num_atoms, data_mat, i, j, 3e50,
+                                                         InternalCoordinateUtils::atom_radii_int);
         coords.push_back(InternalCoordinate(
           i, j, length / exachem::constants::ang2bohr)); // converting to angstrom
       }
@@ -315,9 +321,9 @@ InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool
     for(int j = 0; j < num_atoms; j++) {   // atom 1
       for(int k = i; k < num_atoms; k++) { // atom 2
         if(i != j && i != k && j != k && bondmatrix(i, j) == 1.0 && bondmatrix(j, k) == 1.0 &&
-           exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k) != 0.0 &&
-           angle_eval(matrix_geom, false, i, j, k) > acos(-1.0) / 4) {
-          double angle = exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k);
+           geom.specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k) != 0.0 &&
+           InternalCoordinateUtils::angle_eval(matrix_geom, false, i, j, k) > acos(-1.0) / 4) {
+          double angle = geom.specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k);
 
           coords.push_back(InternalCoordinate(i, j, k, angle));
         }
@@ -342,8 +348,7 @@ InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool
                 std::vector<int> reverse = {l, k, j, i};
 
                 if(i != l && j != l && k != l && bonds[k][l] != 0.0 &&
-                   exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, j, k, l) !=
-                     acos(-1.0) &&
+                   geom.specific_bond_angle(ec, num_atoms, bonds, apuv, j, k, l) != acos(-1.0) &&
                    used_indices.find(reverse) != used_indices.end()) {
                   // std::vector<double> e_ij      = apuv[i][j];
                   // std::vector<double> e_jk      = apuv[j][k];
@@ -376,16 +381,14 @@ InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool
 
                   // double current_torsional_angle = value * sign;
 
-                  double current_torsional_angle = exachem::task::single_torsional_angle(
-                    ec, data_mat, num_atoms, bonds, i, j, k, l);
+                  double current_torsional_angle =
+                    geom.single_torsional_angle(ec, data_mat, num_atoms, bonds, i, j, k, l);
 
                   if(current_torsional_angle != 0.0 && current_torsional_angle != acos(-1.0)) {
                     InternalCoordinate coord1(
-                      i, j, k,
-                      exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k));
+                      i, j, k, geom.specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k));
                     InternalCoordinate coord2(
-                      j, k, l,
-                      exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, j, k, l));
+                      j, k, l, geom.specific_bond_angle(ec, num_atoms, bonds, apuv, j, k, l));
 
                     // dihedral angles are disabled because they are not computed with pyberny
 

@@ -6,13 +6,13 @@
  * See LICENSE.txt for details
  */
 
-#include "exachem/cc/gfcc/gfccsd_ea.hpp"
+#include "exachem/cc/gfcc/gfccsd_ea_a.hpp"
 
 namespace exachem::cc::gfcc {
 
 #if 0
   template<typename T>
-  void gfccsd_driver_ea_a(
+  void GFCCSD_EA_A_Driver<T>::gfccsd_driver_ea_a(
     ExecutionContext& gec, ChemEnv& chem_env, const TiledIndexSpace& MO,
     Tensor<T>& t1_a, Tensor<T>& t1_b, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb, Tensor<T>& t2_abab,
     Tensor<T>& f1, Tensor<T>& t2v2_v, Tensor<T>& lt12_v_a, Tensor<T>& lt12_v_b, Tensor<T>& iy1_1_a,
@@ -72,10 +72,10 @@ namespace exachem::cc::gfcc {
     o_beta  = {MO("occ"), range(oatiles, otiles)};
     v_beta  = {MO("virt"), range(vatiles, vtiles)};
   
-    auto [p1_va, p2_va] = v_alpha.labels<2>("all");
-    auto [p1_vb, p2_vb] = v_beta.labels<2>("all");
-    auto [h1_oa, h2_oa] = o_alpha.labels<2>("all");
-    auto [h1_ob, h2_ob] = o_beta.labels<2>("all");
+    const auto [p1_va, p2_va] = v_alpha.labels<2>("all");
+    const auto [p1_vb, p2_vb] = v_beta.labels<2>("all");
+    const auto [h1_oa, h2_oa] = o_alpha.labels<2>("all");
+    const auto [h1_ob, h2_ob] = o_beta.labels<2>("all");
   
     std::cout.precision(15);
   
@@ -100,8 +100,8 @@ namespace exachem::cc::gfcc {
   
     // double au2ev = 27.2113961;
   
-    std::string dtmp_aaa_file = files_prefix + ".W" + gfo.str() + ".a_dtmp_aaa.l" + levelstr;
-    std::string dtmp_bab_file = files_prefix + ".W" + gfo.str() + ".a_dtmp_bab.l" + levelstr;
+  const   std::string dtmp_aaa_file = files_prefix + ".W" + gfo.str() + ".a_dtmp_aaa.l" + levelstr;
+    const std::string dtmp_bab_file = files_prefix + ".W" + gfo.str() + ".a_dtmp_bab.l" + levelstr;
   
     if(fs::exists(dtmp_aaa_file) && fs::exists(dtmp_bab_file)) {
       read_from_disk(dtmp_aaa, dtmp_aaa_file);
@@ -158,11 +158,11 @@ namespace exachem::cc::gfcc {
     std::vector<size_t> pi_tbp;
     // Check pi's already processed
     for(size_t pi = 0; pi < num_oi; pi++) {
-      std::string y1_a_conv_wpi_file =
+      const std::string y1_a_conv_wpi_file =
         files_prefix + ".y1_a.w" + gfo.str() + ".oi" + std::to_string(pi);
-      std::string y2_aaa_conv_wpi_file =
+      const std::string y2_aaa_conv_wpi_file =
         files_prefix + ".y2_aaa.w" + gfo.str() + ".oi" + std::to_string(pi);
-      std::string y2_bab_conv_wpi_file =
+      const std::string y2_bab_conv_wpi_file =
         files_prefix + ".y2_bab.w" + gfo.str() + ".oi" + std::to_string(pi);
   
       if(fs::exists(y1_a_conv_wpi_file) && fs::exists(y2_aaa_conv_wpi_file) &&
@@ -193,10 +193,10 @@ namespace exachem::cc::gfcc {
     }
   
     if(rank == 0) {
-      cout << "Total, remaining orbitals, batch size = " << num_oi << ", " << num_pi_remain << ", "
-           << num_oi_can_bp << endl;
-      cout << "No of processes used to compute each orbital = " << subranks << endl;
-      // ofs_profile << "No of processes used to compute each orbital = " << subranks << endl;
+      std::cout << "Total, remaining orbitals, batch size = " << num_oi << ", " << num_pi_remain << ", "
+           << num_oi_can_bp << std::endl;
+      std::cout << "No of processes used to compute each orbital = " << subranks << std::endl;
+      // ofs_profile << "No of processes used to compute each orbital = " << subranks << std::endl;
     }
   
     ///////////////////////////
@@ -241,7 +241,7 @@ namespace exachem::cc::gfcc {
           ComplexTensor y2_bab{o_beta, v_alpha, v_beta};
           Tensor<T>     B1_a{v_alpha};
   
-          // if(rank==0) cout << "allocate B" << endl;
+          // if(rank==0) std::cout << "allocate B" << std::endl;
           sch.allocate(B1, B1_a).execute();
           LabelLoopNest loop_nest{B1().labels()};
           sch(B1() = 0).execute();
@@ -275,13 +275,13 @@ namespace exachem::cc::gfcc {
           double gf_t_dis_tot   = 0.0;
           size_t gf_iter        = 0;
   
-          std::string y1_a_inter_wpi_file =
-            files_prefix + ".y1_a.inter.w" + gfo.str() + ".oi" + std::to_string(pi);
-          std::string y2_aaa_inter_wpi_file =
-            files_prefix + ".y2_aaa.inter.w" + gfo.str() + ".oi" + std::to_string(pi);
-          std::string y2_bab_inter_wpi_file =
-            files_prefix + ".y2_bab.inter.w" + gfo.str() + ".oi" + std::to_string(pi);
-  
+          const std::string y1_a_inter_wpi_file =
+            const std::string files_prefix + ".y1_a.inter.w" + gfo.str() + ".oi" + std::to_string(pi);
+          const std::string y2_aaa_inter_wpi_file =
+            const std::string files_prefix + ".y2_aaa.inter.w" + gfo.str() + ".oi" + std::to_string(pi);
+          const std::string y2_bab_inter_wpi_file =
+            const std::string files_prefix + ".y2_bab.inter.w" + gfo.str() + ".oi" + std::to_string(pi);
+
           if(fs::exists(y1_a_inter_wpi_file) && fs::exists(y2_aaa_inter_wpi_file) &&
              fs::exists(y2_bab_inter_wpi_file)) {
             read_from_disk(y1_a, y1_a_inter_wpi_file);
@@ -353,7 +353,7 @@ namespace exachem::cc::gfcc {
                                     r2_bab_norm * r2_bab_norm);
   
             if(rank == root_ppi && debug) {
-              cout << std::fixed << std::setprecision(2) << "w,oi (" << gfo.str() << "," << pi
+              std::cout << std::fixed << std::setprecision(2) << "w,oi (" << gfo.str() << "," << pi
                    << "): #iter " << gf_iter << "(" << gf_maxiter << "), residual = " << std::fixed
                    << std::setprecision(6) << gf_residual << std::endl;
             }
@@ -472,7 +472,7 @@ namespace exachem::cc::gfcc {
               b(k, 0)     = cn(k, 0) * b(k, 0);
   
               if(rank == root_ppi && debug)
-                cout << "k: " << k << ", error: " << std::abs(b(k + 1, 0)) << endl;
+                std::cout << "k: " << k << ", error: " << std::abs(b(k + 1, 0)) << std::endl;
   
               // normalization
               if(std::abs(b(k + 1, 0)) > 1e-2) {
@@ -495,7 +495,7 @@ namespace exachem::cc::gfcc {
             CMatrix bsub = b.block(0, 0, gmres_hist, 1);
             CMatrix y    = Hsub.householderQr().solve(bsub);
   
-            if(rank == 0) cout << "residual: " << (bsub - Hsub * y).norm() << endl;
+            if(rank == 0) std::cout << "residual: " << (bsub - Hsub * y).norm() << std::endl;
   
             for(auto i = 0; i < gmres_hist; i++) {
               // clang-format off
@@ -522,11 +522,11 @@ namespace exachem::cc::gfcc {
           sch.deallocate(tmp).execute();
   
           if(gf_conv) {
-            std::string y1_a_conv_wpi_file =
+            const std::string y1_a_conv_wpi_file =
               files_prefix + ".y1_a.w" + gfo.str() + ".oi" + std::to_string(pi);
-            std::string y2_aaa_conv_wpi_file =
+            const std::string y2_aaa_conv_wpi_file =
               files_prefix + ".y2_aaa.w" + gfo.str() + ".oi" + std::to_string(pi);
-            std::string y2_bab_conv_wpi_file =
+            const std::string y2_bab_conv_wpi_file =
               files_prefix + ".y2_bab.w" + gfo.str() + ".oi" + std::to_string(pi);
             write_to_disk(y1_a, y1_a_conv_wpi_file);
             write_to_disk(y2_aaa, y2_aaa_conv_wpi_file);
@@ -537,7 +537,7 @@ namespace exachem::cc::gfcc {
           }
   
           if(!gf_conv) { // && rank == root_ppi
-            std::string error_string = gfo.str() + "," + std::to_string(pi) + ".";
+            const std::string error_string = gfo.str() + "," + std::to_string(pi) + ".";
             tamm_terminate("ERROR: GF-CCSD does not converge for w,oi = " + error_string);
           }
   
@@ -591,27 +591,9 @@ namespace exachem::cc::gfcc {
   
     gsch.deallocate(dtmp_aaa, dtmp_bab).execute();
   } // gfccsd_driver_ea_a
-  
-
-template void gfccsd_driver_ea_a<double>(
-  ExecutionContext& gec, ChemEnv& chem_env, const TiledIndexSpace& MO,
-  Tensor<T>& t1_a, Tensor<T>& t1_b, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb, Tensor<T>& t2_abab,
-  Tensor<T>& f1, Tensor<T>& t2v2_v, Tensor<T>& lt12_v_a, Tensor<T>& lt12_v_b, Tensor<T>& iy1_1_a,
-  Tensor<T>& iy1_1_b, Tensor<T>& iy1_2_1_a, Tensor<T>& iy1_2_1_b, Tensor<T>& iy1_a,
-  Tensor<T>& iy1_b, Tensor<T>& iy2_a, Tensor<T>& iy2_b, Tensor<T>& iy3_1_aaaa,
-  Tensor<T>& iy3_1_bbbb, Tensor<T>& iy3_1_abab, Tensor<T>& iy3_1_baba, Tensor<T>& iy3_1_baab,
-  Tensor<T>& iy3_1_abba, Tensor<T>& iy3_1_2_a, Tensor<T>& iy3_1_2_b, Tensor<T>& iy3_aaaa,
-  Tensor<T>& iy3_bbbb, Tensor<T>& iy3_abab, Tensor<T>& iy3_baba, Tensor<T>& iy3_baab,
-  Tensor<T>& iy3_abba, Tensor<T>& iy4_1_aaaa, Tensor<T>& iy4_1_baab, Tensor<T>& iy4_1_baba,
-  Tensor<T>& iy4_1_bbbb, Tensor<T>& iy4_1_abba, Tensor<T>& iy4_1_abab, Tensor<T>& iy4_2_aaaa,
-  Tensor<T>& iy4_2_baab, Tensor<T>& iy4_2_bbbb, Tensor<T>& iy4_2_abba, Tensor<T>& iy5_aaaa,
-  Tensor<T>& iy5_abab, Tensor<T>& iy5_baab, Tensor<T>& iy5_bbbb, Tensor<T>& iy5_baba,
-  Tensor<T>& iy5_abba, Tensor<T>& iy6_a, Tensor<T>& iy6_b, Tensor<T>& v2ijab_aaaa,
-  Tensor<T>& v2ijab_abab, Tensor<T>& v2ijab_bbbb, Tensor<T>& cholOO_a, Tensor<T>& cholOO_b,
-  Tensor<T>& cholOV_a, Tensor<T>& cholOV_b, Tensor<T>& cholVV_a, Tensor<T>& cholVV_b,
-  std::vector<T>& p_evl_sorted_occ, std::vector<T>& p_evl_sorted_virt,
-  const TAMM_SIZE nocc, const TAMM_SIZE nvir, size_t& nptsi, const TiledIndexSpace& CI,
-  const TiledIndexSpace& unit_tis, string files_prefix, string levelstr, double gf_omega);
 #endif
+
+// Explicit template instantiation
+template class GFCCSD_EA_A_Driver<double>;
 
 } // namespace exachem::cc::gfcc

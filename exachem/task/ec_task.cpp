@@ -34,7 +34,6 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
                                   task.cc2,
                                   task.ducc.first,
                                   task.ccsd,
-                                  task.ccsdt,
                                   task.ccsd_t,
                                   task.ccsd_lambda,
                                   task.eom_ccsd,
@@ -63,9 +62,9 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // TODO: avoid redefining. originally defined in task options parser
   const std::vector<string> valid_tasks{
-    "sinfo",  "scf",       "fci",        "fcidump",    "mp2",         "gw",          "cd_2e",
-    "cc2",    "ducc",      "ccsd",       "ccsdt",      "ccsd_t",      "ccsd_lambda", "eom_ccsd",
-    "gfccsd", "rteom_cc2", "rteom_ccsd", "dlpno_ccsd", "dlpno_ccsd_t"};
+    "sinfo",    "scf",    "fci",       "fcidump",    "mp2",        "gw",
+    "cd_2e",    "cc2",    "ducc",      "ccsd",       "ccsd_t",     "ccsd_lambda",
+    "eom_ccsd", "gfccsd", "rteom_cc2", "rteom_ccsd", "dlpno_ccsd", "dlpno_ccsd_t"};
 
   for(size_t i = 0; i < tvec.size(); ++i) {
     if(tvec[i]) {
@@ -81,30 +80,32 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
 }
 
 void print_internal(ExecutionContext& ec, ChemEnv& chem_env) {
+  GeometryAnalyzer                   geom;
   exachem::task::InternalCoordinates coords = exachem::task::InternalCoords(ec, chem_env, true);
   coords.print(ec); // prints bonds, angles, and torsions
   ec.pg().barrier();
-  auto data_mat  = exachem::task::process_geometry(ec, chem_env);
+  auto data_mat  = geom.process_geometry(ec, chem_env);
   int  num_atoms = data_mat.size();
-  auto com       = exachem::task::center_of_mass(ec, data_mat, num_atoms);
-  auto mot       = exachem::task::moment_of_inertia(ec, data_mat, num_atoms, com);
-  auto pmots     = exachem::task::principle_moments_of_inertia(ec, mot);
-  exachem::task::print_com(ec, com);
+  auto com       = geom.center_of_mass(ec, data_mat, num_atoms);
+  auto mot       = geom.moment_of_inertia(ec, data_mat, num_atoms, com);
+  auto pmots     = geom.principle_moments_of_inertia(ec, mot);
+  geom.print_com(ec, com);
   ec.pg().barrier();
-  exachem::task::print_mot(ec, mot);
+  geom.print_mot(ec, mot);
   ec.pg().barrier();
-  exachem::task::print_pmots(ec, pmots, num_atoms);
+  geom.print_pmots(ec, pmots, num_atoms);
   ec.pg().barrier();
-  auto zmatrix = exachem::task::z_matrix(ec, chem_env);
-  exachem::task::cartesian_from_z_matrix(ec, chem_env, zmatrix);
+  auto zmatrix = geom.z_matrix(ec, chem_env);
+  geom.cartesian_from_z_matrix(ec, chem_env, zmatrix);
 
   std::cout.flags(std::ios::fmtflags());
   ec.pg().barrier();
 }
 
 void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) {
-  const auto task       = chem_env.ioptions.task_options;
-  const auto input_file = chem_env.input_file;
+  GeometryAnalyzer geom;
+  const auto       task       = chem_env.ioptions.task_options;
+  const auto       input_file = chem_env.input_file;
   // TODO: This is redundant if multiple tasks for same geometry are executed.
 
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
@@ -116,7 +117,7 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
   if(chem_env.atoms.size() > 1 &&
      chem_env.atoms.size() <= (size_t) chem_env.ioptions.common_options.natoms_max)
     print_internal(ec, chem_env);
-  print_geometry(ec, chem_env);
+  geom.print_geometry(ec, chem_env);
 
   // ECBasis constructs the basisset with all the basis functions. Remove the bq atoms
   for(int i = (int) chem_env.atoms.size() - 1; i >= 0; --i) {

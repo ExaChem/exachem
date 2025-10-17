@@ -142,18 +142,51 @@ struct EOM_X2Tensors {
   }
 };
 
+// Encapsulated optimized EOM-CCSD routines
 template<typename T>
-void eomccsd_x1(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const Tensor<T>& t1,
-                const Tensor<T>& t2, const Tensor<T>& x1, const Tensor<T>& x2, const Tensor<T>& f1,
-                exachem::cholesky_2e::V2Tensors<T>& v2tensors, EOM_X1Tensors<T>& x1tensors);
+class EOMCCSD_OPT {
+public:
+  // Constructor
+  EOMCCSD_OPT() = default;
 
-template<typename T>
-void eomccsd_x2(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const Tensor<T>& t1,
-                const Tensor<T>& t2, const Tensor<T>& x1, const Tensor<T>& x2, const Tensor<T>& f1,
-                exachem::cholesky_2e::V2Tensors<T>& v2tensors, EOM_X2Tensors<T>& x2tensors);
+  // Destructor
+  virtual ~EOMCCSD_OPT() = default;
 
-template<typename T>
-void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
-                          Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1,
+  EOMCCSD_OPT(const EOMCCSD_OPT&)                = default;
+  EOMCCSD_OPT(EOMCCSD_OPT&&) noexcept            = default;
+  EOMCCSD_OPT& operator=(const EOMCCSD_OPT&)     = default;
+  EOMCCSD_OPT& operator=(EOMCCSD_OPT&&) noexcept = default;
+
+  // Build sigma contributions for singles trial vector
+  virtual void eomccsd_x1(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0,
+                          const Tensor<T>& t1, const Tensor<T>& t2, const Tensor<T>& x1,
+                          const Tensor<T>& x2, const Tensor<T>& f1,
                           exachem::cholesky_2e::V2Tensors<T>& v2tensors,
-                          std::vector<T>                      p_evl_sorted);
+                          EOM_X1Tensors<T>&                   x1tensors);
+
+  // Build sigma contributions for doubles trial vector
+  virtual void eomccsd_x2(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0,
+                          const Tensor<T>& t1, const Tensor<T>& t2, const Tensor<T>& x1,
+                          const Tensor<T>& x2, const Tensor<T>& f1,
+                          exachem::cholesky_2e::V2Tensors<T>& v2tensors,
+                          EOM_X2Tensors<T>&                   x2tensors);
+
+  // Right-hand EOM-CCSD Davidson-like iterative driver (optimized void-return variant)
+  virtual void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec,
+                                    const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
+                                    Tensor<T>& f1, exachem::cholesky_2e::V2Tensors<T>& v2tensors,
+                                    std::vector<T> p_evl_sorted);
+
+  // EOM-CCSD driver method
+  virtual void eom_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env);
+};
+
+// template<typename T>
+// inline void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace&
+// MO,
+//                                  Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1,
+//                                  exachem::cholesky_2e::V2Tensors<T>& v2tensors,
+//                                  std::vector<T>                      p_evl_sorted) {
+//   EOMCCSD_OPT<T> eomccsd_opt;
+//   eomccsd_opt.right_eomccsd_driver(chem_env, ec, MO, t1, t2, f1, v2tensors, p_evl_sorted);
+// }

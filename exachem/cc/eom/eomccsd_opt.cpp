@@ -7,14 +7,17 @@
  */
 
 #include "exachem/cc/eom/eomccsd_opt.hpp"
+#include "exachem/cholesky/cholesky_2e_driver.hpp"
 
 #include <filesystem>
 namespace fs = std::filesystem;
 using namespace exachem::scf;
 template<typename T>
-void eomccsd_x1(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const Tensor<T>& t1,
-                const Tensor<T>& t2, const Tensor<T>& x1, const Tensor<T>& x2, const Tensor<T>& f1,
-                exachem::cholesky_2e::V2Tensors<T>& v2tensors, EOM_X1Tensors<T>& x1tensors) {
+void EOMCCSD_OPT<T>::eomccsd_x1(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0,
+                                const Tensor<T>& t1, const Tensor<T>& t2, const Tensor<T>& x1,
+                                const Tensor<T>& x2, const Tensor<T>& f1,
+                                exachem::cholesky_2e::V2Tensors<T>& v2tensors,
+                                EOM_X1Tensors<T>&                   x1tensors) {
   auto [h1, h3, h4, h5, h6, h8] = MO.labels<6>("occ");
   auto [p2, p3, p4, p5, p6, p7] = MO.labels<6>("virt");
 
@@ -70,9 +73,11 @@ void eomccsd_x1(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const 
 }
 
 template<typename T>
-void eomccsd_x2(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const Tensor<T>& t1,
-                const Tensor<T>& t2, const Tensor<T>& x1, const Tensor<T>& x2, const Tensor<T>& f1,
-                exachem::cholesky_2e::V2Tensors<T>& v2tensors, EOM_X2Tensors<T>& x2tensors) {
+void EOMCCSD_OPT<T>::eomccsd_x2(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0,
+                                const Tensor<T>& t1, const Tensor<T>& t2, const Tensor<T>& x1,
+                                const Tensor<T>& x2, const Tensor<T>& f1,
+                                exachem::cholesky_2e::V2Tensors<T>& v2tensors,
+                                EOM_X2Tensors<T>&                   x2tensors) {
   TiledIndexLabel h1, h2, h5, h6, h7, h8, h9, h10;
   TiledIndexLabel p3, p4, p5, p6, p7, p8, p9;
 
@@ -252,10 +257,11 @@ void eomccsd_x2(Scheduler& sch, const TiledIndexSpace& MO, Tensor<T>& i0, const 
 }
 
 template<typename T>
-void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
-                          Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1,
-                          exachem::cholesky_2e::V2Tensors<T>& v2tensors,
-                          std::vector<T>                      p_evl_sorted) {
+void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec,
+                                          const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
+                                          Tensor<T>&                          f1,
+                                          exachem::cholesky_2e::V2Tensors<T>& v2tensors,
+                                          std::vector<T>                      p_evl_sorted) {
   SystemData&     sys_data    = chem_env.sys_data;
   const TAMM_SIZE n_occ_alpha = static_cast<TAMM_SIZE>(sys_data.n_occ_alpha);
   const TAMM_SIZE n_occ_beta  = static_cast<TAMM_SIZE>(sys_data.n_occ_beta);
@@ -263,11 +269,11 @@ void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIn
   // EOMCCSD Variables
   CCSDOptions ccsd_options = chem_env.ioptions.ccsd_options;
   int         nroots       = ccsd_options.eom_nroots;
-  int         maxeomiter   = ccsd_options.maxiter;
+  const int   maxeomiter   = ccsd_options.maxiter;
   //    int eomsolver        = 1; //INDICATES WHICH SOLVER TO USE. (LATER IMPLEMENTATION)
   double eomthresh = ccsd_options.eom_threshold;
   //    double x2guessthresh = 0.6; //THRESHOLD FOR X2 INITIAL GUESS (LATER IMPLEMENTATION)
-  int        microeomiter = ccsd_options.eom_microiter; // Number of iterations in a microcycle
+  const int  microeomiter = ccsd_options.eom_microiter; // Number of iterations in a microcycle
   const bool profile      = ccsd_options.profile_ccsd;
 
   const TiledIndexSpace& O = MO("occ");
@@ -332,9 +338,9 @@ void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIn
   Tensor<T> d_r1{};
   Tensor<T> oscalar{};
   Tensor<T>::allocate(&ec, d_r1, oscalar);
-  bool       convflag = false;
-  double     au2ev    = 27.2113961;
-  const bool mrank    = (ec.pg().rank() == 0);
+  bool             convflag = false;
+  constexpr double au2ev    = 27.2113961;
+  const bool       mrank    = (ec.pg().rank() == 0);
 
   //################################################################################
   //  CALL THE EOM_GUESS ROUTINE (EXTERNAL ROUTINE)
@@ -364,8 +370,8 @@ void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIn
 
   cc_t1 = std::chrono::high_resolution_clock::now();
 
-  auto [h1, h2, h3, h4, h5, h6, h7, h8, h9, h10] = MO.labels<10>("occ");
-  auto [p1, p2, p3, p4, p5, p6, p7, p8, p9]      = MO.labels<9>("virt");
+  const auto [h1, h2, h3, h4, h5, h6, h7, h8, h9, h10] = MO.labels<10>("occ");
+  const auto [p1, p2, p3, p4, p5, p6, p7, p8, p9]      = MO.labels<9>("virt");
 
   { // X1
     Tensor<T> i_1   = x1tensors.i_1;
@@ -772,8 +778,4 @@ void right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIn
   free_vec_tensors(x1, x2, xp1, xp2, xc1, xc2, r1, r2);
 }
 
-using T = double;
-template void right_eomccsd_driver<T>(ChemEnv& chem_env, ExecutionContext& ec,
-                                      const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
-                                      Tensor<T>& f1, exachem::cholesky_2e::V2Tensors<T>& v2tensors,
-                                      std::vector<T> p_evl_sorted);
+template class EOMCCSD_OPT<double>;

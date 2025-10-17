@@ -441,8 +441,9 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       retile_tamm_tensor(d_f1, d_f1_sub);
 
       // Call DUCC
-      DUCC_T_CCSD_Driver<T>(chem_env, ec, MO_AS, dt1_sub, dt2_sub, d_f1_sub, v2tensors_sub,
-                            occ_int_vec, virt_int_vec, pos_str);
+      DUCCInternal<T> ducc_internal;
+      ducc_internal.DUCC_T_CCSD_Driver(chem_env, ec, MO_AS, dt1_sub, dt2_sub, d_f1_sub,
+                                       v2tensors_sub, occ_int_vec, virt_int_vec, pos_str);
 
       // Get QFlow results
       auto& qflow_results = chem_env.sys_data.results["output"]["QFlow"]["results"];

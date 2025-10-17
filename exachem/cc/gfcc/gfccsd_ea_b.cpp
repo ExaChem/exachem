@@ -6,13 +6,12 @@
  * See LICENSE.txt for details
  */
 
-#include "exachem/cc/gfcc/gfccsd_ea.hpp"
-
+#include "exachem/cc/gfcc/gfccsd_ea_b.hpp"
 namespace exachem::cc::gfcc {
 
 #if 0
   template<typename T>
-  void gfccsd_driver_ea_b(
+  void exachem::cc::gfcc::GFCCSD_EA_B_Driver<T>::gfccsd_driver_ea_b(
     ExecutionContext& gec, ChemEnv& chem_env, const TiledIndexSpace& MO,
     Tensor<T>& t1_a, Tensor<T>& t1_b, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb, Tensor<T>& t2_abab,
     Tensor<T>& f1, Tensor<T>& t2v2_v, Tensor<T>& lt12_v_a, Tensor<T>& lt12_v_b, Tensor<T>& iy1_1_a,
@@ -30,7 +29,7 @@ namespace exachem::cc::gfcc {
     Tensor<T>& cholOV_a, Tensor<T>& cholOV_b, Tensor<T>& cholVV_a, Tensor<T>& cholVV_b,
     std::vector<T>& p_evl_sorted_occ, std::vector<T>& p_evl_sorted_virt,
     const TAMM_SIZE nocc, const TAMM_SIZE nvir, size_t& nptsi, const TiledIndexSpace& CI,
-    const TiledIndexSpace& unit_tis, string files_prefix, string levelstr, double gf_omega) {
+    const TiledIndexSpace& unit_tis, std::string files_prefix, std::string levelstr, double gf_omega) {
     using ComplexTensor = Tensor<std::complex<T>>;
   
     const CCSDOptions&     ccsd_options = chem_env.ioptions.ccsd_options;
@@ -77,6 +76,9 @@ namespace exachem::cc::gfcc {
   
     std::cout.precision(15);
   
+    // Create instance of GFCCSD_EA_B for calling gfccsd_y1_b and gfccsd_y2_b
+    GFCCSD_EA_B<T> gfccsd_ea_b_instance;
+  
     Scheduler gsch{gec};
     auto      rank = gec.pg().rank();
   
@@ -98,8 +100,8 @@ namespace exachem::cc::gfcc {
   
     // double au2ev = 27.2113961;
   
-    std::string dtmp_bbb_file = files_prefix + ".W" + gfo.str() + ".a_dtmp_bbb.l" + levelstr;
-    std::string dtmp_aba_file = files_prefix + ".W" + gfo.str() + ".a_dtmp_aba.l" + levelstr;
+    const std::string dtmp_bbb_file = files_prefix + ".W" + gfo.str() + ".a_dtmp_bbb.l" + levelstr;
+    const std::string dtmp_aba_file = files_prefix + ".W" + gfo.str() + ".a_dtmp_aba.l" + levelstr;
   
     if(fs::exists(dtmp_bbb_file) && fs::exists(dtmp_aba_file)) {
       read_from_disk(dtmp_bbb, dtmp_bbb_file);
@@ -161,10 +163,10 @@ namespace exachem::cc::gfcc {
     std::vector<size_t> pi_tbp;
     // Check pi's already processed
     for(size_t pi = nva; pi < nva + num_oi; pi++) {
-      std::string y1_b_wpi_file = files_prefix + ".y1_b.w" + gfo.str() + ".oi" + std::to_string(pi);
-      std::string y2_bbb_wpi_file =
+      const std::string y1_b_wpi_file = files_prefix + ".y1_b.w" + gfo.str() + ".oi" + std::to_string(pi);
+      const std::string y2_bbb_wpi_file =
         files_prefix + ".y2_bbb.w" + gfo.str() + ".oi" + std::to_string(pi);
-      std::string y2_aba_wpi_file =
+      const std::string y2_aba_wpi_file =
         files_prefix + ".y2_aba.w" + gfo.str() + ".oi" + std::to_string(pi);
   
       if(fs::exists(y1_b_wpi_file) && fs::exists(y2_bbb_wpi_file) && fs::exists(y2_aba_wpi_file))
@@ -194,10 +196,10 @@ namespace exachem::cc::gfcc {
     }
   
     if(rank == 0) {
-      cout << "Total, remaining orbitals, batch size = " << num_oi << ", " << num_pi_remain << ", "
-           << num_oi_can_bp << endl;
-      cout << "No of processes used to compute each orbital = " << subranks << endl;
-      // ofs_profile << "No of processes used to compute each orbital = " << subranks << endl;
+      std::cout << "Total, remaining orbitals, batch size = " << num_oi << ", " << num_pi_remain << ", "
+           << num_oi_can_bp << std::endl;
+      std::cout << "No of processes used to compute each orbital = " << subranks << std::endl;
+      // ofs_profile << "No of processes used to compute each orbital = " << subranks << std::endl;
     }
   
     ///////////////////////////
@@ -264,11 +266,11 @@ namespace exachem::cc::gfcc {
           double gf_t_upd_tot   = 0.0;
           double gf_t_dis_tot   = 0.0;
   
-          std::string y1_b_wpi_file =
+          const std::string y1_b_wpi_file =
             files_prefix + ".y1_b.w" + gfo.str() + ".oi" + std::to_string(pi);
-          std::string y2_bbb_wpi_file =
+          const std::string y2_bbb_wpi_file =
             files_prefix + ".y2_bbb.w" + gfo.str() + ".oi" + std::to_string(pi);
-          std::string y2_aba_wpi_file =
+          const std::string y2_aba_wpi_file =
             files_prefix + ".y2_aba.w" + gfo.str() + ".oi" + std::to_string(pi);
   
           if(!(fs::exists(y1_b_wpi_file) && fs::exists(y2_bbb_wpi_file) &&
@@ -341,7 +343,7 @@ namespace exachem::cc::gfcc {
                 total_iter    = micro;
                 auto gf_t_ini = std::chrono::high_resolution_clock::now();
   
-                gfccsd_y1_b(sch, MO, Hy1_b, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, y1_b, y2_bbb,
+                gfccsd_ea_b_instance.gfccsd_y1_b(sch, MO, Hy1_b, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, y1_b, y2_bbb,
                             y2_aba, f1, iy1_b, iy1_2_1_a, iy1_2_1_b, v2ijab_bbbb, v2ijab_abab,
                             cholOV_a, cholOV_b, cholVV_b, CI, unit_tis, false);
   
@@ -350,7 +352,7 @@ namespace exachem::cc::gfcc {
                   std::chrono::duration_cast<std::chrono::duration<double>>((gf_t_y1 - gf_t_ini))
                     .count();
   
-                gfccsd_y2_b(sch, MO, Hy2_bbb, Hy2_aba, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, y1_b,
+                gfccsd_ea_b_instance.gfccsd_y2_b(sch, MO, Hy2_bbb, Hy2_aba, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, y1_b,
                             y2_bbb, y2_aba, f1, iy1_1_a, iy1_1_b, iy1_2_1_a, iy1_2_1_b, iy2_a, iy2_b,
                             iy3_1_bbbb, iy3_1_abab, iy3_1_baab, iy3_1_2_a, iy3_1_2_b, iy3_aaaa,
                             iy3_bbbb, iy3_abab, iy3_baab, iy3_abba, iy4_1_aaaa, iy4_1_baab,
@@ -396,7 +398,7 @@ namespace exachem::cc::gfcc {
                                        .real();
   
                 if(debug && rank == root_ppi)
-                  cout << std::fixed << std::setprecision(2) << "w,oi (" << gfo.str() << "," << pi
+                  std::cout << std::fixed << std::setprecision(2) << "w,oi (" << gfo.str() << "," << pi
                        << "): #iter " << total_iter << ", residual = " << std::fixed
                        << std::setprecision(6) << gf_residual << std::endl;
                 auto gf_t_res = std::chrono::high_resolution_clock::now();
@@ -462,7 +464,7 @@ namespace exachem::cc::gfcc {
           else { gf_conv = true; }
   
           if(!gf_conv) { // && rank == root_ppi
-            std::string error_string = gfo.str() + "," + std::to_string(pi) + ".";
+            const std::string error_string = gfo.str() + "," + std::to_string(pi) + ".";
             tamm_terminate("ERROR: GF-CCSD does not converge for w,oi = " + error_string);
           }
   
@@ -519,27 +521,9 @@ namespace exachem::cc::gfcc {
   
     gsch.deallocate(dtmp_bbb, dtmp_aba).execute();
   } // gfccsd_driver_ea_b
-  
-  
-template void gfccsd_driver_ea_b<double>(
-  ExecutionContext& gec, ChemEnv& chem_env, const TiledIndexSpace& MO,
-  Tensor<T>& t1_a, Tensor<T>& t1_b, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb, Tensor<T>& t2_abab,
-  Tensor<T>& f1, Tensor<T>& t2v2_v, Tensor<T>& lt12_v_a, Tensor<T>& lt12_v_b, Tensor<T>& iy1_1_a,
-  Tensor<T>& iy1_1_b, Tensor<T>& iy1_2_1_a, Tensor<T>& iy1_2_1_b, Tensor<T>& iy1_a,
-  Tensor<T>& iy1_b, Tensor<T>& iy2_a, Tensor<T>& iy2_b, Tensor<T>& iy3_1_aaaa,
-  Tensor<T>& iy3_1_bbbb, Tensor<T>& iy3_1_abab, Tensor<T>& iy3_1_baba, Tensor<T>& iy3_1_baab,
-  Tensor<T>& iy3_1_abba, Tensor<T>& iy3_1_2_a, Tensor<T>& iy3_1_2_b, Tensor<T>& iy3_aaaa,
-  Tensor<T>& iy3_bbbb, Tensor<T>& iy3_abab, Tensor<T>& iy3_baba, Tensor<T>& iy3_baab,
-  Tensor<T>& iy3_abba, Tensor<T>& iy4_1_aaaa, Tensor<T>& iy4_1_baab, Tensor<T>& iy4_1_baba,
-  Tensor<T>& iy4_1_bbbb, Tensor<T>& iy4_1_abba, Tensor<T>& iy4_1_abab, Tensor<T>& iy4_2_aaaa,
-  Tensor<T>& iy4_2_baab, Tensor<T>& iy4_2_bbbb, Tensor<T>& iy4_2_abba, Tensor<T>& iy5_aaaa,
-  Tensor<T>& iy5_abab, Tensor<T>& iy5_baab, Tensor<T>& iy5_bbbb, Tensor<T>& iy5_baba,
-  Tensor<T>& iy5_abba, Tensor<T>& iy6_a, Tensor<T>& iy6_b, Tensor<T>& v2ijab_aaaa,
-  Tensor<T>& v2ijab_abab, Tensor<T>& v2ijab_bbbb, Tensor<T>& cholOO_a, Tensor<T>& cholOO_b,
-  Tensor<T>& cholOV_a, Tensor<T>& cholOV_b, Tensor<T>& cholVV_a, Tensor<T>& cholVV_b,
-  std::vector<T>& p_evl_sorted_occ, std::vector<T>& p_evl_sorted_virt,
-  const TAMM_SIZE nocc, const TAMM_SIZE nvir, size_t& nptsi, const TiledIndexSpace& CI,
-  const TiledIndexSpace& unit_tis, string files_prefix, string levelstr, double gf_omega);
+
+// Explicit template instantiation
+template class GFCCSD_EA_B_Driver<double>;
 #endif
 
 } // namespace exachem::cc::gfcc

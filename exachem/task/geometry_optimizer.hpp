@@ -10,10 +10,13 @@
 
 namespace exachem::task {
 
-void update_geometry(std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
-                     const Eigen::RowVectorXd& new_geometry);
-void geometry_optimizer(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Atom>& atoms,
+class GeometryOptimizer {
+public:
+  static void update_geometry(std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
+                              const Eigen::RowVectorXd& new_geometry);
+  static void geometry_optimizer(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Atom>& atoms,
+                                 std::vector<ECAtom>& ec_atoms, std::string ec_arg2);
+  static void optimizer(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Atom>& atoms,
                         std::vector<ECAtom>& ec_atoms, std::string ec_arg2);
-void optimizer(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Atom>& atoms,
-               std::vector<ECAtom>& ec_atoms, std::string ec_arg2);
+};
 } // namespace exachem::task

@@ -6,28 +6,26 @@
  * See LICENSE.txt for details
  */
 
-#include "exachem/cc/gfcc/gfccsd_ip.hpp"
+#include "exachem/cc/gfcc/gfccsd_ip_a.hpp"
 using T = double;
 namespace exachem::cc::gfcc {
 
 template<typename T>
-void gfccsd_driver_ip_a(ExecutionContext& gec, ChemEnv& chem_env, const TiledIndexSpace& MO,
-                        Tensor<T>& t1_a, Tensor<T>& t1_b, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb,
-                        Tensor<T>& t2_abab, Tensor<T>& f1, Tensor<T>& t2v2_o, Tensor<T>& lt12_o_a,
-                        Tensor<T>& lt12_o_b, Tensor<T>& ix1_1_1_a, Tensor<T>& ix1_1_1_b,
-                        Tensor<T>& ix2_1_aaaa, Tensor<T>& ix2_1_abab, Tensor<T>& ix2_1_bbbb,
-                        Tensor<T>& ix2_1_baba, Tensor<T>& ix2_2_a, Tensor<T>& ix2_2_b,
-                        Tensor<T>& ix2_3_a, Tensor<T>& ix2_3_b, Tensor<T>& ix2_4_aaaa,
-                        Tensor<T>& ix2_4_abab, Tensor<T>& ix2_4_bbbb, Tensor<T>& ix2_5_aaaa,
-                        Tensor<T>& ix2_5_abba, Tensor<T>& ix2_5_abab, Tensor<T>& ix2_5_bbbb,
-                        Tensor<T>& ix2_5_baab, Tensor<T>& ix2_5_baba, Tensor<T>& ix2_6_2_a,
-                        Tensor<T>& ix2_6_2_b, Tensor<T>& ix2_6_3_aaaa, Tensor<T>& ix2_6_3_abba,
-                        Tensor<T>& ix2_6_3_abab, Tensor<T>& ix2_6_3_bbbb, Tensor<T>& ix2_6_3_baab,
-                        Tensor<T>& ix2_6_3_baba, Tensor<T>& v2ijab_aaaa, Tensor<T>& v2ijab_abab,
-                        Tensor<T>& v2ijab_bbbb, std::vector<T>& p_evl_sorted_occ,
-                        std::vector<T>& p_evl_sorted_virt, const TAMM_SIZE nocc,
-                        const TAMM_SIZE nvir, size_t& nptsi, const TiledIndexSpace& unit_tis,
-                        std::string files_prefix, std::string levelstr, double gf_omega) {
+void GFCCSD_IP_A_Driver<T>::gfccsd_driver_ip_a(
+  ExecutionContext& gec, ChemEnv& chem_env, const TiledIndexSpace& MO, Tensor<T>& t1_a,
+  Tensor<T>& t1_b, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb, Tensor<T>& t2_abab, Tensor<T>& f1,
+  Tensor<T>& t2v2_o, Tensor<T>& lt12_o_a, Tensor<T>& lt12_o_b, Tensor<T>& ix1_1_1_a,
+  Tensor<T>& ix1_1_1_b, Tensor<T>& ix2_1_aaaa, Tensor<T>& ix2_1_abab, Tensor<T>& ix2_1_bbbb,
+  Tensor<T>& ix2_1_baba, Tensor<T>& ix2_2_a, Tensor<T>& ix2_2_b, Tensor<T>& ix2_3_a,
+  Tensor<T>& ix2_3_b, Tensor<T>& ix2_4_aaaa, Tensor<T>& ix2_4_abab, Tensor<T>& ix2_4_bbbb,
+  Tensor<T>& ix2_5_aaaa, Tensor<T>& ix2_5_abba, Tensor<T>& ix2_5_abab, Tensor<T>& ix2_5_bbbb,
+  Tensor<T>& ix2_5_baab, Tensor<T>& ix2_5_baba, Tensor<T>& ix2_6_2_a, Tensor<T>& ix2_6_2_b,
+  Tensor<T>& ix2_6_3_aaaa, Tensor<T>& ix2_6_3_abba, Tensor<T>& ix2_6_3_abab,
+  Tensor<T>& ix2_6_3_bbbb, Tensor<T>& ix2_6_3_baab, Tensor<T>& ix2_6_3_baba, Tensor<T>& v2ijab_aaaa,
+  Tensor<T>& v2ijab_abab, Tensor<T>& v2ijab_bbbb, std::vector<T>& p_evl_sorted_occ,
+  std::vector<T>& p_evl_sorted_virt, const TAMM_SIZE nocc, const TAMM_SIZE nvir, size_t& nptsi,
+  const TiledIndexSpace& unit_tis, std::string files_prefix, std::string levelstr,
+  double gf_omega) {
   using ComplexTensor  = Tensor<std::complex<T>>;
   using VComplexTensor = std::vector<Tensor<std::complex<T>>>;
   using CMatrix = Eigen::Matrix<std::complex<T>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
@@ -398,15 +396,17 @@ void gfccsd_driver_ip_a(ExecutionContext& gec, ChemEnv& chem_env, const TiledInd
         VComplexTensor Q2_aaa;
         VComplexTensor Q2_bab;
 
-        gfccsd_x1_a(sch, MO, Hx1_a, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, x1_a, x2_aaa, x2_bab, f1,
-                    ix2_2_a, ix1_1_1_a, ix1_1_1_b, ix2_6_3_aaaa, ix2_6_3_abab, unit_tis, false);
+        GFCCSD_IP_A<T> gfccsd_ip_a;
+        gfccsd_ip_a.gfccsd_x1_a(sch, MO, Hx1_a, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, x1_a, x2_aaa,
+                                x2_bab, f1, ix2_2_a, ix1_1_1_a, ix1_1_1_b, ix2_6_3_aaaa,
+                                ix2_6_3_abab, unit_tis, false);
 
-        gfccsd_x2_a(sch, MO, Hx2_aaa, Hx2_bab, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, x1_a, x2_aaa,
-                    x2_bab, f1, ix2_1_aaaa, ix2_1_abab, ix2_2_a, ix2_2_b, ix2_3_a, ix2_3_b,
-                    ix2_4_aaaa, ix2_4_abab, ix2_5_aaaa, ix2_5_abba, ix2_5_abab, ix2_5_bbbb,
-                    ix2_5_baab, ix2_6_2_a, ix2_6_2_b, ix2_6_3_aaaa, ix2_6_3_abba, ix2_6_3_abab,
-                    ix2_6_3_bbbb, ix2_6_3_baab, v2ijab_aaaa, v2ijab_abab, v2ijab_bbbb, unit_tis,
-                    false);
+        gfccsd_ip_a.gfccsd_x2_a(
+          sch, MO, Hx2_aaa, Hx2_bab, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, x1_a, x2_aaa, x2_bab,
+          f1, ix2_1_aaaa, ix2_1_abab, ix2_2_a, ix2_2_b, ix2_3_a, ix2_3_b, ix2_4_aaaa, ix2_4_abab,
+          ix2_5_aaaa, ix2_5_abba, ix2_5_abab, ix2_5_bbbb, ix2_5_baab, ix2_6_2_a, ix2_6_2_b,
+          ix2_6_3_aaaa, ix2_6_3_abba, ix2_6_3_abab, ix2_6_3_bbbb, ix2_6_3_baab, v2ijab_aaaa,
+          v2ijab_abab, v2ijab_bbbb, unit_tis, false);
 
         // clang-format off
         sch
@@ -488,16 +488,16 @@ void gfccsd_driver_ip_a(ExecutionContext& gec, ChemEnv& chem_env, const TiledInd
 
           auto gf_gmres_1 = std::chrono::high_resolution_clock::now();
 
-          gfccsd_x1_a(sch, MO, Hx1_a, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, Q1_a[k], Q2_aaa[k],
-                      Q2_bab[k], f1, ix2_2_a, ix1_1_1_a, ix1_1_1_b, ix2_6_3_aaaa, ix2_6_3_abab,
-                      unit_tis, false);
+          gfccsd_ip_a.gfccsd_x1_a(sch, MO, Hx1_a, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, Q1_a[k],
+                                  Q2_aaa[k], Q2_bab[k], f1, ix2_2_a, ix1_1_1_a, ix1_1_1_b,
+                                  ix2_6_3_aaaa, ix2_6_3_abab, unit_tis, false);
 
-          gfccsd_x2_a(sch, MO, Hx2_aaa, Hx2_bab, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, Q1_a[k],
-                      Q2_aaa[k], Q2_bab[k], f1, ix2_1_aaaa, ix2_1_abab, ix2_2_a, ix2_2_b, ix2_3_a,
-                      ix2_3_b, ix2_4_aaaa, ix2_4_abab, ix2_5_aaaa, ix2_5_abba, ix2_5_abab,
-                      ix2_5_bbbb, ix2_5_baab, ix2_6_2_a, ix2_6_2_b, ix2_6_3_aaaa, ix2_6_3_abba,
-                      ix2_6_3_abab, ix2_6_3_bbbb, ix2_6_3_baab, v2ijab_aaaa, v2ijab_abab,
-                      v2ijab_bbbb, unit_tis, false);
+          gfccsd_ip_a.gfccsd_x2_a(
+            sch, MO, Hx2_aaa, Hx2_bab, t1_a, t1_b, t2_aaaa, t2_bbbb, t2_abab, Q1_a[k], Q2_aaa[k],
+            Q2_bab[k], f1, ix2_1_aaaa, ix2_1_abab, ix2_2_a, ix2_2_b, ix2_3_a, ix2_3_b, ix2_4_aaaa,
+            ix2_4_abab, ix2_5_aaaa, ix2_5_abba, ix2_5_abab, ix2_5_bbbb, ix2_5_baab, ix2_6_2_a,
+            ix2_6_2_b, ix2_6_3_aaaa, ix2_6_3_abba, ix2_6_3_abab, ix2_6_3_bbbb, ix2_6_3_baab,
+            v2ijab_aaaa, v2ijab_abab, v2ijab_bbbb, unit_tis, false);
 
           // clang-format off
           sch 
@@ -796,19 +796,7 @@ void gfccsd_driver_ip_a(ExecutionContext& gec, ChemEnv& chem_env, const TiledInd
   gsch.deallocate(dtmp_a, dtmp_aaa, dtmp_bab).execute();
 }
 
-template void gfccsd_driver_ip_a<double>(
-  ExecutionContext& gec, ChemEnv& chem_env, const TiledIndexSpace& MO, Tensor<T>& t1_a,
-  Tensor<T>& t1_b, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb, Tensor<T>& t2_abab, Tensor<T>& f1,
-  Tensor<T>& t2v2_o, Tensor<T>& lt12_o_a, Tensor<T>& lt12_o_b, Tensor<T>& ix1_1_1_a,
-  Tensor<T>& ix1_1_1_b, Tensor<T>& ix2_1_aaaa, Tensor<T>& ix2_1_abab, Tensor<T>& ix2_1_bbbb,
-  Tensor<T>& ix2_1_baba, Tensor<T>& ix2_2_a, Tensor<T>& ix2_2_b, Tensor<T>& ix2_3_a,
-  Tensor<T>& ix2_3_b, Tensor<T>& ix2_4_aaaa, Tensor<T>& ix2_4_abab, Tensor<T>& ix2_4_bbbb,
-  Tensor<T>& ix2_5_aaaa, Tensor<T>& ix2_5_abba, Tensor<T>& ix2_5_abab, Tensor<T>& ix2_5_bbbb,
-  Tensor<T>& ix2_5_baab, Tensor<T>& ix2_5_baba, Tensor<T>& ix2_6_2_a, Tensor<T>& ix2_6_2_b,
-  Tensor<T>& ix2_6_3_aaaa, Tensor<T>& ix2_6_3_abba, Tensor<T>& ix2_6_3_abab,
-  Tensor<T>& ix2_6_3_bbbb, Tensor<T>& ix2_6_3_baab, Tensor<T>& ix2_6_3_baba, Tensor<T>& v2ijab_aaaa,
-  Tensor<T>& v2ijab_abab, Tensor<T>& v2ijab_bbbb, std::vector<T>& p_evl_sorted_occ,
-  std::vector<T>& p_evl_sorted_virt, const TAMM_SIZE nocc, const TAMM_SIZE nvir, size_t& nptsi,
-  const TiledIndexSpace& unit_tis, std::string files_prefix, std::string levelstr, double gf_omega);
+// Explicit template instantiation
+template class GFCCSD_IP_A_Driver<double>;
 
 } // namespace exachem::cc::gfcc

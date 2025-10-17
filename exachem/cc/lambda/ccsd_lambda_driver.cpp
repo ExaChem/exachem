@@ -7,6 +7,8 @@
  */
 
 #include "exachem/cc/lambda/ccsd_lambda.hpp"
+#include "exachem/cc/lambda/ccsd_natural_orbitals.hpp"
+#include "exachem/cc/lambda/ccsd_rdm.hpp"
 // #include "exachem/common/termcolor.hpp"
 #include "exachem/scf/scf_guess.hpp"
 #include <filesystem>
@@ -14,20 +16,7 @@
 namespace fs = std::filesystem;
 
 template<typename T>
-void ccsd_natural_orbitals(ChemEnv& chem_env, std::vector<int>&, std::string, std::string,
-                           Scheduler&, ExecutionContext&, TiledIndexSpace&, TiledIndexSpace&,
-                           Tensor<T>&, ExecutionHW);
-
-template<typename T>
-Tensor<T> compute_1rdm(std::vector<int>&, std::string, Scheduler&, TiledIndexSpace&, Tensor<T>,
-                       Tensor<T>, Tensor<T>, Tensor<T>);
-
-template<typename T>
-Tensor<T> compute_2rdm(std::vector<int>&, std::string, Scheduler&, TiledIndexSpace&, Tensor<T>,
-                       Tensor<T>, Tensor<T>, Tensor<T>);
-
-void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env) {
-  using T   = double;
+void exachem::cc::ccsd_lambda::CCSDLambda_Engine<T>::run(ExecutionContext& ec, ChemEnv& chem_env) {
   auto rank = ec.pg().rank();
 
   chem_env.cd_context.keep_movecs_so = true;
@@ -57,14 +46,14 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
   auto cc_t1 = std::chrono::high_resolution_clock::now();
 
   auto [l_r1, l_r2, d_y1, d_y2, l_r1s, l_r2s, d_y1s, d_y2s] =
-    setupLambdaTensors<T>(ec, MO, ccsd_options.ndiis);
+    CCSDLambda_Engine<T>::setupLambdaTensors(ec, MO, ccsd_options.ndiis);
 
   double residual{};
   double corr_energy{};
 
-  std::tie(residual, corr_energy) =
-    lambda_ccsd_driver<T>(chem_env, ec, MO, CI, d_t1, d_t2, d_f1, v2tensors, cholVpr, l_r1, l_r2,
-                          d_y1, d_y2, l_r1s, l_r2s, d_y1s, d_y2s, chem_env.cd_context.p_evl_sorted);
+  std::tie(residual, corr_energy) = this->lambda_ccsd_driver(
+    chem_env, ec, MO, CI, d_t1, d_t2, d_f1, v2tensors, cholVpr, l_r1, l_r2, d_y1, d_y2, l_r1s,
+    l_r2s, d_y1s, d_y2s, chem_env.cd_context.p_evl_sorted);
   auto cc_t2 = std::chrono::high_resolution_clock::now();
 
   if(rank == 0) {
@@ -121,10 +110,10 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
   scf_guess.compute_dipole_ints(ec, spvars, DipX_ao, DipY_ao, DipZ_ao, atoms, chem_env.shells,
                                 libint2::Operator::emultipole1);
 
-  auto [mu, nu, ku]     = AO_opt.labels<3>("all");
-  auto [mo1, mo2]       = MO.labels<2>("all");
-  auto [h1, h2, h3, h4] = MO.labels<4>("occ");
-  auto [p1, p2, p3, p4] = MO.labels<4>("virt");
+  const auto [mu, nu, ku]     = AO_opt.labels<3>("all");
+  const auto [mo1, mo2]       = MO.labels<2>("all");
+  const auto [h1, h2, h3, h4] = MO.labels<4>("occ");
+  const auto [p1, p2, p3, p4] = MO.labels<4>("virt");
 
   Tensor<T> lcao = chem_env.cd_context.movecs_so;
 
@@ -265,17 +254,21 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
   }
 
   if(!ccsd_options.cc_rdm.empty()) {
+    CCSD_RDM<T> rdm_instance;
     if(ccsd_options.cc_rdm[0] == 1) {
       Tensor<T> gamma1;
-      gamma1 = compute_1rdm<T>(ccsd_options.cc_rdm, files_prefix, sch, MO, d_t1, d_t2, d_y1, d_y2);
-      ccsd_natural_orbitals(chem_env, ccsd_options.cc_rdm, files_prefix, files_dir, sch, ec, MO,
-                            AO_opt, gamma1, ex_hw);
+      gamma1 = rdm_instance.compute_1rdm(ccsd_options.cc_rdm, files_prefix, sch, MO, d_t1, d_t2,
+                                         d_y1, d_y2);
+      CCSD_Natural_Orbitals<T> ccsd_no_inst;
+      ccsd_no_inst.ccsd_natural_orbitals(chem_env, ccsd_options.cc_rdm, files_prefix, files_dir,
+                                         sch, ec, MO, AO_opt, gamma1, ex_hw);
     }
     auto rdm_val = (ccsd_options.cc_rdm.size() == 2) ? ccsd_options.cc_rdm[1]
                                                      : ccsd_options.cc_rdm[0];
     if(rdm_val == 2) {
       Tensor<T> gamma2;
-      gamma2 = compute_2rdm<T>(ccsd_options.cc_rdm, files_prefix, sch, MO, d_t1, d_t2, d_y1, d_y2);
+      gamma2 = rdm_instance.compute_2rdm(ccsd_options.cc_rdm, files_prefix, sch, MO, d_t1, d_t2,
+                                         d_y1, d_y2);
     }
   }
 
@@ -287,3 +280,13 @@ void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv&
   ec.flush_and_sync();
   // delete ec;
 }
+
+// Non-template wrapper function for external interface
+void exachem::cc::ccsd_lambda::ccsd_lambda_driver(ExecutionContext& ec, ChemEnv& chem_env) {
+  CCSDLambda_Engine<double> ccsd_lambda_instance;
+  ccsd_lambda_instance.run(ec, chem_env);
+}
+
+// Explicit template instantiation
+// template void exachem::cc::ccsd_lambda::CCSDLambda_Engine<double>::run(ExecutionContext&,
+// ChemEnv&);

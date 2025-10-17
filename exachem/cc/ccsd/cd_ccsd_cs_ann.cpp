@@ -9,29 +9,31 @@
 
 #include "exachem/cc/ccsd/cd_ccsd_cs_ann.hpp"
 
-using CCEType = double;
-CCSE_Tensors<CCEType> _a021;
-Tensor<CCEType>       a22_abab, a22_aaaa, a22_bbbb;
-TiledIndexSpace       o_alpha, v_alpha, o_beta, v_beta;
+// using CCEType = double;
+// CCSE_Tensors<CCEType> _a021;
+// Tensor<CCEType>       a22_abab, a22_aaaa, a22_bbbb;
+// TiledIndexSpace       o_alpha, v_alpha, o_beta, v_beta;
 
-Tensor<CCEType>       _a01V, _a02V, _a007V;
-CCSE_Tensors<CCEType> _a01, _a02, _a03, _a04, _a05, _a06, _a001, _a004, _a006, _a008, _a009, _a017,
-  _a019, _a020; //_a022
+// Tensor<CCEType>       _a01V, _a02V, _a007V;
+// CCSE_Tensors<CCEType> _a01, _a02, _a03, _a04, _a05, _a06, _a001, _a004, _a006, _a008, _a009,
+// _a017,
+//   _a019, _a020; //_a022
 
-Tensor<CCEType> i0_temp, t2_aaaa_temp; // CS only
+// Tensor<CCEType> i0_temp, t2_aaaa_temp; // CS only
 
 template<typename T>
-void exachem::cc::ccsd::ccsd_e_cs(Scheduler& sch, const TiledIndexSpace& MO,
-                                  const TiledIndexSpace& CI, Tensor<T>& de, const Tensor<T>& t1_aa,
-                                  const Tensor<T>& t2_abab, const Tensor<T>& t2_aaaa,
-                                  std::vector<CCSE_Tensors<T>>& f1_se,
-                                  std::vector<CCSE_Tensors<T>>& chol3d_se) {
-  auto [cind] = CI.labels<1>("all");
+void exachem::cc::ccsd::CD_CCSD_CS<T>::ccsd_e_cs(Scheduler& sch, const TiledIndexSpace& MO,
+                                                 const TiledIndexSpace& CI, Tensor<T>& de,
+                                                 const Tensor<T>& t1_aa, const Tensor<T>& t2_abab,
+                                                 const Tensor<T>&              t2_aaaa,
+                                                 std::vector<CCSE_Tensors<T>>& f1_se,
+                                                 std::vector<CCSE_Tensors<T>>& chol3d_se) {
+  const auto [cind] = CI.labels<1>("all");
 
-  auto [p1_va, p2_va] = v_alpha.labels<2>("all");
-  auto [p1_vb]        = v_beta.labels<1>("all");
-  auto [h1_oa, h2_oa] = o_alpha.labels<2>("all");
-  auto [h1_ob]        = o_beta.labels<1>("all");
+  const auto [p1_va, p2_va] = v_alpha.labels<2>("all");
+  const auto [p1_vb]        = v_beta.labels<1>("all");
+  const auto [h1_oa, h2_oa] = o_alpha.labels<2>("all");
+  const auto [h1_ob]        = o_beta.labels<1>("all");
 
   // f1_se     = {f1_oo,f1_ov,f1_vv}
   // chol3d_se = {chol3d_oo,chol3d_ov,chol3d_vv}
@@ -68,19 +70,19 @@ void exachem::cc::ccsd::ccsd_e_cs(Scheduler& sch, const TiledIndexSpace& MO,
 }
 
 template<typename T>
-void exachem::cc::ccsd::ccsd_t1_cs(Scheduler& sch, const TiledIndexSpace& MO,
-                                   const TiledIndexSpace& CI, Tensor<T>& i0_aa,
-                                   const Tensor<T>& t1_aa, const Tensor<T>& t2_abab,
-                                   std::vector<CCSE_Tensors<T>>& f1_se,
-                                   std::vector<CCSE_Tensors<T>>& chol3d_se) {
-  auto [cind] = CI.labels<1>("all");
-  auto [p2]   = MO.labels<1>("virt");
-  auto [h1]   = MO.labels<1>("occ");
+void exachem::cc::ccsd::CD_CCSD_CS<T>::ccsd_t1_cs(Scheduler& sch, const TiledIndexSpace& MO,
+                                                  const TiledIndexSpace& CI, Tensor<T>& i0_aa,
+                                                  const Tensor<T>& t1_aa, const Tensor<T>& t2_abab,
+                                                  std::vector<CCSE_Tensors<T>>& f1_se,
+                                                  std::vector<CCSE_Tensors<T>>& chol3d_se) {
+  const auto [cind] = CI.labels<1>("all");
+  const auto [p2]   = MO.labels<1>("virt");
+  const auto [h1]   = MO.labels<1>("occ");
 
-  auto [p1_va, p2_va] = v_alpha.labels<2>("all");
-  auto [p1_vb]        = v_beta.labels<1>("all");
-  auto [h1_oa, h2_oa] = o_alpha.labels<2>("all");
-  auto [h1_ob]        = o_beta.labels<1>("all");
+  const auto [p1_va, p2_va] = v_alpha.labels<2>("all");
+  const auto [p1_vb]        = v_beta.labels<1>("all");
+  const auto [h1_oa, h2_oa] = o_alpha.labels<2>("all");
+  const auto [h1_ob]        = o_beta.labels<1>("all");
 
   // f1_se     = {f1_oo,f1_ov,f1_vv}
   // chol3d_se = {chol3d_oo,chol3d_ov,chol3d_vv}
@@ -143,14 +145,15 @@ void exachem::cc::ccsd::ccsd_t1_cs(Scheduler& sch, const TiledIndexSpace& MO,
 }
 
 template<typename T>
-void exachem::cc::ccsd::ccsd_t2_cs(Scheduler& sch, const TiledIndexSpace& MO,
-                                   const TiledIndexSpace& CI, Tensor<T>& i0_abab,
-                                   const Tensor<T>& t1_aa, Tensor<T>& t2_abab, Tensor<T>& t2_aaaa,
-                                   std::vector<CCSE_Tensors<T>>& f1_se,
-                                   std::vector<CCSE_Tensors<T>>& chol3d_se) {
-  auto [cind]   = CI.labels<1>("all");
-  auto [p3, p4] = MO.labels<2>("virt");
-  auto [h1, h2] = MO.labels<2>("occ");
+void exachem::cc::ccsd::CD_CCSD_CS<T>::ccsd_t2_cs(Scheduler& sch, const TiledIndexSpace& MO,
+                                                  const TiledIndexSpace& CI, Tensor<T>& i0_abab,
+                                                  const Tensor<T>& t1_aa, Tensor<T>& t2_abab,
+                                                  Tensor<T>&                    t2_aaaa,
+                                                  std::vector<CCSE_Tensors<T>>& f1_se,
+                                                  std::vector<CCSE_Tensors<T>>& chol3d_se) {
+  const auto [cind]   = CI.labels<1>("all");
+  const auto [p3, p4] = MO.labels<2>("virt");
+  const auto [h1, h2] = MO.labels<2>("occ");
 
   auto [p1_va, p2_va, p3_va] = v_alpha.labels<3>("all");
   auto [p1_vb, p2_vb]        = v_beta.labels<2>("all");
@@ -562,7 +565,7 @@ void exachem::cc::ccsd::ccsd_t2_cs(Scheduler& sch, const TiledIndexSpace& MO,
 }
 
 template<typename T>
-std::tuple<double, double> exachem::cc::ccsd::cd_ccsd_cs_driver(
+std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
   ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
   Tensor<T>& t1_aa, Tensor<T>& t2_abab, Tensor<T>& d_f1, Tensor<T>& r1_aa, Tensor<T>& r2_abab,
   std::vector<Tensor<T>>& d_r1s, std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_t1s,
@@ -570,23 +573,23 @@ std::tuple<double, double> exachem::cc::ccsd::cd_ccsd_cs_driver(
   Tensor<T> dt2_full, bool ccsd_restart, std::string ccsd_fp, bool computeTData) {
   auto cc_t1 = std::chrono::high_resolution_clock::now();
 
-  SystemData& sys_data    = chem_env.sys_data;
-  int         maxiter     = chem_env.ioptions.ccsd_options.ccsd_maxiter;
-  int         ndiis       = chem_env.ioptions.ccsd_options.ndiis;
-  double      thresh      = chem_env.ioptions.ccsd_options.threshold;
-  bool        writet      = chem_env.ioptions.ccsd_options.writet;
-  int         writet_iter = chem_env.ioptions.ccsd_options.writet_iter;
-  double      zshiftl     = chem_env.ioptions.ccsd_options.lshift;
-  bool        profile     = chem_env.ioptions.ccsd_options.profile_ccsd;
-  double      residual    = 0.0;
-  double      energy      = 0.0;
-  int         niter       = 0;
+  SystemData&  sys_data    = chem_env.sys_data;
+  const int    maxiter     = chem_env.ioptions.ccsd_options.ccsd_maxiter;
+  const int    ndiis       = chem_env.ioptions.ccsd_options.ndiis;
+  const double thresh      = chem_env.ioptions.ccsd_options.threshold;
+  const bool   writet      = chem_env.ioptions.ccsd_options.writet;
+  const int    writet_iter = chem_env.ioptions.ccsd_options.writet_iter;
+  const double zshiftl     = chem_env.ioptions.ccsd_options.lshift;
+  const bool   profile     = chem_env.ioptions.ccsd_options.profile_ccsd;
+  double       residual    = 0.0;
+  double       energy      = 0.0;
+  int          niter       = 0;
 
   const TAMM_SIZE n_occ_alpha = static_cast<TAMM_SIZE>(sys_data.n_occ_alpha);
   const TAMM_SIZE n_vir_alpha = static_cast<TAMM_SIZE>(sys_data.n_vir_alpha);
 
-  std::string t1file = ccsd_fp + ".t1amp";
-  std::string t2file = ccsd_fp + ".t2amp";
+  const std::string t1file = ccsd_fp + ".t1amp";
+  const std::string t2file = ccsd_fp + ".t2amp";
 
   std::cout.precision(15);
 
@@ -746,7 +749,7 @@ std::tuple<double, double> exachem::cc::ccsd::cd_ccsd_cs_driver(
                .execute();
         // clang-format on
 
-        ccsd_e_cs(sch, MO, CI, d_e, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
+        CD_CCSD_CS<T>::ccsd_e_cs(sch, MO, CI, d_e, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
         ccsd_t1_cs(sch, MO, CI, r1_aa, t1_aa, t2_abab, f1_se, chol3d_se);
         ccsd_t2_cs(sch, MO, CI, r2_abab, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
 
@@ -812,7 +815,7 @@ std::tuple<double, double> exachem::cc::ccsd::cd_ccsd_cs_driver(
 
   } // no restart
   else {
-    exachem::cc::ccsd::ccsd_e_cs(sch, MO, CI, d_e, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
+    ccsd_e_cs(sch, MO, CI, d_e, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
 
     sch.execute(exhw, profile);
 
@@ -893,10 +896,4 @@ std::tuple<double, double> exachem::cc::ccsd::cd_ccsd_cs_driver(
   return std::make_tuple(residual, energy);
 }
 
-using T = double;
-template std::tuple<double, double> exachem::cc::ccsd::cd_ccsd_cs_driver<T>(
-  ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
-  Tensor<T>& t1_aa, Tensor<T>& t2_abab, Tensor<T>& d_f1, Tensor<T>& r1_aa, Tensor<T>& r2_abab,
-  std::vector<Tensor<T>>& d_r1s, std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_t1s,
-  std::vector<Tensor<T>>& d_t2s, std::vector<T>& p_evl_sorted, Tensor<T>& cv3d, Tensor<T> dt1_full,
-  Tensor<T> dt2_full, bool ccsd_restart, std::string out_fp, bool computeTData);
+template class exachem::cc::ccsd::CD_CCSD_CS<double>;

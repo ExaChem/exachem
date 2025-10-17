@@ -17,7 +17,7 @@ namespace exachem::task {
 // constexpr double ang2bohr = exachem::constants::ang2bohr;
 constexpr double bohr2ang = exachem::constants::bohr2ang;
 
-std::vector<double> atom_mass = {
+std::vector<double> GeometryAnalyzer::atom_mass = {
   1.007825, 4.0026,    7.016,    9.01218,  11.00931, 12.0,     14.00307, 15.99491, 18.9984,
   19.99244, 22.9898,   23.98504, 26.98154, 27.97693, 30.97376, 31.97207, 34.96885, 39.9624,
   38.96371, 39.96259,  44.95592, 45.948,   50.9440,  51.9405,  54.9381,  55.9349,  58.9332,
@@ -34,7 +34,7 @@ std::vector<double> atom_mass = {
   294.0000, 0.0,       0.0};
 
 // bohr
-std::vector<double> atom_radii = {
+std::vector<double> GeometryAnalyzer::atom_radii = {
   0.604712316123456,  0.699198615517746,  2.45664378425154,   1.776342428612652,
   1.455089010672066,  1.41729449091435,   1.341705451398918,  1.209424632246912,
   1.209424632246912,  1.171630112489196,  3.02356158061728,   2.6456163830401196,
@@ -59,7 +59,7 @@ std::vector<double> atom_radii = {
   2.8345889818287,    2.8345889818287};
 
 // prints atomic coordinates
-void print_geometry(ExecutionContext& ec, ChemEnv& chem_env) {
+void GeometryAnalyzer::print_geometry(ExecutionContext& ec, ChemEnv& chem_env) {
   if(ec.print()) {
     std::stringstream ss;
     ss << std::endl << std::string(70, '-') << std::endl;
@@ -110,7 +110,7 @@ void print_oop_angles(ExecutionContext& ec, ChemEnv& chem_env,
   }
 }
 
-void print_com(ExecutionContext& ec, std::vector<double>& com) {
+void GeometryAnalyzer::print_com(ExecutionContext& ec, std::vector<double>& com) {
   if(ec.print()) {
     std::stringstream ss;
     ss << std::endl << std::string(70, '-') << std::endl;
@@ -126,7 +126,8 @@ void print_com(ExecutionContext& ec, std::vector<double>& com) {
   }
 }
 
-void print_mot(ExecutionContext& ec, const std::vector<std::vector<double>>& mot) {
+void GeometryAnalyzer::print_mot(ExecutionContext&                       ec,
+                                 const std::vector<std::vector<double>>& mot) {
   if(ec.print()) {
     std::stringstream ss;
     ss << std::endl << std::string(70, '-') << std::endl;
@@ -140,7 +141,8 @@ void print_mot(ExecutionContext& ec, const std::vector<std::vector<double>>& mot
   }
 }
 
-void print_pmots(ExecutionContext& ec, std::vector<double>& pmots, const int& num_atoms) {
+void GeometryAnalyzer::print_pmots(ExecutionContext& ec, std::vector<double>& pmots,
+                                   const int& num_atoms) {
   constexpr double bohr2ang = exachem::constants::bohr2ang;
   if(ec.print()) {
     std::stringstream ss;
@@ -192,7 +194,8 @@ void print_pmots(ExecutionContext& ec, std::vector<double>& pmots, const int& nu
   }
 }
 
-std::vector<std::vector<double>> process_geometry(ExecutionContext& ec, ChemEnv& chem_env) {
+std::vector<std::vector<double>> GeometryAnalyzer::process_geometry(ExecutionContext& ec,
+                                                                    ChemEnv&          chem_env) {
   std::vector<std::vector<double>> data_mat;
 
   // for each atom
@@ -208,8 +211,9 @@ std::vector<std::vector<double>> process_geometry(ExecutionContext& ec, ChemEnv&
   return data_mat;
 }
 
-double single_bond_length(ExecutionContext& ec, int num_atoms,
-                          std::vector<std::vector<double>>& data_mat, int i, int j) {
+double GeometryAnalyzer::single_bond_length(ExecutionContext& ec, int num_atoms,
+                                            std::vector<std::vector<double>>& data_mat, int i,
+                                            int j) {
   double sqx          = (data_mat[i][1] - data_mat[j][1]) * (data_mat[i][1] - data_mat[j][1]);
   double sqy          = (data_mat[i][2] - data_mat[j][2]) * (data_mat[i][2] - data_mat[j][2]);
   double sqz          = (data_mat[i][3] - data_mat[j][3]) * (data_mat[i][3] - data_mat[j][3]);
@@ -221,9 +225,10 @@ double single_bond_length(ExecutionContext& ec, int num_atoms,
   else { return 0.0; }
 }
 
-double single_bond_length_optimize(ExecutionContext& ec, int num_atoms,
-                                   std::vector<std::vector<double>>& data_mat, int i, int j,
-                                   double threshold, std::vector<double> atom_radii_arg) {
+double GeometryAnalyzer::single_bond_length_optimize(ExecutionContext& ec, int num_atoms,
+                                                     std::vector<std::vector<double>>& data_mat,
+                                                     int i, int j, double threshold,
+                                                     std::vector<double> atom_radii_arg) {
   double sqx          = (data_mat[i][1] - data_mat[j][1]) * (data_mat[i][1] - data_mat[j][1]);
   double sqy          = (data_mat[i][2] - data_mat[j][2]) * (data_mat[i][2] - data_mat[j][2]);
   double sqz          = (data_mat[i][3] - data_mat[j][3]) * (data_mat[i][3] - data_mat[j][3]);
@@ -235,8 +240,9 @@ double single_bond_length_optimize(ExecutionContext& ec, int num_atoms,
   else { return 0.0; }
 }
 
-std::vector<std::vector<double>> process_bond_lengths(ExecutionContext& ec, int num_atoms,
-                                                      std::vector<std::vector<double>>& data_mat) {
+std::vector<std::vector<double>>
+GeometryAnalyzer::process_bond_lengths(ExecutionContext& ec, int num_atoms,
+                                       std::vector<std::vector<double>>& data_mat) {
   std::vector<std::vector<double>> bond_lengths(num_atoms, std::vector<double>(num_atoms));
 
   for(int i = 0; i < num_atoms; i++) {
@@ -300,9 +306,10 @@ std::vector<std::vector<double>> process_bond_lengths(ExecutionContext& ec, int 
   return bond_lengths;
 }
 
-std::vector<std::vector<double>> process_bond_lengths(ExecutionContext& ec, int num_atoms,
-                                                      std::vector<std::vector<double>>& data_mat,
-                                                      std::vector<double> atom_radii_arg) {
+std::vector<std::vector<double>>
+GeometryAnalyzer::process_bond_lengths(ExecutionContext& ec, int num_atoms,
+                                       std::vector<std::vector<double>>& data_mat,
+                                       std::vector<double>               atom_radii_arg) {
   std::vector<std::vector<double>> bond_lengths(num_atoms, std::vector<double>(num_atoms));
 
   for(int i = 0; i < num_atoms; i++) {
@@ -386,9 +393,8 @@ auto atom_pair_unit_vector(std::vector<std::vector<double>>& data, int& idx0, in
 }
 
 // function to precalculate all possible unit vectors for all pairs of atoms
-std::vector<std::vector<std::vector<double>>>
-calculate_atom_pair_unit_vector(std::vector<std::vector<double>>& data,
-                                std::vector<std::vector<double>>& bonds, int& num_atoms) {
+std::vector<std::vector<std::vector<double>>> GeometryAnalyzer::calculate_atom_pair_unit_vector(
+  std::vector<std::vector<double>>& data, std::vector<std::vector<double>>& bonds, int& num_atoms) {
   std::vector<std::vector<std::vector<double>>> atom_pair_unit_vectors(
     num_atoms, std::vector<std::vector<double>>(num_atoms, std::vector<double>(3, 0)));
 
@@ -403,14 +409,15 @@ calculate_atom_pair_unit_vector(std::vector<std::vector<double>>& data,
   return atom_pair_unit_vectors;
 }
 
-double dot_product(std::vector<double>& atom0, std::vector<double>& atom1) {
+double GeometryAnalyzer::dot_product(std::vector<double>& atom0, std::vector<double>& atom1) {
   return atom0[0] * atom1[0] + atom0[1] * atom1[1] + atom0[2] * atom1[2];
 }
 
-double specific_bond_angle(ExecutionContext& ec, const int& num_atoms,
-                           const std::vector<std::vector<double>>&              bonds,
-                           const std::vector<std::vector<std::vector<double>>>& apuv, const int& i,
-                           const int& j, const int& k) {
+double
+GeometryAnalyzer::specific_bond_angle(ExecutionContext& ec, const int& num_atoms,
+                                      const std::vector<std::vector<double>>&              bonds,
+                                      const std::vector<std::vector<std::vector<double>>>& apuv,
+                                      const int& i, const int& j, const int& k) {
   std::vector<double> atom0 = apuv[j][i];
   std::vector<double> atom1 = apuv[j][k];
   double              angle = acos(atom0[0] * atom1[0] + atom0[1] * atom1[1] + atom0[2] * atom1[2]);
@@ -418,7 +425,8 @@ double specific_bond_angle(ExecutionContext& ec, const int& num_atoms,
   return angle;
 }
 
-std::vector<double> cross_product(std::vector<double>& atom0, std::vector<double>& atom1) {
+std::vector<double> GeometryAnalyzer::cross_product(std::vector<double>& atom0,
+                                                    std::vector<double>& atom1) {
   std::vector<double> product(3);
   product[0] = atom0[1] * atom1[2] - atom0[2] * atom1[1];
   product[1] = -(atom0[0] * atom1[2] - atom0[2] * atom1[0]);
@@ -426,7 +434,7 @@ std::vector<double> cross_product(std::vector<double>& atom0, std::vector<double
   return product;
 }
 
-Eigen::Vector3d cross_product(Eigen::Vector3d atom0, Eigen::Vector3d atom1) {
+Eigen::Vector3d GeometryAnalyzer::cross_product(Eigen::Vector3d atom0, Eigen::Vector3d atom1) {
   return atom0.cross(atom1);
 }
 
@@ -505,10 +513,12 @@ auto bond_angle(const ExecutionContext& ec, const int& num_atoms,
   return angle;
 }
 
-double single_torsional_angle(const ExecutionContext&                 ec,
-                              const std::vector<std::vector<double>>& data, const int& num_atoms,
-                              const std::vector<std::vector<double>>& bonds, const int& i,
-                              const int& j, const int& k, const int& l) {
+double GeometryAnalyzer::single_torsional_angle(const ExecutionContext&                 ec,
+                                                const std::vector<std::vector<double>>& data,
+                                                const int&                              num_atoms,
+                                                const std::vector<std::vector<double>>& bonds,
+                                                const int& i, const int& j, const int& k,
+                                                const int& l) {
   Eigen::Vector3d point0(data[i][1], data[i][2], data[i][3]);
   Eigen::Vector3d point1(data[j][1], data[j][2], data[j][3]);
   Eigen::Vector3d point2(data[k][1], data[k][2], data[k][3]);
@@ -529,9 +539,9 @@ double single_torsional_angle(const ExecutionContext&                 ec,
   return atan2(y, x);
 }
 
-std::vector<double> center_of_mass(ExecutionContext&                       ec,
-                                   const std::vector<std::vector<double>>& data,
-                                   const int&                              num_atoms) {
+std::vector<double> GeometryAnalyzer::center_of_mass(ExecutionContext&                       ec,
+                                                     const std::vector<std::vector<double>>& data,
+                                                     const int& num_atoms) {
   double den   = 0;
   double x_num = 0;
   double y_num = 0;
@@ -548,8 +558,9 @@ std::vector<double> center_of_mass(ExecutionContext&                       ec,
 }
 
 std::vector<std::vector<double>>
-moment_of_inertia(ExecutionContext& ec, const std::vector<std::vector<double>>& base_data,
-                  const int& num_atoms, const std::vector<double>& com) {
+GeometryAnalyzer::moment_of_inertia(ExecutionContext&                       ec,
+                                    const std::vector<std::vector<double>>& base_data,
+                                    const int& num_atoms, const std::vector<double>& com) {
   std::vector<std::vector<double>> mot(3, std::vector<double>(3, 0));
   std::vector<std::vector<double>> data = base_data;
 
@@ -574,8 +585,9 @@ moment_of_inertia(ExecutionContext& ec, const std::vector<std::vector<double>>& 
   return mot;
 }
 
-std::vector<double> principle_moments_of_inertia(ExecutionContext&                       ec,
-                                                 const std::vector<std::vector<double>>& mot) {
+std::vector<double>
+GeometryAnalyzer::principle_moments_of_inertia(ExecutionContext&                       ec,
+                                               const std::vector<std::vector<double>>& mot) {
   typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> Matrix;
   Matrix                                                                         I(3, 3);
   for(int i = 0; i < 3; i++) {
@@ -597,7 +609,8 @@ double bond_length(const std::vector<double>& atom0, const std::vector<double>& 
   return length;
 }
 
-std::vector<std::vector<double>> z_matrix(ExecutionContext& ec, ChemEnv& chem_env) {
+std::vector<std::vector<double>> GeometryAnalyzer::z_matrix(ExecutionContext& ec,
+                                                            ChemEnv&          chem_env) {
   std::stringstream ss;
   auto              atoms     = process_geometry(ec, chem_env);
   int               num_atoms = atoms.size();
@@ -799,8 +812,8 @@ Eigen::Vector3d nerf(const Eigen::Vector3d& a, const Eigen::Vector3d& b, const E
   return c + M * d2;
 }
 
-void cartesian_from_z_matrix(ExecutionContext& ec, const ChemEnv& chem_env,
-                             const std::vector<std::vector<double>> zmatrix) {
+void GeometryAnalyzer::cartesian_from_z_matrix(ExecutionContext& ec, const ChemEnv& chem_env,
+                                               const std::vector<std::vector<double>> zmatrix) {
   // takes a z matrix
   // computes cartesian coordinates from z-matrix
   std::vector<std::vector<double>> cartesian(zmatrix.size(),

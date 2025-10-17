@@ -152,99 +152,96 @@ public:
 };
 
 class CCSDOptions: public CommonOptions {
-private:
-  void initialize();
-
 public:
-  CCSDOptions(): CommonOptions() { initialize(); }
-
-  int  tilesize;
-  int  ndiis;
-  int  writet_iter;
-  bool readt, writet, gf_restart, gf_ip, gf_ea, gf_os, gf_cs, gf_itriples, gf_profile,
-    balance_tiles;
-  bool                    profile_ccsd;
-  double                  lshift;
-  double                  threshold;
+  double                  threshold{1e-6};
+  int                     tilesize{40};
+  int                     ndiis{5};
+  int                     writet_iter{ndiis};
+  bool                    readt{false};
+  bool                    writet{false};
+  bool                    gf_restart{false};
+  bool                    gf_ip{true};
+  bool                    gf_ea{false};
+  bool                    gf_os{false};
+  bool                    gf_cs{true};
+  bool                    gf_itriples{false};
+  bool                    gf_profile{false};
+  bool                    balance_tiles{true};
+  bool                    profile_ccsd{false};
+  double                  lshift{0.0};
   bool                    ccsd_diagnostics{false};
   std::pair<bool, double> tamplitudes{false, 0.05};
   std::vector<int>        cc_rdm{};
 
-  int    nactive_oa, nactive_ob, nactive_va, nactive_vb;
-  int    ducc_lvl, qflow_cycles;
-  double qflow_threshold;
-  int    ccsd_maxiter;
+  int    nactive_oa{0}, nactive_ob{0}, nactive_va{0}, nactive_vb{0};
+  int    ducc_lvl{2};
+  int    qflow_cycles{100};
+  double qflow_threshold{1e-3};
+  int    ccsd_maxiter{100};
   bool   freeze_atomic{false};
-  int    freeze_core;
-  int    freeze_virtual;
+  int    freeze_core{0};
+  int    freeze_virtual{0};
 
-  // RT-EOMCC
-  int    pcore;      // pth core orbital
-  int    ntimesteps; // number of time steps
-  int    rt_microiter;
-  double rt_threshold;
-  double rt_step_size;
-  double rt_multiplier;
-  double secent_x; // secent scale factor
-  double h_red;    // time-step reduction factor
-  double h_inc;    // time-step increase factor
-  double h_max;    // max time-step factor
+  int    pcore{0};
+  int    ntimesteps{10};
+  int    rt_microiter{20};
+  double rt_threshold{1e-6};
+  double rt_step_size{0.025};
+  double rt_multiplier{0.5};
+  double secent_x{0.1};
+  double h_red{0.5};
+  double h_inc{1.2};
+  double h_max{0.25};
 
-  // CCSD(T)
-  bool skip_ccsd;
-  int  cache_size;
-  int  ccsdt_tilesize;
+  bool skip_ccsd{false};
+  int  cache_size{8};
+  int  ccsdt_tilesize{40};
 
-  // DLPNO
-  bool             localize;
-  bool             skip_dlpno;
-  int              max_pnos;
-  size_t           keep_npairs;
-  double           TCutEN;
-  double           TCutPNO;
-  double           TCutTNO;
-  double           TCutPre;
-  double           TCutPairs;
-  double           TCutDO;
-  double           TCutDOij;
-  double           TCutDOPre;
-  std::string      dlpno_dfbasis;
-  std::vector<int> doubles_opt_eqns;
+  bool             localize{false};
+  bool             skip_dlpno{false};
+  int              max_pnos{1};
+  size_t           keep_npairs{1};
+  double           TCutEN{0.97};
+  double           TCutPNO{1.0e-6};
+  double           TCutTNO{1.0e-6};
+  double           TCutPre{1.0e-3};
+  double           TCutPairs{1.0e-3};
+  double           TCutDO{1.0e-2};
+  double           TCutDOij{1.0e-7};
+  double           TCutDOPre{3.0e-2};
+  std::string      dlpno_dfbasis{};
+  std::vector<int> doubles_opt_eqns{};
 
-  // EOM
-  int         eom_nroots;
-  int         eom_microiter;
-  std::string eom_type;
-  double      eom_threshold;
+  int         eom_nroots{1};
+  int         eom_microiter{100};
+  std::string eom_type{"right"};
+  double      eom_threshold{1e-6};
 
-  // GF
-  int    gf_p_oi_range;
-  int    gf_ndiis;
-  int    gf_ngmres;
-  int    gf_maxiter;
-  double gf_eta;
-  double gf_lshift;
-  bool   gf_preconditioning;
-  int    gf_nprocs_poi;
-  double gf_damping_factor;
-  // double gf_omega;
-  double              gf_threshold;
-  double              gf_omega_min_ip;
-  double              gf_omega_max_ip;
-  double              gf_omega_min_ip_e;
-  double              gf_omega_max_ip_e;
-  double              gf_omega_min_ea;
-  double              gf_omega_max_ea;
-  double              gf_omega_min_ea_e;
-  double              gf_omega_max_ea_e;
-  double              gf_omega_delta;
-  double              gf_omega_delta_e;
-  int                 gf_extrapolate_level;
-  int                 gf_analyze_level;
-  int                 gf_analyze_num_omega;
-  std::vector<double> gf_analyze_omega;
-  // Force processing of specified orbitals first
-  std::vector<size_t> gf_orbitals;
+  int                 gf_p_oi_range{0};
+  int                 gf_ndiis{10};
+  int                 gf_ngmres{10};
+  int                 gf_maxiter{500};
+  double              gf_eta{0.01};
+  double              gf_lshift{1.0};
+  bool                gf_preconditioning{true};
+  int                 gf_nprocs_poi{0};
+  double              gf_damping_factor{1.0};
+  double              gf_threshold{1e-2};
+  double              gf_omega_min_ip{-0.8};
+  double              gf_omega_max_ip{-0.4};
+  double              gf_omega_min_ip_e{-2.0};
+  double              gf_omega_max_ip_e{0.0};
+  double              gf_omega_min_ea{0.0};
+  double              gf_omega_max_ea{0.1};
+  double              gf_omega_min_ea_e{0.0};
+  double              gf_omega_max_ea_e{2.0};
+  double              gf_omega_delta{0.01};
+  double              gf_omega_delta_e{0.002};
+  int                 gf_extrapolate_level{0};
+  int                 gf_analyze_level{0};
+  int                 gf_analyze_num_omega{0};
+  std::vector<double> gf_analyze_omega{};
+  std::vector<size_t> gf_orbitals{};
   void                print() override;
 };
 
@@ -264,23 +261,24 @@ public:
 };
 
 class FCIOptions: public CommonOptions {
-private:
-  void initialize();
-
 public:
-  FCIOptions(): CommonOptions() { initialize(); }
-  int         nalpha{}, nbeta{}, nactive{}, ninactive{};
-  std::string job, expansion;
-
-  // MCSCF
-  bool   enable_diis;
-  int    max_macro_iter, diis_start_iter, diis_nkeep, ci_max_subspace;
-  double max_orbital_step, orb_grad_tol_mcscf, ci_res_tol, ci_matel_tol;
-
-  // FCIDUMP
-
-  // PRINT
-  bool print_davidson{}, print_ci{}, print_mcscf{}, print_diis{}, print_asci_search{};
+  int                     nalpha{0}, nbeta{0}, nactive{0}, ninactive{0};
+  std::string             job{"CI"};
+  std::string             expansion{"CAS"};
+  bool                    enable_diis{true};
+  int                     max_macro_iter{100};
+  int                     diis_start_iter{3};
+  int                     diis_nkeep{10};
+  int                     ci_max_subspace{20};
+  double                  max_orbital_step{0.5};
+  double                  orb_grad_tol_mcscf{5e-6};
+  double                  ci_res_tol{1e-8};
+  double                  ci_matel_tol{std::numeric_limits<double>::epsilon()};
+  bool                    print_davidson{false};
+  bool                    print_ci{false};
+  bool                    print_mcscf{true};
+  bool                    print_diis{false};
+  bool                    print_asci_search{false};
   std::pair<bool, double> print_state_char{false, 1e-2};
 };
 
@@ -316,7 +314,6 @@ public:
   bool                         ccsd{false};
   bool                         ccsd_sf{false};
   bool                         ccsd_t{false};
-  bool                         ccsdt{false};
   bool                         ccsd_lambda{false};
   bool                         eom_ccsd{false};
   bool                         rteom_cc2{false};

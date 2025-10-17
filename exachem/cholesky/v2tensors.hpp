@@ -46,20 +46,31 @@ public:
 };
 
 // ---------------------------------- class V2TensorSetup -------------------------------
-// template<typename T>
-// class V2TensorSetup {
-// public:
-//     V2TensorSetup(ExecutionContext& ec, Tensor<T> cholVpr, ExecutionHW ex_hw = ExecutionHW::CPU);
-//     V2Tensors<T> setup(std::vector<std::string> blocks = {"ijab", "iajb", "ijka", "ijkl", "iabc",
-//     "abcd"});
+template<typename T>
+class V2TensorSetup {
+public:
+  V2TensorSetup()          = default;
+  virtual ~V2TensorSetup() = default;
 
-// private:
-//     ExecutionContext& ec_;
-//     Tensor<T> cholVpr_;
-//     ExecutionHW ex_hw_;
-// };
-// ---------------------------------- class V2TensorSetup -------------------------------
+  // Copy constructor and copy assignment operator
+  V2TensorSetup(const V2TensorSetup&)            = default;
+  V2TensorSetup& operator=(const V2TensorSetup&) = default;
 
+  // Move constructor and move assignment operator
+  V2TensorSetup(V2TensorSetup&&)            = default;
+  V2TensorSetup& operator=(V2TensorSetup&&) = default;
+
+  virtual V2Tensors<T> setupV2Tensors(ExecutionContext& ec, Tensor<T> cholVpr,
+                                      ExecutionHW              ex_hw  = ExecutionHW::CPU,
+                                      std::vector<std::string> blocks = {"ijab", "iajb", "ijka",
+                                                                         "ijkl", "iabc", "abcd"});
+
+  virtual Tensor<T> setupV2(ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& CI,
+                            Tensor<T> cholVpr, const tamm::Tile chol_count,
+                            ExecutionHW hw = ExecutionHW::CPU, bool anti_sym = true);
+};
+
+// Backward compatibility wrapper functions
 template<typename T>
 V2Tensors<T>
 setupV2Tensors(ExecutionContext& ec, Tensor<T> cholVpr, ExecutionHW ex_hw = ExecutionHW::CPU,
@@ -73,10 +84,10 @@ Tensor<T> setupV2(ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& CI
 } // namespace exachem::cholesky_2e
 
 template<typename T>
-Tensor<T> exachem::cholesky_2e::setupV2(ExecutionContext& ec, TiledIndexSpace& MO,
-                                        TiledIndexSpace& CI, Tensor<T> cholVpr,
-                                        const tamm::Tile chol_count, ExecutionHW hw,
-                                        bool anti_sym) {
+Tensor<T> exachem::cholesky_2e::V2TensorSetup<T>::setupV2(ExecutionContext& ec, TiledIndexSpace& MO,
+                                                          TiledIndexSpace& CI, Tensor<T> cholVpr,
+                                                          const tamm::Tile chol_count,
+                                                          ExecutionHW hw, bool anti_sym) {
   auto rank = ec.pg().rank();
 
   TiledIndexSpace N = MO("all");
@@ -224,4 +235,22 @@ bool exachem::cholesky_2e::V2Tensors<T>::exist_on_disk(const std::string& fprefi
   bool tfiles_exist = std::all_of(tensor_files.begin(), tensor_files.end(),
                                   [](std::string x) { return std::filesystem::exists(x); });
   return tfiles_exist;
+}
+
+// Backward compatibility wrapper functions
+template<typename T>
+exachem::cholesky_2e::V2Tensors<T>
+exachem::cholesky_2e::setupV2Tensors(ExecutionContext& ec, Tensor<T> cholVpr, ExecutionHW ex_hw,
+                                     std::vector<std::string> blocks) {
+  V2TensorSetup<T> setup;
+  return setup.setupV2Tensors(ec, cholVpr, ex_hw, blocks);
+}
+
+template<typename T>
+Tensor<T> exachem::cholesky_2e::setupV2(ExecutionContext& ec, TiledIndexSpace& MO,
+                                        TiledIndexSpace& CI, Tensor<T> cholVpr,
+                                        const tamm::Tile chol_count, ExecutionHW hw,
+                                        bool anti_sym) {
+  V2TensorSetup<T> setup;
+  return setup.setupV2(ec, MO, CI, cholVpr, chol_count, hw, anti_sym);
 }

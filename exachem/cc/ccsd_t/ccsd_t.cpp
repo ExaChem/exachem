@@ -11,19 +11,11 @@
 #include "exachem/cc/ccsd/cd_ccsd_os_ann.hpp"
 #include "exachem/cc/ccsd_t/ccsd_t_fused_driver.hpp"
 #include "exachem/cholesky/cholesky_2e_driver.hpp"
+#include "exachem/cc/ccsd_t/ccsd_t.hpp"
 // clang-format on
 
-double ccsdt_s1_t1_GetTime  = 0;
-double ccsdt_s1_v2_GetTime  = 0;
-double ccsdt_d1_t2_GetTime  = 0;
-double ccsdt_d1_v2_GetTime  = 0;
-double ccsdt_d2_t2_GetTime  = 0;
-double ccsdt_d2_v2_GetTime  = 0;
-double genTime              = 0;
-double ccsd_t_data_per_rank = 0; // in GB
-
-void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env) {
-  using T   = double;
+template<typename T>
+void exachem::cc::ccsd_t::CCSD_T_Driver<T>::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   auto rank = ec.pg().rank();
 
   SystemData& sys_data = chem_env.sys_data;
@@ -62,7 +54,7 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   double& hf_energy   = chem_env.scf_context.hf_energy;
   double  corr_energy = cc_context.ccsd_correlation_energy;
 
-  auto [MO1, total_orbitals1] = cholesky_2e::setupMOIS(ec, chem_env, true);
+  auto [MO1, total_orbitals1] = exachem::cholesky_2e::setupMOIS(ec, chem_env, true);
   TiledIndexSpace N1          = MO1("all");
   TiledIndexSpace O1          = MO1("occ");
   TiledIndexSpace V1          = MO1("virt");
@@ -71,10 +63,10 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   // Tensor<T> t_d_f1{{N1,N1},{1,1}};
   // Tensor<T> t_d_v2{{N1,N1,N1,N1}, {2,2}};
 
-  Tensor<T>                 t_d_t1{{V1, O1}, {1, 1}};
-  Tensor<T>                 t_d_t2{{V1, V1, O1, O1}, {2, 2}};
-  Tensor<T>                 t_d_cv2{{N1, N1, CI}, {1, 1}};
-  cholesky_2e::V2Tensors<T> v2tensors({"ijab", "ijka", "iabc"});
+  Tensor<T>                          t_d_t1{{V1, O1}, {1, 1}};
+  Tensor<T>                          t_d_t2{{V1, V1, O1, O1}, {2, 2}};
+  Tensor<T>                          t_d_cv2{{N1, N1, CI}, {1, 1}};
+  exachem::cholesky_2e::V2Tensors<T> v2tensors({"ijab", "ijka", "iabc"});
 
   T            ccsd_t_mem{};
   const double gib   = (1024 * 1024 * 1024.0);
@@ -179,7 +171,8 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
       retile_tamm_tensor(cholVpr, t_d_cv2, "CholV2");
       free_tensors(cholVpr);
 
-      v2tensors = cholesky_2e::setupV2Tensors<T>(ec, t_d_cv2, ex_hw, v2tensors.get_blocks());
+      v2tensors =
+        exachem::cholesky_2e::setupV2Tensors<T>(ec, t_d_cv2, ex_hw, v2tensors.get_blocks());
       free_tensors(t_d_cv2);
 
       if(rank == 0) { cout << endl << "Retile T1,T2 tensors ... " << endl; }
@@ -256,8 +249,9 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   for(tamm::Index x = nvab / 2; x < nvab; x++) k_spin.push_back(2);
 
   double ccsd_t_time = 0, total_t_time = 0;
-  // cc_t1 = std::chrono::high_resolution_clock::now();
-  std::tie(energy1, energy2, ccsd_t_time, total_t_time) = ccsd_t_fused_driver_new<T>(
+
+  CCSD_T_Fused_Driver<T> ccsd_t_fused_driver_new;
+  std::tie(energy1, energy2, ccsd_t_time, total_t_time) = ccsd_t_fused_driver_new.execute(
     chem_env, ec, k_spin, MO1, t_d_t1, t_d_t2, v2tensors, p_evl_sorted, hf_energy + corr_energy,
     is_restricted, cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v, seq_h3b);
 
@@ -301,13 +295,10 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
   long double total_num_ops = 0;
   //
   if(rank == 0) {
-    // std::cout << "--------------------------------------------------------------------" <<
-    // std::endl;
-    ccsd_t_fused_driver_calculator_ops<T>(chem_env, ec, k_spin, MO1, p_evl_sorted,
-                                          hf_energy + corr_energy, is_restricted, total_num_ops,
-                                          seq_h3b);
-    // std::cout << "--------------------------------------------------------------------" <<
-    // std::endl;
+    CCSD_T_Fused_Driver<T> ccsd_t_perf_calculator;
+    ccsd_t_perf_calculator.calculate_performance_ops(chem_env, ec, k_spin, MO1, p_evl_sorted,
+                                                     hf_energy + corr_energy, is_restricted,
+                                                     total_num_ops, seq_h3b);
   }
 
   ec.pg().barrier();
@@ -370,4 +361,13 @@ void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env)
 
   ec.flush_and_sync();
   if(!skip_ccsd) cc_context.destroy_subgroup();
+}
+
+template class exachem::cc::ccsd_t::CCSD_T_Driver<double>;
+
+// Backward compatibility wrapper function
+
+void exachem::cc::ccsd_t::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env) {
+  CCSD_T_Driver<double> driver;
+  driver.ccsd_t_driver(ec, chem_env);
 }

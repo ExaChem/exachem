@@ -8,12 +8,10 @@
 
 #include "v2tensors.hpp"
 using T = double;
-// ---------------------------------- class V2TensorSetup -------------------------------
 
 template<typename T>
-exachem::cholesky_2e::V2Tensors<T>
-exachem::cholesky_2e::setupV2Tensors(ExecutionContext& ec, Tensor<T> cholVpr, ExecutionHW ex_hw,
-                                     std::vector<std::string> blocks) {
+exachem::cholesky_2e::V2Tensors<T> exachem::cholesky_2e::V2TensorSetup<T>::setupV2Tensors(
+  ExecutionContext& ec, Tensor<T> cholVpr, ExecutionHW ex_hw, std::vector<std::string> blocks) {
   TiledIndexSpace MO    = cholVpr.tiled_index_spaces()[0]; // MO
   TiledIndexSpace CI    = cholVpr.tiled_index_spaces()[2]; // CI
   auto [cind]           = CI.labels<1>("all");
@@ -59,11 +57,14 @@ exachem::cholesky_2e::setupV2Tensors(ExecutionContext& ec, Tensor<T> cholVpr, Ex
   return v2tensors;
 }
 
-template Tensor<T> exachem::cholesky_2e::setupV2<T>(ExecutionContext& ec, TiledIndexSpace& MO,
-                                                    TiledIndexSpace& CI, Tensor<T> cholVpr,
-                                                    const tamm::Tile chol_count, ExecutionHW hw,
-                                                    bool anti_sym);
+template class exachem::cholesky_2e::V2TensorSetup<double>;
 
-template exachem::cholesky_2e::V2Tensors<T>
-exachem::cholesky_2e::setupV2Tensors<T>(ExecutionContext& ec, Tensor<T> cholVpr, ExecutionHW ex_hw,
-                                        std::vector<std::string> blocks);
+// Backward compatibility wrapper instantiations
+template Tensor<double>
+exachem::cholesky_2e::setupV2<double>(ExecutionContext& ec, TiledIndexSpace& MO,
+                                      TiledIndexSpace& CI, Tensor<double> cholVpr,
+                                      const tamm::Tile chol_count, ExecutionHW hw, bool anti_sym);
+
+template exachem::cholesky_2e::V2Tensors<double>
+exachem::cholesky_2e::setupV2Tensors<double>(ExecutionContext& ec, Tensor<double> cholVpr,
+                                             ExecutionHW ex_hw, std::vector<std::string> blocks);

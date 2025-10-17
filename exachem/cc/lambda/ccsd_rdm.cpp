@@ -6,14 +6,14 @@
  * See LICENSE.txt for details
  */
 
-#include <tamm/tamm.hpp>
+#include "exachem/cc/lambda/ccsd_rdm.hpp"
 
-using namespace tamm;
+namespace exachem::cc::ccsd_lambda {
 
 template<typename T>
-Tensor<T> compute_1rdm(std::vector<int>& cc_rdm, std::string files_prefix, Scheduler& sch,
-                       TiledIndexSpace& MO, Tensor<T> d_t1, Tensor<T> d_t2, Tensor<T> d_y1,
-                       Tensor<T> d_y2) {
+Tensor<T> CCSD_RDM<T>::compute_1rdm(std::vector<int>& cc_rdm, std::string files_prefix,
+                                    Scheduler& sch, TiledIndexSpace& MO, Tensor<T> d_t1,
+                                    Tensor<T> d_t2, Tensor<T> d_y1, Tensor<T> d_y2) {
   auto [mo1, mo2]      = MO.labels<2>("all");
   auto [i, j, k, l, m] = MO.labels<5>("occ");
   auto [a, b, c, d, e] = MO.labels<5>("virt");
@@ -83,9 +83,9 @@ Tensor<T> compute_1rdm(std::vector<int>& cc_rdm, std::string files_prefix, Sched
 
 // 2-RDM
 template<typename T>
-Tensor<T> compute_2rdm(std::vector<int>& cc_rdm, std::string files_prefix, Scheduler& sch,
-                       TiledIndexSpace& MO, Tensor<T> d_t1, Tensor<T> d_t2, Tensor<T> d_y1,
-                       Tensor<T> d_y2) {
+Tensor<T> CCSD_RDM<T>::compute_2rdm(std::vector<int>& cc_rdm, std::string files_prefix,
+                                    Scheduler& sch, TiledIndexSpace& MO, Tensor<T> d_t1,
+                                    Tensor<T> d_t2, Tensor<T> d_y1, Tensor<T> d_y2) {
   auto [mo1, mo2, mo3, mo4] = MO.labels<4>("all");
   auto [i, j, k, l, m]      = MO.labels<5>("occ");
   auto [a, b, c, d, e]      = MO.labels<5>("virt");
@@ -341,11 +341,7 @@ Tensor<T> compute_2rdm(std::vector<int>& cc_rdm, std::string files_prefix, Sched
   return gamma2;
 }
 
-using T = double;
-template Tensor<T> compute_1rdm<T>(std::vector<int>& cc_rdm, std::string files_prefix,
-                                   Scheduler& sch, TiledIndexSpace& MO, Tensor<T> d_t1,
-                                   Tensor<T> d_t2, Tensor<T> d_y1, Tensor<T> d_y2);
+// Explicit template instantiation
+template class CCSD_RDM<double>;
 
-template Tensor<T> compute_2rdm<T>(std::vector<int>& cc_rdm, std::string files_prefix,
-                                   Scheduler& sch, TiledIndexSpace& MO, Tensor<T> d_t1,
-                                   Tensor<T> d_t2, Tensor<T> d_y1, Tensor<T> d_y2);
+} // namespace exachem::cc::ccsd_lambda

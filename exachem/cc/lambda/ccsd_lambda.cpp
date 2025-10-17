@@ -8,8 +8,9 @@
 
 #include "exachem/cc/lambda/ccsd_lambda.hpp"
 
-void exachem::cc::ccsd_lambda::iteration_print_lambda(ChemEnv& chem_env, const ProcGroup& pg,
-                                                      int iter, double residual, double time) {
+template<typename T>
+void exachem::cc::ccsd_lambda::CCSDLambda_Engine<T>::iteration_print_lambda(
+  ChemEnv& chem_env, const ProcGroup& pg, int iter, double residual, double time) {
   if(pg.rank() == 0) {
     std::cout << std::setw(4) << std::right << iter + 1 << "     ";
     std::cout << std::setprecision(13) << std::setw(16) << std::left << residual << "  ";
@@ -26,8 +27,9 @@ void exachem::cc::ccsd_lambda::iteration_print_lambda(ChemEnv& chem_env, const P
 template<typename T>
 std::tuple<Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vector<Tensor<T>>,
            std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>>
-exachem::cc::ccsd_lambda::setupLambdaTensors(ExecutionContext& ec, TiledIndexSpace& MO,
-                                             size_t ndiis) {
+exachem::cc::ccsd_lambda::CCSDLambda_Engine<T>::setupLambdaTensors(ExecutionContext& ec,
+                                                                   TiledIndexSpace&  MO,
+                                                                   size_t            ndiis) {
   TiledIndexSpace O = MO("occ");
   TiledIndexSpace V = MO("virt");
 
@@ -71,13 +73,11 @@ exachem::cc::ccsd_lambda::setupLambdaTensors(ExecutionContext& ec, TiledIndexSpa
 }
 
 template<typename T>
-void exachem::cc::ccsd_lambda::lambda_ccsd_y1(Scheduler& sch, const TiledIndexSpace& MO,
-                                              const TiledIndexSpace& CI, Tensor<T>& i0,
-                                              const Tensor<T>& t1, const Tensor<T>& t2,
-                                              const Tensor<T>& y1, const Tensor<T>& y2,
-                                              const Tensor<T>&           f1,
-                                              cholesky_2e::V2Tensors<T>& v2tensors, Tensor<T>& cv3d,
-                                              Y1Tensors<T>& y1tensors) {
+void exachem::cc::ccsd_lambda::CCSDLambda_Engine<T>::lambda_ccsd_y1(
+  Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI, Tensor<T>& i0,
+  const Tensor<T>& t1, const Tensor<T>& t2, const Tensor<T>& y1, const Tensor<T>& y2,
+  const Tensor<T>& f1, cholesky_2e::V2Tensors<T>& v2tensors, Tensor<T>& cv3d,
+  Y1Tensors<T>& y1tensors) {
   // const TiledIndexSpace& O = MO("occ");
   // const TiledIndexSpace& V = MO("virt");
   auto [cind] = CI.labels<1>("all");
@@ -279,7 +279,7 @@ void exachem::cc::ccsd_lambda::lambda_ccsd_y1(Scheduler& sch, const TiledIndexSp
 }
 
 template<typename T>
-void exachem::cc::ccsd_lambda::lambda_ccsd_y2(
+void exachem::cc::ccsd_lambda::CCSDLambda_Engine<T>::lambda_ccsd_y2(
   Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI, Tensor<T>& i0,
   const Tensor<T>& t1, Tensor<T>& t2, const Tensor<T>& y1, Tensor<T>& y2, const Tensor<T>& f1,
   cholesky_2e::V2Tensors<T>& v2tensors, Tensor<T>& cv3d, Y2Tensors<T>& y2tensors) {
@@ -446,7 +446,7 @@ void exachem::cc::ccsd_lambda::lambda_ccsd_y2(
 }
 
 template<typename T>
-std::tuple<double, double> exachem::cc::ccsd_lambda::lambda_ccsd_driver(
+std::tuple<double, double> exachem::cc::ccsd_lambda::CCSDLambda_Engine<T>::lambda_ccsd_driver(
   ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
   Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_f1, cholesky_2e::V2Tensors<T>& v2tensors,
   Tensor<T>& cv3d, Tensor<T>& d_r1, Tensor<T>& d_r2, Tensor<T>& d_y1, Tensor<T>& d_y2,
@@ -455,12 +455,12 @@ std::tuple<double, double> exachem::cc::ccsd_lambda::lambda_ccsd_driver(
   // TODO: LAMBDA DOES NOT HAVE THE SAME ITERATION CONVERGENCE
   //       PROTOCOL AND NEEDS TO BE UPDATED.
 
-  double      zshiftl  = 0.0;
-  SystemData& sys_data = chem_env.sys_data;
-  int         maxiter  = chem_env.ioptions.ccsd_options.ccsd_maxiter;
-  int         ndiis    = chem_env.ioptions.ccsd_options.ndiis;
-  double      thresh   = chem_env.ioptions.ccsd_options.threshold;
-  bool        profile  = chem_env.ioptions.ccsd_options.profile_ccsd;
+  double       zshiftl  = 0.0;
+  SystemData&  sys_data = chem_env.sys_data;
+  const int    maxiter  = chem_env.ioptions.ccsd_options.ccsd_maxiter;
+  const int    ndiis    = chem_env.ioptions.ccsd_options.ndiis;
+  const double thresh   = chem_env.ioptions.ccsd_options.threshold;
+  const bool   profile  = chem_env.ioptions.ccsd_options.profile_ccsd;
 
   const TAMM_SIZE n_occ_alpha = static_cast<TAMM_SIZE>(sys_data.n_occ_alpha);
   const TAMM_SIZE n_occ_beta  = static_cast<TAMM_SIZE>(sys_data.n_occ_beta);
@@ -506,7 +506,7 @@ std::tuple<double, double> exachem::cc::ccsd_lambda::lambda_ccsd_driver(
         std::chrono::duration_cast<std::chrono::duration<double>>((timer_end - timer_start))
           .count();
 
-      iteration_print_lambda(chem_env, ec.pg(), iter, residual, iter_time);
+      CCSDLambda_Engine<T>::iteration_print_lambda(chem_env, ec.pg(), iter, residual, iter_time);
 
       if(residual < thresh) { break; }
     }
@@ -531,15 +531,5 @@ std::tuple<double, double> exachem::cc::ccsd_lambda::lambda_ccsd_driver(
   return std::make_tuple(residual, energy);
 } // End of lambda_ccsd_driver
 
-using T = double;
-template std::tuple<double, double> exachem::cc::ccsd_lambda::lambda_ccsd_driver(
-  ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
-  Tensor<T>& d_t1, Tensor<T>& d_t2, Tensor<T>& d_f1, cholesky_2e::V2Tensors<T>& v2tensors,
-  Tensor<T>& cv3d, Tensor<T>& d_r1, Tensor<T>& d_r2, Tensor<T>& d_y1, Tensor<T>& d_y2,
-  std::vector<Tensor<T>>& d_r1s, std::vector<Tensor<T>>& d_r2s, std::vector<Tensor<T>>& d_y1s,
-  std::vector<Tensor<T>>& d_y2s, std::vector<T>& p_evl_sorted);
-
-template std::tuple<Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>, std::vector<Tensor<T>>,
-                    std::vector<Tensor<T>>, std::vector<Tensor<T>>, std::vector<Tensor<T>>>
-exachem::cc::ccsd_lambda::setupLambdaTensors(ExecutionContext& ec, TiledIndexSpace& MO,
-                                             size_t ndiis);
+// Explicit template instantiations for double
+template class exachem::cc::ccsd_lambda::CCSDLambda_Engine<double>;

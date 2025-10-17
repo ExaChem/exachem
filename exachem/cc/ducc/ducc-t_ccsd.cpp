@@ -9,14 +9,15 @@
 #include "exachem/cc/ducc/ducc-t_ccsd.hpp"
 #include "exachem/cc/ccsd/cd_ccsd_os_ann.hpp"
 
-namespace exachem::cc::ducc {
-using namespace exachem::cc::ducc::internal;
+namespace exachem::cc::ducc::internal {
 
+// Member function implementation
 template<typename T>
-void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
-                        Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1,
-                        cholesky_2e::V2Tensors<T>& v2tensors, IndexVector& occ_int_vec,
-                        IndexVector& virt_int_vec, string& pos_str) {
+void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec,
+                                         const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
+                                         Tensor<T>& f1, cholesky_2e::V2Tensors<T>& v2tensors,
+                                         IndexVector& occ_int_vec, IndexVector& virt_int_vec,
+                                         string& pos_str) {
   Scheduler   sch{ec};
   ExecutionHW ex_hw = ec.exhw();
 
@@ -172,9 +173,9 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
     if(orig_nactva != nactva) { dtensors_exist = false; }
     const int orig_ducc_lvl = chem_env.run_context["ducc"]["ducc_lvl"];
     if(orig_ducc_lvl > ducc_lvl) { dtensors_exist = false; }
-    if(!(drestart && dtensors_exist)) { exachem::cc::ducc::internal::reset_ducc_runcontext(ec, chem_env); }
+    if(!(drestart && dtensors_exist)) { reset_ducc_runcontext(ec, chem_env); }
   }
-  else { exachem::cc::ducc::internal::reset_ducc_runcontext(ec, chem_env); }
+  else { reset_ducc_runcontext(ec, chem_env); }
 
   chem_env.run_context["ducc"]["ducc_lvl"] = ducc_lvl;
 
@@ -572,10 +573,7 @@ void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledInde
   if(rank == 0) chem_env.write_json_data();
 }
 
-using T = double;
-template void DUCC_T_CCSD_Driver<T>(ChemEnv& chem_env, ExecutionContext& ec,
-                                    const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
-                                    Tensor<T>& f1, cholesky_2e::V2Tensors<T>& v2tensors,
-                                    IndexVector& occ_int_vec, IndexVector& virt_int_vec,
-                                    string& pos_str);
-} // namespace exachem::cc::ducc
+} // namespace exachem::cc::ducc::internal
+
+// Explicit template instantiation for DUCCInternal class
+template class exachem::cc::ducc::internal::DUCCInternal<double>;

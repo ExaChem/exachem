@@ -11,9 +11,9 @@
 #include "exachem/common/context/is_context.hpp"
 using namespace exachem::scf;
 
-void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& chem_env) {
-  using T = double;
-
+template<typename T>
+void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionContext& ec,
+                                                                     ChemEnv&          chem_env) {
   if(!chem_env.scf_context.skip_scf) scf::scf_driver(ec, chem_env);
 
   Tensor<T> C_AO      = chem_env.scf_context.C_AO;
@@ -116,7 +116,8 @@ void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& che
     Tensor<T>& movecs_so = cd_context.movecs_so;
     Tensor<T>::allocate(&ec, cd_context.d_f1, movecs_so);
 
-    exachem::cholesky_2e::two_index_transform<T>(ec, chem_env);
+    exachem::cholesky_2e::TwoIndexTransform<T> tit;
+    tit.two_index_transform(ec, chem_env);
     if(do_cholesky) exachem::cholesky_2e::cholesky_2e<T>(ec, chem_env);
 
     MO = chem_env.is_context.MSO; // modified if freezing
@@ -259,3 +260,11 @@ void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& che
   }
 
 } // END of cholesky_2e_driver
+
+template class exachem::cholesky_2e::Cholesky_2E_Driver<double>;
+
+// Backward compatibility wrapper function
+void exachem::cholesky_2e::cholesky_2e_driver(ExecutionContext& ec, ChemEnv& chem_env) {
+  Cholesky_2E_Driver<double> driver;
+  driver.cholesky_2e_driver(ec, chem_env);
+}

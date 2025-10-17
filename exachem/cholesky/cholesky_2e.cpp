@@ -22,7 +22,7 @@ auto cd_tensor_zero(Tensor<T>& tens) {
 
 namespace exachem::cholesky_2e {
 
-int get_ts_recommendation(ExecutionContext& ec, ChemEnv& chem_env) {
+int Cholesky_2E_Util::get_ts_recommendation(ExecutionContext& ec, ChemEnv& chem_env) {
   int nranks   = ec.nnodes() * ec.ppn();
   int ts_guess = chem_env.ioptions.ccsd_options.tilesize;
 
@@ -75,8 +75,8 @@ int get_ts_recommendation(ExecutionContext& ec, ChemEnv& chem_env) {
   return ts_max_;
 }
 
-std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ExecutionContext& ec, ChemEnv& chem_env,
-                                                    bool triples) {
+std::tuple<TiledIndexSpace, TAMM_SIZE>
+Cholesky_2E_Util::setup_mo_red(ExecutionContext& ec, ChemEnv& chem_env, bool triples) {
   SystemData& sys_data    = chem_env.sys_data;
   TAMM_SIZE   n_occ_alpha = sys_data.n_occ_alpha;
   TAMM_SIZE   n_vir_alpha = sys_data.n_vir_alpha;
@@ -125,8 +125,8 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ExecutionContext& ec, ChemEn
   return std::make_tuple(MO, total_orbitals);
 }
 
-std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& chem_env,
-                                                 bool triples) {
+std::tuple<TiledIndexSpace, TAMM_SIZE>
+Cholesky_2E_Util::setupMOIS(ExecutionContext& ec, ChemEnv& chem_env, bool triples) {
   const int   rank         = ec.pg().rank().value();
   SystemData& sys_data     = chem_env.sys_data;
   auto        ccsd_options = chem_env.ioptions.ccsd_options;
@@ -345,7 +345,8 @@ std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& 
   return std::make_tuple(MO, total_orbitals);
 }
 
-void update_sysdata(ExecutionContext& ec, ChemEnv& chem_env, TiledIndexSpace& MO, bool is_mso) {
+void Cholesky_2E_Util::update_sysdata(ExecutionContext& ec, ChemEnv& chem_env, TiledIndexSpace& MO,
+                                      bool is_mso) {
   SystemData& sys_data       = chem_env.sys_data;
   const bool  do_freeze      = sys_data.n_frozen_core > 0 || sys_data.n_frozen_virtual > 0;
   TAMM_SIZE   total_orbitals = sys_data.nmo;
@@ -364,7 +365,7 @@ void update_sysdata(ExecutionContext& ec, ChemEnv& chem_env, TiledIndexSpace& MO
 }
 
 // reshape F/lcao after freezing
-Matrix reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat, bool is_lcao) {
+Matrix Cholesky_2E_Util::reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat, bool is_lcao) {
   SystemData& sys_data = chem_env.sys_data;
   const int   noa      = sys_data.n_occ_alpha;
   const int   nob      = sys_data.n_occ_beta;
@@ -419,7 +420,7 @@ Matrix reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat, bool is_lcao) {
 }
 
 template<typename TensorType>
-void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
+void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
   TiledIndexSpace& tMO = chem_env.is_context.MSO;
   TiledIndexSpace& tAO = chem_env.is_context.AO_opt;
 
@@ -1180,5 +1181,43 @@ void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
   chem_env.cd_context.cholV2        = CholVpr_tamm;
 }
 
+template class Cholesky_2E<double>;
+
+// Backward compatibility wrapper function
+template<typename TensorType>
+void cholesky_2e(ExecutionContext& ec, ChemEnv& chem_env) {
+  Cholesky_2E<TensorType> cholesky;
+  cholesky.cholesky_2e(ec, chem_env);
+}
+
 template void cholesky_2e<double>(ExecutionContext& ec, ChemEnv& chem_env);
+
+// Backward compatibility wrapper functions for utility methods
+int get_ts_recommendation(ExecutionContext& ec, ChemEnv& chem_env) {
+  Cholesky_2E_Util util;
+  return util.get_ts_recommendation(ec, chem_env);
+}
+
+std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ExecutionContext& ec, ChemEnv& chem_env,
+                                                    bool triples) {
+  Cholesky_2E_Util util;
+  return util.setup_mo_red(ec, chem_env, triples);
+}
+
+std::tuple<TiledIndexSpace, TAMM_SIZE> setupMOIS(ExecutionContext& ec, ChemEnv& chem_env,
+                                                 bool triples) {
+  Cholesky_2E_Util util;
+  return util.setupMOIS(ec, chem_env, triples);
+}
+
+void update_sysdata(ExecutionContext& ec, ChemEnv& chem_env, TiledIndexSpace& MO, bool is_mso) {
+  Cholesky_2E_Util util;
+  util.update_sysdata(ec, chem_env, MO, is_mso);
+}
+
+Matrix reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat, bool is_lcao) {
+  Cholesky_2E_Util util;
+  return util.reshape_mo_matrix(chem_env, emat, is_lcao);
+}
+
 } // namespace exachem::cholesky_2e

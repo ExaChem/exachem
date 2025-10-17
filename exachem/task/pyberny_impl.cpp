@@ -276,7 +276,7 @@ double torsion_eval(Eigen::MatrixXd coords, int i, int j, int k, int l, bool _) 
   return phi;
 }
 
-auto b_matrix(Eigen::MatrixXd geom, InternalCoordinates int_coords) {
+Eigen::MatrixXd b_matrix(Eigen::MatrixXd geom, InternalCoordinates int_coords) {
   std::vector<std::vector<Eigen::Vector3d>> B(
     int_coords.size(), std::vector<Eigen::Vector3d>(geom.size() / 3, Eigen::Vector3d::Zero()));
 
@@ -769,10 +769,10 @@ bool is_converged(Eigen::VectorXd forces, Eigen::VectorXd step, bool on_sphere) 
 
 std::tuple<Eigen::RowVectorXd, OptPoint, OptPoint, OptPoint, OptPoint, OptPoint, double,
            Eigen::MatrixXd>
-optimizer_berny(ExecutionContext& ec, ChemEnv& chem_env, double energy, Eigen::MatrixXd gradients,
-                bool first, OptPoint best, OptPoint previous, OptPoint predicted,
-                OptPoint interpolated, OptPoint future, double trust, Eigen::MatrixXd hessian,
-                InternalCoordinates int_coords) {
+Pyberny::optimizer_berny(ExecutionContext& ec, ChemEnv& chem_env, double energy,
+                         Eigen::MatrixXd gradients, bool first, OptPoint best, OptPoint previous,
+                         OptPoint predicted, OptPoint interpolated, OptPoint future, double trust,
+                         Eigen::MatrixXd hessian, InternalCoordinates int_coords) {
   // initial geometry setup
   std::tuple<std::vector<int>, Eigen::MatrixXd> init_geom      = get_init_geometry(ec, chem_env);
   std::vector<int>                              atomic_numbers = std::get<0>(init_geom);

@@ -6,12 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include "exachem/cc/gfcc/gf_diis.hpp"
-#include "exachem/cc/gfcc/gf_guess.hpp"
-#include "exachem/cc/gfcc/gfccsd_ea.hpp"
-#include "exachem/cc/gfcc/gfccsd_ip.hpp"
-#include "exachem/cc/lambda/ccsd_lambda.hpp"
-#include "exachem/cholesky/cholesky_2e_driver.hpp"
+#include "exachem/cc/gfcc/gfccsd_driver.hpp"
 
 namespace exachem::cc::gfcc {
 Tensor<double> t2v2_o, lt12_o_a, lt12_o_b, ix1_1_1_a, ix1_1_1_b, ix2_1_aaaa, ix2_1_abab, ix2_1_bbbb,
@@ -27,9 +22,10 @@ Tensor<double> t2v2_o, lt12_o_a, lt12_o_b, ix1_1_1_a, ix1_1_1_b, ix2_1_aaaa, ix2
 TiledIndexSpace diis_tis;
 // std::ofstream ofs_profile;
 
-void write_results_to_json(ExecutionContext& ec, ChemEnv& chem_env, int level,
-                           std::vector<double>& ni_w, std::vector<double>& ni_A,
-                           std::string gfcc_type) {
+template<typename T>
+void GFCCSD_Driver<T>::write_results_to_json(ExecutionContext& ec, ChemEnv& chem_env, int level,
+                                             std::vector<T>& ni_w, std::vector<T>& ni_A,
+                                             std::string gfcc_type) {
   auto lomega_npts = ni_w.size();
   // std::vector<double> r_ni_w;
   // std::vector<double> r_ni_A;
@@ -53,8 +49,9 @@ void write_results_to_json(ExecutionContext& ec, ChemEnv& chem_env, int level,
   }
 }
 
-void write_string_to_disk(ExecutionContext& ec, const std::string& tstring,
-                          const std::string& filename) {
+template<typename T>
+void GFCCSD_Driver<T>::write_string_to_disk(ExecutionContext& ec, const std::string& tstring,
+                                            const std::string& filename) {
   int  tstring_len = tstring.length();
   auto rank        = ec.pg().rank().value();
 
@@ -95,7 +92,7 @@ void write_string_to_disk(ExecutionContext& ec, const std::string& tstring,
   ec.pg().gatherv(tstring.c_str(), tstring_len, combined_string, &recvcounts[0], &displs[0], 0);
 
   if(rank == 0) {
-    // cout << combined_string << endl;
+    // std::cout << combined_string << std::endl;
     std::ofstream out(filename, std::ios::out);
     if(!out) std::cerr << "Error opening file " << filename << std::endl;
     out << combined_string << std::endl;
@@ -105,9 +102,8 @@ void write_string_to_disk(ExecutionContext& ec, const std::string& tstring,
 }
 
 ////////////////////main entry point///////////////////////////
-void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
-  using T = double;
-
+template<typename T>
+void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   auto rank = ec.pg().rank();
 
   ProcGroup        pg_l = ProcGroup::create_self();
@@ -127,9 +123,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   ProcGroup& sub_pg = cc_context.sub_pg;
   Scheduler  sub_sch{*(cc_context.sub_ec)};
 
-  SystemData& sys_data     = chem_env.sys_data;
-  std::string files_dir    = chem_env.get_files_dir("", "gfcc");
-  std::string files_prefix = chem_env.get_files_prefix("", "gfcc");
+  SystemData&       sys_data     = chem_env.sys_data;
+  const std::string files_dir    = chem_env.get_files_dir("", "gfcc");
+  const std::string files_prefix = chem_env.get_files_prefix("", "gfcc");
 
   TiledIndexSpace& MO           = chem_env.is_context.MSO;
   TiledIndexSpace& CI           = chem_env.is_context.CI;
@@ -161,16 +157,16 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   const bool   gf_profile   = ccsd_options.gf_profile;
   const double gf_threshold = ccsd_options.gf_threshold;
 
-  double omega_min_ip  = ccsd_options.gf_omega_min_ip;
-  double omega_max_ip  = ccsd_options.gf_omega_max_ip;
-  double lomega_min_ip = ccsd_options.gf_omega_min_ip_e;
-  double lomega_max_ip = ccsd_options.gf_omega_max_ip_e;
-  double omega_min_ea  = ccsd_options.gf_omega_min_ea;
-  double omega_max_ea  = ccsd_options.gf_omega_max_ea;
+  const double omega_min_ip  = ccsd_options.gf_omega_min_ip;
+  const double omega_max_ip  = ccsd_options.gf_omega_max_ip;
+  const double lomega_min_ip = ccsd_options.gf_omega_min_ip_e;
+  const double lomega_max_ip = ccsd_options.gf_omega_max_ip_e;
+  const double omega_min_ea  = ccsd_options.gf_omega_min_ea;
+  const double omega_max_ea  = ccsd_options.gf_omega_max_ea;
   // double lomega_min_ea      = ccsd_options.gf_omega_min_ea_e;
   // double lomega_max_ea      = ccsd_options.gf_omega_max_ea_e;
-  double omega_delta   = ccsd_options.gf_omega_delta;
-  double omega_delta_e = ccsd_options.gf_omega_delta_e;
+  const double omega_delta   = ccsd_options.gf_omega_delta;
+  const double omega_delta_e = ccsd_options.gf_omega_delta_e;
 
   const int gf_extrapolate_level = ccsd_options.gf_extrapolate_level;
   int64_t   omega_npts_ip        = std::ceil((omega_max_ip - omega_min_ip) / omega_delta + 1);
@@ -209,19 +205,20 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   auto [p1, p2, p3, p4, p5, p6, p7, p8, p9, p10] = MO.labels<10>("virt");
   auto [h1, h2, h3, h4, h5, h6, h7, h8, h9, h10] = MO.labels<10>("occ");
 
-  auto [cind] = CI.labels<1>("all");
-  auto [h1_oa, h2_oa, h3_oa, h4_oa, h5_oa, h6_oa, h7_oa, h8_oa, h9_oa, h10_oa] =
+  const auto [cind] = CI.labels<1>("all");
+  const auto [h1_oa, h2_oa, h3_oa, h4_oa, h5_oa, h6_oa, h7_oa, h8_oa, h9_oa, h10_oa] =
     o_alpha.labels<10>("all");
-  auto [h1_ob, h2_ob, h3_ob, h4_ob, h5_ob, h6_ob, h7_ob, h8_ob, h9_ob, h10_ob] =
+  const auto [h1_ob, h2_ob, h3_ob, h4_ob, h5_ob, h6_ob, h7_ob, h8_ob, h9_ob, h10_ob] =
     o_beta.labels<10>("all");
-  auto [p1_va, p2_va, p3_va, p4_va, p5_va, p6_va, p7_va, p8_va, p9_va, p10_va] =
+  const auto [p1_va, p2_va, p3_va, p4_va, p5_va, p6_va, p7_va, p8_va, p9_va, p10_va] =
     v_alpha.labels<10>("all");
-  auto [p1_vb, p2_vb, p3_vb, p4_vb, p5_vb, p6_vb, p7_vb, p8_vb, p9_vb, p10_vb] =
+  const auto [p1_vb, p2_vb, p3_vb, p4_vb, p5_vb, p6_vb, p7_vb, p8_vb, p9_vb, p10_vb] =
     v_beta.labels<10>("all");
 
   Scheduler sch{ec};
 
-  if(rank == 0) cout << endl << "#occupied, #virtual = " << nocc << ", " << nvir << endl;
+  if(rank == 0)
+    std::cout << std::endl << "#occupied, #virtual = " << nocc << ", " << nvir << std::endl;
   std::vector<T> p_evl_sorted_occ(nocc);
   std::vector<T> p_evl_sorted_virt(nvir);
   std::copy(p_evl_sorted.begin(), p_evl_sorted.begin() + nocc, p_evl_sorted_occ.begin());
@@ -238,8 +235,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       omega_space_ip.push_back(omega_tmp);
     }
     if(rank == 0)
-      cout << "Freq. space (before doing MOR): " << std::fixed << std::setprecision(2)
-           << omega_space_ip << endl;
+      std::cout << "Freq. space (before doing MOR): " << std::fixed << std::setprecision(2)
+                << omega_space_ip << std::endl;
   }
   if(ccsd_options.gf_ea) {
     for(int64_t ni = 0; ni < omega_npts_ea; ni++) {
@@ -247,8 +244,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       omega_space_ea.push_back(omega_tmp);
     }
     if(rank == 0)
-      cout << "Freq. space (before doing MOR): " << std::fixed << std::setprecision(2)
-           << omega_space_ea << endl;
+      std::cout << "Freq. space (before doing MOR): " << std::fixed << std::setprecision(2)
+                << omega_space_ea << std::endl;
   }
 
   //#define MOR 1
@@ -308,20 +305,20 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   Tensor<T> v2iajb{{O, V, O, V}, {2, 2}};
   Tensor<T> v2iabc{{O, V, V, V}, {2, 2}};
 
-  std::string d_t1_a_file      = files_prefix + ".d_t1_a";
-  std::string d_t1_b_file      = files_prefix + ".d_t1_b";
-  std::string d_t2_aaaa_file   = files_prefix + ".d_t2_aaaa";
-  std::string d_t2_bbbb_file   = files_prefix + ".d_t2_bbbb";
-  std::string d_t2_abab_file   = files_prefix + ".d_t2_abab";
-  std::string cholOO_a_file    = files_prefix + ".cholOO_a";
-  std::string cholOO_b_file    = files_prefix + ".cholOO_b";
-  std::string cholOV_a_file    = files_prefix + ".cholOV_a";
-  std::string cholOV_b_file    = files_prefix + ".cholOV_b";
-  std::string cholVV_a_file    = files_prefix + ".cholVV_a";
-  std::string cholVV_b_file    = files_prefix + ".cholVV_b";
-  std::string v2ijab_aaaa_file = files_prefix + ".v2ijab_aaaa";
-  std::string v2ijab_bbbb_file = files_prefix + ".v2ijab_bbbb";
-  std::string v2ijab_abab_file = files_prefix + ".v2ijab_abab";
+  const std::string d_t1_a_file      = files_prefix + ".d_t1_a";
+  const std::string d_t1_b_file      = files_prefix + ".d_t1_b";
+  const std::string d_t2_aaaa_file   = files_prefix + ".d_t2_aaaa";
+  const std::string d_t2_bbbb_file   = files_prefix + ".d_t2_bbbb";
+  const std::string d_t2_abab_file   = files_prefix + ".d_t2_abab";
+  const std::string cholOO_a_file    = files_prefix + ".cholOO_a";
+  const std::string cholOO_b_file    = files_prefix + ".cholOO_b";
+  const std::string cholOV_a_file    = files_prefix + ".cholOV_a";
+  const std::string cholOV_b_file    = files_prefix + ".cholOV_b";
+  const std::string cholVV_a_file    = files_prefix + ".cholVV_a";
+  const std::string cholVV_b_file    = files_prefix + ".cholVV_b";
+  const std::string v2ijab_aaaa_file = files_prefix + ".v2ijab_aaaa";
+  const std::string v2ijab_bbbb_file = files_prefix + ".v2ijab_bbbb";
+  const std::string v2ijab_abab_file = files_prefix + ".v2ijab_abab";
 
   sch
     .allocate(d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, cholOO_a, cholOO_b, cholOV_a,
@@ -777,8 +774,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       //                                   //
       ///////////////////////////////////////
       if(rank == 0) {
-        cout << endl << "_____retarded_GFCCSD_on_alpha_spin______" << endl;
-        // ofs_profile << endl << "_____retarded_GFCCSD_on_alpha_spin______" << endl;
+        std::cout << std::endl << "_____retarded_GFCCSD_on_alpha_spin______" << std::endl;
+        // ofs_profile << std::endl << "_____retarded_GFCCSD_on_alpha_spin______" << std::endl;
       }
 
       size_t prev_qr_rank_orig    = 0;
@@ -790,13 +787,13 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         std::string       q1_a_file    = files_prefix + ".r_q1_a.l" + levelstr;
         std::string       q2_aaa_file  = files_prefix + ".r_q2_aaa.l" + levelstr;
         std::string       q2_bab_file  = files_prefix + ".r_q2_bab.l" + levelstr;
-        std::string       hx1_a_file   = files_prefix + ".r_hx1_a.l" + levelstr;
-        std::string       hx2_aaa_file = files_prefix + ".r_hx2_aaa.l" + levelstr;
-        std::string       hx2_bab_file = files_prefix + ".r_hx2_bab.l" + levelstr;
-        std::string       hsub_a_file  = files_prefix + ".r_hsub_a.l" + levelstr;
-        std::string       bsub_a_file  = files_prefix + ".r_bsub_a.l" + levelstr;
-        std::string       cp_a_file    = files_prefix + ".r_cp_a.l" + levelstr;
-        std::string       qrr_up_file  = files_prefix + ".qr_rank_updated.l" + levelstr;
+        const std::string hx1_a_file   = files_prefix + ".r_hx1_a.l" + levelstr;
+        const std::string hx2_aaa_file = files_prefix + ".r_hx2_aaa.l" + levelstr;
+        const std::string hx2_bab_file = files_prefix + ".r_hx2_bab.l" + levelstr;
+        const std::string hsub_a_file  = files_prefix + ".r_hsub_a.l" + levelstr;
+        const std::string bsub_a_file  = files_prefix + ".r_bsub_a.l" + levelstr;
+        const std::string cp_a_file    = files_prefix + ".r_cp_a.l" + levelstr;
+        const std::string qrr_up_file  = files_prefix + ".qr_rank_updated.l" + levelstr;
 
         bool q_exist = fs::exists(q1_a_file) && fs::exists(q2_aaa_file) && fs::exists(q2_bab_file);
 
@@ -805,7 +802,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
                           fs::exists(bsub_a_file) && fs::exists(cp_a_file) &&
                           ccsd_options.gf_restart;
 
-        // if(rank==0 && debug) cout << "gf_restart: " << gf_restart << endl;
+        // if(rank==0 && debug) std::cout << "gf_restart: " << gf_restart << std::endl;
 
         if(level == 1) {
           omega_extra.push_back(omega_min_ip);
@@ -833,11 +830,11 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         }
 
         if(rank == 0) {
-          cout << endl << std::string(55, '-') << endl;
-          cout << "qr_rank_orig, qr_rank_updated: " << qr_rank_orig << ", " << qr_rank_updated
-               << endl;
-          cout << "prev_qr_rank_orig, prev_qr_rank_updated: " << prev_qr_rank_orig << ", "
-               << prev_qr_rank_updated << endl;
+          std::cout << std::endl << std::string(55, '-') << std::endl;
+          std::cout << "qr_rank_orig, qr_rank_updated: " << qr_rank_orig << ", " << qr_rank_updated
+                    << std::endl;
+          std::cout << "prev_qr_rank_orig, prev_qr_rank_updated: " << prev_qr_rank_orig << ", "
+                    << prev_qr_rank_updated << std::endl;
         }
 
         TiledIndexSpace otis;
@@ -860,7 +857,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         for(auto gf_omega: omega_extra) {
           // omega_extra_finished.push_back(x);
           if(!gf_restart) {
-            gfccsd_driver_ip_a<T>(
+            GFCCSD_IP_A_Driver<T> gfccsd_driver_ip_a_inst;
+            gfccsd_driver_ip_a_inst.gfccsd_driver_ip_a(
               ec, chem_env, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, d_f1, t2v2_o,
               lt12_o_a, lt12_o_b, ix1_1_1_a, ix1_1_1_b, ix2_1_aaaa, ix2_1_abab, ix2_1_bbbb,
               ix2_1_baba, ix2_2_a, ix2_2_b, ix2_3_a, ix2_3_b, ix2_4_aaaa, ix2_4_abab, ix2_4_bbbb,
@@ -869,7 +867,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
               ix2_6_3_baba, v2ijab_aaaa, v2ijab_abab, v2ijab_bbbb, p_evl_sorted_occ,
               p_evl_sorted_virt, nocc, nvir, nptsi, unit_tis, files_prefix, levelstr, gf_omega);
           }
-          else if(rank == 0) cout << endl << "Restarting freq: " << gf_omega << endl;
+          else if(rank == 0) std::cout << std::endl << "Restarting freq: " << gf_omega << std::endl;
           auto ni             = std::round((gf_omega - omega_min_ip) / omega_delta);
           omega_ip_conv_a[ni] = true;
         }
@@ -893,14 +891,14 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
           const std::string plevelstr = std::to_string(level - 1);
 
-          std::string pq1_a_file   = files_prefix + ".r_q1_a.l" + plevelstr;
-          std::string pq2_aaa_file = files_prefix + ".r_q2_aaa.l" + plevelstr;
-          std::string pq2_bab_file = files_prefix + ".r_q2_bab.l" + plevelstr;
+          const std::string pq1_a_file   = files_prefix + ".r_q1_a.l" + plevelstr;
+          const std::string pq2_aaa_file = files_prefix + ".r_q2_aaa.l" + plevelstr;
+          const std::string pq2_bab_file = files_prefix + ".r_q2_bab.l" + plevelstr;
 
           bool prev_q12 = fs::exists(pq1_a_file) && fs::exists(pq2_aaa_file) &&
                           fs::exists(pq2_bab_file);
 
-          if(rank == 0 && debug) cout << "prev_q12:" << prev_q12 << endl;
+          if(rank == 0 && debug) std::cout << "prev_q12:" << prev_q12 << std::endl;
 
           if(prev_q12 && !q_exist) {
             TiledIndexSpace otis_prev_opt = {IndexSpace{range(0, prev_qr_rank_updated)},
@@ -951,8 +949,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
               auto nrm_q2_aaa_prev = norm(q2_tamm_aaa);
               auto nrm_q2_bab_prev = norm(q2_tamm_bab);
               if(rank == 0 && debug) {
-                cout << "norm of q1/2 at previous level" << endl;
-                cout << nrm_q1_a_prev << "," << nrm_q2_aaa_prev << "," << nrm_q2_bab_prev << endl;
+                std::cout << "norm of q1/2 at previous level" << std::endl;
+                std::cout << nrm_q1_a_prev << "," << nrm_q2_aaa_prev << "," << nrm_q2_bab_prev
+                          << std::endl;
               }
             }
           }
@@ -961,9 +960,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           double time =
             std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
           if(rank == 0)
-            cout << endl
-                 << "Time to read in pre-computed Q1/Q2: " << std::fixed << std::setprecision(6)
-                 << time << " secs" << endl;
+            std::cout << std::endl
+                      << "Time to read in pre-computed Q1/Q2: " << std::fixed
+                      << std::setprecision(6) << time << " secs" << std::endl;
 
           std::vector<ComplexTensor> gs_q1_tmp_a;   //{o_alpha};
           std::vector<ComplexTensor> gs_q2_tmp_aaa; //{v_alpha,o_alpha,o_alpha};
@@ -975,7 +974,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           double time_gs_norm = 0.0;
 
           double q_norm_threshold = chem_env.ioptions.scf_options.tol_lindep;
-          if(rank == 0 && debug) { cout << "q_norm threshold: " << q_norm_threshold << endl; }
+          if(rank == 0 && debug) {
+            std::cout << "q_norm threshold: " << q_norm_threshold << std::endl;
+          }
 
           auto gs_start_timer = std::chrono::high_resolution_clock::now();
 
@@ -1032,16 +1033,16 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
               std::chrono::duration_cast<std::chrono::duration<double>>((gs_rv_end - gs_rv_start))
                 .count();
             if(rank == 0) {
-              cout << endl
-                   << " -- Gram-Schmidt: Time for reading GS vectors from disk: " << std::fixed
-                   << std::setprecision(6) << gs_read_time << " secs" << endl
-                   << endl;
+              std::cout << std::endl
+                        << " -- Gram-Schmidt: Time for reading GS vectors from disk: " << std::fixed
+                        << std::setprecision(6) << gs_read_time << " secs" << std::endl
+                        << std::endl;
             }
 
             auto ivec_start = prev_qr_rank_orig;
 
             // setup for restarting ivec loop as needed
-            std::string gs_ivec_file = files_prefix + ".gs_ivec.l" + levelstr;
+            const std::string gs_ivec_file = files_prefix + ".gs_ivec.l" + levelstr;
 #if 1
             if(ccsd_options.gf_restart) {
               bool gsivec_exists = fs::exists(gs_ivec_file);
@@ -1055,10 +1056,10 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
               }
               if(gsivec_exists) {
                 ec.pg().broadcast(&ivec_start, 0);
-                auto q1_a_file   = files_prefix + ".r_q1_a.gs_ivec.l" + levelstr;
-                auto q2_aaa_file = files_prefix + ".r_q2_aaa.gs_ivec.l" + levelstr;
-                auto q2_bab_file = files_prefix + ".r_q2_bab.gs_ivec.l" + levelstr;
-                auto q_exist     = fs::exists(q1_a_file) && fs::exists(q2_aaa_file) &&
+                const auto q1_a_file   = files_prefix + ".r_q1_a.gs_ivec.l" + levelstr;
+                const auto q2_aaa_file = files_prefix + ".r_q2_aaa.gs_ivec.l" + levelstr;
+                const auto q2_bab_file = files_prefix + ".r_q2_bab.gs_ivec.l" + levelstr;
+                auto       q_exist     = fs::exists(q1_a_file) && fs::exists(q2_aaa_file) &&
                                fs::exists(q2_bab_file);
                 if(q_exist) {
                   if(rank == 0)
@@ -1205,12 +1206,12 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
               if(q_norm < q_norm_threshold) {
                 gs_cur_lindep++;
-                if(gf_profile && rank == 0) cout << " --- continue" << endl;
+                if(gf_profile && rank == 0) std::cout << " --- continue" << std::endl;
 #if 1
                 if(ccsd_options.gf_restart && ((ivec - ivec_start) % ndiis == 0)) {
                   if(rank == 0) {
                     std::ofstream out(gs_ivec_file, std::ios::out);
-                    if(!out) cerr << "Error opening file " << gs_ivec_file << endl;
+                    if(!out) std::cerr << "Error opening file " << gs_ivec_file << std::endl;
                     out << ivec << std::endl;
                     out.close();
                   }
@@ -1283,11 +1284,11 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
                 auto nrm_q2_aaa_gs = norm(q2_tamm_aaa);
                 auto nrm_q2_bab_gs = norm(q2_tamm_bab);
                 if(rank == 0) {
-                  cout << " -- " << ivec << "," << q1norm_a << "," << q2norm_aaa << ","
-                       << q2norm_bab << endl;
-                  cout << "   "
-                       << "," << cnewsc << "," << nrm_q1_a_gs << "," << nrm_q2_aaa_gs << ","
-                       << nrm_q2_bab_gs << endl;
+                  std::cout << " -- " << ivec << "," << q1norm_a << "," << q2norm_aaa << ","
+                            << q2norm_bab << std::endl;
+                  std::cout << "   "
+                            << "," << cnewsc << "," << nrm_q1_a_gs << "," << nrm_q2_aaa_gs << ","
+                            << nrm_q2_bab_gs << std::endl;
                 }
               }
 
@@ -1298,13 +1299,13 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
               if(gf_profile && rank == 0)
                 std::cout << "GS: Time (s) for processing ivec " << ivec
                           << ": Orthogonalization: " << time_gs_orth_i
-                          << ", normalization/copy: " << time_gs_norm_i << endl;
+                          << ", normalization/copy: " << time_gs_norm_i << std::endl;
 
 #if 1
               if(ccsd_options.gf_restart && ((ivec - ivec_start) % ndiis == 0)) {
                 if(rank == 0) {
                   std::ofstream out(gs_ivec_file, std::ios::out);
-                  if(!out) cerr << "Error opening file " << gs_ivec_file << endl;
+                  if(!out) std::cerr << "Error opening file " << gs_ivec_file << std::endl;
                   out << ivec << std::endl;
                   out.close();
                 }
@@ -1338,7 +1339,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
             if(ccsd_options.gf_restart && rank == 0) {
               std::ofstream out(gs_ivec_file, std::ios::out);
-              if(!out) cerr << "Error opening file " << gs_ivec_file << endl;
+              if(!out) std::cerr << "Error opening file " << gs_ivec_file << std::endl;
               out << qr_rank_orig << std::endl;
               out.close();
             }
@@ -1383,13 +1384,13 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
                                  .count();
 
           if(rank == 0) {
-            cout << endl
-                 << " -- Gram-Schmidt: Time for orthogonalization: " << std::fixed
-                 << std::setprecision(6) << time_gs_orth << " secs" << endl;
-            cout << " -- Gram-Schmidt: Time for normalizing and copying back: " << std::fixed
-                 << std::setprecision(6) << time_gs_norm << " secs" << endl;
-            cout << "Total time for Gram-Schmidt: " << std::fixed << std::setprecision(6)
-                 << total_time_gs << " secs" << endl;
+            std::cout << std::endl
+                      << " -- Gram-Schmidt: Time for orthogonalization: " << std::fixed
+                      << std::setprecision(6) << time_gs_orth << " secs" << std::endl;
+            std::cout << " -- Gram-Schmidt: Time for normalizing and copying back: " << std::fixed
+                      << std::setprecision(6) << time_gs_norm << " secs" << std::endl;
+            std::cout << "Total time for Gram-Schmidt: " << std::fixed << std::setprecision(6)
+                      << total_time_gs << " secs" << std::endl;
           }
           auto cc_gs_x = std::chrono::high_resolution_clock::now();
 
@@ -1401,28 +1402,32 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           bool gs_x12_restart = fs::exists(hx1_a_file) && fs::exists(hx2_aaa_file) &&
                                 fs::exists(hx2_bab_file);
 
+          GFCCSD_IP_A<T> gfccsd_ip_a;
           if(!gs_x12_restart) {
 #if GF_IN_SG
             if(sub_pg.is_valid()) {
-              gfccsd_x1_a(sub_sch,
+              gfccsd_ip_a.gfccsd_x1_a(sub_sch,
 #else
-          gfccsd_x1_a(sch,
+          gfccsd_ip_a.gfccsd_x1_a(sch,
 #endif
-                          MO, Hx1_tamm_a, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab,
-                          q1_tamm_a, q2_tamm_aaa, q2_tamm_bab, d_f1, ix2_2_a, ix1_1_1_a, ix1_1_1_b,
-                          ix2_6_3_aaaa, ix2_6_3_abab, otis_opt, true);
+                                      MO, Hx1_tamm_a, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
+                                      d_t2_abab, q1_tamm_a, q2_tamm_aaa, q2_tamm_bab, d_f1, ix2_2_a,
+                                      ix1_1_1_a, ix1_1_1_b, ix2_6_3_aaaa, ix2_6_3_abab, otis_opt,
+                                      true);
 
 #if GF_IN_SG
-              gfccsd_x2_a(sub_sch,
+              gfccsd_ip_a.gfccsd_x2_a(
+                sub_sch,
 #else
-          gfccsd_x2_a(sch,
+          gfccsd_ip_a.gfccsd_x2_a(
+            sch,
 #endif
-                          MO, Hx2_tamm_aaa, Hx2_tamm_bab, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
-                          d_t2_abab, q1_tamm_a, q2_tamm_aaa, q2_tamm_bab, d_f1, ix2_1_aaaa,
-                          ix2_1_abab, ix2_2_a, ix2_2_b, ix2_3_a, ix2_3_b, ix2_4_aaaa, ix2_4_abab,
-                          ix2_5_aaaa, ix2_5_abba, ix2_5_abab, ix2_5_bbbb, ix2_5_baab, ix2_6_2_a,
-                          ix2_6_2_b, ix2_6_3_aaaa, ix2_6_3_abba, ix2_6_3_abab, ix2_6_3_bbbb,
-                          ix2_6_3_baab, v2ijab_aaaa, v2ijab_abab, v2ijab_bbbb, otis_opt, true);
+                MO, Hx2_tamm_aaa, Hx2_tamm_bab, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab,
+                q1_tamm_a, q2_tamm_aaa, q2_tamm_bab, d_f1, ix2_1_aaaa, ix2_1_abab, ix2_2_a, ix2_2_b,
+                ix2_3_a, ix2_3_b, ix2_4_aaaa, ix2_4_abab, ix2_5_aaaa, ix2_5_abba, ix2_5_abab,
+                ix2_5_bbbb, ix2_5_baab, ix2_6_2_a, ix2_6_2_b, ix2_6_3_aaaa, ix2_6_3_abba,
+                ix2_6_3_abab, ix2_6_3_bbbb, ix2_6_3_baab, v2ijab_aaaa, v2ijab_abab, v2ijab_bbbb,
+                otis_opt, true);
 
 #if GF_IN_SG
               sub_sch.execute(sub_sch.ec().exhw());
@@ -1450,16 +1455,20 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
             auto nrm_hx2_tamm_aaa = norm(Hx2_tamm_aaa);
             auto nrm_hx2_tamm_bab = norm(Hx2_tamm_bab);
             if(rank == 0) {
-              cout << endl << "norms of q1/2 and hq1/2" << endl;
-              cout << nrm_q1_tamm_a << "," << nrm_q2_tamm_aaa << "," << nrm_q2_tamm_bab << endl;
-              cout << nrm_hx1_tamm_a << "," << nrm_hx2_tamm_aaa << "," << nrm_hx2_tamm_bab << endl;
+              std::cout << std::endl << "norms of q1/2 and hq1/2" << std::endl;
+              std::cout << nrm_q1_tamm_a << "," << nrm_q2_tamm_aaa << "," << nrm_q2_tamm_bab
+                        << std::endl;
+              std::cout << nrm_hx1_tamm_a << "," << nrm_hx2_tamm_aaa << "," << nrm_hx2_tamm_bab
+                        << std::endl;
             }
           }
 
           auto   cc_q12 = std::chrono::high_resolution_clock::now();
           double time_q12 =
             std::chrono::duration_cast<std::chrono::duration<double>>((cc_q12 - cc_gs_x)).count();
-          if(rank == 0) cout << endl << "Time to contract Q1/Q2: " << time_q12 << " secs" << endl;
+          if(rank == 0)
+            std::cout << std::endl
+                      << "Time to contract Q1/Q2: " << time_q12 << " secs" << std::endl;
         } // if !gf_restart
 
         prev_qr_rank_orig    = qr_rank_orig;
@@ -1467,7 +1476,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
         if(rank == 0) {
           std::ofstream out(qrr_up_file, std::ios::out);
-          if(!out) cerr << "Error opening file " << qrr_up_file << endl;
+          if(!out) std::cerr << "Error opening file " << qrr_up_file << std::endl;
           out << qr_rank_updated << std::endl;
           out.close();
         }
@@ -1511,7 +1520,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         auto time =
           std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
 
-        if(rank == 0) cout << endl << "Time to compute Cp: " << time << " secs" << endl;
+        if(rank == 0)
+          std::cout << std::endl << "Time to compute Cp: " << time << " secs" << std::endl;
 
         // Write all tensors
         if(!gf_restart) {
@@ -1531,8 +1541,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           auto nrm_bsub = norm(bsub_tamm_a);
           auto nrm_cp   = norm(Cp_a);
           if(rank == 0) {
-            cout << "norms of hsub,bsub,cp" << endl;
-            cout << nrm_hsub << "," << nrm_bsub << "," << nrm_cp << endl;
+            std::cout << "norms of hsub,bsub,cp" << std::endl;
+            std::cout << nrm_hsub << "," << nrm_bsub << "," << nrm_cp << std::endl;
           }
         }
 
@@ -1553,7 +1563,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         sch_l(Cp_local_a(h1_oa, otil) = Cp_a(h1_oa, otil)).execute();
 
         if(rank == 0) {
-          cout << endl << "spectral function (omega_npts_ip = " << omega_npts_ip << "):" << endl;
+          std::cout << std::endl
+                    << "spectral function (omega_npts_ip = " << omega_npts_ip << "):" << std::endl;
         }
 
         cc_t1 = std::chrono::high_resolution_clock::now();
@@ -1585,8 +1596,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
             std::ostringstream spf;
             spf << "W = " << std::fixed << std::setprecision(2) << std::real(omega_tmp)
                 << ", omega_ip_A0 = " << std::fixed << std::setprecision(4) << omega_ip_A0[ni]
-                << endl;
-            cout << spf.str();
+                << std::endl;
+            std::cout << spf.str();
             ni_A[ni] = omega_ip_A0[ni];
             ni_w[ni] = std::real(omega_tmp);
           }
@@ -1595,11 +1606,12 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         cc_t2 = std::chrono::high_resolution_clock::now();
         time  = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
         if(rank == 0) {
-          cout << endl
-               << "omegas processed in level " << level << " = " << std::fixed
-               << std::setprecision(2) << omega_extra << endl;
-          cout << "Time to compute spectral function in level " << level
-               << " (omega_npts_ip = " << omega_npts_ip << "): " << time << " secs" << endl;
+          std::cout << std::endl
+                    << "omegas processed in level " << level << " = " << std::fixed
+                    << std::setprecision(2) << omega_extra << std::endl;
+          std::cout << "Time to compute spectral function in level " << level
+                    << " (omega_npts_ip = " << omega_npts_ip << "): " << time << " secs"
+                    << std::endl;
           write_results_to_json(ec, chem_env, level, ni_w, ni_A, "retarded_alpha");
         }
 
@@ -1642,9 +1654,10 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           }   // end oe finished
         }
         if(rank == 0) {
-          cout << "new freq's:" << std::fixed << std::setprecision(2) << omega_extra << endl;
-          cout << "qr_rank_orig, qr_rank_updated: " << qr_rank_orig << ", " << qr_rank_updated
-               << endl;
+          std::cout << "new freq's:" << std::fixed << std::setprecision(2) << omega_extra
+                    << std::endl;
+          std::cout << "qr_rank_orig, qr_rank_updated: " << qr_rank_orig << ", " << qr_rank_updated
+                    << std::endl;
         }
 
         // extrapolate or proceed to next level
@@ -1653,8 +1666,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
         if(conv_all || gf_extrapolate_level == level || omega_extra.size() == 0) {
           if(rank == 0)
-            cout << endl
-                 << "--------------------extrapolate & converge-----------------------" << endl;
+            std::cout << std::endl
+                      << "--------------------extrapolate & converge-----------------------"
+                      << std::endl;
           auto cc_t1 = std::chrono::high_resolution_clock::now();
 
           AtomicCounter* ac = new AtomicCounterGA(ec.pg(), 1);
@@ -1679,11 +1693,11 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
               tamm_to_eigen_tensor(o_local_a, olocala_eig);
               for(TAMM_SIZE nj = 0; nj < noa; nj++) {
                 auto gpp = olocala_eig(nj).imag();
-                spfe << "orb_index = " << nj << ", gpp_a = " << gpp << endl;
+                spfe << "orb_index = " << nj << ", gpp_a = " << gpp << std::endl;
               }
 
               spfe << "w = " << std::fixed << std::setprecision(3) << std::real(omega_tmp)
-                   << ", A_a =  " << std::fixed << std::setprecision(6) << oscalar << endl;
+                   << ", A_a =  " << std::fixed << std::setprecision(6) << oscalar << std::endl;
               next = ac->fetch_add(0, 1);
             }
             taskcount++;
@@ -1704,9 +1718,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           double time =
             std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
           if(rank == 0)
-            std::cout << endl
+            std::cout << std::endl
                       << "Time taken for extrapolation (lomega_npts_ip = " << lomega_npts_ip
-                      << "): " << time << " secs" << endl;
+                      << "): " << time << " secs" << std::endl;
           break;
         }
 
@@ -1728,22 +1742,22 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 ////////////////////////////////////////////////
 #if 0
     if(ccsd_options.gf_os && rank == 0) {
-      cout << endl << "_____retarded_GFCCSD_on_beta_spin______" << endl;
-      // ofs_profile << endl <<"_____retarded_GFCCSD_on_beta_spin______" << endl;
+      std::cout << std::endl << "_____retarded_GFCCSD_on_beta_spin______" << std::endl;
+      // ofs_profile << std::endl <<"_____retarded_GFCCSD_on_beta_spin______" << std::endl;
     }
 
     while(ccsd_options.gf_os) {
       const std::string levelstr = std::to_string(level);
 
-      std::string q1_b_file    = files_prefix + ".r_q1_b.l" + levelstr;
-      std::string q2_bbb_file  = files_prefix + ".r_q2_bbb.l" + levelstr;
-      std::string q2_aba_file  = files_prefix + ".r_q2_aba.l" + levelstr;
-      std::string hx1_b_file   = files_prefix + ".r_hx1_b.l" + levelstr;
-      std::string hx2_bbb_file = files_prefix + ".r_hx2_bbb.l" + levelstr;
-      std::string hx2_aba_file = files_prefix + ".r_hx2_aba.l" + levelstr;
-      std::string hsub_b_file  = files_prefix + ".r_hsub_b.l" + levelstr;
-      std::string bsub_b_file  = files_prefix + ".r_bsub_b.l" + levelstr;
-      std::string cp_b_file    = files_prefix + ".r_cp_b.l" + levelstr;
+      const std::string q1_b_file    = files_prefix + ".r_q1_b.l" + levelstr;
+      const std::string q2_bbb_file  = files_prefix + ".r_q2_bbb.l" + levelstr;
+      const std::string q2_aba_file  = files_prefix + ".r_q2_aba.l" + levelstr;
+      const std::string hx1_b_file   = files_prefix + ".r_hx1_b.l" + levelstr;
+      const std::string hx2_bbb_file = files_prefix + ".r_hx2_bbb.l" + levelstr;
+      const std::string hx2_aba_file = files_prefix + ".r_hx2_aba.l" + levelstr;
+      const std::string hsub_b_file  = files_prefix + ".r_hsub_b.l" + levelstr;
+      const std::string bsub_b_file  = files_prefix + ".r_bsub_b.l" + levelstr;
+      const std::string cp_b_file    = files_prefix + ".r_cp_b.l" + levelstr;
 
       bool gf_restart = fs::exists(q1_b_file) && fs::exists(q2_bbb_file) &&
                         fs::exists(q2_aba_file) && fs::exists(hx1_b_file) &&
@@ -1778,7 +1792,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       for(auto gf_omega: omega_extra) {
 
         if(!gf_restart) {
-          gfccsd_driver_ip_b<T>(ec, chem_env, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
+          GFCCSD_IP_B_Driver<T> gfccsd_driver_ip_b_inst;
+          gfccsd_driver_ip_b_inst.gfccsd_driver_ip_b(ec, chem_env, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
                                 d_t2_abab, d_f1, t2v2_o, lt12_o_a, lt12_o_b, ix1_1_1_a, ix1_1_1_b,
                                 ix2_1_aaaa, ix2_1_abab, ix2_1_bbbb, ix2_1_baba, ix2_2_a, ix2_2_b,
                                 ix2_3_a, ix2_3_b, ix2_4_aaaa, ix2_4_abab, ix2_4_bbbb, ix2_5_aaaa,
@@ -1805,9 +1820,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
         const std::string plevelstr = std::to_string(level - 1);
 
-        std::string pq1_b_file   = files_prefix + ".r_q1_b.l" + plevelstr;
-        std::string pq2_bbb_file = files_prefix + ".r_q2_bbb.l" + plevelstr;
-        std::string pq2_aba_file = files_prefix + ".r_q2_aba.l" + plevelstr;
+        const std::string pq1_b_file   = files_prefix + ".r_q1_b.l" + plevelstr;
+        const std::string pq2_bbb_file = files_prefix + ".r_q2_bbb.l" + plevelstr;
+        const std::string pq2_aba_file = files_prefix + ".r_q2_aba.l" + plevelstr;
 
         decltype(qr_rank) ivec_start = 0;
         bool              prev_q12   = fs::exists(pq1_b_file) && fs::exists(pq2_aba_file) &&
@@ -1842,9 +1857,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         double time =
           std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
         if(rank == 0)
-          cout << endl
+          std::cout << std::endl
                << "Time to read in pre-computed Q1/Q2: " << std::fixed << std::setprecision(6)
-               << time << " secs" << endl;
+               << time << " secs" << std::endl;
 
         ComplexTensor q1_tmp_b{o_beta};
         ComplexTensor q2_tmp_bbb{v_beta, o_beta, o_beta};
@@ -1987,31 +2002,32 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         }
 
         if(rank == 0) {
-          cout << endl << "Time for orthogonalization: " << time_gs_orth << " secs" << endl;
-          cout << endl
-               << "Time for normalizing and copying back: " << time_gs_norm << " secs" << endl;
-          cout << endl << "Total time for Gram-Schmidt: " << total_time_gs << " secs" << endl;
+          std::cout << std::endl << "Time for orthogonalization: " << time_gs_orth << " secs" << std::endl;
+          std::cout << std::endl
+               << "Time for normalizing and copying back: " << time_gs_norm << " secs" << std::endl;
+          std::cout << std::endl << "Total time for Gram-Schmidt: " << total_time_gs << " secs" << std::endl;
         }
         auto cc_gs_x = std::chrono::high_resolution_clock::now();
 
         bool gs_x12_restart = fs::exists(hx1_b_file) && fs::exists(hx2_bbb_file) &&
                               fs::exists(hx2_aba_file);
 
+        GFCCSDIPAB<T> gfccsd_ip_b;
         if(!gs_x12_restart) {
 #if GF_IN_SG
           if(sub_pg.is_valid()) {
-            gfccsd_x1_b(sub_sch,
+            gfccsd_ip_b.gfccsd_x1_b(sub_sch,
 #else
-          gfccsd_x1_b(sch,
+          gfccsd_ip_b.gfccsd_x1_b(sch,
 #endif
                         MO, Hx1_tamm_b, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, q1_tamm_b,
                         q2_tamm_bbb, q2_tamm_aba, d_f1, ix2_2_b, ix1_1_1_a, ix1_1_1_b, ix2_6_3_bbbb,
                         ix2_6_3_baba, otis, true);
 
 #if GF_IN_SG
-            gfccsd_x2_b(sub_sch,
+            gfccsd_ip_b.gfccsd_x2_b(sub_sch,
 #else
-          gfccsd_x2_b(sch,
+          gfccsd_ip_b.gfccsd_x2_b(sch,
 #endif
                         MO, Hx2_tamm_bbb, Hx2_tamm_aba, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
                         d_t2_abab, q1_tamm_b, q2_tamm_bbb, q2_tamm_aba, d_f1, ix2_1_bbbb,
@@ -2039,7 +2055,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         auto   cc_q12 = std::chrono::high_resolution_clock::now();
         double time_q12 =
           std::chrono::duration_cast<std::chrono::duration<double>>((cc_q12 - cc_gs_x)).count();
-        if(rank == 0) cout << endl << "Time to contract Q1/Q2: " << time_q12 << " secs" << endl;
+        if(rank == 0) std::cout << std::endl << "Time to contract Q1/Q2: " << time_q12 << " secs" << std::endl;
 
       } // if !gf_restart
 
@@ -2085,7 +2101,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       auto time =
         std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
 
-      if(rank == 0) cout << endl << "Time to compute Cp: " << time << " secs" << endl;
+      if(rank == 0) std::cout << std::endl << "Time to compute Cp: " << time << " secs" << std::endl;
 
       // Write all tensors
       if(!gf_restart) {
@@ -2117,7 +2133,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       sch_l(Cp_local_b(h1_ob, otil) = Cp_b(h1_ob, otil)).execute();
 
       if(rank == 0) {
-        std::cout << endl << "spectral function (omega_npts_ip = " << omega_npts_ip << "):" << endl;
+        std::cout << std::endl << "spectral function (omega_npts_ip = " << omega_npts_ip << "):" << std::endl;
       }
 
       cc_t1 = std::chrono::high_resolution_clock::now();
@@ -2147,8 +2163,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           std::ostringstream spf;
           spf << "W = " << std::fixed << std::setprecision(2) << std::real(omega_tmp)
               << ", omega_ip_A0 =  " << std::fixed << std::setprecision(4) << omega_ip_A0[ni]
-              << endl;
-          cout << spf.str();
+              << std::endl;
+          std::cout << spf.str();
           ni_A[ni] = omega_ip_A0[ni];
           ni_w[ni] = std::real(omega_tmp);
         }
@@ -2157,11 +2173,11 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       cc_t2 = std::chrono::high_resolution_clock::now();
       time  = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
       if(rank == 0) {
-        cout << endl
+        std::cout << std::endl
              << "omegas processed in level " << level << " = " << std::fixed << std::setprecision(2)
-             << omega_extra << endl;
-        cout << "Time to compute spectral function in level " << level
-             << " (omega_npts_ip = " << omega_npts_ip << "): " << time << " secs" << endl;
+             << omega_extra << std::endl;
+        std::cout << "Time to compute spectral function in level " << level
+             << " (omega_npts_ip = " << omega_npts_ip << "): " << time << " secs" << std::endl;
         write_results_to_json(ec, chem_env, level, ni_w, ni_A, "retarded_beta");
       }
 
@@ -2173,8 +2189,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       if(std::all_of(omega_ip_conv_b.begin(), omega_ip_conv_b.end(), [](bool x) { return x; }) ||
          gf_extrapolate_level == level) {
         if(rank == 0)
-          cout << endl
-               << "--------------------extrapolate & converge-----------------------" << endl;
+          std::cout << std::endl
+               << "--------------------extrapolate & converge-----------------------" << std::endl;
         auto cc_t1 = std::chrono::high_resolution_clock::now();
 
         AtomicCounter* ac = new AtomicCounterGA(ec.pg(), 1);
@@ -2198,11 +2214,11 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
             tamm_to_eigen_tensor(o_local_b, olocala_eig);
             for(TAMM_SIZE nj = 0; nj < noa; nj++) {
               auto gpp = olocala_eig(nj).imag();
-              spfe << "orb_index = " << nj << ", gpp_b = " << gpp << endl;
+              spfe << "orb_index = " << nj << ", gpp_b = " << gpp << std::endl;
             }
 
             spfe << "w = " << std::fixed << std::setprecision(3) << std::real(omega_tmp)
-                 << ", A_b =  " << std::fixed << std::setprecision(6) << oscalar << endl;
+                 << ", A_b =  " << std::fixed << std::setprecision(6) << oscalar << std::endl;
             next = ac->fetch_add(0, 1);
           }
           taskcount++;
@@ -2225,9 +2241,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         double time =
           std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
         if(rank == 0)
-          std::cout << endl
+          std::cout << std::endl
                     << "Time taken for extrapolation (lomega_npts_ip = " << lomega_npts_ip
-                    << "): " << time << " secs" << endl;
+                    << "): " << time << " secs" << std::endl;
 
         break;
       }
@@ -2268,7 +2284,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           }   // end oe finished
         }
         if(rank == 0) {
-          cout << "new freq's:" << std::fixed << std::setprecision(2) << omega_extra << endl;
+          std::cout << "new freq's:" << std::fixed << std::setprecision(2) << omega_extra << std::endl;
         }
         level++;
       }
@@ -2283,49 +2299,49 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 ///////// retarded part is done, perform advanced part if needed /////////////
 #if 0
   if(ccsd_options.gf_ea) {
-    std::string t2v2_v_file     = files_prefix + ".t2v2_v";
-    std::string lt12_v_a_file   = files_prefix + ".lt12_v_a";
-    std::string lt12_v_b_file   = files_prefix + ".lt12_v_b";
-    std::string iy1_1_a_file    = files_prefix + ".iy1_a";      //
-    std::string iy1_1_b_file    = files_prefix + ".iy1_b";      //
-    std::string iy1_2_1_a_file  = files_prefix + ".iy1_2_1_a";  //
-    std::string iy1_2_1_b_file  = files_prefix + ".iy1_2_1_b";  //
-    std::string iy1_a_file      = files_prefix + ".iy1_a";      //
-    std::string iy1_b_file      = files_prefix + ".iy1_b";      //
-    std::string iy2_a_file      = files_prefix + ".iy2_a";      //
-    std::string iy2_b_file      = files_prefix + ".iy2_b";      //
-    std::string iy3_1_aaaa_file = files_prefix + ".iy3_1_aaaa"; //
-    std::string iy3_1_abba_file = files_prefix + ".iy3_1_abba"; //
-    std::string iy3_1_baba_file = files_prefix + ".iy3_1_baba"; //
-    std::string iy3_1_bbbb_file = files_prefix + ".iy3_1_bbbb"; //
-    std::string iy3_1_baab_file = files_prefix + ".iy3_1_baab"; //
-    std::string iy3_1_abab_file = files_prefix + ".iy3_1_abab"; //
-    std::string iy3_1_2_a_file  = files_prefix + ".iy3_1_2_a";  //
-    std::string iy3_1_2_b_file  = files_prefix + ".iy3_1_2_b";  //
-    std::string iy3_aaaa_file   = files_prefix + ".iy3_aaaa";   //
-    std::string iy3_baab_file   = files_prefix + ".iy3_baab";   //
-    std::string iy3_abba_file   = files_prefix + ".iy3_abba";   //
-    std::string iy3_bbbb_file   = files_prefix + ".iy3_bbbb";   //
-    std::string iy3_abab_file   = files_prefix + ".iy3_abab";   //
-    std::string iy3_baba_file   = files_prefix + ".iy3_baba";   //
-    std::string iy4_1_aaaa_file = files_prefix + ".iy4_1_aaaa"; //
-    std::string iy4_1_baab_file = files_prefix + ".iy4_1_baab"; //
-    std::string iy4_1_baba_file = files_prefix + ".iy4_1_baba"; //
-    std::string iy4_1_bbbb_file = files_prefix + ".iy4_1_bbbb"; //
-    std::string iy4_1_abba_file = files_prefix + ".iy4_1_abba"; //
-    std::string iy4_1_abab_file = files_prefix + ".iy4_1_abab"; //
-    std::string iy4_2_aaaa_file = files_prefix + ".iy4_2_aaaa"; //
-    std::string iy4_2_abba_file = files_prefix + ".iy4_2_abba"; //
-    std::string iy4_2_bbbb_file = files_prefix + ".iy4_2_bbbb"; //
-    std::string iy4_2_baab_file = files_prefix + ".iy4_2_baab"; //
-    std::string iy5_aaaa_file   = files_prefix + ".iy5_aaaa";   //
-    std::string iy5_baab_file   = files_prefix + ".iy5_baab";   //
-    std::string iy5_baba_file   = files_prefix + ".iy5_baba";   //
-    std::string iy5_bbbb_file   = files_prefix + ".iy5_bbbb";   //
-    std::string iy5_abba_file   = files_prefix + ".iy5_abba";   //
-    std::string iy5_abab_file   = files_prefix + ".iy5_abab";   //
-    std::string iy6_a_file      = files_prefix + ".iy6_a";      //
-    std::string iy6_b_file      = files_prefix + ".iy6_b";      //
+    const std::string t2v2_v_file     = files_prefix + ".t2v2_v";
+    const std::string lt12_v_a_file   = files_prefix + ".lt12_v_a";
+    const std::string lt12_v_b_file   = files_prefix + ".lt12_v_b";
+    const std::string iy1_1_a_file    = files_prefix + ".iy1_a";      //
+    const std::string iy1_1_b_file    = files_prefix + ".iy1_b";      //
+    const std::string iy1_2_1_a_file  = files_prefix + ".iy1_2_1_a";  //
+    const std::string iy1_2_1_b_file  = files_prefix + ".iy1_2_1_b";  //
+    const std::string iy1_a_file      = files_prefix + ".iy1_a";      //
+    const std::string iy1_b_file      = files_prefix + ".iy1_b";      //
+    const std::string iy2_a_file      = files_prefix + ".iy2_a";      //
+    const std::string iy2_b_file      = files_prefix + ".iy2_b";      //
+    const std::string iy3_1_aaaa_file = files_prefix + ".iy3_1_aaaa"; //
+    const std::string iy3_1_abba_file = files_prefix + ".iy3_1_abba"; //
+    const std::string iy3_1_baba_file = files_prefix + ".iy3_1_baba"; //
+    const std::string iy3_1_bbbb_file = files_prefix + ".iy3_1_bbbb"; //
+    const std::string iy3_1_baab_file = files_prefix + ".iy3_1_baab"; //
+    const std::string iy3_1_abab_file = files_prefix + ".iy3_1_abab"; //
+    const std::string iy3_1_2_a_file  = files_prefix + ".iy3_1_2_a";  //
+    const std::string iy3_1_2_b_file  = files_prefix + ".iy3_1_2_b";  //
+    const std::string iy3_aaaa_file   = files_prefix + ".iy3_aaaa";   //
+    const std::string iy3_baab_file   = files_prefix + ".iy3_baab";   //
+    const std::string iy3_abba_file   = files_prefix + ".iy3_abba";   //
+    const std::string iy3_bbbb_file   = files_prefix + ".iy3_bbbb";   //
+    const std::string iy3_abab_file   = files_prefix + ".iy3_abab";   //
+    const std::string iy3_baba_file   = files_prefix + ".iy3_baba";   //
+    const std::string iy4_1_aaaa_file = files_prefix + ".iy4_1_aaaa"; //
+    const std::string iy4_1_baab_file = files_prefix + ".iy4_1_baab"; //
+    const std::string iy4_1_baba_file = files_prefix + ".iy4_1_baba"; //
+    const std::string iy4_1_bbbb_file = files_prefix + ".iy4_1_bbbb"; //
+    const std::string iy4_1_abba_file = files_prefix + ".iy4_1_abba"; //
+    const std::string iy4_1_abab_file = files_prefix + ".iy4_1_abab"; //
+    const std::string iy4_2_aaaa_file = files_prefix + ".iy4_2_aaaa"; //
+    const std::string iy4_2_abba_file = files_prefix + ".iy4_2_abba"; //
+    const std::string iy4_2_bbbb_file = files_prefix + ".iy4_2_bbbb"; //
+    const std::string iy4_2_baab_file = files_prefix + ".iy4_2_baab"; //
+    const std::string iy5_aaaa_file   = files_prefix + ".iy5_aaaa";   //
+    const std::string iy5_baab_file   = files_prefix + ".iy5_baab";   //
+    const std::string iy5_baba_file   = files_prefix + ".iy5_baba";   //
+    const std::string iy5_bbbb_file   = files_prefix + ".iy5_bbbb";   //
+    const std::string iy5_abba_file   = files_prefix + ".iy5_abba";   //
+    const std::string iy5_abab_file   = files_prefix + ".iy5_abab";   //
+    const std::string iy6_a_file      = files_prefix + ".iy6_a";      //
+    const std::string iy6_b_file      = files_prefix + ".iy6_b";      //
 
     t2v2_v     = Tensor<T>{{V, V}, {1, 1}};
     lt12_v_a   = Tensor<T>{v_alpha, v_alpha};
@@ -2632,21 +2648,21 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     //                                   //
     ///////////////////////////////////////
     if(rank == 0) {
-      cout << endl << "_____advanced_GFCCSD_for_alpha_spin______" << endl;
-      // ofs_profile << endl << "_____advanced_GFCCSD_for_alpha_spin______" << endl;
+      std::cout << std::endl << "_____advanced_GFCCSD_for_alpha_spin______" << std::endl;
+      // ofs_profile << std::endl << "_____advanced_GFCCSD_for_alpha_spin______" << std::endl;
     }
 
     while(true) {
       const std::string levelstr     = std::to_string(level);
-      std::string       q1_a_file    = files_prefix + ".a_q1_a.l" + levelstr;
-      std::string       q2_aaa_file  = files_prefix + ".a_q2_aaa.l" + levelstr;
-      std::string       q2_bab_file  = files_prefix + ".a_q2_bab.l" + levelstr;
-      std::string       hx1_a_file   = files_prefix + ".a_hx1_a.l" + levelstr;
-      std::string       hx2_aaa_file = files_prefix + ".a_hx2_aaa.l" + levelstr;
-      std::string       hx2_bab_file = files_prefix + ".a_hx2_bab.l" + levelstr;
-      std::string       hsub_a_file  = files_prefix + ".a_hsub_a.l" + levelstr;
-      std::string       bsub_a_file  = files_prefix + ".a_bsub_a.l" + levelstr;
-      std::string       cp_a_file    = files_prefix + ".a_cp_a.l" + levelstr;
+      const std::string       q1_a_file    = files_prefix + ".a_q1_a.l" + levelstr;
+      const std::string       q2_aaa_file  = files_prefix + ".a_q2_aaa.l" + levelstr;
+      const std::string       q2_bab_file  = files_prefix + ".a_q2_bab.l" + levelstr;
+      const std::string       hx1_a_file   = files_prefix + ".a_hx1_a.l" + levelstr;
+      const std::string       hx2_aaa_file = files_prefix + ".a_hx2_aaa.l" + levelstr;
+      const std::string       hx2_bab_file = files_prefix + ".a_hx2_bab.l" + levelstr;
+      const std::string       hsub_a_file  = files_prefix + ".a_hsub_a.l" + levelstr;
+      const std::string       bsub_a_file  = files_prefix + ".a_bsub_a.l" + levelstr;
+      const std::string       cp_a_file    = files_prefix + ".a_cp_a.l" + levelstr;
 
       bool gf_restart = fs::exists(q1_a_file) && fs::exists(q2_aaa_file) &&
                         fs::exists(q2_bab_file) && fs::exists(hx1_a_file) &&
@@ -2681,7 +2697,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       for(auto gf_omega: omega_extra) {
 
         if(!gf_restart) {
-          gfccsd_driver_ea_a<T>(
+          GFCCSD_EA_A_Driver<T> driver_ea_a;
+          driver_ea_a.gfccsd_driver_ea_a(
             ec, chem_env, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, d_f1, t2v2_v,
             lt12_v_a, lt12_v_b, iy1_1_a, iy1_1_b, iy1_2_1_a, iy1_2_1_b, iy1_a, iy1_b, iy2_a, iy2_b,
             iy3_1_aaaa, iy3_1_bbbb, iy3_1_abab, iy3_1_baba, iy3_1_baab, iy3_1_abba, iy3_1_2_a,
@@ -2714,8 +2731,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         std::string pq2_bab_file = files_prefix + ".a_q2_bab.l" + plevelstr;
 
         if(rank == 0) {
-          cout << "level = " << level << endl;
-          // ofs_profile << "level = " << level << endl;
+          std::cout << "level = " << level << std::endl;
+          // ofs_profile << "level = " << level << std::endl;
         }
 
         decltype(qr_rank) ivec_start = 0;
@@ -2751,9 +2768,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         double time =
           std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
         if(rank == 0)
-          cout << endl
+          std::cout << std::endl
                << "Time to read in pre-computed Q1/Q2: " << std::fixed << std::setprecision(6)
-               << time << " secs" << endl;
+               << time << " secs" << std::endl;
 
         ComplexTensor q1_tmp_a{v_alpha};
         ComplexTensor q2_tmp_aaa{o_alpha, v_alpha, v_alpha};
@@ -2771,8 +2788,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           sch.allocate(q1_tmp_a, q2_tmp_aaa, q2_tmp_bab).execute();
 
           if(rank == 0) {
-            cout << "ivec_start,qr_rank = " << ivec_start << "," << qr_rank << endl;
-            // ofs_profile << "ivec_start,qr_rank = " << ivec_start << "," << qr_rank << endl;
+            std::cout << "ivec_start,qr_rank = " << ivec_start << "," << qr_rank << std::endl;
+            // ofs_profile << "ivec_start,qr_rank = " << ivec_start << "," << qr_rank << std::endl;
           }
 
           for(decltype(qr_rank) ivec = ivec_start; ivec < qr_rank; ivec++) {
@@ -2897,36 +2914,37 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         }
 
         if(rank == 0) {
-          cout << endl
+          std::cout << std::endl
                << "Time for orthogonalization: " << std::fixed << std::setprecision(6)
-               << time_gs_orth << " secs" << endl;
-          cout << endl
+               << time_gs_orth << " secs" << std::endl;
+          std::cout << std::endl
                << "Time for normalizing and copying back: " << std::fixed << std::setprecision(6)
-               << time_gs_norm << " secs" << endl;
-          cout << endl
+               << time_gs_norm << " secs" << std::endl;
+          std::cout << std::endl
                << "Total time for Gram-Schmidt: " << std::fixed << std::setprecision(6)
-               << total_time_gs << " secs" << endl;
+               << total_time_gs << " secs" << std::endl;
         }
         auto cc_gs_x = std::chrono::high_resolution_clock::now();
 
         bool gs_x12_restart = fs::exists(hx1_a_file) && fs::exists(hx2_aaa_file) &&
                               fs::exists(hx2_bab_file);
 
+        GFCCSD_EA_A<T> gfccsd_ea_a;
         if(!gs_x12_restart) {
 #if GF_IN_SG
           if(sub_pg.is_valid()) {
-            gfccsd_y1_a(sub_sch,
+            gfccsd_ea_a.gfccsd_y1_a(sub_sch,
 #else
-          gfccsd_y1_a(sch,
+          gfccsd_ea_a.gfccsd_y1_a(sch,
 #endif
                         MO, Hx1_tamm_a, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, q1_tamm_a,
                         q2_tamm_aaa, q2_tamm_bab, d_f1, iy1_a, iy1_2_1_a, iy1_2_1_b, v2ijab_aaaa,
                         v2ijab_abab, cholOV_a, cholOV_b, cholVV_a, CI, otis, true);
 
 #if GF_IN_SG
-            gfccsd_y2_a(sub_sch,
+            gfccsd_ea_a.gfccsd_y2_a(sub_sch,
 #else
-          gfccsd_y2_a(sch,
+          gfccsd_ea_a.gfccsd_y2_a(sch,
 #endif
                         MO, Hx2_tamm_aaa, Hx2_tamm_bab, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
                         d_t2_abab, q1_tamm_a, q2_tamm_aaa, q2_tamm_bab, d_f1, iy1_1_a, iy1_1_b,
@@ -2955,7 +2973,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         auto   cc_q12 = std::chrono::high_resolution_clock::now();
         double time_q12 =
           std::chrono::duration_cast<std::chrono::duration<double>>((cc_q12 - cc_gs_x)).count();
-        if(rank == 0) cout << endl << "Time to contract Q1/Q2: " << time_q12 << " secs" << endl;
+        if(rank == 0) std::cout << std::endl << "Time to contract Q1/Q2: " << time_q12 << " secs" << std::endl;
       } // if !gf_restart
 
       prev_qr_rank = qr_rank;
@@ -3002,7 +3020,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       auto time =
         std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
 
-      if(rank == 0) cout << endl << "Time to compute Cp: " << time << " secs" << endl;
+      if(rank == 0) std::cout << std::endl << "Time to compute Cp: " << time << " secs" << std::endl;
 
       if(!gf_restart) {
         write_to_disk(hsub_tamm_a, hsub_a_file);
@@ -3028,7 +3046,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       sch_l.allocate(Cp_local_a)(Cp_local_a() = Cp_a()).execute();
 
       if(rank == 0) {
-        cout << endl << "spectral function (omega_npts_ea = " << omega_npts_ea << "):" << endl;
+        std::cout << std::endl << "spectral function (omega_npts_ea = " << omega_npts_ea << "):" << std::endl;
       }
 
       cc_t1 = std::chrono::high_resolution_clock::now();
@@ -3065,8 +3083,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           std::ostringstream spf;
           spf << "W = " << std::fixed << std::setprecision(2) << std::real(omega_tmp)
               << ", omega_ea_A0 =  " << std::fixed << std::setprecision(4) << omega_ea_A0[ni]
-              << endl;
-          cout << spf.str();
+              << std::endl;
+          std::cout << spf.str();
           ni_A[ni] = omega_ea_A0[ni];
           ni_w[ni] = std::real(omega_tmp);
         }
@@ -3075,9 +3093,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       cc_t2 = std::chrono::high_resolution_clock::now();
       time  = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
       if(rank == 0) {
-        cout << endl << "omegas processed in level " << level << " = " << omega_extra << endl;
-        cout << "Time to compute spectral function in level " << level
-             << " (omega_npts_ea = " << omega_npts_ea << "): " << time << " secs" << endl;
+        std::cout << std::endl << "omegas processed in level " << level << " = " << omega_extra << std::endl;
+        std::cout << "Time to compute spectral function in level " << level
+             << " (omega_npts_ea = " << omega_npts_ea << "): " << time << " secs" << std::endl;
         write_results_to_json(ec, chem_env, level, ni_w, ni_A, "advanced_alpha");
       }
 
@@ -3089,8 +3107,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       if(std::all_of(omega_ea_conv_a.begin(), omega_ea_conv_a.end(), [](bool x) { return x; }) ||
          gf_extrapolate_level == level) {
         if(rank == 0)
-          cout << endl
-               << "--------------------extrapolate & converge-----------------------" << endl;
+          std::cout << std::endl
+               << "--------------------extrapolate & converge-----------------------" << std::endl;
         auto cc_t1 = std::chrono::high_resolution_clock::now();
 
         AtomicCounter* ac = new AtomicCounterGA(ec.pg(), 1);
@@ -3117,11 +3135,11 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
             tamm_to_eigen_tensor(o_local_a, olocala_eig);
             for(TAMM_SIZE nj = 0; nj < nva; nj++) {
               auto gpp = olocala_eig(nj).imag();
-              spfe << "orb_index = " << nj << ", gpp_a = " << gpp << endl;
+              spfe << "orb_index = " << nj << ", gpp_a = " << gpp << std::endl;
             }
 
             spfe << "w = " << std::fixed << std::setprecision(3) << std::real(omega_tmp)
-                 << ", A_a =  " << std::fixed << std::setprecision(6) << oscalar << endl;
+                 << ", A_a =  " << std::fixed << std::setprecision(6) << oscalar << std::endl;
 
             next = ac->fetch_add(0, 1);
           }
@@ -3147,9 +3165,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         double time =
           std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
         if(rank == 0)
-          std::cout << endl
+          std::cout << std::endl
                     << "Time taken for extrapolation (lomega_npts_ea = " << lomega_npts_ea
-                    << "): " << time << " secs" << endl;
+                    << "): " << time << " secs" << std::endl;
 
         break;
       }
@@ -3190,7 +3208,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           }   // end oe finished
         }
         if(rank == 0) {
-          cout << "new freq's:" << std::fixed << std::setprecision(2) << omega_extra << endl;
+          std::cout << "new freq's:" << std::fixed << std::setprecision(2) << omega_extra << std::endl;
         }
         level++;
       }
@@ -3210,21 +3228,21 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     //                                            //
     ////////////////////////////////////////////////
     if(rank == 0 && ccsd_options.gf_os) {
-      cout << endl << "_____advanced_GFCCSD_on_beta_spin______" << endl;
-      // ofs_profile << endl << "_____advanced_GFCCSD_on_beta_spin______" << endl;
+      std::cout << std::endl << "_____advanced_GFCCSD_on_beta_spin______" << std::endl;
+      // ofs_profile << std::endl << "_____advanced_GFCCSD_on_beta_spin______" << std::endl;
     }
 
     while(ccsd_options.gf_os) {
       const std::string levelstr     = std::to_string(level);
-      std::string       q1_b_file    = files_prefix + ".a_q1_b.l" + levelstr;
-      std::string       q2_bbb_file  = files_prefix + ".a_q2_bbb.l" + levelstr;
-      std::string       q2_aba_file  = files_prefix + ".a_q2_aba.l" + levelstr;
-      std::string       hx1_b_file   = files_prefix + ".a_hx1_b.l" + levelstr;
-      std::string       hx2_bbb_file = files_prefix + ".a_hx2_bbb.l" + levelstr;
-      std::string       hx2_aba_file = files_prefix + ".a_hx2_aba.l" + levelstr;
-      std::string       hsub_b_file  = files_prefix + ".a_hsub_b.l" + levelstr;
-      std::string       bsub_b_file  = files_prefix + ".a_bsub_b.l" + levelstr;
-      std::string       cp_b_file    = files_prefix + ".a_cp_b.l" + levelstr;
+      const std::string       q1_b_file    = files_prefix + ".a_q1_b.l" + levelstr;
+      const std::string       q2_bbb_file  = files_prefix + ".a_q2_bbb.l" + levelstr;
+      const std::string       q2_aba_file  = files_prefix + ".a_q2_aba.l" + levelstr;
+      const std::string       hx1_b_file   = files_prefix + ".a_hx1_b.l" + levelstr;
+      const std::string       hx2_bbb_file = files_prefix + ".a_hx2_bbb.l" + levelstr;
+      const std::string       hx2_aba_file = files_prefix + ".a_hx2_aba.l" + levelstr;
+      const std::string       hsub_b_file  = files_prefix + ".a_hsub_b.l" + levelstr;
+      const std::string       bsub_b_file  = files_prefix + ".a_bsub_b.l" + levelstr;
+      const std::string       cp_b_file    = files_prefix + ".a_cp_b.l" + levelstr;
 
       bool gf_restart = fs::exists(q1_b_file) && fs::exists(q2_bbb_file) &&
                         fs::exists(q2_aba_file) && fs::exists(hx1_b_file) &&
@@ -3258,7 +3276,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
       for(auto gf_omega: omega_extra) {
         if(!gf_restart) {
-          gfccsd_driver_ea_b<T>(
+          GFCCSD_EA_B_Driver<T> driver_ea_b;
+          driver_ea_b.gfccsd_driver_ea_b(
             ec, chem_env, MO, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, d_f1, t2v2_v,
             lt12_v_a, lt12_v_b, iy1_1_a, iy1_1_b, iy1_2_1_a, iy1_2_1_b, iy1_a, iy1_b, iy2_a, iy2_b,
             iy3_1_aaaa, iy3_1_bbbb, iy3_1_abab, iy3_1_baba, iy3_1_baab, iy3_1_abba, iy3_1_2_a,
@@ -3323,9 +3342,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         double time =
           std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
         if(rank == 0)
-          cout << endl
+          std::cout << std::endl
                << "Time to read in pre-computed Q1/Q2: " << std::fixed << std::setprecision(6)
-               << time << " secs" << endl;
+               << time << " secs" << std::endl;
 
         ComplexTensor q1_tmp_b{v_beta};
         ComplexTensor q2_tmp_bbb{o_beta, v_beta, v_beta};
@@ -3468,36 +3487,37 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         }
 
         if(rank == 0) {
-          cout << endl
+          std::cout << std::endl
                << "Time for orthogonalization: " << std::fixed << std::setprecision(6)
-               << time_gs_orth << " secs" << endl;
-          cout << endl
+               << time_gs_orth << " secs" << std::endl;
+          std::cout << std::endl
                << "Time for normalizing and copying back: " << std::fixed << std::setprecision(6)
-               << time_gs_norm << " secs" << endl;
-          cout << endl
+               << time_gs_norm << " secs" << std::endl;
+          std::cout << std::endl
                << "Total time for Gram-Schmidt: " << std::fixed << std::setprecision(6)
-               << total_time_gs << " secs" << endl;
+               << total_time_gs << " secs" << std::endl;
         }
         auto cc_gs_x = std::chrono::high_resolution_clock::now();
 
         bool gs_x12_restart = fs::exists(hx1_b_file) && fs::exists(hx2_bbb_file) &&
                               fs::exists(hx2_aba_file);
 
+        GFCCSD_EA_B<T> gfccsd_ea_b;
         if(!gs_x12_restart) {
 #if GF_IN_SG
           if(sub_pg.is_valid()) {
-            gfccsd_y1_b(sub_sch,
+            gfccsd_ea_b.gfccsd_y1_b(sub_sch,
 #else
-          gfccsd_y1_b(sch,
+          gfccsd_ea_b.gfccsd_y1_b(sch,
 #endif
                         MO, Hx1_tamm_b, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, q1_tamm_b,
                         q2_tamm_bbb, q2_tamm_aba, d_f1, iy1_b, iy1_2_1_a, iy1_2_1_b, v2ijab_bbbb,
                         v2ijab_abab, cholOV_a, cholOV_b, cholVV_b, CI, otis, true);
 
 #if GF_IN_SG
-            gfccsd_y2_b(sub_sch,
+            gfccsd_ea_b.gfccsd_y2_b(sub_sch,
 #else
-          gfccsd_y2_b(sch,
+          gfccsd_ea_b.gfccsd_y2_b(sch,
 #endif
                         MO, Hx2_tamm_bbb, Hx2_tamm_aba, d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb,
                         d_t2_abab, q1_tamm_b, q2_tamm_bbb, q2_tamm_aba, d_f1, iy1_1_a, iy1_1_b,
@@ -3527,7 +3547,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         auto   cc_q12 = std::chrono::high_resolution_clock::now();
         double time_q12 =
           std::chrono::duration_cast<std::chrono::duration<double>>((cc_q12 - cc_gs_x)).count();
-        if(rank == 0) cout << endl << "Time to contract Q1/Q2: " << time_q12 << " secs" << endl;
+        if(rank == 0) std::cout << std::endl << "Time to contract Q1/Q2: " << time_q12 << " secs" << std::endl;
       } // if !gf_restart
 
       prev_qr_rank = qr_rank;
@@ -3571,7 +3591,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       auto time =
         std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
 
-      if(rank == 0) cout << endl << "Time to compute Cp: " << time << " secs" << endl;
+      if(rank == 0) std::cout << std::endl << "Time to compute Cp: " << time << " secs" << std::endl;
 
       // Write all tensors
       if(!gf_restart) {
@@ -3603,7 +3623,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       sch_l(Cp_local_b(p1_vb, otil) = Cp_b(p1_vb, otil)).execute();
 
       if(rank == 0) {
-        cout << endl << "spectral function (omega_npts_ea = " << omega_npts_ea << "):" << endl;
+        std::cout << std::endl << "spectral function (omega_npts_ea = " << omega_npts_ea << "):" << std::endl;
       }
 
       cc_t1 = std::chrono::high_resolution_clock::now();
@@ -3633,8 +3653,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           std::ostringstream spf;
           spf << "W = " << std::fixed << std::setprecision(2) << std::real(omega_tmp)
               << ", omega_ea_A0 =  " << std::fixed << std::setprecision(4) << omega_ea_A0[ni]
-              << endl;
-          cout << spf.str();
+              << std::endl;
+          std::cout << spf.str();
           ni_A[ni] = omega_ea_A0[ni];
           ni_w[ni] = std::real(omega_tmp);
         }
@@ -3643,9 +3663,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       cc_t2 = std::chrono::high_resolution_clock::now();
       time  = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
       if(rank == 0) {
-        cout << endl << "omegas processed in level " << level << " = " << omega_extra << endl;
-        cout << "Time to compute spectral function in level " << level
-             << " (omega_npts_ea = " << omega_npts_ea << "): " << time << " secs" << endl;
+        std::cout << std::endl << "omegas processed in level " << level << " = " << omega_extra << std::endl;
+        std::cout << "Time to compute spectral function in level " << level
+             << " (omega_npts_ea = " << omega_npts_ea << "): " << time << " secs" << std::endl;
         write_results_to_json(ec, chem_env, level, ni_w, ni_A, "advanced_beta");
       }
 
@@ -3657,8 +3677,8 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       if(std::all_of(omega_ea_conv_b.begin(), omega_ea_conv_b.end(), [](bool x) { return x; }) ||
          gf_extrapolate_level == level) {
         if(rank == 0)
-          cout << endl
-               << "--------------------extrapolate & converge-----------------------" << endl;
+          std::cout << std::endl
+               << "--------------------extrapolate & converge-----------------------" << std::endl;
         auto cc_t1 = std::chrono::high_resolution_clock::now();
 
         AtomicCounter* ac = new AtomicCounterGA(ec.pg(), 1);
@@ -3681,11 +3701,11 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
             tamm_to_eigen_tensor(o_local_b, olocala_eig);
             for(TAMM_SIZE nj = 0; nj < nvb; nj++) {
               auto gpp = olocala_eig(nj).imag();
-              spfe << "orb_index = " << nj << ", gpp_a = " << gpp << endl;
+              spfe << "orb_index = " << nj << ", gpp_a = " << gpp << std::endl;
             }
 
             spfe << "w = " << std::fixed << std::setprecision(3) << std::real(omega_tmp)
-                 << ", A_a =  " << std::fixed << std::setprecision(6) << oscalar << endl;
+                 << ", A_a =  " << std::fixed << std::setprecision(6) << oscalar << std::endl;
             next = ac->fetch_add(0, 1);
           }
           taskcount++;
@@ -3708,9 +3728,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         double time =
           std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
         if(rank == 0)
-          std::cout << endl
+          std::cout << std::endl
                     << "Time taken for extrapolation (lomega_npts_ea = " << lomega_npts_ea
-                    << "): " << time << " secs" << endl;
+                    << "): " << time << " secs" << std::endl;
 
         break;
       }
@@ -3751,7 +3771,7 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           }   // end oe finished
         }
         if(rank == 0) {
-          cout << "new freq's:" << std::fixed << std::setprecision(2) << omega_extra << endl;
+          std::cout << "new freq's:" << std::fixed << std::setprecision(2) << omega_extra << std::endl;
         }
         level++;
       }
@@ -3795,9 +3815,9 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
     auto ccsd_time = std::chrono::duration_cast<std::chrono::duration<T>>((cc_t2 - cc_t1)).count();
     if(rank == 0)
-      cout << std::endl
-           << "Time taken for GF-CCSD: " << std::fixed << std::setprecision(2) << ccsd_time
-           << " secs" << std::endl;
+      std::cout << std::endl
+                << "Time taken for GF-CCSD: " << std::fixed << std::setprecision(2) << ccsd_time
+                << " secs" << std::endl;
 
     // ofs_profile.close();
 
@@ -3809,4 +3829,14 @@ void gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     pg_l.destroy_coll();
     cc_context.destroy_subgroup();
   }
+
+  // Explicit template instantiation
+  template class GFCCSD_Driver<double>;
+
+  // Wrapper function for backward compatibility
+  void gfccsd_driver(ExecutionContext & ec, ChemEnv & chem_env) {
+    GFCCSD_Driver<double> driver;
+    driver.gfccsd_driver(ec, chem_env);
+  }
+
 } // namespace exachem::cc::gfcc

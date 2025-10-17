@@ -16,13 +16,22 @@ using namespace tamm;
 using namespace tamm::new_ops;
 
 namespace exachem::cc::ducc {
-void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
-template<typename T>
-void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
-                        Tensor<T>& t1, Tensor<T>& t2, Tensor<T>& f1,
-                        cholesky_2e::V2Tensors<T>& v2tensors, IndexVector& occ_int_vec,
-                        IndexVector& virt_int_vec, string& pos_str);
+class DUCCDriver {
+public:
+  DUCCDriver()          = default;
+  virtual ~DUCCDriver() = default;
+
+  DUCCDriver(const DUCCDriver&)                = default;
+  DUCCDriver& operator=(const DUCCDriver&)     = default;
+  DUCCDriver(DUCCDriver&&) noexcept            = default;
+  DUCCDriver& operator=(DUCCDriver&&) noexcept = default;
+
+  virtual void execute(ExecutionContext& ec, ChemEnv& chem_env);
+};
+
+// Wrapper function for backward compatibility
+void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
 #if defined(USE_NWQSIM)
 void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env);
@@ -40,22 +49,33 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
 
 namespace exachem::cc::ducc::internal {
 
-inline void reset_ducc_runcontext(ExecutionContext& ec, ChemEnv& chem_env) {
-  CCSDOptions& ccsd_options                  = chem_env.ioptions.ccsd_options;
-  chem_env.run_context["ducc"]["nactive_oa"] = ccsd_options.nactive_oa;
-  chem_env.run_context["ducc"]["nactive_ob"] = ccsd_options.nactive_ob;
-  chem_env.run_context["ducc"]["nactive_va"] = ccsd_options.nactive_va;
-  chem_env.run_context["ducc"]["nactive_vb"] = ccsd_options.nactive_vb;
-  chem_env.run_context["ducc"]["ducc_lvl"]   = ccsd_options.ducc_lvl;
-  chem_env.run_context["ducc"]["level0"]     = false;
-  chem_env.run_context["ducc"]["level1"]     = false;
-  chem_env.run_context["ducc"]["level2"]     = false;
-  if(ec.print()) chem_env.write_run_context();
-}
-
-// clang-format off
 template<typename T>
-void H_0(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
+class DUCCInternal {
+public:
+  DUCCInternal()          = default;
+  virtual ~DUCCInternal() = default;
+
+  virtual void DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec,
+                                  const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
+                                  Tensor<T>& f1, cholesky_2e::V2Tensors<T>& v2tensors,
+                                  IndexVector& occ_int_vec, IndexVector& virt_int_vec,
+                                  string& pos_str);
+
+  virtual void reset_ducc_runcontext(ExecutionContext& ec, ChemEnv& chem_env) {
+    CCSDOptions& ccsd_options                  = chem_env.ioptions.ccsd_options;
+    chem_env.run_context["ducc"]["nactive_oa"] = ccsd_options.nactive_oa;
+    chem_env.run_context["ducc"]["nactive_ob"] = ccsd_options.nactive_ob;
+    chem_env.run_context["ducc"]["nactive_va"] = ccsd_options.nactive_va;
+    chem_env.run_context["ducc"]["nactive_vb"] = ccsd_options.nactive_vb;
+    chem_env.run_context["ducc"]["ducc_lvl"]   = ccsd_options.ducc_lvl;
+    chem_env.run_context["ducc"]["level0"]     = false;
+    chem_env.run_context["ducc"]["level1"]     = false;
+    chem_env.run_context["ducc"]["level2"]     = false;
+    if(ec.print()) chem_env.write_run_context();
+  }
+
+  // clang-format off
+  virtual void H_0(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
             const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
             const Tensor<T>& vtijkl, const Tensor<T>& vtijka,
             const Tensor<T>& vtaijb, const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
@@ -82,8 +102,7 @@ void H_0(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
   }
 }
 
-template<typename T>
-void F_1(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
+  virtual void F_1(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
             const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
             const Tensor<T>& vtijkl, const Tensor<T>& vtijka,
             const Tensor<T>& vtaijb, const Tensor<T>& vtijab, const Tensor<T>& vtiabc,
@@ -191,8 +210,7 @@ op_exec.execute(vtijab, true, ex_hw);
   }
 }
 
-template<typename T>
-void V_1(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
+  virtual void V_1(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
             const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
             const Tensor<T>& vtijkl, const Tensor<T>& vtijka,
             const Tensor<T>& vtaijb, const Tensor<T>& vtijab, const Tensor<T>& vtiabc,
@@ -362,8 +380,7 @@ op_exec.execute(vtaijb, true, ex_hw);
 }
 
 
-template<typename T>
-void F_2(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
+  virtual void F_2(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
             const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
             const Tensor<T>& vtijkl, const Tensor<T>& vtijka,
             const Tensor<T>& vtaijb, const Tensor<T>& vtijab, const Tensor<T>& vtiabc,
@@ -577,8 +594,7 @@ op_exec.execute(vtaijb, true, ex_hw);
 }
 
 
-template<typename T>
-void V_2(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
+  virtual void V_2(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
             const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
             const Tensor<T>& vtijkl, const Tensor<T>& vtijka,
             const Tensor<T>& vtaijb, const Tensor<T>& vtijab, const Tensor<T>& vtiabc,
@@ -1099,8 +1115,7 @@ op_exec.execute(vtaijb, true, ex_hw);
 }
 
 
-template<typename T>
-void F_3(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
+  virtual void F_3(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
             const Tensor<T>& ftij, const Tensor<T>& ftia, const Tensor<T>& ftab,
             const Tensor<T>& vtijkl, const Tensor<T>& vtijka,
             const Tensor<T>& vtaijb, const Tensor<T>& vtijab, const Tensor<T>& vtiabc,
@@ -1673,8 +1688,7 @@ op_exec.execute(vtaijb, true, ex_hw);
 }
 
 
-template<typename T>
-bool ducc_tensors_exist(std::vector<Tensor<T>>& rwtensors, std::vector<std::string> tfiles,
+  virtual bool ducc_tensors_exist(std::vector<Tensor<T>>& rwtensors, std::vector<std::string> tfiles,
                         bool do_io = false) {
   if(!do_io) return false;
 
@@ -1682,8 +1696,7 @@ bool ducc_tensors_exist(std::vector<Tensor<T>>& rwtensors, std::vector<std::stri
   return (std::all_of(tfiles.begin(), tfiles.end(), [](std::string x) { return fs::exists(x); }));
 }
 
-template<typename T>
-void ducc_tensors_io(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Tensor<T>>& rwtensors,
+  virtual void ducc_tensors_io(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Tensor<T>>& rwtensors,
                      std::vector<std::string> tfiles, int dlvl, bool writet = false,
                      bool read = false) {
   if(!writet) return;
@@ -1700,5 +1713,6 @@ void ducc_tensors_io(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Tensor
     write_to_disk_group(ec, rwtensors, tfiles);
   }
 }
+}; // class DUCCInternal
 
 } //namespace exachem::cc::ducc::internal

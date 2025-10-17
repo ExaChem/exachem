@@ -11,5 +11,7 @@ set(CC_LAMBDA_SRCS
 
 set(CC_LAMBDA_INCLUDES
     ${CC_LAMBDA_SRCDIR}/ccsd_lambda.hpp
+    ${CC_LAMBDA_SRCDIR}/ccsd_rdm.hpp
+    ${CC_LAMBDA_SRCDIR}/ccsd_natural_orbitals.hpp
     )    
 

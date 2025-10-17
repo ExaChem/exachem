@@ -13,25 +13,18 @@
 using namespace tamm;
 namespace exachem::rteom_cc::ccsd {
 
-bool debug = false;
-
 using CCEType = std::complex<double>;
 
-TiledIndexSpace o_alpha, v_alpha, o_beta, v_beta;
-
-Tensor<CCEType>       _a01V, _a02V, _a007V;
-CCSE_Tensors<CCEType> _a01, _a02, _a03, _a04, _a05, _a06, _a001, _a004, _a006, _a008, _a009, _a017,
-  _a019, _a020, _a021, _a022;
-
 template<typename T>
-void ccsd_e_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI, Tensor<T>& de,
-               CCSE_Tensors<T>& t1, CCSE_Tensors<T>& t2, std::vector<CCSE_Tensors<T>>& f1_se,
-               std::vector<CCSE_Tensors<T>>& chol3d_se) {
-  auto [cind]                = CI.labels<1>("all");
-  auto [p1_va, p2_va, p3_va] = v_alpha.labels<3>("all");
-  auto [p1_vb, p2_vb, p3_vb] = v_beta.labels<3>("all");
-  auto [h3_oa, h4_oa, h6_oa] = o_alpha.labels<3>("all");
-  auto [h3_ob, h4_ob, h6_ob] = o_beta.labels<3>("all");
+void RT_EOM_CD_CCSD<T>::ccsd_e_os(Scheduler& sch, const TiledIndexSpace& MO,
+                                  const TiledIndexSpace& CI, Tensor<T>& de, CCSE_Tensors<T>& t1,
+                                  CCSE_Tensors<T>& t2, std::vector<CCSE_Tensors<T>>& f1_se,
+                                  std::vector<CCSE_Tensors<T>>& chol3d_se) {
+  const auto [cind]                = CI.labels<1>("all");
+  const auto [p1_va, p2_va, p3_va] = v_alpha.labels<3>("all");
+  const auto [p1_vb, p2_vb, p3_vb] = v_beta.labels<3>("all");
+  const auto [h3_oa, h4_oa, h6_oa] = o_alpha.labels<3>("all");
+  const auto [h3_ob, h4_ob, h6_ob] = o_beta.labels<3>("all");
 
   Tensor<T> t1_aa   = t1("aa");
   Tensor<T> t1_bb   = t1("bb");
@@ -81,16 +74,18 @@ void ccsd_e_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace&
 }
 
 template<typename T>
-void ccsd_t1_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
-                CCSE_Tensors<T>& r1_vo, CCSE_Tensors<T>& t1, CCSE_Tensors<T>& t2,
-                std::vector<CCSE_Tensors<T>>& f1_se, std::vector<CCSE_Tensors<T>>& chol3d_se) {
-  auto [cind]                       = CI.labels<1>("all");
-  auto [p2]                         = MO.labels<1>("virt");
-  auto [h1]                         = MO.labels<1>("occ");
-  auto [p1_va, p2_va, p3_va]        = v_alpha.labels<3>("all");
-  auto [p1_vb, p2_vb, p3_vb]        = v_beta.labels<3>("all");
-  auto [h1_oa, h2_oa, h3_oa, h7_oa] = o_alpha.labels<4>("all");
-  auto [h1_ob, h2_ob, h3_ob, h7_ob] = o_beta.labels<4>("all");
+void RT_EOM_CD_CCSD<T>::ccsd_t1_os(Scheduler& sch, const TiledIndexSpace& MO,
+                                   const TiledIndexSpace& CI, CCSE_Tensors<T>& r1_vo,
+                                   CCSE_Tensors<T>& t1, CCSE_Tensors<T>& t2,
+                                   std::vector<CCSE_Tensors<T>>& f1_se,
+                                   std::vector<CCSE_Tensors<T>>& chol3d_se) {
+  const auto [cind]                       = CI.labels<1>("all");
+  const auto [p2]                         = MO.labels<1>("virt");
+  const auto [h1]                         = MO.labels<1>("occ");
+  const auto [p1_va, p2_va, p3_va]        = v_alpha.labels<3>("all");
+  const auto [p1_vb, p2_vb, p3_vb]        = v_beta.labels<3>("all");
+  const auto [h1_oa, h2_oa, h3_oa, h7_oa] = o_alpha.labels<4>("all");
+  const auto [h1_ob, h2_ob, h3_ob, h7_ob] = o_beta.labels<4>("all");
 
   Tensor<T> i0_aa = r1_vo("aa");
   Tensor<T> i0_bb = r1_vo("bb");
@@ -211,27 +206,29 @@ void ccsd_t1_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
 }
 
 template<typename T>
-void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
-                CCSE_Tensors<T>& r2, CCSE_Tensors<T>& t1, CCSE_Tensors<T>& t2,
-                std::vector<CCSE_Tensors<T>>& f1_se, std::vector<CCSE_Tensors<T>>& chol3d_se,
-                CCSE_Tensors<T>& i0tmp) {
-  auto [cind]                                     = CI.labels<1>("all");
-  auto [p3, p4]                                   = MO.labels<2>("virt");
-  auto [h1, h2]                                   = MO.labels<2>("occ");
-  auto [p1_va, p2_va, p3_va, p4_va, p5_va, p8_va] = v_alpha.labels<6>("all");
-  auto [p1_vb, p2_vb, p3_vb, p4_vb, p6_vb, p8_vb] = v_beta.labels<6>("all");
-  auto [h1_oa, h2_oa, h3_oa, h4_oa, h7_oa, h9_oa] = o_alpha.labels<6>("all");
-  auto [h1_ob, h2_ob, h3_ob, h4_ob, h8_ob, h9_ob] = o_beta.labels<6>("all");
+void RT_EOM_CD_CCSD<T>::ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO,
+                                   const TiledIndexSpace& CI, CCSE_Tensors<T>& r2,
+                                   CCSE_Tensors<T>& t1, CCSE_Tensors<T>& t2,
+                                   std::vector<CCSE_Tensors<T>>& f1_se,
+                                   std::vector<CCSE_Tensors<T>>& chol3d_se,
+                                   CCSE_Tensors<T>&              i0tmp) {
+  const auto [cind]                                     = CI.labels<1>("all");
+  const auto [p3, p4]                                   = MO.labels<2>("virt");
+  const auto [h1, h2]                                   = MO.labels<2>("occ");
+  const auto [p1_va, p2_va, p3_va, p4_va, p5_va, p8_va] = v_alpha.labels<6>("all");
+  const auto [p1_vb, p2_vb, p3_vb, p4_vb, p6_vb, p8_vb] = v_beta.labels<6>("all");
+  const auto [h1_oa, h2_oa, h3_oa, h4_oa, h7_oa, h9_oa] = o_alpha.labels<6>("all");
+  const auto [h1_ob, h2_ob, h3_ob, h4_ob, h8_ob, h9_ob] = o_beta.labels<6>("all");
 
   Tensor<T> i0_aaaa = r2("aaaa");
   Tensor<T> i0_abab = r2("abab");
   Tensor<T> i0_bbbb = r2("bbbb");
 
-  Tensor<T> t1_aa   = t1("aa");
-  Tensor<T> t1_bb   = t1("bb");
-  Tensor<T> t2_aaaa = t2("aaaa");
-  Tensor<T> t2_abab = t2("abab");
-  Tensor<T> t2_bbbb = t2("bbbb");
+  const Tensor<T> t1_aa   = t1("aa");
+  const Tensor<T> t1_bb   = t1("bb");
+  const Tensor<T> t2_aaaa = t2("aaaa");
+  const Tensor<T> t2_abab = t2("abab");
+  const Tensor<T> t2_bbbb = t2("bbbb");
 
   // f1_se{f1_oo,f1_ov,f1_vo,f1_vv}
   // chol3d_se{chol3d_oo,chol3d_ov,chol3d_vo,chol3d_vv}
@@ -448,22 +445,19 @@ void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace
   // clang-format on
 }
 
-template<typename TensorType>
-void scale_complex_ip(Tensor<TensorType> tensor, double alpha_real, double alpha_imag) {
-  if constexpr(tamm::internal::is_complex_v<TensorType>) {
-    std::function<TensorType(TensorType)> func = [&](TensorType a) {
-      TensorType val(alpha_real * a.real(), alpha_imag * a.imag());
-      return val;
-    };
+template<typename T>
+void RT_EOM_CD_CCSD<T>::scale_complex_ip(Tensor<T> tensor, double alpha_real, double alpha_imag) {
+  if constexpr(tamm::internal::is_complex_v<T>) {
+    std::function<T(T)> func = [&](T a) { return T(alpha_real * a.real(), alpha_imag * a.imag()); };
     apply_ewise_ip(tensor(), func);
   }
-  else tamm_terminate("[scale_complex_ip] TensorType not complex ...");
+  else tamm_terminate("[scale_complex_ip] Tensor type T not complex ...");
 }
 
-void td_iteration_print(ChemEnv& chem_env, int iter, std::complex<double> energy,
-                        std::complex<double> x1_1, std::complex<double> x1_2,
-                        std::complex<double> x2_1, std::complex<double> x2_2,
-                        std::complex<double> x2_3, double time) {
+template<typename T>
+void RT_EOM_CD_CCSD<T>::td_iteration_print(ChemEnv& chem_env, int iter, CCEType energy,
+                                           CCEType x1_1, CCEType x1_2, CCEType x2_1, CCEType x2_2,
+                                           CCEType x2_3, double time) {
   std::cout.width(6);
   std::cout << std::right << iter + 1 << std::string(3, ' ');
   std::cout << std::fixed << std::setprecision(13) << energy.real() << std::string(3, ' ');
@@ -479,14 +473,14 @@ void td_iteration_print(ChemEnv& chem_env, int iter, std::complex<double> energy
 }
 
 template<typename T>
-void debug_full_rt(Scheduler& sch, const TiledIndexSpace& MO, CCSE_Tensors<T>& r1_vo,
-                   CCSE_Tensors<T>& r2_vvoo) {
+void RT_EOM_CD_CCSD<T>::debug_full_rt(Scheduler& sch, const TiledIndexSpace& MO,
+                                      CCSE_Tensors<T>& r1_vo, CCSE_Tensors<T>& r2_vvoo) {
   const TiledIndexSpace& O       = MO("occ");
   const TiledIndexSpace& V       = MO("virt");
-  TiledIndexSpace        o_alpha = MO("occ_alpha");
-  TiledIndexSpace        v_alpha = MO("virt_alpha");
-  TiledIndexSpace        o_beta  = MO("occ_beta");
-  TiledIndexSpace        v_beta  = MO("virt_beta");
+  const TiledIndexSpace  o_alpha = MO("occ_alpha");
+  const TiledIndexSpace  v_alpha = MO("virt_alpha");
+  const TiledIndexSpace  o_beta  = MO("occ_beta");
+  const TiledIndexSpace  v_beta  = MO("virt_beta");
 
   auto [p1_va, p2_va, p3_va, p4_va] = v_alpha.labels<4>("all");
   auto [p1_vb, p2_vb, p3_vb, p4_vb] = v_beta.labels<4>("all");
@@ -532,27 +526,23 @@ void debug_full_rt(Scheduler& sch, const TiledIndexSpace& MO, CCSE_Tensors<T>& r
   sch.deallocate(d_r1, d_r2, r2_baba, r2_abba, r2_baab).execute();
 }
 
-template<typename TensorType>
-void complex_copy_swap(ExecutionContext& ec, Tensor<TensorType> src, Tensor<TensorType> dest,
-                       bool update = true) {
-  if constexpr(tamm::internal::is_complex_v<TensorType>) {
-    Tensor<TensorType> tensor = dest;
+template<typename T>
+void RT_EOM_CD_CCSD<T>::complex_copy_swap(ExecutionContext& ec, Tensor<T> src, Tensor<T> dest,
+                                          bool update) {
+  if constexpr(tamm::internal::is_complex_v<T>) {
+    Tensor<T> tensor = dest;
 
     auto copy_lambda = [&](const IndexVector& bid) {
-      const IndexVector blockid = internal::translate_blockid(bid, tensor());
+      const IndexVector     blockid = internal::translate_blockid(bid, tensor());
+      const tamm::TAMM_SIZE dsize   = tensor.block_size(blockid);
 
-      auto block_dims   = tensor.block_dims(blockid);
-      auto block_offset = tensor.block_offsets(blockid);
-
-      const tamm::TAMM_SIZE dsize = tensor.block_size(blockid);
-
-      std::vector<TensorType> sbuf(dsize);
-      std::vector<TensorType> dbuf(dsize, 0);
+      std::vector<T> sbuf(dsize);
+      std::vector<T> dbuf(dsize, 0);
       src.get(blockid, sbuf);
       if(update) dest.get(blockid, dbuf);
 
       for(TAMM_SIZE i = 0; i < dsize; i++) {
-        TensorType val(sbuf[i].imag(), sbuf[i].real());
+        T val(sbuf[i].imag(), sbuf[i].real());
         if(update) dbuf[i] += val;
         else dbuf[i] = val;
       }
@@ -561,21 +551,22 @@ void complex_copy_swap(ExecutionContext& ec, Tensor<TensorType> src, Tensor<Tens
 
     block_for(ec, tensor(), copy_lambda);
   }
-  else tamm_terminate("[complex_copy_swap] Tensors provided are not complex");
+  else tamm_terminate("[complex_copy_swap] Tensor type T not complex");
 }
 
 template<typename T>
-void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
-                    const TiledIndexSpace& CI, Tensor<T>& d_f1, std::vector<T>& p_evl_sorted,
-                    Tensor<T>& cv3d, bool cc_restart, std::string rt_eom_fp) {
+void RT_EOM_CD_CCSD<T>::rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec,
+                                       const TiledIndexSpace& MO, const TiledIndexSpace& CI,
+                                       Tensor<T>& d_f1, std::vector<T>& p_evl_sorted,
+                                       Tensor<T>& cv3d, bool cc_restart, std::string rt_eom_fp) {
   SystemData& sys_data = chem_env.sys_data;
   // int    maxiter     = chem_env.ioptions.ccsd_options.ccsd_maxiter;
   // int    ndiis       = chem_env.ioptions.ccsd_options.ndiis;
-  double thresh      = chem_env.ioptions.ccsd_options.rt_threshold;
-  bool   writet      = chem_env.ioptions.ccsd_options.writet;
-  int    writet_iter = chem_env.ioptions.ccsd_options.writet_iter;
+  const double thresh      = chem_env.ioptions.ccsd_options.rt_threshold;
+  const bool   writet      = chem_env.ioptions.ccsd_options.writet;
+  const int    writet_iter = chem_env.ioptions.ccsd_options.writet_iter;
   // double zshiftl     = chem_env.ioptions.ccsd_options.lshift;
-  bool profile = chem_env.ioptions.ccsd_options.profile_ccsd;
+  const bool profile = chem_env.ioptions.ccsd_options.profile_ccsd;
   // T    residual = 0.0;
   // T    energy   = 0.0;
   // int    niter       = 0;
@@ -597,11 +588,11 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
   o_beta  = {MO("occ"), range(oatiles, otiles)};
   v_beta  = {MO("virt"), range(vatiles, vtiles)};
 
-  auto [cind]                       = CI.labels<1>("all");
-  auto [p1_va, p2_va, p3_va, p4_va] = v_alpha.labels<4>("all");
-  auto [p1_vb, p2_vb, p3_vb, p4_vb] = v_beta.labels<4>("all");
-  auto [h1_oa, h2_oa, h3_oa, h4_oa] = o_alpha.labels<4>("all");
-  auto [h1_ob, h2_ob, h3_ob, h4_ob] = o_beta.labels<4>("all");
+  const auto [cind]                       = CI.labels<1>("all");
+  const auto [p1_va, p2_va, p3_va, p4_va] = v_alpha.labels<4>("all");
+  const auto [p1_vb, p2_vb, p3_vb, p4_vb] = v_beta.labels<4>("all");
+  const auto [h1_oa, h2_oa, h3_oa, h4_oa] = o_alpha.labels<4>("all");
+  const auto [h1_ob, h2_ob, h3_ob, h4_ob] = o_beta.labels<4>("all");
 
   Tensor<T> d_e{};
 
@@ -821,7 +812,7 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
     if(ec.print()) std::cout << std::right << "Timestep " << titer + 1 << std::endl;
 
     // step 1
-    rteom_cc::ccsd::ccsd_e_os(sch, MO, CI, d_e, t1_vo, t2_vvoo, f1_se, chol3d_se);
+    ccsd_e_os(sch, MO, CI, d_e, t1_vo, t2_vvoo, f1_se, chol3d_se);
     sch.execute(exhw, profile);
 
     if(ec.print()) {
@@ -851,9 +842,8 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
     sch.execute();
 
     // step 3
-    rteom_cc::ccsd::ccsd_t1_os(sch, MO, CI, r1_vo_old, t1_vo_old, t2_vvoo_old, f1_se, chol3d_se);
-    rteom_cc::ccsd::ccsd_t2_os(sch, MO, CI, r2_vvoo_old, t1_vo_old, t2_vvoo_old, f1_se, chol3d_se,
-                               i0_t2_tmp);
+    ccsd_t1_os(sch, MO, CI, r1_vo_old, t1_vo_old, t2_vvoo_old, f1_se, chol3d_se);
+    ccsd_t2_os(sch, MO, CI, r2_vvoo_old, t1_vo_old, t2_vvoo_old, f1_se, chol3d_se, i0_t2_tmp);
     sch.execute(exhw, profile);
 
     // if(ec.print() && debug) std::cout << "Step 3 debug r1,r2 old norm ..." << std::endl;
@@ -871,8 +861,8 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
 
       // r1=r2=0
       // step 5
-      rteom_cc::ccsd::ccsd_t1_os(sch, MO, CI, r1_vo, t1_vo, t2_vvoo, f1_se, chol3d_se);
-      rteom_cc::ccsd::ccsd_t2_os(sch, MO, CI, r2_vvoo, t1_vo, t2_vvoo, f1_se, chol3d_se, i0_t2_tmp);
+      ccsd_t1_os(sch, MO, CI, r1_vo, t1_vo, t2_vvoo, f1_se, chol3d_se);
+      ccsd_t2_os(sch, MO, CI, r2_vvoo, t1_vo, t2_vvoo, f1_se, chol3d_se, i0_t2_tmp);
       sch.execute(exhw, profile);
 
       // step 6 (r += r_old)
@@ -898,7 +888,7 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
       complex_copy_swap(ec, r2_vvoo("bbbb"), t2_vvoo_aux("bbbb"));
 
       // step 9
-      rteom_cc::ccsd::ccsd_e_os(sch, MO, CI, d_e, t1_vo_aux, t2_vvoo_aux, f1_se, chol3d_se);
+      ccsd_e_os(sch, MO, CI, d_e, t1_vo_aux, t2_vvoo_aux, f1_se, chol3d_se);
       sch.execute(exhw, profile);
 
       // step 10
@@ -980,9 +970,9 @@ void rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpa
 
 void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T             = double;
-  using ComplexTensor = Tensor<rteom_cc::ccsd::CCEType>;
+  using ComplexTensor = Tensor<CCEType>;
 
-  auto        rank     = ec.pg().rank();
+  const auto  rank     = ec.pg().rank();
   SystemData& sys_data = chem_env.sys_data;
 
   cholesky_2e::cholesky_2e_driver(ec, chem_env);
@@ -995,7 +985,7 @@ void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   cc_context.init_filenames(files_prefix);
   CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
 
-  auto debug = ccsd_options.debug;
+  const auto debug = ccsd_options.debug;
 
   TiledIndexSpace& MO      = chem_env.is_context.MSO;
   TiledIndexSpace& CI      = chem_env.is_context.CI;
@@ -1016,7 +1006,7 @@ void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     .deallocate(d_f1, cholVpr)
     .execute();
 
-  std::vector<rteom_cc::ccsd::CCEType> p_evl_sorted = tamm::diagonal(d_f1_c);
+  std::vector<CCEType> p_evl_sorted = tamm::diagonal(d_f1_c);
 
   if(rank == 0 && debug) {
     print_vector(p_evl_sorted, files_prefix + ".eigen_values.txt");
@@ -1032,8 +1022,9 @@ void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
   files_prefix = files_dir + sys_data.output_file_prefix;
 
-  rteom_cc::ccsd::rt_eom_cd_ccsd<rteom_cc::ccsd::CCEType>(
-    chem_env, ec, MO, CI, d_f1_c, p_evl_sorted, cholVpr_c, cc_restart, files_prefix);
+  RT_EOM_CD_CCSD<CCEType> rteom_obj;
+  rteom_obj.rt_eom_cd_ccsd(chem_env, ec, MO, CI, d_f1_c, p_evl_sorted, cholVpr_c, cc_restart,
+                           files_prefix);
 
   auto   cc_t2 = std::chrono::high_resolution_clock::now();
   double ccsd_time =

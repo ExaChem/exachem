@@ -11,8 +11,8 @@
 
 namespace exachem::task {
 
-void update_geometry(std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
-                     const Eigen::RowVectorXd& new_geometry) {
+void GeometryOptimizer::update_geometry(std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
+                                        const Eigen::RowVectorXd& new_geometry) {
   int c = 0;
   for(size_t i = 0; i < atoms.size(); i++) {
     atoms[i].x         = new_geometry(0, c++);
@@ -26,8 +26,9 @@ void update_geometry(std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
   }
 }
 
-void geometry_optimizer(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Atom>& atoms,
-                        std::vector<ECAtom>& ec_atoms, std::string ec_arg2) {
+void GeometryOptimizer::geometry_optimizer(ExecutionContext& ec, ChemEnv& chem_env,
+                                           std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
+                                           std::string ec_arg2) {
   using RowVectorXd = Eigen::RowVectorXd;
 
   const int    max_steps = 20;
@@ -43,7 +44,8 @@ void geometry_optimizer(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Ato
     geometry(c++) = atoms[i].z;
   }
 
-  Matrix      gradient_matrix = compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
+  Matrix gradient_matrix =
+    NumericalGradients::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
   RowVectorXd gradients = Eigen::Map<RowVectorXd>(gradient_matrix.data(), gradient_matrix.size());
 
   double curr_energy = chem_env.task_energy; // original task energy
@@ -78,7 +80,7 @@ void geometry_optimizer(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Ato
 
     update_geometry(atoms, ec_atoms, new_geometry);
 
-    gradient_matrix = compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
+    gradient_matrix = NumericalGradients::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
     RowVectorXd new_gradients =
       Eigen::Map<RowVectorXd>(gradient_matrix.data(), gradient_matrix.size());
 

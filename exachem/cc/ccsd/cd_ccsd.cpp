@@ -38,11 +38,11 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
     return;
   }
 
-  auto        debug      = ccsd_options.debug;
-  bool        scf_conv   = chem_env.scf_context.no_scf;
-  std::string t1file     = cc_context.t1file;
-  std::string t2file     = cc_context.t2file;
-  const bool  ccsdstatus = cc_context.is_converged(chem_env.run_context, "ccsd");
+  auto              debug      = ccsd_options.debug;
+  bool              scf_conv   = chem_env.scf_context.no_scf;
+  const std::string t1file     = cc_context.t1file;
+  const std::string t2file     = cc_context.t2file;
+  const bool        ccsdstatus = cc_context.is_converged(chem_env.run_context, "ccsd");
 
   bool ccsd_restart = ccsd_options.readt || ccsd_options.writet ||
                       ((fs::exists(t1file) && fs::exists(t2file) && fs::exists(cd_context.f1file) &&
@@ -112,8 +112,10 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
   Tensor<T> dt1_full, dt2_full;
   if(computeTData && is_rhf) setup_full_t1t2(ec, MO, dt1_full, dt2_full);
 
-  double residual = 0, corr_energy = 0;
-
+  double                            residual = 0, corr_energy = 0;
+  exachem::cc2::CD_CC2_CS_Engine<T> cc2cs_engine;
+  CD_CCSD_OS<T>                     ccsd_os_ann;
+  CD_CCSD_CS<T>                     ccsd_cs_ann;
   if(is_rhf) {
     if(ccsd_restart && use_subgroup) {
       if(cc_context.sub_pg.is_valid()) {
@@ -122,14 +124,14 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
           std::cout << "Executing with " << nsranks << " ranks (" << nsranks / ppn << " nodes)"
                     << std::endl;
         if(cc_context.task_cc2) {
-          std::tie(residual, corr_energy) = exachem::cc2::cc2_cs::cd_cc2_cs_driver<T>(
-            chem_env, *(cc_context.sub_ec), MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s,
-            d_t1s, d_t2s, p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix,
-            computeTData);
+          std::tie(residual, corr_energy) =
+            cc2cs_engine.run(chem_env, *(cc_context.sub_ec), MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2,
+                             d_r1s, d_r2s, d_t1s, d_t2s, p_evl_sorted, cholVpr, dt1_full, dt2_full,
+                             ccsd_restart, files_prefix, computeTData);
         }
 
         else {
-          std::tie(residual, corr_energy) = exachem::cc::ccsd::cd_ccsd_cs_driver<T>(
+          std::tie(residual, corr_energy) = ccsd_cs_ann.cd_ccsd_cs_driver(
             chem_env, *(cc_context.sub_ec), MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s,
             d_t1s, d_t2s, p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix,
             computeTData);
@@ -139,12 +141,12 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
     }
     else {
       if(cc_context.task_cc2) {
-        std::tie(residual, corr_energy) = exachem::cc2::cc2_cs::cd_cc2_cs_driver<T>(
+        std::tie(residual, corr_energy) = cc2cs_engine.run(
           chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
           p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
       }
       else {
-        std::tie(residual, corr_energy) = exachem::cc::ccsd::cd_ccsd_cs_driver<T>(
+        std::tie(residual, corr_energy) = ccsd_cs_ann.cd_ccsd_cs_driver(
           chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
           p_evl_sorted, cholVpr, dt1_full, dt2_full, ccsd_restart, files_prefix, computeTData);
       }
@@ -159,12 +161,13 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
                     << std::endl;
 
         if(cc_context.task_cc2) {
-          std::tie(residual, corr_energy) = exachem::cc2::cc2_os::cd_cc2_os_driver<T>(
+          exachem::cc2::CD_CC2_OS_Engine<T> cc2_os_engine;
+          std::tie(residual, corr_energy) = cc2_os_engine.run(
             chem_env, *(cc_context.sub_ec), MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s,
             d_t1s, d_t2s, p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
         }
         else {
-          std::tie(residual, corr_energy) = cd_ccsd_os_driver<T>(
+          std::tie(residual, corr_energy) = ccsd_os_ann.cd_ccsd_os_driver(
             chem_env, *(cc_context.sub_ec), MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s,
             d_t1s, d_t2s, p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
         }
@@ -173,12 +176,13 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
     }
     else {
       if(cc_context.task_cc2) {
-        std::tie(residual, corr_energy) = exachem::cc2::cc2_os::cd_cc2_os_driver<T>(
-          chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
-          p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
+        exachem::cc2::CD_CC2_OS_Engine<T> cc2_os_engine;
+        std::tie(residual, corr_energy) =
+          cc2_os_engine.run(chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s,
+                            d_t2s, p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
       }
       else {
-        std::tie(residual, corr_energy) = cd_ccsd_os_driver<T>(
+        std::tie(residual, corr_energy) = ccsd_os_ann.cd_ccsd_os_driver(
           chem_env, ec, MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s,
           p_evl_sorted, cholVpr, ccsd_restart, files_prefix, computeTData);
       }

@@ -106,26 +106,25 @@ int main(int argc, char* argv[]) {
       cout << endl
            << "Output folder & files prefix: " << chem_env.sys_data.output_file_prefix << endl
            << endl;
-      chem_env.sys_data.results["output"]["machine_info"]["date"]           = cur_date.str();
-      chem_env.sys_data.results["output"]["machine_info"]["nnodes"]         = ec.nnodes();
-      chem_env.sys_data.results["output"]["machine_info"]["nproc_per_node"] = ec.ppn();
-      chem_env.sys_data.results["output"]["machine_info"]["nproc_total"] = ec.nnodes() * ec.ppn();
-      auto meminfo                                                       = ec.mem_info();
-      chem_env.sys_data.results["output"]["machine_info"]["cpu"]["name"] = meminfo.cpu_name;
-      chem_env.sys_data.results["output"]["machine_info"]["cpu"]["cpu_memory_per_node_gib"] =
-        meminfo.cpu_mem_per_node;
-      chem_env.sys_data.results["output"]["machine_info"]["cpu"]["total_cpu_memory_gib"] =
-        meminfo.total_cpu_mem;
+
+      // Store machine info in results
+      auto& machine_info = chem_env.sys_data.results["output"]["machine_info"];
+      auto  meminfo      = ec.mem_info();
+
+      machine_info["date"]                           = cur_date.str();
+      machine_info["nnodes"]                         = ec.nnodes();
+      machine_info["nproc_per_node"]                 = ec.ppn();
+      machine_info["nproc_total"]                    = ec.nnodes() * ec.ppn();
+      machine_info["cpu"]["name"]                    = meminfo.cpu_name;
+      machine_info["cpu"]["cpu_memory_per_node_gib"] = meminfo.cpu_mem_per_node;
+      machine_info["cpu"]["total_cpu_memory_gib"]    = meminfo.total_cpu_mem;
       if(ec.has_gpu()) {
-        chem_env.sys_data.results["output"]["machine_info"]["ngpus_per_node"] = ec.gpn();
-        chem_env.sys_data.results["output"]["machine_info"]["ngpus_total"] = ec.nnodes() * ec.gpn();
-        chem_env.sys_data.results["output"]["machine_info"]["gpu"]["name"] = meminfo.gpu_name;
-        chem_env.sys_data.results["output"]["machine_info"]["gpu"]["memory_per_gpu_gib"] =
-          meminfo.gpu_mem_per_device;
-        chem_env.sys_data.results["output"]["machine_info"]["gpu"]["gpu_memory_per_node_gib"] =
-          meminfo.gpu_mem_per_node;
-        chem_env.sys_data.results["output"]["machine_info"]["gpu"]["total_gpu_memory_gib"] =
-          meminfo.total_gpu_mem;
+        machine_info["ngpus_per_node"]                 = ec.gpn();
+        machine_info["ngpus_total"]                    = ec.nnodes() * ec.gpn();
+        machine_info["gpu"]["name"]                    = meminfo.gpu_name;
+        machine_info["gpu"]["memory_per_gpu_gib"]      = meminfo.gpu_mem_per_device;
+        machine_info["gpu"]["gpu_memory_per_node_gib"] = meminfo.gpu_mem_per_node;
+        machine_info["gpu"]["total_gpu_memory_gib"]    = meminfo.total_gpu_mem;
       }
     }
 
@@ -145,12 +144,12 @@ int main(int argc, char* argv[]) {
     std::vector<ECAtom> ec_atoms = chem_env.ec_atoms;
 
     if(task_op[0] == "gradient") {
-      exachem::task::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
+      exachem::task::NumericalGradients::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
     }
     else if(task_op[0] == "optimize") {
-      exachem::task::geometry_optimizer(ec, chem_env, atoms, ec_atoms, ec_arg2);
+      exachem::task::GeometryOptimizer::geometry_optimizer(ec, chem_env, atoms, ec_atoms, ec_arg2);
     }
-    else exachem::task::compute_energy(ec, chem_env, ec_arg2);
+    else exachem::task::NumericalGradients::compute_energy(ec, chem_env, ec_arg2);
 
     if(ec.print()) chem_env.write_run_context();
 

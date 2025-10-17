@@ -10,7 +10,7 @@
 
 namespace exachem::task {
 
-double get_task_energy(ExecutionContext& ec, ChemEnv& chem_env) {
+double NumericalGradients::get_task_energy(ExecutionContext& ec, ChemEnv& chem_env) {
   const TaskOptions& task   = chem_env.ioptions.task_options;
   double             energy = 0.0;
   // TODO:Assumes only 1 task is true
@@ -18,21 +18,22 @@ double get_task_energy(ExecutionContext& ec, ChemEnv& chem_env) {
   else if(task.mp2) energy = chem_env.mp2_context.mp2_total_energy;
   else if(task.cc2) energy = chem_env.cc_context.cc2_total_energy;
   else if(task.ccsd) energy = chem_env.cc_context.ccsd_total_energy;
-  else if(task.ccsdt) energy = chem_env.cc_context.ccsdt_total_energy;
   else if(task.ccsd_t) energy = chem_env.cc_context.ccsd_pt_total_energy;
 
   return energy;
 }
 
-double compute_energy(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) {
+double NumericalGradients::compute_energy(ExecutionContext& ec, ChemEnv& chem_env,
+                                          std::string ec_arg2) {
   // std::cout << "computing energy" << std::endl;
   execute_task(ec, chem_env, ec_arg2);
   return get_task_energy(ec, chem_env);
 }
 
-Matrix compute_numerical_gradients(ExecutionContext& ec, ChemEnv& chem_env,
-                                   const std::vector<Atom>&   atoms,
-                                   const std::vector<ECAtom>& ec_atoms, const std::string ec_arg2) {
+Matrix NumericalGradients::compute_numerical_gradients(ExecutionContext& ec, ChemEnv& chem_env,
+                                                       const std::vector<Atom>&   atoms,
+                                                       const std::vector<ECAtom>& ec_atoms,
+                                                       const std::string          ec_arg2) {
   const auto natoms    = chem_env.atoms.size();
   Matrix     gradients = Matrix::Zero(natoms, 3);
 
@@ -104,12 +105,14 @@ Matrix compute_numerical_gradients(ExecutionContext& ec, ChemEnv& chem_env,
   return gradients;
 }
 
-Matrix compute_gradients(ExecutionContext& ec, ChemEnv& chem_env, const std::vector<Atom>& atoms,
-                         const std::vector<ECAtom>& ec_atoms, const std::string ec_arg2) {
+Matrix NumericalGradients::compute_gradients(ExecutionContext& ec, ChemEnv& chem_env,
+                                             const std::vector<Atom>&   atoms,
+                                             const std::vector<ECAtom>& ec_atoms,
+                                             const std::string          ec_arg2) {
   // Compute reference energy
   chem_env.atoms       = atoms;
   chem_env.ec_atoms    = ec_atoms;
-  chem_env.task_energy = exachem::task::compute_energy(ec, chem_env, ec_arg2);
+  chem_env.task_energy = compute_energy(ec, chem_env, ec_arg2);
 
   if(ec.print()) {
     std::cout << std::endl

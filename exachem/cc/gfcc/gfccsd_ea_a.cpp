@@ -591,9 +591,9 @@ namespace exachem::cc::gfcc {
   
     gsch.deallocate(dtmp_aaa, dtmp_bab).execute();
   } // gfccsd_driver_ea_a
-#endif
 
 // Explicit template instantiation
 template class GFCCSD_EA_A_Driver<double>;
+#endif
 
 } // namespace exachem::cc::gfcc

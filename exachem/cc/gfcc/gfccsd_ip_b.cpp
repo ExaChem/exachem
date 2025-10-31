@@ -544,9 +544,9 @@ void GFCCSD_IP_B_Driver<T>::gfccsd_driver_ip_b(
   
     gsch.deallocate(dtmp_bbb, dtmp_aba).execute();
 } // gfccsd_driver_ip_b
-#endif
 
 // Explicit template instantiation
 template class GFCCSD_IP_B_Driver<double>;
+#endif
 
 } // namespace exachem::cc::gfcc

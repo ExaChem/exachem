@@ -1074,6 +1074,9 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
 #endif
 
   ec.pg().barrier();
+
+  if(chem_env.sys_data.do_qed) count += 3; // for storing the 3 extra dipole terms for QED-CC
+
   ec.pg().broadcast(&count, 0);
 
   update_sysdata(ec, chem_env, tMO, is_mso);

@@ -15,21 +15,14 @@ using namespace tamm;
 namespace exachem::cc::qed_ccsd_os {
 
 template<typename T>
-using TensorMap = std::map<std::string, Tensor<T>>;
+void build_tmps(Scheduler& sch, ChemEnv& chem_env, TensorMap<T>& tmps, TensorMap<T>& scalars,
+                const TensorMap<T>& f, const TensorMap<T>& eri, const TensorMap<T>& dp,
+                const double w0, const TensorMap<T>& t1, const TensorMap<T>& t2, const double t0_1p,
+                const TensorMap<T>& t1_1p, const TensorMap<T>& t2_1p, const double t0_2p,
+                const TensorMap<T>& t1_2p, const TensorMap<T>& t2_2p);
 
 template<typename T>
-Tensor<T> declare(const TiledIndexSpace& MO, const std::string& name);
-
-template<typename T>
-void build_tmps(Scheduler& sch, const TiledIndexSpace& MO, TensorMap<T>& tmps,
-                TensorMap<T>& scalars, const TensorMap<T>& f, const TensorMap<T>& eri,
-                const TensorMap<T>& dp, const double w0, const TensorMap<T>& t1,
-                const TensorMap<T>& t2, const double t0_1p, const TensorMap<T>& t1_1p,
-                const TensorMap<T>& t2_1p, const double t0_2p, const TensorMap<T>& t1_2p,
-                const TensorMap<T>& t2_2p);
-
-template<typename T>
-void residuals(Scheduler& sch, const TiledIndexSpace& MO, const TensorMap<T>& f,
+void residuals(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO, const TensorMap<T>& f,
                const TensorMap<T>& eri, const TensorMap<T>& dp, const double w0,
                const TensorMap<T>& t1, const TensorMap<T>& t2, const double t0_1p,
                const TensorMap<T>& t1_1p, const TensorMap<T>& t2_1p, const double t0_2p,

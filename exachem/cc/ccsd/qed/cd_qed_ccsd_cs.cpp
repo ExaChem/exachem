@@ -6,45 +6,47 @@
  * See LICENSE.txt for details
  */
 
-#include "qed_ccsd_cs.hpp"
-#include "residuals/qed_ccsd_cs/qed_ccsd_cs_resid_1.hpp"
-#include "residuals/qed_ccsd_cs/qed_ccsd_cs_resid_2.hpp"
-#include "residuals/qed_ccsd_cs/qed_ccsd_cs_resid_3.hpp"
-#include "residuals/qed_ccsd_cs/qed_ccsd_cs_resid_4.hpp"
-#include "residuals/qed_ccsd_cs/qed_ccsd_cs_tmps.hpp"
+#include "cd_qed_ccsd_cs.hpp"
+#include "residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_1.hpp"
+#include "residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_2.hpp"
+#include "residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_3.hpp"
+#include "residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_4.hpp"
+#include "residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_tmps.hpp"
 
-namespace exachem::cc::qed_ccsd_cs {
+namespace exachem::cc::cd_qed_ccsd_cs {
 
 template<typename T>
-void residuals(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO, const TensorMap<T>& f,
-               const TensorMap<T>& eri, const TensorMap<T>& dp, const double w0,
-               const TensorMap<T>& t1, const TensorMap<T>& t2, const double t0_1p,
-               const TensorMap<T>& t1_1p, const TensorMap<T>& t2_1p, const double t0_2p,
-               const TensorMap<T>& t1_2p, const TensorMap<T>& t2_2p, Tensor<T>& energy,
-               TensorMap<T>& r1, TensorMap<T>& r2, Tensor<T>& r0_1p, TensorMap<T>& r1_1p,
-               TensorMap<T>& r2_1p, Tensor<T>& r0_2p, TensorMap<T>& r1_2p, TensorMap<T>& r2_2p) {
+double residuals(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
+                 const TensorMap<T>& f, const TensorMap<T>& chol, const TensorMap<T>& dp,
+                 const double w0, const TensorMap<T>& t1, const TensorMap<T>& t2,
+                 const double t0_1p, const TensorMap<T>& t1_1p, const TensorMap<T>& t2_1p,
+                 const double t0_2p, const TensorMap<T>& t1_2p, const TensorMap<T>& t2_2p,
+                 Tensor<T>& energy, TensorMap<T>& r1, TensorMap<T>& r2, Tensor<T>& r0_1p,
+                 TensorMap<T>& r1_1p, TensorMap<T>& r2_1p, Tensor<T>& r0_2p, TensorMap<T>& r1_2p,
+                 TensorMap<T>& r2_2p) {
   // build intermediates
   TensorMap<T> tmps, scalars;
-  build_tmps(sch, chem_env, tmps, scalars, f, eri, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p,
+  build_tmps(sch, chem_env, tmps, scalars, f, chol, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p,
              t1_2p, t2_2p);
 
   const auto timer_start = std::chrono::high_resolution_clock::now();
   const auto profile     = chem_env.ioptions.ccsd_options.profile_ccsd;
 
   // Residuals
-  resid_part1(sch, MO, tmps, scalars, f, eri, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p, t1_2p,
-              t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
-  resid_part2(sch, MO, tmps, scalars, f, eri, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p, t1_2p,
-              t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
-  resid_part3(sch, MO, tmps, scalars, f, eri, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p, t1_2p,
-              t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
-  resid_part4(sch, MO, tmps, scalars, f, eri, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p, t1_2p,
-              t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
+  resid_part1(sch, chem_env, tmps, scalars, f, chol, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p,
+              t1_2p, t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
+  resid_part2(sch, chem_env, tmps, scalars, f, chol, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p,
+              t1_2p, t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
+  resid_part3(sch, chem_env, tmps, scalars, f, chol, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p,
+              t1_2p, t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
+  resid_part4(sch, chem_env, tmps, scalars, f, chol, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p,
+              t1_2p, t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
 
   sch.execute(sch.ec().exhw(), profile);
 
   const auto timer_end = std::chrono::high_resolution_clock::now();
-  std::chrono::duration_cast<std::chrono::duration<double>>((timer_end - timer_start)).count();
+  auto       iter_time =
+    std::chrono::duration_cast<std::chrono::duration<double>>((timer_end - timer_start)).count();
 
   // Deallocate temporary tensors
   for(auto& [name, tmp]: tmps) {
@@ -53,93 +55,22 @@ void residuals(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO, con
   }
   for(auto& [name, scalar]: scalars) sch.deallocate(scalar);
   sch.execute();
+
+  return (double) iter_time;
 }
 
 template<typename T>
 std::tuple<TensorMap<T>, // fock
-           TensorMap<T>, // eri
+           TensorMap<T>, // chol
            TensorMap<T>  // dipole
            >
 extract_spin_blocks(Scheduler& sch, ChemEnv& chem_env, const Tensor<T>& d_f1,
                     const Tensor<T>& cholVpr, const Tensor<T>& dip) {
-  TiledIndexSpace&       MO      = chem_env.is_context.MSO;
-  const TiledIndexSpace& O       = MO("occ");
-  const TiledIndexSpace& V       = MO("virt");
-  const TiledIndexSpace& CI      = chem_env.is_context.CI;
-  const int              otiles  = O.num_tiles();
-  const int              vtiles  = V.num_tiles();
-  const int              oatiles = MO("occ_alpha").num_tiles();
-  const int              vatiles = MO("virt_alpha").num_tiles();
+  TensorMap<T> f    = oei_spin_blocks<T>(sch, chem_env, d_f1, false);
+  TensorMap<T> chol = oei_spin_blocks<T>(sch, chem_env, cholVpr, true);
+  TensorMap<T> dp   = oei_spin_blocks<T>(sch, chem_env, dip, false);
 
-  const TiledIndexSpace Oa = {MO("occ"), range(oatiles)};
-  const TiledIndexSpace Va = {MO("virt"), range(vatiles)};
-  const TiledIndexSpace Ob = {MO("occ"), range(oatiles, otiles)};
-  const TiledIndexSpace Vb = {MO("virt"), range(vatiles, vtiles)};
-
-  TiledIndexLabel aa, ba, ca, da;
-  TiledIndexLabel ia, ja, ka, la;
-  TiledIndexLabel ab, bb, cb, db;
-  TiledIndexLabel ib, jb, kb, lb;
-  TiledIndexLabel cind;
-
-  std::tie(aa, ba, ca, da) = Va.labels<4>("all");
-  std::tie(ab, bb, cb, db) = Vb.labels<4>("all");
-  std::tie(ia, ja, ka, la) = Oa.labels<4>("all");
-  std::tie(ib, jb, kb, lb) = Ob.labels<4>("all");
-  std::tie(cind)           = CI.labels<1>("all");
-
-  // one body integrals
-  TensorMap<T> f  = oei_spin_blocks<T>(sch, chem_env, d_f1, false);
-  TensorMap<T> dp = oei_spin_blocks<T>(sch, chem_env, dip, false);
-
-  auto build_eri_block = [&](Tensor<T>& v2_block, const TiledIndexLabel& p,
-                             const TiledIndexLabel& q, const TiledIndexLabel& r,
-                             const TiledIndexLabel& s) {
-    // clang-format off
-    sch
-      (v2_block(p, q, r, s)          = cholVpr(p, r, cind) * cholVpr(q, s, cind))
-      (v2_block(p, q, r, s)         -= cholVpr(p, s, cind) * cholVpr(q, r, cind))
-      ;
-    // clang-format on
-  };
-
-  TensorMap<T>             eri; // electron repulsion integrals
-  std::vector<std::string> eri_blocks = {
-    "aaaa_oovo", "aaaa_oovv", "aaaa_vovo", "aaaa_vovv", "abab_oooo", "abab_oovo",
-    "abab_oovv", "abab_vooo", "abab_vovo", "abab_vovv", "abab_vvoo", "abab_vvvo",
-    "abab_vvvv", "abba_oovo", "abba_vovo", "abba_vvvo", "baab_vooo", "baab_vovo",
-    "baab_vovv", "baba_vovo", "bbbb_oovo", "bbbb_oovv", "bbbb_vovo", "bbbb_vovv"};
-
-  for(const auto& block: eri_blocks) {
-    eri[block] = declare<T>(chem_env, block);
-    sch.allocate(eri.at(block));
-
-    TiledIndexLabel p, q, r, s;
-    if(block[0] == 'a' && block[0 + 5] == 'o') p = ia;
-    if(block[0] == 'b' && block[0 + 5] == 'o') p = ib;
-    if(block[0] == 'a' && block[0 + 5] == 'v') p = aa;
-    if(block[0] == 'b' && block[0 + 5] == 'v') p = ab;
-
-    if(block[1] == 'a' && block[1 + 5] == 'o') q = ja;
-    if(block[1] == 'b' && block[1 + 5] == 'o') q = jb;
-    if(block[1] == 'a' && block[1 + 5] == 'v') q = ba;
-    if(block[1] == 'b' && block[1 + 5] == 'v') q = bb;
-
-    if(block[2] == 'a' && block[2 + 5] == 'o') r = ka;
-    if(block[2] == 'b' && block[2 + 5] == 'o') r = kb;
-    if(block[2] == 'a' && block[2 + 5] == 'v') r = ca;
-    if(block[2] == 'b' && block[2 + 5] == 'v') r = cb;
-
-    if(block[3] == 'a' && block[3 + 5] == 'o') s = la;
-    if(block[3] == 'b' && block[3 + 5] == 'o') s = lb;
-    if(block[3] == 'a' && block[3 + 5] == 'v') s = da;
-    if(block[3] == 'b' && block[3 + 5] == 'v') s = db;
-
-    build_eri_block(eri.at(block), p, q, r, s);
-  }
-  sch.execute();
-
-  return {f, eri, dp};
+  return {f, chol, dp};
 }
 
 template<typename T>
@@ -152,7 +83,7 @@ std::tuple<double, double> ccsd_v2_driver(
   std::vector<Tensor<T>>& d_r1_2ps, std::vector<Tensor<T>>& d_r2_2ps, std::vector<Tensor<T>>& d_t1s,
   std::vector<Tensor<T>>& d_t2s, std::vector<Tensor<T>>& d_t1_1ps, std::vector<Tensor<T>>& d_t2_1ps,
   std::vector<Tensor<T>>& d_t1_2ps, std::vector<Tensor<T>>& d_t2_2ps, TensorMap<T>& f,
-  TensorMap<T>& eri, TensorMap<T>& dp, double w0, std::vector<T>& p_evl_sorted,
+  TensorMap<T>& chol, TensorMap<T>& dp, double w0, std::vector<T>& p_evl_sorted,
   bool ccsd_restart = false, std::string ccsd_fp = "") {
   auto cc_t1 = std::chrono::high_resolution_clock::now();
 
@@ -367,9 +298,9 @@ std::tuple<double, double> ccsd_v2_driver(
         // clang-format on
 
         // modified energy equation
-        qed_ccsd_cs::residuals(sch, chem_env, MO, f, eri, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p,
-                               t0_2p, t1_2p, t2_2p, d_e, r1, r2, d_r0_1p, r1_1p, r2_1p, d_r0_2p,
-                               r1_2p, r2_2p);
+        cd_qed_ccsd_cs::residuals(sch, chem_env, MO, f, chol, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p,
+                                  t0_2p, t1_2p, t2_2p, d_e, r1, r2, d_r0_1p, r1_1p, r2_1p, d_r0_2p,
+                                  r1_2p, r2_2p);
         sch.execute(ec.exhw(), profile);
 
         // clang-format off
@@ -469,6 +400,24 @@ std::tuple<double, double> ccsd_v2_driver(
 
     Tensor<T>::deallocate(d_r1_residual, d_r2_residual, d_r1_1p_residual, d_r2_1p_residual,
                           d_r1_2p_residual, d_r2_2p_residual);
+
+    // add bb, aaaa and bbbb to full tensors
+    // clang-format off
+    sch
+
+    (    d_t1(ab,ib)       =      t1.at("bb")(ab,ib) )
+    ( d_t1_1p(ab,ib)       =   t1_1p.at("bb")(ab,ib) )
+    ( d_t1_2p(ab,ib)       =   t1_2p.at("bb")(ab,ib) )
+
+    (    d_t2(aa,ba,ia,ja) =    t2.at("aaaa")(aa,ba,ia,ja) )
+    ( d_t2_1p(aa,ba,ia,ja) = t2_1p.at("aaaa")(aa,ba,ia,ja) )
+    ( d_t2_2p(aa,ba,ia,ja) = t2_2p.at("aaaa")(aa,ba,ia,ja) )
+
+    (    d_t2(ab,bb,ib,jb) =    t2.at("bbbb")(ab,bb,ib,jb) )
+    ( d_t2_1p(ab,bb,ib,jb) = t2_1p.at("bbbb")(ab,bb,ib,jb) )
+    ( d_t2_2p(ab,bb,ib,jb) = t2_2p.at("bbbb")(ab,bb,ib,jb) )
+    .execute();
+    // clang-format on
 
     // deallocate tensors
     for(auto& [name, t]: t1) sch.deallocate(t);
@@ -784,17 +733,17 @@ void qed_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     .execute();
 
   // clang-format off
-  sch
-  (temp_x(mu, p) = QED_Dx(mu, nu) * lcao(nu, p)) (dipole_mo_x(p, q) = lcao(mu, p) * temp_x(mu, q))
-  (temp_y(mu, p) = QED_Dy(mu, nu) * lcao(nu, p)) (dipole_mo_y(p, q) = lcao(mu, p) * temp_y(mu, q))
-  (temp_z(mu, p) = QED_Dz(mu, nu) * lcao(nu, p)) (dipole_mo_z(p, q) = lcao(mu, p) * temp_z(mu, q))
-  (temp_ao_nuc_x(mu, nu) = d_nuc_x * S1(mu, nu)) (temp_x(mu, p) = temp_ao_nuc_x(mu, nu) * lcao(nu, p))
-  (temp_ao_nuc_y(mu, nu) = d_nuc_y * S1(mu, nu)) (temp_y(mu, p) = temp_ao_nuc_y(mu, nu) * lcao(nu, p))
-  (temp_ao_nuc_z(mu, nu) = d_nuc_z * S1(mu, nu)) (temp_z(mu, p) = temp_ao_nuc_z(mu, nu) * lcao(nu, p))
-  (d_nuc_x_mo(p, q) = lcao(mu, p) * temp_x(mu, q))
-  (d_nuc_y_mo(p, q) = lcao(mu, p) * temp_y(mu, q))
-  (d_nuc_z_mo(p, q) = lcao(mu, p) * temp_z(mu, q))
-  .execute(ec.exhw());
+    sch
+    (temp_x(mu, p) = QED_Dx(mu, nu) * lcao(nu, p)) (dipole_mo_x(p, q) = lcao(mu, p) * temp_x(mu, q))
+    (temp_y(mu, p) = QED_Dy(mu, nu) * lcao(nu, p)) (dipole_mo_y(p, q) = lcao(mu, p) * temp_y(mu, q))
+    (temp_z(mu, p) = QED_Dz(mu, nu) * lcao(nu, p)) (dipole_mo_z(p, q) = lcao(mu, p) * temp_z(mu, q))
+    (temp_ao_nuc_x(mu, nu) = d_nuc_x * S1(mu, nu)) (temp_x(mu, p) = temp_ao_nuc_x(mu, nu) * lcao(nu, p))
+    (temp_ao_nuc_y(mu, nu) = d_nuc_y * S1(mu, nu)) (temp_y(mu, p) = temp_ao_nuc_y(mu, nu) * lcao(nu, p))
+    (temp_ao_nuc_z(mu, nu) = d_nuc_z * S1(mu, nu)) (temp_z(mu, p) = temp_ao_nuc_z(mu, nu) * lcao(nu, p))
+    (d_nuc_x_mo(p, q) = lcao(mu, p) * temp_x(mu, q))
+    (d_nuc_y_mo(p, q) = lcao(mu, p) * temp_y(mu, q))
+    (d_nuc_z_mo(p, q) = lcao(mu, p) * temp_z(mu, q))
+    .execute(ec.exhw());
   // clang-format on
 
   // create vector of length = number of cholesky vectors, with each element = lambda_x, lambda_y,
@@ -835,15 +784,15 @@ void qed_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   free_tensors(lcao, S1);
   sch.execute();
 
-  TensorMap<T> f, eri, dp;
-  std::tie(f, eri, dp) = extract_spin_blocks<T>(sch, chem_env, d_f1, cholVpr, dip);
-  free_tensors(d_f1, dip, cholVpr);
+  TensorMap<T> f, chol, dp;
+  std::tie(f, chol, dp) = extract_spin_blocks<T>(sch, chem_env, d_f1, cholVpr, dip);
+  free_tensors(d_f1, dip);
 
   auto [residual, corr_energy] =
     ccsd_v2_driver<T>(chem_env, ec, MO, d_t1, d_t2, d_t1_1p, d_t2_1p, d_t1_2p, d_t2_2p, d_r1, d_r2,
                       d_r0_1p, d_r1_1p, d_r2_1p, d_r0_2p, d_r1_2p, d_r2_2p, d_r1s, d_r2s, d_r1_1ps,
                       d_r2_1ps, d_r1_2ps, d_r2_2ps, d_t1s, d_t2s, d_t1_1ps, d_t2_1ps, d_t1_2ps,
-                      d_t2_2ps, f, eri, dp, omega, p_evl_sorted, ccsd_restart, files_prefix);
+                      d_t2_2ps, f, chol, dp, omega, p_evl_sorted, ccsd_restart, files_prefix);
 
   ccsd_stats(ec, chem_env.scf_context.hf_energy, residual, corr_energy, ccsd_options.threshold);
 
@@ -868,15 +817,41 @@ void qed_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   cc_context.d_t1_full = d_t1;
   cc_context.d_t2_full = d_t2;
 
+  double      t0_1p            = 0.0;
+  double      t0_2p            = 0.0;
+  std::string t0_1p_t0_2p_file = files_prefix + ".t0_1p_t0_2p.txt";
+  if(fs::exists(t0_1p_t0_2p_file)) {
+    std::ifstream inFile(t0_1p_t0_2p_file);
+    if(inFile.is_open()) {
+      std::string label;
+
+      inFile >> label >> t0_1p;
+      inFile >> label >> t0_2p;
+      inFile.close();
+    }
+  }
+
+  Tensor<T> d_t0_1p{}, d_t0_2p{};
+  sch.allocate(d_t0_1p, d_t0_2p).execute();
+  sch(d_t0_1p() = t0_1p)(d_t0_2p() = t0_2p).execute();
+
+  cc_context.d_t0_1p_full = d_t0_1p;
+  cc_context.d_t1_1p_full = d_t1_1p;
+  cc_context.d_t2_1p_full = d_t2_1p;
+
+  cc_context.d_t0_2p_full = d_t0_2p;
+  cc_context.d_t1_2p_full = d_t1_2p;
+  cc_context.d_t2_2p_full = d_t2_2p;
+
   if(!ccsd_restart) {
     free_tensors(d_r1, d_r2, d_r0_1p, d_r1_1p, d_r2_1p, d_r0_2p, d_r1_2p, d_r2_2p);
     free_vec_tensors(d_r1s, d_r2s, d_r1_1ps, d_r2_1ps, d_r1_2ps, d_r2_2ps, d_t1s, d_t2s, d_t1_1ps,
                      d_t2_1ps, d_t1_2ps, d_t2_2ps);
   }
-  free_tensors(d_f1, d_t1_1p, d_t2_1p, d_t1_2p, d_t2_2p, dip);
+  // free_tensors(d_t1_1p, d_t2_1p, d_t1_2p, d_t2_2p);
 
   for(auto& [block, tensor]: f) sch.deallocate(tensor);
-  for(auto& [block, tensor]: eri) sch.deallocate(tensor);
+  for(auto& [block, tensor]: chol) sch.deallocate(tensor);
   for(auto& [block, tensor]: dp) sch.deallocate(tensor);
   sch.execute(ec.exhw());
   ec.flush_and_sync();
@@ -893,13 +868,13 @@ template std::tuple<double, double> ccsd_v2_driver<double>(
   std::vector<Tensor<double>>& d_r2_2ps, std::vector<Tensor<double>>& d_t1s,
   std::vector<Tensor<double>>& d_t2s, std::vector<Tensor<double>>& d_t1_1ps,
   std::vector<Tensor<double>>& d_t2_1ps, std::vector<Tensor<double>>& d_t1_2ps,
-  std::vector<Tensor<double>>& d_t2_2ps, TensorMap<double>& f, TensorMap<double>& eri,
+  std::vector<Tensor<double>>& d_t2_2ps, TensorMap<double>& f, TensorMap<double>& chol,
   TensorMap<double>& dp, double w0, std::vector<double>& p_evl_sorted, bool ccsd_restart = false,
   std::string ccsd_fp = "");
 
-template void
+template double
 residuals<double>(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
-                  const TensorMap<double>& f, const TensorMap<double>& eri,
+                  const TensorMap<double>& f, const TensorMap<double>& chol,
                   const TensorMap<double>& dp, const double w0, const TensorMap<double>& t1,
                   const TensorMap<double>& t2, const double t0_1p, const TensorMap<double>& t1_1p,
                   const TensorMap<double>& t2_1p, const double t0_2p,
@@ -909,10 +884,10 @@ residuals<double>(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
                   Tensor<double>& r0_2p, TensorMap<double>& r1_2p, TensorMap<double>& r2_2p);
 
 template std::tuple<TensorMap<double>, // fock
-                    TensorMap<double>, // eri
+                    TensorMap<double>, // chol
                     TensorMap<double>  // dipole
                     >
 extract_spin_blocks(Scheduler& sch, ChemEnv& chem_env, const Tensor<double>& d_f1,
                     const Tensor<double>& cholVpr, const Tensor<double>& dip);
 
-}; // namespace exachem::cc::qed_ccsd_cs
+}; // namespace exachem::cc::cd_qed_ccsd_cs

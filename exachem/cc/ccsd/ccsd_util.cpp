@@ -81,6 +81,135 @@ void iteration_print(ChemEnv& chem_env, const ProcGroup& pg, int iter, double re
   }
 }
 
+template<typename T>
+Tensor<T> declare(ChemEnv& chem_env, const std::string& name) {
+  auto split = [](const std::string& s, char sep) {
+    std::vector<std::string> parts;
+    size_t                   i = 0;
+    while(i <= s.size()) {
+      auto j = s.find(sep, i);
+      if(j == std::string::npos) {
+        parts.push_back(s.substr(i));
+        break;
+      }
+      parts.push_back(s.substr(i, j - i));
+      i = j + 1;
+    }
+    return parts;
+  };
+
+  auto parts = split(name, '_');
+  if(parts.size() == 1) return Tensor<T>{}; // no underscore -> empty
+
+  const std::string spin_blk  = (parts.size() == 2 ? parts[0] : parts[1]);
+  const std::string dimstring = (parts.size() == 2 ? parts[1] : parts[2]);
+
+  // special case for chol vectors (e.g. dimstring starting with 'Q')
+  if(!dimstring.empty() && dimstring[0] == 'Q') return Tensor<T>{{chem_env.is_context.CI}};
+
+  TiledIndexSpace& MO      = chem_env.is_context.MSO;
+  const int        otiles  = MO("occ").num_tiles();
+  const int        vtiles  = MO("virt").num_tiles();
+  const int        oatiles = MO("occ_alpha").num_tiles();
+  const int        vatiles = MO("virt_alpha").num_tiles();
+
+  const TiledIndexSpace Oa{MO("occ"), range(oatiles)};
+  const TiledIndexSpace Va{MO("virt"), range(vatiles)};
+  const TiledIndexSpace Ob{MO("occ"), range(oatiles, otiles)};
+  const TiledIndexSpace Vb{MO("virt"), range(vatiles, vtiles)};
+
+  auto pick_space = [&](char s) -> std::pair<const TiledIndexSpace*, const TiledIndexSpace*> {
+    if(s == 'a') return {&Oa, &Va};
+    if(s == 'b') return {&Ob, &Vb};
+    throw std::runtime_error(std::string("Invalid spin character: ") + s + " in " + name);
+  };
+
+  const bool       is_chol = (name.find('Q') != std::string::npos);
+  TiledIndexSpace& CI      = chem_env.is_context.CI;
+
+  const size_t ndim = spin_blk.size();
+  if(dimstring.size() - int(is_chol) != ndim)
+    throw std::runtime_error("Spin block and dimension string length mismatch for tensor: " + name);
+
+  std::vector<const TiledIndexSpace*> tis;
+  tis.reserve(ndim);
+  for(size_t i = 0; i < ndim; ++i) {
+    auto [Os, Vs] = pick_space(spin_blk[i]);
+    char d        = dimstring[i];
+    if(d == 'o') tis.push_back(Os);
+    else if(d == 'v') tis.push_back(Vs);
+    else
+      throw std::runtime_error(std::string("Invalid dimension character: ") + d + " in " +
+                               dimstring);
+  }
+
+  switch(ndim) {
+    case 2: return is_chol ? Tensor<T>{{*tis[0], *tis[1], CI}} : Tensor<T>{{*tis[0], *tis[1]}};
+    case 4:
+      return is_chol ? Tensor<T>{{*tis[0], *tis[1], *tis[2], *tis[3], CI}}
+                     : Tensor<T>{{*tis[0], *tis[1], *tis[2], *tis[3]}};
+    case 6:
+      return is_chol ? Tensor<T>{{*tis[0], *tis[1], *tis[2], *tis[3], *tis[4], *tis[5], CI}}
+                     : Tensor<T>{{*tis[0], *tis[1], *tis[2], *tis[3], *tis[4], *tis[5]}};
+    default:
+      throw std::runtime_error("Unsupported tensor dimension: " + std::to_string(ndim) +
+                               " for tensor: " + name);
+  }
+}
+
+template<typename T>
+TensorMap<T> oei_spin_blocks(Scheduler& sch, ChemEnv& chem_env, const Tensor<T>& oei,
+                             bool is_chol) {
+  TiledIndexSpace&       MO      = chem_env.is_context.MSO;
+  const TiledIndexSpace& O       = MO("occ");
+  const TiledIndexSpace& V       = MO("virt");
+  const TiledIndexSpace& CI      = chem_env.is_context.CI;
+  const int              otiles  = O.num_tiles();
+  const int              vtiles  = V.num_tiles();
+  const int              oatiles = MO("occ_alpha").num_tiles();
+  const int              vatiles = MO("virt_alpha").num_tiles();
+
+  const TiledIndexSpace Oa = {MO("occ"), range(oatiles)};
+  const TiledIndexSpace Va = {MO("virt"), range(vatiles)};
+  const TiledIndexSpace Ob = {MO("occ"), range(oatiles, otiles)};
+  const TiledIndexSpace Vb = {MO("virt"), range(vatiles, vtiles)};
+
+  std::vector<std::string> one_body_blocks = {"aa_oo", "aa_ov", "aa_vo", "aa_vv",
+                                              "bb_oo", "bb_ov", "bb_vo", "bb_vv"};
+
+  auto set_label = [&Oa, &Va, &Ob, &Vb, &CI](TiledIndexLabel& label, char spin, char occ) {
+    if(spin == 'a') {
+      if(occ == 'v') std::tie(label) = Va.labels<1>("all");
+      else std::tie(label) = Oa.labels<1>("all");
+    }
+    else if(occ == 'v') std::tie(label) = Vb.labels<1>("all");
+    else std::tie(label) = Ob.labels<1>("all");
+  };
+
+  // one body integrals
+  TensorMap<T> oei_map;
+  for(auto& block: one_body_blocks) {
+    if(is_chol) block += 'Q';
+    oei_map[block] = declare<T>(chem_env, block);
+    sch.allocate(oei_map.at(block));
+
+    TiledIndexLabel p, q, L;
+    if(is_chol) std::tie(L) = CI.labels<1>("all");
+
+    set_label(p, block[0], block[3]);
+    set_label(q, block[1], block[4]);
+
+    // clang-format off
+    if (!is_chol) 
+         sch (oei_map.at(block)(p,q)   = oei(p,q));
+    else sch (oei_map.at(block)(p,q,L) = oei(p,q,L));
+    // clang-format on
+  }
+  sch.execute();
+
+  return oei_map;
+}
+
 /**
  *
  * @tparam T
@@ -570,6 +699,11 @@ template void update_r2<T>(ExecutionContext& ec, LabeledTensor<T> ltensor);
 
 template void setup_full_t1t2<T>(ExecutionContext& ec, const TiledIndexSpace& MO,
                                  Tensor<T>& dt1_full, Tensor<T>& dt2_full);
+
+template Tensor<double> declare<double>(ChemEnv& chem_env, const std::string& name);
+
+template TensorMap<double> oei_spin_blocks(Scheduler& sch, ChemEnv& chem_env,
+                                           const Tensor<double>& oei, bool is_chol);
 
 template std::pair<double, double> rest<T>(ExecutionContext& ec, const TiledIndexSpace& MO,
                                            Tensor<T>& d_r1, Tensor<T>& d_r2, Tensor<T>& d_t1,

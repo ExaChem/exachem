@@ -15,9 +15,6 @@ using namespace tamm;
 namespace exachem::cc::qed_ccsd_cs {
 
 template<typename T>
-using TensorMap = std::map<std::string, Tensor<T>>;
-
-template<typename T>
 extern void
 resid_part2(Scheduler& sch, const TiledIndexSpace& MO, TensorMap<T>& tmps, TensorMap<T>& scalars,
             const TensorMap<T>& f, const TensorMap<T>& eri, const TensorMap<T>& dp, const double w0,

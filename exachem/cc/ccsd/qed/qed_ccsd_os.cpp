@@ -19,16 +19,16 @@
 
 template<typename T>
 void exachem::cc::qed_ccsd_os::residuals(
-  Scheduler& sch, const TiledIndexSpace& MO, const TensorMap<T>& f, const TensorMap<T>& eri,
-  const TensorMap<T>& dp, const double w0, const TensorMap<T>& t1, const TensorMap<T>& t2,
-  const double t0_1p, const TensorMap<T>& t1_1p, const TensorMap<T>& t2_1p, const double t0_2p,
-  const TensorMap<T>& t1_2p, const TensorMap<T>& t2_2p, Tensor<T>& energy, TensorMap<T>& r1,
-  TensorMap<T>& r2, Tensor<T>& r0_1p, TensorMap<T>& r1_1p, TensorMap<T>& r2_1p, Tensor<T>& r0_2p,
-  TensorMap<T>& r1_2p, TensorMap<T>& r2_2p) {
+  Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO, const TensorMap<T>& f,
+  const TensorMap<T>& eri, const TensorMap<T>& dp, const double w0, const TensorMap<T>& t1,
+  const TensorMap<T>& t2, const double t0_1p, const TensorMap<T>& t1_1p, const TensorMap<T>& t2_1p,
+  const double t0_2p, const TensorMap<T>& t1_2p, const TensorMap<T>& t2_2p, Tensor<T>& energy,
+  TensorMap<T>& r1, TensorMap<T>& r2, Tensor<T>& r0_1p, TensorMap<T>& r1_1p, TensorMap<T>& r2_1p,
+  Tensor<T>& r0_2p, TensorMap<T>& r1_2p, TensorMap<T>& r2_2p) {
   // build intermediates
   TensorMap<T> tmps, scalars;
-  build_tmps(sch, MO, tmps, scalars, f, eri, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p, t1_2p,
-             t2_2p);
+  build_tmps(sch, chem_env, tmps, scalars, f, eri, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p,
+             t1_2p, t2_2p);
 
   sch.execute();
 
@@ -147,51 +147,51 @@ std::tuple<double, double> ccsd_v2_driver(
   if(!ccsd_restart) {
     TensorMap<T> t1, t2, t1_1p, t2_1p, t1_2p, t2_2p;
 
-    t1["aa"]   = declare<T>(MO, "aa_vo");
-    t1["bb"]   = declare<T>(MO, "bb_vo");
-    t2["aaaa"] = declare<T>(MO, "aaaa_vvoo");
-    t2["abab"] = declare<T>(MO, "abab_vvoo");
-    t2["bbbb"] = declare<T>(MO, "bbbb_vvoo");
+    t1["aa"]   = declare<T>(chem_env, "aa_vo");
+    t1["bb"]   = declare<T>(chem_env, "bb_vo");
+    t2["aaaa"] = declare<T>(chem_env, "aaaa_vvoo");
+    t2["abab"] = declare<T>(chem_env, "abab_vvoo");
+    t2["bbbb"] = declare<T>(chem_env, "bbbb_vvoo");
     sch.allocate(t1.at("aa"), t1.at("bb"), t2.at("aaaa"), t2.at("abab"), t2.at("bbbb"));
 
-    t1_1p["aa"]   = declare<T>(MO, "aa_vo");
-    t1_1p["bb"]   = declare<T>(MO, "bb_vo");
-    t2_1p["aaaa"] = declare<T>(MO, "aaaa_vvoo");
-    t2_1p["abab"] = declare<T>(MO, "abab_vvoo");
-    t2_1p["bbbb"] = declare<T>(MO, "bbbb_vvoo");
+    t1_1p["aa"]   = declare<T>(chem_env, "aa_vo");
+    t1_1p["bb"]   = declare<T>(chem_env, "bb_vo");
+    t2_1p["aaaa"] = declare<T>(chem_env, "aaaa_vvoo");
+    t2_1p["abab"] = declare<T>(chem_env, "abab_vvoo");
+    t2_1p["bbbb"] = declare<T>(chem_env, "bbbb_vvoo");
     sch.allocate(t1_1p.at("aa"), t1_1p.at("bb"), t2_1p.at("aaaa"), t2_1p.at("abab"),
                  t2_1p.at("bbbb"));
 
-    t1_2p["aa"]   = declare<T>(MO, "aa_vo");
-    t1_2p["bb"]   = declare<T>(MO, "bb_vo");
-    t2_2p["aaaa"] = declare<T>(MO, "aaaa_vvoo");
-    t2_2p["abab"] = declare<T>(MO, "abab_vvoo");
-    t2_2p["bbbb"] = declare<T>(MO, "bbbb_vvoo");
+    t1_2p["aa"]   = declare<T>(chem_env, "aa_vo");
+    t1_2p["bb"]   = declare<T>(chem_env, "bb_vo");
+    t2_2p["aaaa"] = declare<T>(chem_env, "aaaa_vvoo");
+    t2_2p["abab"] = declare<T>(chem_env, "abab_vvoo");
+    t2_2p["bbbb"] = declare<T>(chem_env, "bbbb_vvoo");
     sch.allocate(t1_2p.at("aa"), t1_2p.at("bb"), t2_2p.at("aaaa"), t2_2p.at("abab"),
                  t2_2p.at("bbbb"));
 
     TensorMap<T> r1, r2, r1_1p, r2_1p, r1_2p, r2_2p;
 
-    r1["aa"]   = declare<T>(MO, "aa_vo");
-    r1["bb"]   = declare<T>(MO, "bb_vo");
-    r2["aaaa"] = declare<T>(MO, "aaaa_vvoo");
-    r2["abab"] = declare<T>(MO, "abab_vvoo");
-    r2["bbbb"] = declare<T>(MO, "bbbb_vvoo");
+    r1["aa"]   = declare<T>(chem_env, "aa_vo");
+    r1["bb"]   = declare<T>(chem_env, "bb_vo");
+    r2["aaaa"] = declare<T>(chem_env, "aaaa_vvoo");
+    r2["abab"] = declare<T>(chem_env, "abab_vvoo");
+    r2["bbbb"] = declare<T>(chem_env, "bbbb_vvoo");
     sch.allocate(r1.at("aa"), r1.at("bb"), r2.at("aaaa"), r2.at("abab"), r2.at("bbbb"));
 
-    r1_1p["aa"]   = declare<T>(MO, "aa_vo");
-    r1_1p["bb"]   = declare<T>(MO, "bb_vo");
-    r2_1p["aaaa"] = declare<T>(MO, "aaaa_vvoo");
-    r2_1p["abab"] = declare<T>(MO, "abab_vvoo");
-    r2_1p["bbbb"] = declare<T>(MO, "bbbb_vvoo");
+    r1_1p["aa"]   = declare<T>(chem_env, "aa_vo");
+    r1_1p["bb"]   = declare<T>(chem_env, "bb_vo");
+    r2_1p["aaaa"] = declare<T>(chem_env, "aaaa_vvoo");
+    r2_1p["abab"] = declare<T>(chem_env, "abab_vvoo");
+    r2_1p["bbbb"] = declare<T>(chem_env, "bbbb_vvoo");
     sch.allocate(r1_1p.at("aa"), r1_1p.at("bb"), r2_1p.at("aaaa"), r2_1p.at("abab"),
                  r2_1p.at("bbbb"));
 
-    r1_2p["aa"]   = declare<T>(MO, "aa_vo");
-    r1_2p["bb"]   = declare<T>(MO, "bb_vo");
-    r2_2p["aaaa"] = declare<T>(MO, "aaaa_vvoo");
-    r2_2p["abab"] = declare<T>(MO, "abab_vvoo");
-    r2_2p["bbbb"] = declare<T>(MO, "bbbb_vvoo");
+    r1_2p["aa"]   = declare<T>(chem_env, "aa_vo");
+    r1_2p["bb"]   = declare<T>(chem_env, "bb_vo");
+    r2_2p["aaaa"] = declare<T>(chem_env, "aaaa_vvoo");
+    r2_2p["abab"] = declare<T>(chem_env, "abab_vvoo");
+    r2_2p["bbbb"] = declare<T>(chem_env, "bbbb_vvoo");
     sch.allocate(r1_2p.at("aa"), r1_2p.at("bb"), r2_2p.at("aaaa"), r2_2p.at("abab"),
                  r2_2p.at("bbbb"));
 
@@ -249,8 +249,9 @@ std::tuple<double, double> ccsd_v2_driver(
         // clang-format on
 
         // modified energy equation
-        qed_ccsd_os::residuals(sch, MO, f, eri, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p, t1_2p,
-                               t2_2p, d_e, r1, r2, d_r0_1p, r1_1p, r2_1p, d_r0_2p, r1_2p, r2_2p);
+        qed_ccsd_os::residuals(sch, chem_env, MO, f, eri, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p,
+                               t0_2p, t1_2p, t2_2p, d_e, r1, r2, d_r0_1p, r1_1p, r2_1p, d_r0_2p,
+                               r1_2p, r2_2p);
         sch.execute(ec.exhw(), profile);
 
         // copy residuals to d_r1, d_r2, d_r1_1p, d_r2_1p, d_r1_2p, d_r2_2p
@@ -686,7 +687,7 @@ void  exachem::cc::qed_ccsd_os::qed_driver(ExecutionContext& ec, ChemEnv& chem_e
     "aa_oo", "aa_ov", "aa_vo", "aa_vv", "bb_oo", "bb_ov", "bb_vo", "bb_vv",
   };
   for(const auto& block: f_blocks) {
-    f[block] = declare<T>(MO, block);
+    f[block] = declare<T>(chem_env, block);
     sch.allocate(f.at(block));
   }
   // clang-format off
@@ -703,7 +704,7 @@ void  exachem::cc::qed_ccsd_os::qed_driver(ExecutionContext& ec, ChemEnv& chem_e
     "aa_oo", "aa_ov", "aa_vo", "aa_vv", "bb_oo", "bb_ov", "bb_vo", "bb_vv",
   };
   for(const auto& block: dp_blocks) {
-    dp[block] = declare<T>(MO, block);
+    dp[block] = declare<T>(chem_env, block);
     sch.allocate(dp.at(block));
   }
 
@@ -734,17 +735,19 @@ void  exachem::cc::qed_ccsd_os::qed_driver(ExecutionContext& ec, ChemEnv& chem_e
               temp_y, temp_z, temp_ao_nuc_x, temp_ao_nuc_y, temp_ao_nuc_z)
     .execute();
 
-  sch(temp_x(mu, p) = QED_Dx(mu, nu) * lcao(nu, p))(
-    dipole_mo_x(p, q) = lcao(mu, p) * temp_x(mu, q))(temp_y(mu, p) = QED_Dy(mu, nu) * lcao(nu, p))(
-    dipole_mo_y(p, q) = lcao(mu, p) * temp_y(mu, q))(temp_z(mu, p) = QED_Dz(mu, nu) * lcao(nu, p))(
-    dipole_mo_z(p, q) = lcao(mu, p) * temp_z(mu, q))(temp_ao_nuc_x(mu, nu) = d_nuc_x * S1(mu, nu))(
-    temp_x(mu, p) = temp_ao_nuc_x(mu, nu) * lcao(nu, p))(
-    d_nuc_x_mo(p, q) = lcao(mu, p) * temp_x(mu, q))(temp_ao_nuc_y(mu, nu) = d_nuc_y * S1(mu, nu))(
-    temp_y(mu, p) = temp_ao_nuc_y(mu, nu) * lcao(nu, p))(
-    d_nuc_y_mo(p, q) = lcao(mu, p) * temp_y(mu, q))(temp_ao_nuc_z(mu, nu) = d_nuc_z * S1(mu, nu))(
-    temp_z(mu, p) = temp_ao_nuc_z(mu, nu) * lcao(nu, p))(d_nuc_z_mo(p, q) =
-                                                           lcao(mu, p) * temp_z(mu, q))
+  // clang-format off
+    sch
+    (temp_x(mu, p) = QED_Dx(mu, nu) * lcao(nu, p)) (dipole_mo_x(p, q) = lcao(mu, p) * temp_x(mu, q))
+    (temp_y(mu, p) = QED_Dy(mu, nu) * lcao(nu, p)) (dipole_mo_y(p, q) = lcao(mu, p) * temp_y(mu, q))
+    (temp_z(mu, p) = QED_Dz(mu, nu) * lcao(nu, p)) (dipole_mo_z(p, q) = lcao(mu, p) * temp_z(mu, q))
+    (temp_ao_nuc_x(mu, nu) = d_nuc_x * S1(mu, nu)) (temp_x(mu, p) = temp_ao_nuc_x(mu, nu) * lcao(nu, p))
+    (temp_ao_nuc_y(mu, nu) = d_nuc_y * S1(mu, nu)) (temp_y(mu, p) = temp_ao_nuc_y(mu, nu) * lcao(nu, p))
+    (temp_ao_nuc_z(mu, nu) = d_nuc_z * S1(mu, nu)) (temp_z(mu, p) = temp_ao_nuc_z(mu, nu) * lcao(nu, p))
+    (d_nuc_x_mo(p, q) = lcao(mu, p) * temp_x(mu, q))
+    (d_nuc_y_mo(p, q) = lcao(mu, p) * temp_y(mu, q))
+    (d_nuc_z_mo(p, q) = lcao(mu, p) * temp_z(mu, q))
     .execute(ec.exhw());
+  // clang-format on
 
   TiledIndexLabel Q;
   std::tie(Q) = CI.labels<1>("all");
@@ -810,7 +813,7 @@ void  exachem::cc::qed_ccsd_os::qed_driver(ExecutionContext& ec, ChemEnv& chem_e
     "bbbb_vooo", "bbbb_vovo", "bbbb_vovv", "bbbb_vvoo", "bbbb_vvvo", "bbbb_vvvv"};
 
   for(const auto& block: eri_blocks) {
-    eri[block] = declare<T>(MO, block);
+    eri[block] = declare<T>(chem_env, block);
     sch.allocate(eri.at(block));
 
     TiledIndexLabel p, q, r, s;
@@ -903,7 +906,7 @@ template std::tuple<double, double> exachem::cc::qed_ccsd_os::ccsd_v2_driver<dou
   std::string ccsd_fp = "");
 
 template void exachem::cc::qed_ccsd_os::residuals<double>(
-  Scheduler& sch, const TiledIndexSpace& MO, const TensorMap<double>& f,
+  Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO, const TensorMap<double>& f,
   const TensorMap<double>& eri, const TensorMap<double>& dp, const double w0,
   const TensorMap<double>& t1, const TensorMap<double>& t2, const double t0_1p,
   const TensorMap<double>& t1_1p, const TensorMap<double>& t2_1p, const double t0_2p,

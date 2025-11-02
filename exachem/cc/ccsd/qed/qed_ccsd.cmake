@@ -22,11 +22,20 @@ set(QEDCCSD_CS_RESIDS_SRCS
     ${QEDCCSD_SRCDIR}/residuals/qed_ccsd_cs/qed_ccsd_cs_resid_4.cpp
 )
 
+set(CD_QEDCCSD_CS_RESIDS_SRCS
+    ${QEDCCSD_SRCDIR}/residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_1.cpp
+    ${QEDCCSD_SRCDIR}/residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_2.cpp
+    ${QEDCCSD_SRCDIR}/residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_3.cpp
+    ${QEDCCSD_SRCDIR}/residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_4.cpp
+)
+
 set(QEDCCSD_SRCS
-    ${QEDCCSD_SRCDIR}/qed_ccsd_cs.cpp
     ${QEDCCSD_SRCDIR}/qed_ccsd_os.cpp
+    ${QEDCCSD_SRCDIR}/qed_ccsd_cs.cpp
+    ${QEDCCSD_SRCDIR}/cd_qed_ccsd_cs.cpp
     ${QEDCCSD_OS_RESIDS_SRCS}
     ${QEDCCSD_CS_RESIDS_SRCS}
+    ${CD_QEDCCSD_CS_RESIDS_SRCS}
     )
 
 set(QEDCCSD_OS_RESIDS_INCLUDES
@@ -49,9 +58,19 @@ set(QEDCCSD_CS_RESIDS_INCLUDES
     ${QEDCCSD_SRCDIR}/residuals/qed_ccsd_cs/qed_ccsd_cs_resid_4.hpp
 )
 
+set(CD_QEDCCSD_CS_RESIDS_INCLUDES
+    ${QEDCCSD_SRCDIR}/residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_tmps.hpp
+    ${QEDCCSD_SRCDIR}/residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_1.hpp
+    ${QEDCCSD_SRCDIR}/residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_2.hpp
+    ${QEDCCSD_SRCDIR}/residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_3.hpp
+    ${QEDCCSD_SRCDIR}/residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_4.hpp
+)
+
 set(QEDCCSD_INCLUDES
+    ${QEDCCSD_SRCDIR}/qed_ccsd_os.hpp    
     ${QEDCCSD_SRCDIR}/qed_ccsd_cs.hpp
-    ${QEDCCSD_SRCDIR}/qed_ccsd_os.hpp
+    ${QEDCCSD_SRCDIR}/cd_qed_ccsd_cs.hpp
     ${QEDCCSD_OS_RESIDS_INCLUDES}
     ${QEDCCSD_CS_RESIDS_INCLUDES}
+    ${CD_QEDCCSD_CS_RESIDS_INCLUDES}
 )

@@ -37,6 +37,15 @@ public:
   Tensor<double> d_t1_full;
   Tensor<double> d_t2_full;
 
+  // QED-CCSD
+  Tensor<double> d_t0_1p_full;
+  Tensor<double> d_t1_1p_full;
+  Tensor<double> d_t2_1p_full;
+
+  Tensor<double> d_t0_2p_full;
+  Tensor<double> d_t1_2p_full;
+  Tensor<double> d_t2_2p_full;
+
   // CCSD(T)
   double ccsd_pt_correction_energy{0};
   double ccsd_pt_correlation_energy{0};

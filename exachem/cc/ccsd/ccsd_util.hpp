@@ -15,6 +15,9 @@
 // clang-format on
 
 template<typename T>
+using TensorMap = std::map<std::string, Tensor<T>>;
+
+template<typename T>
 void setup_full_t1t2(ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& dt1_full,
                      Tensor<T>& dt2_full);
 
@@ -26,6 +29,12 @@ void init_diagonal(ExecutionContext& ec, LabeledTensor<TensorType> ltensor);
 
 void iteration_print(ChemEnv& chem_env, const ProcGroup& pg, int iter, double residual,
                      double energy, double time, string cmethod = "CCSD");
+
+template<typename T>
+Tensor<T> declare(ChemEnv& chem_env, const std::string& name);
+
+template<typename T>
+TensorMap<T> oei_spin_blocks(Scheduler& sch, ChemEnv& chem_env, const Tensor<T>& oei, bool is_chol);
 
 /**
  *

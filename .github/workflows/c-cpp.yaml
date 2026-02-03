@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         os: 
-          - [self-hosted, ubuntu22]
+          - [self-hosted, ubuntu24]
           - [self-hosted, macos]
         backend:
           - ga
@@ -35,15 +35,15 @@ jobs:
         use_scalapack:
           - no-scalapack         
         include:
-          - os: [self-hosted, ubuntu22]
+          - os: [self-hosted, ubuntu24]
             mpi_impl: mpich
             cxx: clang++
             cc: clang
-            fc: gfortran
+            fc: flang
             backend: ga
             use_cuda: no-cuda
             use_scalapack: no-scalapack
-          - os: [self-hosted, ubuntu22]
+          - os: [self-hosted, ubuntu24]
             mpi_impl: mpich
             cxx: g++
             cc: gcc
@@ -51,7 +51,7 @@ jobs:
             backend: ga
             use_cuda: cuda
             use_scalapack: no-scalapack
-          - os: [self-hosted, ubuntu22]
+          - os: [self-hosted, ubuntu24]
             mpi_impl: mpich
             cxx: g++
             cc: gcc
@@ -76,7 +76,7 @@ jobs:
             backend: upcxx
             use_cuda: no-cuda
             use_scalapack: no-scalapack
-          - os: [self-hosted, ubuntu22]
+          - os: [self-hosted, ubuntu24]
             mpi_impl: mpich
             cxx: g++
             cc: gcc
@@ -109,7 +109,7 @@ jobs:
       shell: bash
 
     - name: Set cache path linux
-      if: ${{ matrix.os[1] == 'ubuntu22' }}
+      if: ${{ matrix.os[1] == 'ubuntu24' }}
       id: set-cache-path-linux
       run: |
         echo "exachem_cache_path=/hpc/software/CI/cache/exachem_cache" >> $GITHUB_ENV
@@ -138,12 +138,13 @@ jobs:
         echo "USE_SCALAPACK=ON" >> $GITHUB_ENV
 
     - name: load llvm
-      if: ${{ matrix.cc == 'clang' && matrix.cxx == 'clang++' && matrix.os[1] == 'ubuntu22' }}
+      if: ${{ matrix.cc == 'clang' && matrix.cxx == 'clang++' && matrix.fc == 'flang' && matrix.os[1] == 'ubuntu24' }}
       shell: bash
       run: |
-        module load llvm/19.1.2
+        module load llvm/20.1.8
         echo "CC=$(which clang)" >> $GITHUB_ENV
         echo "CXX=$(which clang++)" >> $GITHUB_ENV
+        echo "FC=$(which flang)" >> $GITHUB_ENV
 
     - name: macos env
       if: ${{ matrix.os[1] == 'macos' }}
@@ -238,7 +239,6 @@ jobs:
       id: build_exachem_upcxx
       run: |
         export PATH=$PATH:$GITHUB_WORKSPACE/install/bin
-        export CPATH=$CPATH:/hpc/software/spack/opt/spack/linux-ubuntu22.04-broadwell/gcc-11.4.0/mpich-4.2.1-6pwa6w25afu5mgacsiywlczdklq37ktl/include
         echo "UPCXX_SHARED_HEAP_SIZE=MAX" >> $GITHUB_ENV
         echo "CI_MPIEXEC=upcxx-run" >> $GITHUB_ENV
         echo "CI_NRANKS=2" >> $GITHUB_ENV

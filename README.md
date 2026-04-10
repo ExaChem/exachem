@@ -10,10 +10,11 @@
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 [![Documentation Status](https://readthedocs.org/projects/exachem/badge/?version=latest)](https://exachem.readthedocs.io/en/latest/?badge=latest)
+![Github Downloads All Releases](https://img.shields.io/github/downloads/ExaChem/exachem/total)   
 
 ## Overview
 
-**ExaChem** is a suite of scalable electronic structure methods to perform ground and excited-state calculations on molecular systems. It is currently being developed synergistically with the [NWChemEx](https://nwchemex.github.io/NWChemEx), [SPEC](https://spec.labworks.org/home), QIS, and [MAPOL](https://github.com/mapol-chem) projects (please see acknowledgements). The methodologies in ExaChem are implemented using the **T**ensor **A**lgebra for **M**any-body **M**ethods ([TAMM](https://github.com/NWChemEx/TAMM)) library. TAMM is a parallel tensor algebra library for performance-portable development of scalable electronic structure methods that can be run on modern exascale computing platforms. ExaChem  currently includes native implementations of: Hartree-Fock (HF), MP2, CC2, CCSD, CCSD(T), CCSD-Lambda, EOM-CCSD, RT-EOM-CCSD, GFCCSD, and double unitary coupled-cluster (DUCC). ExaChem has also been interfaced with the [GauXC library](https://github.com/wavefunction91/GauXC) to enable DFT calculations.
+**ExaChem** is a suite of scalable electronic structure methods to perform ground and excited-state calculations on molecular systems. It is currently being developed synergistically with the [NWChemEx](https://nwchemex.github.io/NWChemEx), [SPEC](https://spec.labworks.org/home), [QIS](https://www.pnnl.gov/quantum-information-sciences), [MAPOL](https://github.com/mapol-chem), and [NuQuantEm](https://nuquantem.github.io) projects (please see acknowledgements). The methodologies in ExaChem are implemented using the **T**ensor **A**lgebra for **M**any-body **M**ethods ([TAMM](https://github.com/NWChemEx/TAMM)) library. TAMM is a parallel tensor algebra library for performance-portable development of scalable electronic structure methods that can be run on modern exascale computing platforms. ExaChem  currently includes native implementations of: Hartree-Fock (HF), MP2, CC2, CCSD, CCSD(T), CCSD-Lambda, EOM-CCSD, RT-EOM-CCSD, GFCCSD, and double unitary coupled-cluster (DUCC). ExaChem has also been interfaced with the [GauXC library](https://github.com/wavefunction91/GauXC) to enable DFT calculations.
 
 ExaChem and TAMM are actively being developed and maintained at the Pacific Northwest National Laboratory ([PNNL](https://pnnl.gov)) and distributed as open-source under the terms of the Apache License version 2.0.
 
@@ -25,7 +26,7 @@ Build instructions are available [here](https://exachem.readthedocs.io/en/latest
 ## ExaChem Citation
 #### Please cite the following reference when publishing results obtained with ExaChem. 
 
-Panyala, Ajay; Bauman, Nicholas; Mejia Rodriguez, Daniel; Pathak, Himadri; Peng, Bo; Mutlu, Erdal; Murphy, David; Nandipati, Giridhar; Krishnamoorthy, Sriram; Xantheas, Sotiris; Govind, Niranjan; Kowalski, Karol. **ExaChem: Open Source Exascale Computational Chemistry Software.** https://github.com/ExaChem/exachem [DOI:10.11578/dc.20230628.1](https://doi.org/10.11578/dc.20230628.1)
+Panyala, Ajay; Bauman, Nicholas; Mejia Rodriguez, Daniel; Pathak, Himadri; Peng, Bo; Marcus Liebenthal; Murphy, David; Nandipati, Giridhar; Mutlu, Erdal; Krishnamoorthy, Sriram; Apra, Edo; Xantheas, Sotiris; Govind, Niranjan; Kowalski, Karol. **ExaChem: Open Source Exascale Computational Chemistry Software.** https://github.com/ExaChem/exachem [DOI:10.11578/dc.20230628.1](https://doi.org/10.11578/dc.20230628.1)
 
 #### Please cite the following reference in addition if using the ground-state closed-shell CCSD and CCSD(T) capabilities.
 
@@ -37,12 +38,22 @@ The TAMM library (core infrastructure and current optimizations), the ground-sta
 
 The development of additional TAMM infrastructure extensions, optimizations and methodologies (HF, MP2, CC2, CCSD-Lambda, EOM-CCSD, RT-EOM-CCSD, and GFCCSD) are supported by the Center for **S**calable **P**redictive Methods for **E**xcitations and **C**orrelated Phenomena  [(SPEC)](https://spec.labworks.org/home) under FWP 70942.
 
-The double unitary coupled-cluster (DUCC) development is supported under FWP 72689 (Embedding QC into Many-body Frameworks for Strongly Correlated Molecular and Materials Systems) funded by the DOE BES "Materials and Chemical Sciences Research for Quantum Information Science" program.
 
-Ongoing development of many-body methodologies for molecular polaritonic systems is being funded by FWP 79715, Center for **Ma**ny-Body Methods, Spectroscopies, and Dynamics for Molecular **Pol**aritonic Systems (MAPOL).
 
-Additional support was provided by the **Transferring exascale computational chemistry to cloud computing environment and emerging hardware technologies (TEC4)** project, which is funded by the U.S. Department of Energy, Office of Science, Office of Basic Energy Sciences, the Division of Chemical Sciences, Geosciences, and Biosciences (under FWP 82037). 
+Ongoing development of many-body methodologies for molecular polaritonic systems is being funded by FWP 79715, Center for **Ma**ny-Body Methods, Spectroscopies, and Dynamics for Molecular **Pol**aritonic Systems ([MAPOL](https://github.com/mapol-chem)).
 
-The SPEC and MAPOL projects are funded as part of the Computational Chemical Sciences (CCS) program by the U.S. Department of Energy (DOE), Office of Science, Office of Basic Energy Sciences (BES), Division of Chemical Sciences, Geosciences and Biosciences at PNNL. PNNL is a multi-program national laboratory operated by Battelle Memorial Institute for the United States Department of Energy under DOE contract number **DE-AC05-76RL01830**.
+Additional support was provided by the **Transferring exascale computational chemistry to cloud computing environment and emerging hardware technologies (TEC4)** project, which is funded by the U.S. Department of Energy, Office of Science, Office of Basic Energy Sciences, the Division of Chemical Sciences, Geosciences, and Biosciences (under FWP 82037).
+
+The SPEC and MAPOL projects are funded as part of the Computational Chemical Sciences (CCS) program by the U.S. Department of Energy (DOE), Office of Science, Office of Basic Energy Sciences (BES), Division of Chemical Sciences, Geosciences and Biosciences.
+
+The double unitary coupled-cluster (DUCC) development is supported under FWP 72689 (Embedding QC into Many-body Frameworks for Strongly Correlated Molecular and Materials Systems) funded by the DOE BES "Materials and Chemical Sciences Research for Quantum Information Science (QIS)" program.
+
+The development of Hubbard models are supported by the U.S. Department of Energy, Office of Science, National Quantum Information Science Research Centers, Quantum Science Center (QSC) under FWP 76213.
+
+The development of Quantum Flow methods are supported by DOE BES Quantum Information Science (QIS, FWP 72689) and the Quantum Science Center (QSC, FWP 76213).
+
+Ongoing development of many-body methods that incorporate NQEs in simulations of excited-state processes and spectroscopic signatures is part of the [NuQuantEm](https://nuquantem.github.io) project supported through the Scientific Discovery through Advanced Computing (SciDAC) program, with funding from Basic Energy Sciences (BES) and Advanced Scientific Computing Research (ASCR) under FWP 85742 at Pacific Northwest National Laboratory.
+
+Pacific Northwest National Laboratory is a multi-program national laboratory operated by Battelle Memorial Institute for the United States Department of Energy under DOE contract number **DE-AC05-76RL01830**.
 
 Acknowledgements for Computing Resources can be found [here](docs/resource_ack.md).

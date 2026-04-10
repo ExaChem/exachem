@@ -30,8 +30,9 @@ protected:
   Tensor<T> i0_temp, t2_aaaa_temp; // CS-only scratch
 
   CCSE_Tensors<T> _a01, _a02, _a03, _a04, _a05, _a06;
-  CCSE_Tensors<T> _a001, _a004, _a006, _a008, _a009, _a017, _a019, _a020,
-    _a021; // _a022 unused
+  CCSE_Tensors<T> _a001, _a004, _a006, _a008, _a009, _a017, _a019, _a020, _a021, _a022;
+
+  void ccsd_amp_update(Scheduler& sch, const Tensor<T>& t2_abab, const Tensor<T>& t2_aaaa);
 
   virtual void ccsd_e_cs(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
                          Tensor<T>& de, const Tensor<T>& t1_aa, const Tensor<T>& t2_abab,

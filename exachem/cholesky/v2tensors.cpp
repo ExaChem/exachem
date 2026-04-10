@@ -10,6 +10,46 @@
 using T = double;
 
 template<typename T>
+exachem::cholesky_2e::V2Tensors<T>
+exachem::cholesky_2e::V2TensorSetup<T>::setupV2Tensors_from_fullV2(
+  ExecutionContext& ec, Tensor<T> fullv2, ExecutionHW ex_hw, std::vector<std::string> blocks) {
+  TiledIndexSpace MO    = fullv2.tiled_index_spaces()[0]; // MO
+  auto [h1, h2, h3, h4] = MO.labels<4>("occ");
+  auto [p1, p2, p3, p4] = MO.labels<4>("virt");
+
+  V2Tensors<T> v2tensors(blocks);
+  v2tensors.allocate(ec, MO);
+  Scheduler sch{ec};
+
+  for(auto x: blocks) {
+    // clang-format off
+    if (x == "ijab") {
+      sch( v2tensors.v2ijab(h1,h2,p1,p2)      =   fullv2(h1,h2,p1,p2) );
+    }
+    else if (x == "iajb") {
+      sch( v2tensors.v2iajb(h1,p1,h2,p2)      =   fullv2(h1,p1,h2,p2) );
+    }
+    else if (x == "ijka") {
+      sch( v2tensors.v2ijka(h1,h2,h3,p1)      =   fullv2(h1,h2,h3,p1) );
+    }
+    else if (x == "ijkl") {
+      sch( v2tensors.v2ijkl(h1,h2,h3,h4)      =   fullv2(h1,h2,h3,h4) );
+    }
+    else if (x == "iabc") {
+      sch( v2tensors.v2iabc(h1,p1,p2,p3)      =   fullv2(h1,p1,p2,p3) );
+    }
+    else if (x == "abcd") {
+      sch( v2tensors.v2abcd(p1,p2,p3,p4)      =   fullv2(p1,p2,p3,p4) );
+    }
+    // clang-format on
+  }
+
+  sch.execute();
+
+  return v2tensors;
+}
+
+template<typename T>
 exachem::cholesky_2e::V2Tensors<T> exachem::cholesky_2e::V2TensorSetup<T>::setupV2Tensors(
   ExecutionContext& ec, Tensor<T> cholVpr, ExecutionHW ex_hw, std::vector<std::string> blocks) {
   TiledIndexSpace MO    = cholVpr.tiled_index_spaces()[0]; // MO
@@ -68,3 +108,8 @@ exachem::cholesky_2e::setupV2<double>(ExecutionContext& ec, TiledIndexSpace& MO,
 template exachem::cholesky_2e::V2Tensors<double>
 exachem::cholesky_2e::setupV2Tensors<double>(ExecutionContext& ec, Tensor<double> cholVpr,
                                              ExecutionHW ex_hw, std::vector<std::string> blocks);
+
+template exachem::cholesky_2e::V2Tensors<double>
+exachem::cholesky_2e::setupV2Tensors_from_fullV2<double>(ExecutionContext& ec,
+                                                         Tensor<double> fullv2, ExecutionHW ex_hw,
+                                                         std::vector<std::string> blocks);

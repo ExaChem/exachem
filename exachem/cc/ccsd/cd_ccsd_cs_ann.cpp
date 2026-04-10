@@ -9,17 +9,25 @@
 
 #include "exachem/cc/ccsd/cd_ccsd_cs_ann.hpp"
 
-// using CCEType = double;
-// CCSE_Tensors<CCEType> _a021;
-// Tensor<CCEType>       a22_abab, a22_aaaa, a22_bbbb;
-// TiledIndexSpace       o_alpha, v_alpha, o_beta, v_beta;
+template<typename T>
 
-// Tensor<CCEType>       _a01V, _a02V, _a007V;
-// CCSE_Tensors<CCEType> _a01, _a02, _a03, _a04, _a05, _a06, _a001, _a004, _a006, _a008, _a009,
-// _a017,
-//   _a019, _a020; //_a022
+void exachem::cc::ccsd::CD_CCSD_CS<T>::ccsd_amp_update(Scheduler& sch, const Tensor<T>& t2_abab,
+                                                       const Tensor<T>& t2_aaaa) {
+  const auto [p1_va, p2_va] = v_alpha.labels<2>("all");
+  const auto [h1_oa, h2_oa] = o_alpha.labels<2>("all");
 
-// Tensor<CCEType> i0_temp, t2_aaaa_temp; // CS only
+  // clang-format off
+    sch
+    (t2_aaaa_temp()=0)
+    .exact_copy(t2_aaaa(p1_va, p2_va, h1_oa, h2_oa), t2_abab(p1_va, p2_va, h1_oa, h2_oa))
+    (t2_aaaa_temp() = t2_aaaa(),
+    "t2_aaaa_temp() = t2_aaaa()")
+    (t2_aaaa(p1_va,p2_va,h1_oa,h2_oa) += -1.0 * t2_aaaa_temp(p2_va,p1_va,h1_oa,h2_oa),
+    "t2_aaaa(p1_va,p2_va,h1_oa,h2_oa) += -1.0 * t2_aaaa_temp(p2_va,p1_va,h1_oa,h2_oa)")
+    (t2_aaaa_temp(p1_va,p2_va,h1_oa,h2_oa) +=  1.0 * t2_aaaa(p2_va,p1_va,h2_oa,h1_oa),
+    "t2_aaaa_temp(p1_va,p2_va,h1_oa,h2_oa) +=  1.0 * t2_aaaa(p2_va,p1_va,h2_oa,h1_oa)");
+  // clang-format on
+}
 
 template<typename T>
 void exachem::cc::ccsd::CD_CCSD_CS<T>::ccsd_e_cs(Scheduler& sch, const TiledIndexSpace& MO,
@@ -42,15 +50,6 @@ void exachem::cc::ccsd::CD_CCSD_CS<T>::ccsd_e_cs(Scheduler& sch, const TiledInde
 
   // clang-format off
   sch
-    (t2_aaaa_temp()=0)
-    .exact_copy(t2_aaaa(p1_va, p2_va, h1_oa, h2_oa), t2_abab(p1_va, p2_va, h1_oa, h2_oa))
-    (t2_aaaa_temp() = t2_aaaa(),
-    "t2_aaaa_temp() = t2_aaaa()")
-    (t2_aaaa(p1_va,p2_va,h1_oa,h2_oa) += -1.0 * t2_aaaa_temp(p2_va,p1_va,h1_oa,h2_oa),
-    "t2_aaaa(p1_va,p2_va,h1_oa,h2_oa) += -1.0 * t2_aaaa_temp(p2_va,p1_va,h1_oa,h2_oa)")
-    (t2_aaaa_temp(p1_va,p2_va,h1_oa,h2_oa) +=  1.0 * t2_aaaa(p2_va,p1_va,h2_oa,h1_oa),
-    "t2_aaaa_temp(p1_va,p2_va,h1_oa,h2_oa) +=  1.0 * t2_aaaa(p2_va,p1_va,h2_oa,h1_oa)")
-
     (_a01V(cind) = t1_aa(p1_va, h1_oa) * chol3d_ov("aa")(h1_oa, p1_va, cind),
     "_a01V(cind) = t1_aa(p1_va, h1_oa) * chol3d_ov( aa )(h1_oa, p1_va, cind)")
     (_a02("aa")(h1_oa, h2_oa, cind)    = t1_aa(p1_va, h1_oa) * chol3d_ov("aa")(h2_oa, p1_va, cind),
@@ -155,10 +154,10 @@ void exachem::cc::ccsd::CD_CCSD_CS<T>::ccsd_t2_cs(Scheduler& sch, const TiledInd
   const auto [p3, p4] = MO.labels<2>("virt");
   const auto [h1, h2] = MO.labels<2>("occ");
 
-  auto [p1_va, p2_va, p3_va] = v_alpha.labels<3>("all");
-  auto [p1_vb, p2_vb]        = v_beta.labels<2>("all");
-  auto [h1_oa, h2_oa, h3_oa] = o_alpha.labels<3>("all");
-  auto [h1_ob, h2_ob]        = o_beta.labels<2>("all");
+  const auto [p1_va, p2_va, p3_va] = v_alpha.labels<3>("all");
+  const auto [p1_vb, p2_vb]        = v_beta.labels<2>("all");
+  const auto [h1_oa, h2_oa, h3_oa] = o_alpha.labels<3>("all");
+  const auto [h1_ob, h2_ob]        = o_beta.labels<2>("all");
 
   // f1_se     = {f1_oo,f1_ov,f1_vv}
   // chol3d_se = {chol3d_oo,chol3d_ov,chol3d_vv}
@@ -609,10 +608,10 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
   o_beta  = {MO("occ"), range(oatiles, otiles)};
   v_beta  = {MO("virt"), range(vatiles, vtiles)};
 
-  auto [p1_va, p2_va] = v_alpha.labels<2>("all");
-  auto [p1_vb, p2_vb] = v_beta.labels<2>("all");
-  auto [h3_oa, h4_oa] = o_alpha.labels<2>("all");
-  auto [h3_ob, h4_ob] = o_beta.labels<2>("all");
+  const auto [p1_va, p2_va] = v_alpha.labels<2>("all");
+  const auto [p1_vb, p2_vb] = v_beta.labels<2>("all");
+  const auto [h3_oa, h4_oa] = o_alpha.labels<2>("all");
+  const auto [h3_ob, h4_ob] = o_beta.labels<2>("all");
 
   Tensor<T> d_e{};
 
@@ -713,6 +712,9 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
     (f1_vv("bb")(p1_vb,p2_vb) = d_f1(p1_vb,p2_vb));
   // clang-format on
 
+  // for restart, this copy is extra for new CCSD calculations
+  ccsd_amp_update(sch, t2_abab, t2_aaaa);
+
   sch.execute();
 
   if(!ccsd_restart) {
@@ -723,12 +725,12 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
     sch.execute();
 
     // clang-format off
-        sch
-            (r1_aa() = 0)
-            (r2_abab() = 0)
-            (_a004("aaaa")(p1_va, p2_va, h4_oa, h3_oa) = 1.0 * chol3d_ov("aa")(h4_oa, p1_va, cind) * chol3d_ov("aa")(h3_oa, p2_va, cind))
-            .exact_copy(_a004("abab")(p1_va, p1_vb, h3_oa, h3_ob), _a004("aaaa")(p1_va, p1_vb, h3_oa, h3_ob))
-            ;
+    sch
+        (r1_aa() = 0)
+        (r2_abab() = 0)
+        (_a004("aaaa")(p1_va, p2_va, h4_oa, h3_oa) = 1.0 * chol3d_ov("aa")(h4_oa, p1_va, cind) * chol3d_ov("aa")(h3_oa, p2_va, cind))
+        .exact_copy(_a004("abab")(p1_va, p1_vb, h3_oa, h3_ob), _a004("aaaa")(p1_va, p1_vb, h3_oa, h3_ob))
+        ;
     // clang-format on
 
     sch.execute(exhw);
@@ -749,7 +751,6 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
                .execute();
         // clang-format on
 
-        CD_CCSD_CS<T>::ccsd_e_cs(sch, MO, CI, d_e, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
         ccsd_t1_cs(sch, MO, CI, r1_aa, t1_aa, t2_abab, f1_se, chol3d_se);
         ccsd_t2_cs(sch, MO, CI, r2_abab, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
 
@@ -761,10 +762,15 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
 
         update_r2(ec, r2_abab());
         // clang-format off
-            sch((d_r1s[off])() = r1_aa())
-                ((d_r2s[off])() = r2_abab())
-                .execute();
+        sch ((d_r1s[off])() = r1_aa())
+            ((d_r2s[off])() = r2_abab())
+            .execute();
         // clang-format on
+
+        ccsd_amp_update(sch, t2_abab, t2_aaaa); // update t2_aaaa after jacobi
+        CD_CCSD_CS<T>::ccsd_e_cs(sch, MO, CI, d_e, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
+        sch.execute(exhw, profile);
+        energy = get_scalar(d_e);
 
         const auto timer_end = std::chrono::high_resolution_clock::now();
         auto       iter_time =
@@ -792,6 +798,10 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
       std::vector<std::vector<Tensor<T>>> ts{d_t1s, d_t2s};
       std::vector<Tensor<T>>              next_t{t1_aa, t2_abab};
       diis<T>(ec, rs, ts, next_t);
+
+      // update t2_aaaa after diis
+      ccsd_amp_update(sch, t2_abab, t2_aaaa);
+      sch.execute();
     }
 
     if(writet) {

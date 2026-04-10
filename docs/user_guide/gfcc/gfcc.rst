@@ -1,13 +1,13 @@
 .. role:: aspect (emphasis)
 .. role:: sep (strong)
 
-Green’s function coupled-cluster (GFCC)
----------------------------------------
+Green's function coupled-cluster (GFCC)
+=======================================
 
 Methodology
-===========
+~~~~~~~~~~~
 
-GFCC is designed for the Green’s function calculation of molecular
+GFCC is designed for the Green's function calculation of molecular
 system at the coupled-cluster level. For a review of the GFCC method 
 employed in this work, we refer the readers to Refs. 
 [nooijen92_55]_, [nooijen93_15]_, [nooijen95_1681]_, 
@@ -15,7 +15,7 @@ employed in this work, we refer the readers to Refs.
 [kowalski18_561]_, [kowalski18_4335]_, [kowalski18_214102]_.
 
 Briefly, the matrix element of the retarded part of the analytical
-frequency dependent Green’s function of an :math:`N`-electron system can
+frequency dependent Green's function of an :math:`N`-electron system can
 be expressed as
 
 .. math::
@@ -36,7 +36,7 @@ factor, and :math:`p,q,r,s,\ldots` refers to general spin-orbital
 indices (we also use :math:`i,j,k,l,\ldots` to label occupied
 spin-orbital indices, and :math:`a,b,c,d,\ldots` to label virtual
 spin-orbital indices). By introducing bi-orthogonal CC formalism, the CC
-Green’s function can then be expressed as
+Green's function can then be expressed as
 
 .. math::
    :label: gfxn1
@@ -78,7 +78,7 @@ that satisfies
 
 Substituting this expression into Eq. :eq:`gfxn1`, we end up
 with a compact expression for the matrix element of the retarded CC
-Green’s function
+Green's function
 
 .. math::
    :label: gfxn2
@@ -117,8 +117,8 @@ the practical calculation of GFCCSD matrix employing the above method
 involves the solution of the conventional CCSD calculations (to get
 converged :math:`T` and :math:`\Lambda` cluster amplitudes), solving
 linear systems of the form of Eq. :eq:`xplin` for all
-the orbitals (:math:`p`\ ’s) and frequencies of interest
-(:math:`\omega`\ ’s), and performing Eq. :eq:`gfxn2`. The key
+the orbitals (:math:`p`\ 's) and frequencies of interest
+(:math:`\omega`\ 's), and performing Eq. :eq:`gfxn2`. The key
 step is to solve Eq. :eq:`xplin` for
 :math:`X_p(\omega)` for given orbital :math:`p` and frequency
 :math:`\omega`, and the overall computational cost approximately scales
@@ -223,7 +223,7 @@ threshold or when the refined model order exceeds a prescribed upper
 bound.
 
 Key Features
-============
+~~~~~~~~~~~~
 
 -  The Cholesky vectors are used in all the post
    Hartree-Fock calculations supported by the library (to save the
@@ -251,9 +251,9 @@ Key Features
    systems, this is a good approximation, since energy gap between the
    occupied and virtual molecular orbital is relatively large, the
    contribution of the virtual molecular space to the retarded part of
-   the Green’s function is negligible.
+   the Green's function is negligible.
 
--  Concurrent computation of frequency-dependent Green’s function matrix
+-  Concurrent computation of frequency-dependent Green's function matrix
    elements and spectral function in the CCSD/GFCCSD level (enabled via
    MPI process groups).
 
@@ -277,7 +277,7 @@ Key Features
    operations for reading (writing) tensors from (to) disk.   
 
 Example
-=======
+~~~~~~~
 
 In the following, we will use carbon monoxide as an example to
 demonstrate how to perform the CCSD/GFCCSD computation. Here, we want to compute the spectral function of CO molecule
@@ -286,7 +286,7 @@ level, and extrapolate the GFCCSD results to ``[-2.00,0.00]`` **a.u.** (i.e.
 ``[-54.42, 0.00]`` **eV**).
 
 Input File
-==========
+~~~~~~~~~~
 
 The following shows the input file for the CCSD/GFCCSD calculation.
 
@@ -397,7 +397,7 @@ The following shows the input file for the CCSD/GFCCSD calculation.
   Prints profiling information.
 
 Output File
-===========
+~~~~~~~~~~~
 
 The following is the abstract format of the output file, where detailed
 information has been skipped due to the space.
@@ -477,7 +477,7 @@ Spectral functions of the carbon monoxide molecule in the frequency regime of [-
    
 
 Performance
-===========
+~~~~~~~~~~~
 
 At present, the GFCC has been tested for systems consisting of
 100\ :math:`\sim`\ 1200 basis functions. For a given frequency point,
@@ -493,23 +493,23 @@ Running time as a function of number of nodes for carrying out GFCCSD/cc-pVDZ ca
 of C\ :math:`_{60}` molecule at :math:`\omega=-10.45` a.u.
 
 Citing this work
-=================
+~~~~~~~~~~~~~~~~
 If you are referencing this GFCC implementation in a publication, please cite the following papers:
 
 -  Bo Peng, Ajay Panyala, Karol Kowalski and Sriram Krishnamoorthy,
-   **GFCCLib: Scalable and Efficient Coupled-Cluster Green’s Function
+   **GFCCLib: Scalable and Efficient Coupled-Cluster Green's Function
    Library for Accurately Tackling Many Body Electronic Structure
    Problems**, *Computer Physics Communications* (April 2021)
    `DOI:10.1016/j.cpc.2021.108000 <https://doi.org/10.1016/j.cpc.2021.108000>`__.
 
 -  Bo Peng, Karol Kowalski, Ajay Panyala and Sriram Krishnamoorthy,
-   **Green’s function coupled cluster simulation of the near-valence
+   **Green's function coupled cluster simulation of the near-valence
    ionizations of DNA-fragments**, *The Journal of Chemical Physics*
    152, 011101 (Jan 2020)
    `DOI:10.1063/1.5138658 <https://doi.org/10.1063/1.5138658>`__.
 
 Acknowledgments
-===============
+~~~~~~~~~~~~~~~
 
 The development of GFCC is supported by the Center for Scalable,
 Predictive methods for Excitation and Correlated phenomena (SPEC), which

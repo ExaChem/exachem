@@ -49,8 +49,10 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
   // TODO: MO here is MSO, rename MO to MSO
   TiledIndexSpace MO;
   TAMM_SIZE       total_orbitals;
-  std::tie(MO, total_orbitals) = cholesky_2e::setupMOIS(ec, chem_env);
-  chem_env.is_context.MSO      = MO;
+
+  if(!is_mso) std::tie(MO, total_orbitals) = cholesky_2e::setup_mo_red(ec, chem_env);
+  else std::tie(MO, total_orbitals) = cholesky_2e::setupMOIS(ec, chem_env);
+  chem_env.is_context.MSO = MO;
 
   if(ccsd_options.skip_ccsd) {
     Tensor<T>::deallocate(C_AO, F_AO);
@@ -140,7 +142,7 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
 
       write_to_disk<TensorType>(movecs_so, cd_context.movecs_so_file);
       write_to_disk(cd_context.d_f1, cd_context.f1file);
-      write_to_disk(cholVpr, cd_context.v2file);
+      if(do_cholesky) write_to_disk(cholVpr, cd_context.v2file);
       chem_env.run_context["cholesky_2e"]["num_chol_vecs"] = chol_count;
       if(rank == 0) { chem_env.write_run_context(); }
     }
@@ -199,11 +201,14 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
   double cholesky_2e_time =
     std::chrono::duration_cast<std::chrono::duration<double>>((hf_t2 - hf_t1)).count();
 
-  if(rank == 0 && !skip_cd.first)
-    std::cout << std::endl
-              << "Total Time taken for Cholesky Decomposition: " << std::fixed
-              << std::setprecision(2) << cholesky_2e_time << " secs" << std::endl
-              << std::endl;
+  if(rank == 0 && !skip_cd.first) {
+    if(do_cholesky) {
+      std::cout << std::endl
+                << "Total Time taken for Cholesky Decomposition: " << std::fixed
+                << std::setprecision(2) << cholesky_2e_time << " secs" << std::endl
+                << std::endl;
+    }
+  }
 
   Tensor<T>::deallocate(C_AO, F_AO);
   if(sys_data.is_unrestricted) Tensor<T>::deallocate(C_beta_AO, F_beta_AO);

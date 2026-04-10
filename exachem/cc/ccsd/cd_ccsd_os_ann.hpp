@@ -29,6 +29,9 @@ protected:
   CCSE_Tensors<T> _a01_os, _a02_os, _a03_os, _a04_os, _a05_os, _a06_os, _a001_os, _a004_os,
     _a006_os, _a008_os, _a009_os, _a017_os, _a019_os, _a020_os, _a021_os, _a022_os;
 
+  virtual void ccsd_amp_update(Scheduler& sch, CCSE_Tensors<T>& t1_vo, CCSE_Tensors<T>& t2_vvoo,
+                               const Tensor<T>& d_t1, const Tensor<T>& d_t2);
+
   virtual void ccsd_e_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
                          Tensor<T>& de, CCSE_Tensors<T>& t1, CCSE_Tensors<T>& t2,
                          std::vector<CCSE_Tensors<T>>& f1_se,

@@ -31,3 +31,11 @@ Setting the QED options in the SCF block of an input file with ExaChem enables c
 :qed_volumes: A list ``[default: []]``. Instead of specifying the coupling strengths directly, one can provide the effective mode volumes (in atomic units) for each cavity mode. The coupling strengths will be computed internally based on the provided mode volumes and ``qed_omegas``. List dimension must match that of ``qed_omegas``.
 
 :qed_polvecs: A list of lists ``[default: []]``. Specifies the polarization vectors for each cavity mode. Each polarization vector should be a list of three components (x, y, z). List dimension must match that of ``qed_omegas``.
+
+Citing this work
+~~~~~~~~~~~~~~~~
+If you are referencing the QED-CCSD implementation in a publication, please cite the following papers:
+
+-  Nicholas P Bauman, Himadri Pathak, Marcus D Liebenthal, Ajay Panyala, Daniel Mejia-Rodriguez, Niranjan Govind, Karol Kowalski,
+   **Quantum electrodynamics coupled-cluster at scale: High-performance implementation for complex systems**, *Journal of Chemical Theory and Computation* (Dec 2025)
+   `DOI:10.1021/acs.jctc.5c01599 <https://doi.org/10.1021/acs.jctc.5c01599>`__.

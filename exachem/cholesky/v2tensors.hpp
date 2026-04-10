@@ -65,6 +65,10 @@ public:
                                       std::vector<std::string> blocks = {"ijab", "iajb", "ijka",
                                                                          "ijkl", "iabc", "abcd"});
 
+  virtual V2Tensors<T> setupV2Tensors_from_fullV2(
+    ExecutionContext& ec, Tensor<T> fullv2, ExecutionHW ex_hw = ExecutionHW::CPU,
+    std::vector<std::string> blocks = {"ijab", "iajb", "ijka", "ijkl", "iabc", "abcd"});
+
   virtual Tensor<T> setupV2(ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& CI,
                             Tensor<T> cholVpr, const tamm::Tile chol_count,
                             ExecutionHW hw = ExecutionHW::CPU, bool anti_sym = true);
@@ -75,6 +79,12 @@ template<typename T>
 V2Tensors<T>
 setupV2Tensors(ExecutionContext& ec, Tensor<T> cholVpr, ExecutionHW ex_hw = ExecutionHW::CPU,
                std::vector<std::string> blocks = {"ijab", "iajb", "ijka", "ijkl", "iabc", "abcd"});
+
+template<typename T>
+V2Tensors<T> setupV2Tensors_from_fullV2(ExecutionContext& ec, Tensor<T> fullv2,
+                                        ExecutionHW              ex_hw  = ExecutionHW::CPU,
+                                        std::vector<std::string> blocks = {"ijab", "iajb", "ijka",
+                                                                           "ijkl", "iabc", "abcd"});
 
 template<typename T>
 Tensor<T> setupV2(ExecutionContext& ec, TiledIndexSpace& MO, TiledIndexSpace& CI, Tensor<T> cholVpr,
@@ -244,6 +254,13 @@ exachem::cholesky_2e::setupV2Tensors(ExecutionContext& ec, Tensor<T> cholVpr, Ex
                                      std::vector<std::string> blocks) {
   V2TensorSetup<T> setup;
   return setup.setupV2Tensors(ec, cholVpr, ex_hw, blocks);
+}
+
+template<typename T>
+exachem::cholesky_2e::V2Tensors<T> exachem::cholesky_2e::setupV2Tensors_from_fullV2(
+  ExecutionContext& ec, Tensor<T> fullv2, ExecutionHW ex_hw, std::vector<std::string> blocks) {
+  V2TensorSetup<T> setup;
+  return setup.setupV2Tensors_from_fullV2(ec, fullv2, ex_hw, blocks);
 }
 
 template<typename T>

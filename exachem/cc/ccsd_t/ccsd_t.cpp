@@ -324,7 +324,8 @@ void exachem::cc::ccsd_t::CCSD_T_Driver<T>::ccsd_t_driver(ExecutionContext& ec, 
 
   if(rank == 0) {
     std::cout << std::endl << "------CCSD(T) Performance------" << std::endl;
-    std::cout << "Total CCSD(T) Time: " << total_t_time << std::endl;
+    std::cout << "Total CCSD(T) Time: " << std::setprecision(2) << total_t_time << " secs"
+              << std::endl;
   }
   ccsd_t_time = comm_stats("CCSD(T) Avg. Work Time", ccsd_t_time);
   if(rank == 0) {

@@ -143,22 +143,11 @@ Cholesky_2E_Util::setupMOIS(ExecutionContext& ec, ChemEnv& chem_env, bool triple
   // 'int' (internal) are orbitals in the active space
   // 'ext' (external) are orbitals outside the active space
   // xxx_int + xxx_ext = xxx
-  TAMM_SIZE occ_alpha_int = 0;
-  TAMM_SIZE occ_beta_int  = 0;
-  TAMM_SIZE vir_alpha_int = 0;
-  TAMM_SIZE vir_beta_int  = 0;
-  if(task_options.ducc.first) {
-    occ_alpha_int = ccsd_options.nactive_oa;
-    occ_beta_int  = ccsd_options.nactive_ob;
-    vir_alpha_int = ccsd_options.nactive_va;
-    vir_beta_int  = ccsd_options.nactive_vb;
-  }
-  else {
-    if(ccsd_options.nactive_oa > 0 || ccsd_options.nactive_ob > 0 || ccsd_options.nactive_va > 0 ||
-       ccsd_options.nactive_vb > 0) {
-      if(rank == 0) std::cout << std::endl << "**** Ignoring nactive options" << std::endl;
-    }
-  }
+  TAMM_SIZE occ_alpha_int = ccsd_options.nactive_oa;
+  TAMM_SIZE occ_beta_int  = ccsd_options.nactive_ob;
+  TAMM_SIZE vir_alpha_int = ccsd_options.nactive_va;
+  TAMM_SIZE vir_beta_int  = ccsd_options.nactive_vb;
+
   TAMM_SIZE occ_alpha_ext = n_occ_alpha - occ_alpha_int;
   TAMM_SIZE occ_beta_ext  = n_occ_beta - occ_beta_int;
   TAMM_SIZE vir_alpha_ext = n_vir_alpha - vir_alpha_int;

@@ -42,7 +42,7 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
                          const Tensor<T>& vtijkl, const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
                          const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
                          ExecutionHW ex_hw, T shift, IndexVector& occ_int_vec,
-                         IndexVector& virt_int_vec, string& pos_str);
+                         IndexVector& virt_int_vec, const int pos, std::stringstream& qfstr);
 #endif
 
 } // namespace exachem::cc::ducc
@@ -59,7 +59,7 @@ public:
                                   const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
                                   Tensor<T>& f1, cholesky_2e::V2Tensors<T>& v2tensors,
                                   IndexVector& occ_int_vec, IndexVector& virt_int_vec,
-                                  string& pos_str);
+                                  const int pos, std::stringstream& qfstr);
 
   virtual void reset_ducc_runcontext(ExecutionContext& ec, ChemEnv& chem_env) {
     CCSDOptions& ccsd_options                  = chem_env.ioptions.ccsd_options;
@@ -71,7 +71,9 @@ public:
     chem_env.run_context["ducc"]["level0"]     = false;
     chem_env.run_context["ducc"]["level1"]     = false;
     chem_env.run_context["ducc"]["level2"]     = false;
-    if(ec.print()) chem_env.write_run_context();
+    const bool noprint                         = ccsd_options.noprint;
+    const bool ducc_print                      = ec.print() && !noprint;
+    if(ducc_print) chem_env.write_run_context();
   }
 
   // clang-format off

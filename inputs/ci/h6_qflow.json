@@ -1,0 +1,42 @@
+{
+    "geometry": {
+        "coordinates": [
+            "H  0 0 0",
+            "H  0 0 2",
+            "H  0 0 4",
+            "H  0 0 6",
+            "H  0 0 8",
+            "H  0 0 10"
+        ],
+        "units": "bohr"
+    },
+    "common": {
+        "maxiter": 200
+    },
+    "basis": {
+        "basisset": "sto-3g"
+    },
+    "SCF": {
+        "conve": 1e-09,
+        "convd": 1e-08
+    },
+    "CD": {
+        "diagtol": 1e-9
+    },
+    "CC": {
+        "threshold": 1e-06,
+        "qflow_cycles": 2,
+        "qflow_nproc_pc": 0,
+        "nactive_oa": 2,
+        "nactive_ob": 2,
+        "nactive_va": 3,
+        "nactive_vb": 3,
+        "ducc_lvl": 2,
+        "PRINT": {
+          "noprint" : true
+        }        
+    },
+    "TASK": {
+        "ducc": [true, "qflow"]
+    }
+}

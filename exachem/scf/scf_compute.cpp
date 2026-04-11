@@ -233,24 +233,28 @@ void exachem::scf::SCFCompute<T>::compute_cpot_to_spot(const libint2::BasisSet& 
 }
 
 template<typename T>
-std::tuple<int, double>
-exachem::scf::SCFCompute<T>::compute_NRE(const ExecutionContext&           ec,
-                                         const std::vector<libint2::Atom>& atoms) const {
+std::tuple<int, double> exachem::scf::SCFCompute<T>::compute_NRE(const ExecutionContext& ec,
+                                                                 const ChemEnv& chem_env) const {
+  const std::vector<libint2::Atom>& atoms = chem_env.atoms;
+
   // count the number of electrons
   int nelectron = 0;
   for(size_t i = 0; i < atoms.size(); ++i) nelectron += atoms[i].atomic_number;
 
   // compute the nuclear repulsion energy
-  double enuc       = 0.0;
-  auto   coord_diff = [](const libint2::Atom& a, const libint2::Atom& b) {
+  double enuc = 0.0;
+  if(chem_env.ioptions.scf_options.do_hubbard) return std::make_tuple(nelectron, enuc);
+
+  auto coord_diff = [](const libint2::Atom& a, const libint2::Atom& b) {
     return std::make_tuple(a.x - b.x, a.y - b.y, a.z - b.z);
   };
-  for(size_t i = 0; i < atoms.size(); i++)
+  for(size_t i = 0; i < atoms.size(); i++) {
     for(size_t j = i + 1; j < atoms.size(); j++) {
       auto [dxij, dyij, dzij] = coord_diff(atoms[i], atoms[j]);
       double r                = std::hypot(dxij, dyij, dzij);
       enuc += atoms[i].atomic_number * atoms[j].atomic_number / r;
     }
+  }
 
   return std::make_tuple(nelectron, enuc);
 }
@@ -351,6 +355,9 @@ void exachem::scf::SCFCompute<T>::compute_hamiltonian(ExecutionContext& ec, cons
   using libint2::Operator;
   // const size_t N = shells.nbf();
   const auto rank = ec.pg().rank();
+  Scheduler  sch{ec};
+
+  const bool is_hubbard = chem_env.sys_data.is_hubbard;
 
   const std::vector<libint2::Atom>& atoms  = chem_env.atoms;
   const libint2::BasisSet&          shells = chem_env.shells;
@@ -359,9 +366,108 @@ void exachem::scf::SCFCompute<T>::compute_hamiltonian(ExecutionContext& ec, cons
   ttensors.S1 = {scf_data.tAO, scf_data.tAO};
   ttensors.T1 = {scf_data.tAO, scf_data.tAO};
   ttensors.V1 = {scf_data.tAO, scf_data.tAO};
-  Tensor<T>::allocate(&ec, ttensors.H1, ttensors.S1, ttensors.T1, ttensors.V1);
+  sch.allocate(ttensors.H1, ttensors.S1, ttensors.T1, ttensors.V1).execute();
 
   const auto [mu, nu] = scf_data.tAO.labels<2>("all");
+
+  if(is_hubbard) {
+    auto                    lattice         = chem_env.ioptions.scf_options.hub_lattice;
+    const std::vector<bool> is_periodic_vec = chem_env.ioptions.scf_options.hub_is_periodic;
+
+    bool is_1d{true};
+    // empty vector means 1d hubbard, any vector containing 1 or more than 2 elements is ignored.
+    int  nlength{0};
+    int  nbreadth{0};
+    bool periodic_x{false};
+    bool periodic_y{false};
+
+    Matrix     t_matrix, ovl;
+    const int  n_sites = chem_env.sys_data.nbf_orig;
+    const auto tval    = chem_env.ioptions.scf_options.hub_t_val;
+    if(is_periodic_vec.size() >= 1) periodic_x = is_periodic_vec.at(0);
+
+    if(lattice.size() == 2) {
+      is_1d    = false; // 2D
+      nlength  = lattice.at(0);
+      nbreadth = lattice.at(1);
+      if(nlength <= 0 or nbreadth <= 0)
+        tamm_terminate("[SCF][hubbard] lattice length and width must be positive integers");
+      if(is_periodic_vec.size() == 2) periodic_y = is_periodic_vec.at(1);
+      if(n_sites != nlength * nbreadth)
+        tamm_terminate("[SCF][hubbard] lattice length times width should be equal to the total "
+                       "number of orbitals");
+    }
+    else if(lattice.size() > 0) {
+      if(rank == 0) std::cout << "[SCF][hubbard] ignoring non-2D lattice" << std::endl;
+    }
+
+    if(rank == 0 && is_1d) {
+      t_matrix = Matrix::Zero(n_sites, n_sites);
+      ovl      = Matrix::Identity(n_sites, n_sites);
+
+      // Fill nearest-neighbor hopping terms
+      for(int i = 0; i < n_sites - 1; i++) {
+        t_matrix(i, i + 1) = -tval;
+        t_matrix(i + 1, i) = -tval;
+      }
+
+      // Add periodic boundary conditions if requested
+      if(periodic_x) {
+        t_matrix(0, n_sites - 1) = -tval;
+        t_matrix(n_sites - 1, 0) = -tval;
+      }
+    }
+
+    else if(rank == 0 && !is_1d) { // 2D
+      const int n_hub = nlength * nbreadth;
+
+      t_matrix = Matrix::Zero(n_hub, n_hub);
+      ovl      = Matrix::Identity(n_hub, n_hub);
+
+      // Map (x, y) -> single site index (row-major: advance y fastest)
+      auto idx = [nbreadth](int x, int y) -> int { return x * nbreadth + y; };
+
+      // Add nearest-neighbor hoppings: right (+x) and up (+y) only, then symmetrize
+      for(int x = 0; x < nlength; ++x) {
+        for(int y = 0; y < nbreadth; ++y) {
+          const int i = idx(x, y);
+
+          // neighbor in +x direction
+          if(x + 1 < nlength) {
+            const int j    = idx(x + 1, y);
+            t_matrix(i, j) = -tval;
+            t_matrix(j, i) = -tval;
+          }
+          else if(periodic_x && nlength > 1) {
+            const int j    = idx(0, y); // wrap around
+            t_matrix(i, j) = -tval;
+            t_matrix(j, i) = -tval;
+          }
+
+          // neighbor in +y direction
+          if(y + 1 < nbreadth) {
+            const int j    = idx(x, y + 1);
+            t_matrix(i, j) = -tval;
+            t_matrix(j, i) = -tval;
+          }
+          else if(periodic_y && nbreadth > 1) {
+            const int j    = idx(x, 0); // wrap around
+            t_matrix(i, j) = -tval;
+            t_matrix(j, i) = -tval;
+          }
+        }
+      }
+
+    } // 2D
+
+    if(rank == 0) {
+      eigen_to_tamm_tensor(ttensors.H1, t_matrix);
+      eigen_to_tamm_tensor(ttensors.S1, ovl);
+    }
+    ec.pg().barrier();
+
+    return;
+  }
 
   auto        hf_t1 = std::chrono::high_resolution_clock::now();
   SCFGuess<T> scf_guess;
@@ -376,7 +482,7 @@ void exachem::scf::SCFCompute<T>::compute_hamiltonian(ExecutionContext& ec, cons
 
   // Core Hamiltonian = T + V
   // clang-format off
-  Scheduler{ec}
+  sch
     (ttensors.H1(mu, nu)  =  ttensors.T1(mu, nu))
     (ttensors.H1(mu, nu) +=  ttensors.V1(mu, nu)).execute();
   // clang-format on

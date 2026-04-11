@@ -27,11 +27,12 @@ void ParseSCFOptions::parse_check(json& jinput) {
     "debug","scf_type", "n_lindep","restart_size","scalapack_nb",
     "scalapack_np_row", "scalapack_np_col", "ext_data_path", "PRINT",
     "qed_omegas", "qed_lambdas", "qed_volumes", "qed_polvecs",
-    "direct_df", "DFT", "cuscf", "comments"};
+    "direct_df", "DFT", "cuscf", "hubbard", "comments"};
   const std::vector<std::string> valid_dft{"xc_pruning_scheme", "xc_rad_quad", "xc_batch_size", 
     "xc_snK_etol", "xc_snK_ktol", "xc_weight_scheme", "xc_exec_space", "snK", "xc_type", 
     "xc_lb_kernel", "xc_mw_kernel", "xc_int_kernel", "xc_red_kernel", "xc_lwd_kernel", 
     "xc_radang_size", "xc_basis_tol", "xc_grid_type"};
+  const std::vector<std::string> valid_hubbard{"do_hubbard","t_val", "U_val", "nelectrons", "is_periodic", "lattice"};
   // clang-format on
 
   for(auto& el: jinput["SCF"].items()) {
@@ -42,6 +43,12 @@ void ParseSCFOptions::parse_check(json& jinput) {
     for(auto& el: jinput["SCF"]["DFT"].items()) {
       if(std::find(valid_dft.begin(), valid_dft.end(), el.key()) == valid_dft.end())
         tamm_terminate("INPUT FILE ERROR: Invalid DFT option in SCF block [" + el.key() + "]");
+    }
+  }
+  if(jinput["SCF"].contains("hubbard")) {
+    for(auto& el: jinput["SCF"]["hubbard"].items()) {
+      if(std::find(valid_hubbard.begin(), valid_hubbard.end(), el.key()) == valid_hubbard.end())
+        tamm_terminate("INPUT FILE ERROR: Invalid Hubbard option in SCF block [" + el.key() + "]");
     }
   }
 }
@@ -95,7 +102,15 @@ void ParseSCFOptions::parse(ChemEnv& chem_env) {
     parse_option<double>(scf_options.xc_snK_etol, jdft, "xc_snK_etol");
     parse_option<double>(scf_options.xc_snK_ktol, jdft, "xc_snK_ktol");
   }
-
+  if(jscf.contains("hubbard")) {
+    json jhub = jscf["hubbard"];
+    parse_option<bool>(scf_options.do_hubbard, jhub, "do_hubbard");
+    parse_option<double>(scf_options.hub_t_val, jhub, "t_val");
+    parse_option<double>(scf_options.hub_U_val, jhub, "U_val");
+    parse_option<int>(scf_options.hub_nelectrons, jhub, "nelectrons");
+    parse_option<std::vector<bool>>(scf_options.hub_is_periodic, jhub, "is_periodic");
+    parse_option<std::vector<int>>(scf_options.hub_lattice, jhub, "lattice");
+  }
   parse_option<int>(scf_options.n_lindep, jscf, "n_lindep");
   parse_option<int>(scf_options.restart_size, jscf, "restart_size");
   parse_option<int>(scf_options.scalapack_nb, jscf, "scalapack_nb");

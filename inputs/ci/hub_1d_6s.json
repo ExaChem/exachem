@@ -1,0 +1,61 @@
+{
+  "geometry": {
+    "coordinates": [
+      "H    0  0   0",
+      "H    0  0   0.1",
+      "H    0  0   0.2",
+      "H    0  0   0.3",
+      "H    0  0   0.4",
+      "H    0  0   0.5"
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "sto-3g" 
+  },
+  "common": {
+    "maxiter": 100
+  },
+  "SCF": {
+    "tol_lindep": 1e-06,
+    "conve": 1e-9,
+    "convd": 1e-8,
+    "diis_hist": 10,
+    "charge": 0,
+    "multiplicity": 1,
+    "scf_type": "restricted",
+    "hubbard": {
+      "do_hubbard": true,
+      "t_val": 1.0,
+      "U_val": 4.0,
+      "nelectrons": 0,
+      "is_periodic": [true],
+      "lattice": []
+    },
+    "restart": false
+  },
+  "CD": {
+    "diagtol": 1e-12,
+    "max_cvecs": 40
+  },
+  "CC": {
+    "threshold": 1e-6,
+    "ndiis": 5,
+    "writet": false,
+    "ccsd_maxiter": 100,
+    "nactive_va": 2,
+    "nactive_vb": 2,
+    "nactive_oa": 2,
+    "nactive_ob": 2,
+    "ducc_lvl": 2,
+    "CCSD(T)": {
+      "ccsdt_tilesize": 28
+    },
+    "debug": false
+  },
+  "TASK": {
+    "scf": false,
+    "ccsd": true,
+    "ducc": [false, "default"]
+  }  
+}

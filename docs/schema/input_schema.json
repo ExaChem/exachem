@@ -352,8 +352,11 @@
                 "type": "string"
               }
             },
+            "noprint": {
+              "type": "boolean"
+            },
             "ccsd_diagnostics": {
-              "type": "string"
+              "type": "boolean"
             },
             "rdm": {
               "type": "array"
@@ -627,9 +630,6 @@
           "type": "boolean"
         },
         "ccsd_t": {
-          "type": "boolean"
-        },
-        "ccsd_sf": {
           "type": "boolean"
         },
         "ccsd_lambda": {

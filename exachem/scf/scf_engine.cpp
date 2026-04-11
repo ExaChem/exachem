@@ -685,9 +685,16 @@ void exachem::scf::SCFEngine::compute_fock_matrix(ExecutionContext& ec, const Ch
     // TODO: skip for non-CC methods
     if(!chem_env.ioptions.task_options.scf) xHF_adjust = 1.0;
     // build a new Fock matrix
-    scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
-                         SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors, is_3c_init,
-                         scf_data.do_dens_fit, xHF_adjust);
+    if(chem_env.sys_data.is_hubbard) {
+      scf_iter.compute_2bf_hubbard(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen,
+                                   shell2bf, SchwarzK, max_nprim4, scf_data.ttensors,
+                                   scf_data.etensors, is_3c_init, scf_data.do_dens_fit, xHF_adjust);
+    }
+    else {
+      scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
+                           SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors, is_3c_init,
+                           scf_data.do_dens_fit, xHF_adjust);
+    }
 
     // Add QED contribution;
     // CHECK
@@ -789,9 +796,14 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
   }
 
   // Compute Nuclear repulsion energy.
-  auto [nelectrons, enuc] = scf_compute.compute_NRE(exc, chem_env.atoms);
+  auto [nelectrons, enuc] = scf_compute.compute_NRE(exc, chem_env);
   // Might be actually useful to store?
   chem_env.sys_data.results["output"]["SCF"]["nucl_rep_energy"] = enuc;
+
+  if(chem_env.sys_data.is_hubbard) {
+    const int nelec_hub = chem_env.ioptions.scf_options.hub_nelectrons;
+    if(nelec_hub > 0) nelectrons = nelec_hub;
+  }
 
   // Compute number of electrons.
   nelectrons -= chem_env.ioptions.scf_options.charge;
@@ -805,8 +817,15 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
   if((nelectrons + chem_env.ioptions.scf_options.multiplicity - 1) % 2 != 0) {
     std::string err_msg =
       "[ERROR] Number of electrons (" + std::to_string(nelectrons) + ") " + "and multiplicity (" +
-      std::to_string(chem_env.ioptions.scf_options.multiplicity) + ") " + " not compatible!";
+      std::to_string(chem_env.ioptions.scf_options.multiplicity) + ") " + "not compatible!";
     tamm_terminate(err_msg);
+  }
+
+  if(chem_env.sys_data.is_hubbard && chem_env.ioptions.scf_options.hub_lattice.size() < 2) {
+    if(((nelectrons + 2) % 4 != 0) && chem_env.sys_data.is_restricted)
+      tamm_terminate("[ERROR] For Hubbard calculation, the total number of electrons (" +
+                     std::to_string(nelectrons) + ") " +
+                     "does not satisfy (nelectrons + 2) % 4 == 0");
   }
 
   chem_env.sys_data.nelectrons_alpha =
@@ -984,11 +1003,41 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
       ec.pg().barrier();
     }
     else {
-      if(rank == 0) cout << "Superposition of Atomic Density Guess ..." << endl;
-      scf_guess.compute_sad_guess(ec, chem_env, scf_data, scalapack_info, scf_data.etensors,
-                                  scf_data.ttensors);
+      if(!chem_env.sys_data.is_hubbard) {
+        if(rank == 0) cout << "Superposition of Atomic Density Guess ..." << endl;
+        scf_guess.compute_sad_guess(ec, chem_env, scf_data, scalapack_info, scf_data.etensors,
+                                    scf_data.ttensors);
+        ec.pg().barrier();
+      }
+      else { // Guess for Hubbard model
+        if(rank == 0) {
+          cout << "HCore Guess ..." << endl;
+          Matrix HCore = tamm_to_eigen_matrix(scf_data.ttensors.H1);
 
-      ec.pg().barrier();
+          // Diagonalize the core Hamiltonian
+          Eigen::SelfAdjointEigenSolver<Matrix> eigensolver(HCore);
+          Matrix                                C = eigensolver.eigenvectors();
+
+          // Construct density matrix
+          scf_data.etensors.D_alpha = C.leftCols(chem_env.sys_data.nelectrons_alpha) *
+                                      C.leftCols(chem_env.sys_data.nelectrons_alpha).transpose();
+          eigen_to_tamm_tensor(scf_data.ttensors.D_alpha, scf_data.etensors.D_alpha);
+
+          if(chem_env.sys_data.is_unrestricted) {
+            scf_data.etensors.D_beta = C.leftCols(chem_env.sys_data.nelectrons_beta) *
+                                       C.leftCols(chem_env.sys_data.nelectrons_beta).transpose();
+            eigen_to_tamm_tensor(scf_data.ttensors.D_beta, scf_data.etensors.D_beta);
+          }
+        }
+        ec.pg().barrier();
+        if(rank != 0) {
+          tamm_to_eigen_tensor(scf_data.ttensors.D_alpha, scf_data.etensors.D_alpha);
+          if(chem_env.sys_data.is_unrestricted) {
+            tamm_to_eigen_tensor(scf_data.ttensors.D_beta, scf_data.etensors.D_beta);
+          }
+        }
+        ec.pg().barrier();
+      }
     }
 
     hf_t2   = std::chrono::high_resolution_clock::now();
@@ -1079,9 +1128,16 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
       }
 
       // F_alpha = H1 + F_alpha_tmp
-      scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
-                           SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors,
-                           scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
+      if(chem_env.sys_data.is_hubbard) {
+        scf_iter.compute_2bf_hubbard(
+          ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4,
+          scf_data.ttensors, scf_data.etensors, scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
+      }
+      else {
+        scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
+                             SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors,
+                             scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
+      }
 
       // Add QED contribution
       if(chem_env.sys_data.do_qed) {
@@ -1147,9 +1203,16 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
       // if(rank==0) cout << std::setprecision(18) << "norm of D_tamm: " << D_tamm_nrm << endl;
 
       // build a new Fock matrix
-      scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
-                           SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors,
-                           scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
+      if(chem_env.sys_data.is_hubbard) {
+        scf_iter.compute_2bf_hubbard(
+          ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4,
+          scf_data.ttensors, scf_data.etensors, scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
+      }
+      else {
+        scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
+                             SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors,
+                             scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
+      }
 
       // Add QED contribution
       if(chem_env.sys_data.do_qed) {

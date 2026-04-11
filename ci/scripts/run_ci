@@ -76,6 +76,10 @@ $MPIEXEC $EXE_PATH $CHEM_INP/cr2.json
 #CUSCF
 $MPIEXEC $EXE_PATH $CHEM_INP/no.json
 
+#Hubbard
+$MPIEXEC $EXE_PATH $CHEM_INP/hub_1d_6s.json
+$MPIEXEC $EXE_PATH $CHEM_INP/hub_2d_16s.json
+
 cp *_files/restricted/json/*.json .
 cp *_files/unrestricted/json/*.json .
 python3 $CHEM_SRC/ci/scripts/compare_results.py $CHEM_SRC/ci/reference_output/ . $UPCXX

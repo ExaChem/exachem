@@ -65,7 +65,7 @@
         "noscf": false,
         "scf_type": "restricted",
         "cuscf": false,
-        "direct_df": false,    
+        "direct_df": false,
         "DFT": {
           "snK": false,
           "xc_type": [],
@@ -97,7 +97,15 @@
             "O": [0,1],
             "H1": [0,1]
           }
-        },        
+        },
+        "hubbard": {
+          "do_hubbard": false,
+          "t_val": 1.0,
+          "U_val": 4.0,
+          "nelectrons": 0,
+          "is_periodic": [false,false],
+          "lattice": []
+        },
         "PRINT": {
           "mos_txt" : false,
           "mulliken": false,
@@ -148,6 +156,7 @@
         "ducc_lvl": 2,
         "qflow_cycles": 100,
         "qflow_threshold": 1e-3,
+        "qflow_nproc_pc": 0,
         "freeze": {
           "atomic": false,
           "core": 0,
@@ -166,6 +175,7 @@
 
         "PRINT": {
           "tamplitudes": [false,0.05],
+          "noprint" : false,
           "ccsd_diagnostics" : false,
           "rdm": [1,2]
         },
@@ -268,7 +278,6 @@
       "ducc": [false, "default"],
       "ccsd": false,
       "ccsd_t": false,
-      "ccsd_sf": false,
       "ccsd_lambda": false,
       "eom_ccsd": false,
       "rteom_ccsd": false,

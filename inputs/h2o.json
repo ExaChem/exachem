@@ -8,7 +8,7 @@
     "units": "bohr"
   },
   "basis": {
-    "basisset": "cc-pvdz" 
+    "basisset": "cc-pvdz"
   },
   "common": {
     "maxiter": 100

@@ -45,15 +45,15 @@ void ChemEnv::write_run_context() {
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
   std::string files_prefix = get_files_prefix();
   std::string json_file    = files_prefix + ".runcontext.json";
-  bool        json_exists  = std::filesystem::exists(json_file);
-  if(json_exists) {
-    // std::ifstream jread(json_file);
-    // jread >> run_context;
-    std::filesystem::remove(json_file);
-  }
+  // bool        json_exists  = std::filesystem::exists(json_file);
+  // if(json_exists) {
+  //   // std::ifstream jread(json_file);
+  //   // jread >> run_context;
+  //   std::filesystem::remove(json_file);
+  // }
 
   // std::cout << std::endl << std::endl << run_context.dump() << std::endl;
-  std::ofstream res_file(json_file);
+  std::ofstream res_file(json_file, std::ios::out);
   res_file << std::setw(2) << run_context << std::endl;
 }
 
@@ -81,11 +81,11 @@ void ChemEnv::write_sinfo() {
   results["molecule"]["nelectrons_alpha"] = sys_data.nelectrons_alpha;
   results["molecule"]["nelectrons_beta"]  = sys_data.nelectrons_beta;
 
-  std::string json_file   = files_prefix + ".sinfo.json";
-  bool        json_exists = std::filesystem::exists(json_file);
-  if(json_exists) std::filesystem::remove(json_file);
+  std::string json_file = files_prefix + ".sinfo.json";
+  // bool        json_exists = std::filesystem::exists(json_file);
+  // if(json_exists) std::filesystem::remove(json_file);
 
-  std::ofstream res_file(json_file);
+  std::ofstream res_file(json_file, std::ios::out);
   res_file << std::setw(2) << results << std::endl;
 }
 
@@ -101,15 +101,14 @@ void ChemEnv::write_json_data() {
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
   std::string files_prefix = files_dir + "/" + sys_data.output_file_prefix;
   std::string json_file    = files_prefix + "." + l_module + ".json";
-  bool        json_exists  = std::filesystem::exists(json_file);
-  if(json_exists) {
-    // std::ifstream jread(json_file);
-    // jread >> results;
-    std::filesystem::remove(json_file);
-  }
-
+  // bool        json_exists  = std::filesystem::exists(json_file);
+  // if(json_exists) {
+  //   // std::ifstream jread(json_file);
+  //   // jread >> results;
+  //   std::filesystem::remove(json_file);
+  // }
   // std::cout << std::endl << std::endl << results.dump() << std::endl;
-  std::ofstream res_file(json_file);
+  std::ofstream res_file(json_file, std::ios::out);
   res_file << std::setw(2) << results << std::endl;
 }
 

@@ -62,7 +62,15 @@ The values listed below are the defaults where few options are automatically adj
         "Fe1": [1,2],
         "H": [1,2]
       }
-    },   
+    },
+   "hubbard": {
+      "do_hubbard": false,
+      "t_val": 1.0,
+      "U_val": 4.0,
+      "nelectrons": 0,
+      "is_periodic": [false,false],
+      "lattice": []
+   },
    "PRINT": {
      "mos_txt" : false,
      "mulliken": false,
@@ -123,7 +131,7 @@ The values listed below are the defaults where few options are automatically adj
 
 :xc_type: ``[default=[]]`` A list of strings specifying the exchange and correlation functionals for DFT calculations using `GauXC <https://github.com/wavefunction91/GauXC>`_.
    The list of available functionals using the `builtin` backend can be found at the `ExchCXX <https://github.com/wavefunction91/ExchCXX>`_ repository.
-   The `Libxc` backend is restricted to the list of functionals **without** range separation available at `Libxc <https://tddft.org/programs/libxc/functionals/libxc-6.2.2/>`_.
+   The `Libxc` backend is restricted to the list of functionals **without** range separation available at `Libxc <https://libxc.gitlab.io/functionals/previous/libxc-6.2.2/>`_.
 
 :xc_grid_type: ``[default=UltraFine]`` Specifies the quality of the numerical integration grid. The following values are supported
 
@@ -201,6 +209,15 @@ The values listed below are the defaults where few options are automatically adj
    the percentage (as an integer value) of the total number of processors to use.  
 
 :guess: This block allows specifying options for individual atoms for the initial guess specified as atom symbol with charge and multiplicity values.
+
+:hubbard: This block allows specifying options for performing Hubbard model calculations.
+
+   * :strong:`do_hubbard`: This flag enables the use of the Hubbard model for the SCF calculation.
+   * :strong:`hub_t_val`: ``[default=1.0]`` The hopping parameter t, which represents the strength of the hopping term in the Hubbard model Hamiltonian.
+   * :strong:`hub_U_val`: ``[default=4.0]`` The on-site interaction parameter U, representing the strength of the Coulomb interaction between electrons on the same site.
+   * :strong:`nelectrons`: ``[default=0]`` This integer defines the total number of electrons. It can be adjusted based on the system being modeled. If set to 0, the system will attempt to calculate the electron count automatically.
+   * :strong:`is_periodic`: ``[default=[false,false]]`` Flag to specify whether the system is periodic in space (e.g., a periodic lattice). For 2D systems, you can specify two boolean values to define periodicity along both dimensions.
+   * :strong:`lattice`: ``[default=[]]`` A pair of doubles defining the length and width of the lattice.
 
 :PRINT: This block allows specifying a couple of printing options. When enabled, they provide the following
 

@@ -38,15 +38,12 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
    },   
 
    "PRINT": {
+      "noprint" : false,
       "tamplitudes": [false,0.05],
       "ccsd_diagnostics" : false,
       "rdm": [1,2]
    }   
   }
-
-.. note::
-
-   Setting the QED options in SCF block of the input file enables QED-CCSD calculations.
 
 :threshold: ``[default=1e-6]`` Specifies the convergence threshold of iterative solutions of amplitude equations. The threshold refers to the norm of residual, namely, the deviation from the amplitude equations.
 
@@ -80,6 +77,7 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
 
 :PRINT: This block allows specifying a couple of printing options. When enabled, they provide the following
 
+   * :strong:`noprint`: Suppress all printing output (Note: not implemented for all CC modules yet).
    * :strong:`ccsd_diagnostics`: Print CCSD T1, D1, D2 diagnostics.
    * :strong:`tamplitudes`: Write T1,T2 amplitude tensor values above a certain threshold to text files.
    * :strong:`rdm`: Write 1- and 2-RDM (reduced density matrix) tensors to disk as plain text files. Specifying 1 and/or 2 to write the desired RDM tensor. Specifying 1 also computes the CCSD natural orbitals and writes them to the SCF files directory. This option only applies when CCSD Lambda is run.
@@ -117,7 +115,7 @@ The (T) implementation and additional optimizations on various GPU architectures
 DUCC
 ~~~~
 
-The double unitary CC formalism (DUCC) is described in the following paper. 
+The double unitary coupled-cluster formalism (DUCC) is described in the following paper. 
 
 - Nicholas P. Bauman, Eric J. Bylaska, Sriram Krishnamoorthy, Guang Hao Low, Nathan Wiebe, Christopher E. Granade, Martin Roetteler, Matthias Troyer, Karol Kowalski. **Downfolding of many-body Hamiltonians using active-space models: Extension of the sub-system embedding sub-algebras approach to unitary coupled cluster formalisms.** *The Journal of Chemical Physics (JCP)*, July 2019. https://doi.org/10.1063/1.5094643
 
@@ -130,7 +128,8 @@ The double unitary CC formalism (DUCC) is described in the following paper.
    "nactive_vb"  : 0,
    "ducc_lvl" : 2,
    "qflow_cycles" : 100,
-   "qflow_threshold" : 1e-3
+   "qflow_threshold" : 1e-3,
+   "qflow_nproc_pc" : 0
  }
 
 :nactive_oa: ``[default=0]`` An integer that specifies the number of active occupied alpha orbitals included in the Hamiltonian H.
@@ -146,6 +145,7 @@ The double unitary CC formalism (DUCC) is described in the following paper.
 
 :qflow_cycles: ``[default=100]`` An integer that specifies the number of QFlow cycles. A single QFlow cycle computes all of the effective Hamiltonians of a given size given by nactive_oa, nactive_ob, nactive_va, and nactive_vb and then call solvers to update the global pool of cluster amplitudes.  
 :qflow_threshold: ``[default=1e-3]`` Specifies the convergence threshold for the energy of the leading active space of the QFlow cycles. The QFlow cycles are converged when the difference between the current and previous energy is less than qflow_threshold.
+:qflow_nproc_pc: ``[default=0]`` Number of mpi processes to use to process a single combination.
 
 EOMCCSD
 ~~~~~~~
@@ -178,7 +178,7 @@ RT-EOMCCSD
 
 The RT-EOMCCSD procedure is described in the following paper. 
 
-- Himadri Pathak, Ajay Panyala, Bo Peng, Nicholas P. Bauman, Erdal Mutlu, John J. Rehr, Fernando D. Vila, Karol Kowalski. **Real-Time Equation-of-Motion Coupled-Cluster Cumulant Green’s Function Method: Heterogeneous Parallel Implementation Based on the Tensor Algebra for Many-Body Methods Infrastructure.** *Journal of Chemical Theory and Computation (JCTC)*, April 2023. https://doi.org/10.1021/acs.jctc.3c00045
+- Himadri Pathak, Ajay Panyala, Bo Peng, Nicholas P. Bauman, Erdal Mutlu, John J. Rehr, Fernando D. Vila, Karol Kowalski. **Real-Time Equation-of-Motion Coupled-Cluster Cumulant Green's Function Method: Heterogeneous Parallel Implementation Based on the Tensor Algebra for Many-Body Methods Infrastructure.** *Journal of Chemical Theory and Computation (JCTC)*, April 2023. https://doi.org/10.1021/acs.jctc.3c00045
 
 .. code-block:: json
 
@@ -206,3 +206,4 @@ The RT-EOMCCSD procedure is described in the following paper.
 .. note::
 
    The same options described here can be used to run an RT-EOM-CC2 calculation using task ``rteom_cc2`` in the input file.
+

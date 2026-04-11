@@ -45,6 +45,7 @@ public:
   bool is_unrestricted{};
   bool is_restricted_os{};
   bool is_cuscf{};
+  bool is_hubbard{};
   bool is_ks{};
   bool is_qed{};
   bool do_qed{};

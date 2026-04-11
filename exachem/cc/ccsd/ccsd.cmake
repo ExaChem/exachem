@@ -7,6 +7,7 @@ set(CCSD_SRCS
     ${CCSD_SRCDIR}/cd_ccsd.cpp
     ${CCSD_SRCDIR}/cd_ccsd_cs_ann.cpp
     ${CCSD_SRCDIR}/cd_ccsd_os_ann.cpp
+    ${CCSD_SRCDIR}/canonical/ccsd_canonical.cpp
     ${CCSD_SRCDIR}/canonical/ccsd_cs.cpp
     ${CCSD_SRCDIR}/canonical/ccsd_os.cpp
     )
@@ -16,6 +17,7 @@ set(CCSD_INCLUDES
     ${CCSD_SRCDIR}/cd_ccsd.hpp
     ${CCSD_SRCDIR}/cd_ccsd_cs_ann.hpp
     ${CCSD_SRCDIR}/cd_ccsd_os_ann.hpp
+    ${CCSD_SRCDIR}/canonical/ccsd_canonical.hpp
     ${CCSD_SRCDIR}/canonical/ccsd_cs.hpp
     ${CCSD_SRCDIR}/canonical/ccsd_os.hpp
 )

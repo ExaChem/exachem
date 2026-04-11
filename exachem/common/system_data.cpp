@@ -10,6 +10,7 @@
 
 void SystemData::print() {
   std::cout << "scf_type = " << scf_type_string << std::endl;
+  if(is_hubbard) std::cout << "Hubbard Model enabled" << std::endl;
   if(is_restricted) std::cout << "Closed-Shell SCF" << std::endl;
   if(is_unrestricted) {
     if(is_cuscf) { std::cout << "Constrained Unrestricted SCF" << std::endl; }

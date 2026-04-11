@@ -56,6 +56,10 @@ public:
   double ccsd_st_correlation_energy{0};
   double ccsd_st_total_energy{0};
 
+  // QFLOW
+  int qf_cycle{0};
+  int qf_ncombinations{0};
+
   // tensor files
   std::string t1file;
   std::string t2file;
@@ -67,6 +71,9 @@ public:
 
   std::string full_t1file;
   std::string full_t2file;
+
+  std::string t1file_qflow;
+  std::string t2file_qflow;
 
   bool is_converged(nlohmann::ordered_json& j, std::string task_str) {
     if(j.contains(task_str)) { return j[task_str]["converged"].get<bool>(); }
@@ -85,6 +92,9 @@ public:
     this->t2_1pfile = files_prefix + ".t2_1pamp";
     this->t1_2pfile = files_prefix + ".t1_2pamp";
     this->t2_2pfile = files_prefix + ".t2_2pamp";
+
+    this->t1file_qflow = files_prefix + ".t1amp.qflow";
+    this->t2file_qflow = files_prefix + ".t2amp.qflow";
   }
 
   struct Keep {

@@ -1354,6 +1354,315 @@ void exachem::scf::SCFIter<T>::compute_2bf(
 }
 
 template<typename T>
+void exachem::scf::SCFIter<T>::compute_2bf_hubbard(
+  ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info,
+  const SCFData& scf_data, const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
+  const Matrix& SchwarzK, const size_t& max_nprim4, TAMMTensors<T>& ttensors,
+  EigenTensors& etensors, bool& is_3c_init, const bool do_density_fitting, double xHF) {
+  using libint2::Operator;
+
+  const SystemData&        sys_data    = chem_env.sys_data;
+  const SCFOptions&        scf_options = chem_env.ioptions.scf_options;
+  Scheduler                sch{ec};
+  const libint2::BasisSet& obs = chem_env.shells;
+
+  const bool is_uhf       = sys_data.is_unrestricted;
+  const bool is_rhf       = sys_data.is_restricted;
+  const bool do_snK       = sys_data.do_snK;
+  const bool doK          = xHF != 0.0 && !do_snK;
+  const bool is_spherical = (scf_options.gaussian_type == "spherical");
+
+  Matrix& G      = etensors.G_alpha;
+  Matrix& D      = etensors.D_alpha;
+  Matrix& G_beta = etensors.G_beta;
+  Matrix& D_beta = etensors.D_beta;
+
+  Tensor<T>& F_dummy     = ttensors.F_dummy;
+  Tensor<T>& F_alpha_tmp = ttensors.F_alpha_tmp;
+  Tensor<T>& F_beta_tmp  = ttensors.F_beta_tmp;
+
+  // const double fock_precision = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
+  const auto rank  = ec.pg().rank();
+  const auto N     = sys_data.nbf_orig;
+  const auto debug = scf_options.debug;
+
+  auto   do_t1 = std::chrono::high_resolution_clock::now();
+  Matrix D_shblk_norm;
+
+  double Kfactor = is_rhf ? -0.25 * xHF : -0.5 * xHF;
+
+  // double engine_precision = scf_options.tol_int; // default: 1e-22
+
+  auto shblk = is_spherical ? 2 * obs.max_l() + 1 : ((obs.max_l() + 1) * (obs.max_l() + 2)) / 2;
+
+  // To avoid skipping over the whole Fock matrix
+  Matrix J12(shblk, shblk), J34(shblk, shblk);
+  Matrix D12(shblk, shblk), D34(shblk, shblk);
+  Matrix K1_alpha(shblk, N), K1_beta(shblk, N);
+  Matrix K2_alpha(shblk, N), K2_beta(shblk, N);
+
+  auto comp_2bf_lambda = [&](IndexVector blockid) {
+    const auto s1        = blockid[0];
+    const auto bf1_first = shell2bf[s1];
+    const auto n1        = obs[s1].size();
+    auto       sp12_iter = scf_data.obs_shellpair_data.at(s1).begin();
+
+    auto s2     = blockid[1];
+    auto s2spl  = scf_data.obs_shellpair_list.at(s1);
+    auto s2_itr = std::find(s2spl.begin(), s2spl.end(), s2);
+    if(s2_itr == s2spl.end()) return;
+    auto       s2_pos    = std::distance(s2spl.begin(), s2_itr);
+    auto       bf2_first = shell2bf[s2];
+    const auto n2        = obs[s2].size();
+
+    std::advance(sp12_iter, s2_pos);
+    // const auto* sp12 = sp12_iter->get();
+
+    // To avoid skipping over the whole Fock matrix
+    J12.setZero();
+
+    if(doK) {
+      K1_alpha.setZero();
+      K2_alpha.setZero();
+      if(is_uhf) {
+        K1_beta.setZero();
+        K2_beta.setZero();
+      }
+    }
+
+    // For Coulomb part
+    D12.block(0, 0, n1, n2) = D.block(bf1_first, bf2_first, n1, n2);
+    if(is_uhf) D12.block(0, 0, n1, n2) += D_beta.block(bf1_first, bf2_first, n1, n2);
+
+    for(std::remove_const_t<decltype(s1)> s3 = 0; s3 <= s1; ++s3) {
+      auto       bf3_first = shell2bf[s3];
+      const auto n3        = obs[s3].size();
+
+      auto sp34_iter = scf_data.obs_shellpair_data.at(s3).begin();
+
+      const auto s4_max = (s1 == s3) ? s2 : s3;
+      for(const auto& s4: scf_data.obs_shellpair_list.at(s3)) {
+        if(s4 > s4_max)
+          break; // for each s3, s4 are stored in monotonically increasing
+                 // order
+
+        // must update the iter even if going to skip s4
+        // const auto* sp34 = sp34_iter->get();
+        ++sp34_iter;
+
+        auto       bf4_first = shell2bf[s4];
+        const auto n4        = obs[s4].size();
+
+        // For Coulomb part
+        D34.block(0, 0, n3, n4) = D.block(bf3_first, bf4_first, n3, n4);
+        if(is_uhf) D34.block(0, 0, n3, n4) += D_beta.block(bf3_first, bf4_first, n3, n4);
+
+        // compute the permutational degeneracy (i.e. # of equivalents) of
+        // the given shell set
+        const auto s12_deg    = (s1 == s2) ? 1 : 2;
+        const auto s34_deg    = (s3 == s4) ? 1 : 2;
+        const auto s12_34_deg = (s1 == s3) ? (s2 == s4 ? 1 : 2) : 2;
+        const auto s1234_deg  = s12_deg * s34_deg * s12_34_deg; //*0.5 prescale later
+
+        // compute integrals
+        // const auto* buf_1234 = buf[0];
+        // if(buf_1234 == nullptr) continue; // if all integrals screened out, skip to next quartet
+
+        // 1) each shell set of integrals contributes up to 6 shell sets of
+        // the Fock matrix:
+        //    F(a,b) += 1/2 * (ab|cd) * D(c,d)
+        //    F(c,d) += 1/2 * (ab|cd) * D(a,b)
+        //    F(b,d) -= 1/8 * (ab|cd) * D(a,c)
+        //    F(b,c) -= 1/8 * (ab|cd) * D(a,d)
+        //    F(a,c) -= 1/8 * (ab|cd) * D(b,d)
+        //    F(a,d) -= 1/8 * (ab|cd) * D(b,c)
+        // 2) each permutationally-unique integral (shell set) must be
+        // scaled by its degeneracy,
+        //    i.e. the number of the integrals/sets equivalent to it
+        // 3) the end result must be symmetrized
+
+        auto value_scal_by_deg = chem_env.ioptions.scf_options.hub_U_val * 0.5 * s1234_deg;
+        // value_scal_by_deg *= Kfactor;
+
+        // J and K for closed-shell calculations
+        if(doK && is_rhf) {
+          for(std::remove_const_t<decltype(n1)> f1 = 0, f1234 = 0; f1 != n1; ++f1) {
+            const auto bf1 = f1 + bf1_first;
+            for(std::remove_const_t<decltype(n2)> f2 = 0; f2 != n2; ++f2) {
+              const auto bf2 = f2 + bf2_first;
+              for(std::remove_const_t<decltype(n3)> f3 = 0; f3 != n3; ++f3) {
+                const auto bf3 = f3 + bf3_first;
+                for(std::remove_const_t<decltype(n4)> f4 = 0; f4 != n4; ++f4, ++f1234) {
+                  const auto bf4 = f4 + bf4_first;
+                  if(bf1 != bf2 || bf3 != bf4 || bf1 != bf3) continue;
+
+                  J12(f1, f2) += D34(f3, f4) * value_scal_by_deg;
+                  G(bf3, bf4) += D12(f1, f2) * value_scal_by_deg;
+
+                  // value_scal_by_deg *= Kfactor;
+                  K1_alpha(f1, bf3) += D(bf2, bf4) * value_scal_by_deg * Kfactor;
+                  K1_alpha(f1, bf4) += D(bf2, bf3) * value_scal_by_deg * Kfactor;
+                  K2_alpha(f2, bf3) += D(bf1, bf4) * value_scal_by_deg * Kfactor;
+                  K2_alpha(f2, bf4) += D(bf1, bf3) * value_scal_by_deg * Kfactor;
+                }
+              }
+            }
+          }
+        }
+        else if(doK && is_uhf) {
+          for(std::remove_const_t<decltype(n1)> f1 = 0, f1234 = 0; f1 != n1; ++f1) {
+            const auto bf1 = f1 + bf1_first;
+            for(std::remove_const_t<decltype(n2)> f2 = 0; f2 != n2; ++f2) {
+              const auto bf2 = f2 + bf2_first;
+              for(std::remove_const_t<decltype(n3)> f3 = 0; f3 != n3; ++f3) {
+                const auto bf3 = f3 + bf3_first;
+                for(std::remove_const_t<decltype(n4)> f4 = 0; f4 != n4; ++f4, ++f1234) {
+                  const auto bf4 = f4 + bf4_first;
+                  if(bf1 != bf2 || bf3 != bf4 || bf1 != bf3) continue;
+
+                  auto J34 = D12(f1, f2) * value_scal_by_deg;
+                  J12(f1, f2) += D34(f3, f4) * value_scal_by_deg;
+                  G(bf3, bf4) += J34;
+                  G_beta(bf3, bf4) += J34;
+
+                  K1_alpha(f1, bf3) += D(bf2, bf4) * value_scal_by_deg * Kfactor;
+                  K1_alpha(f1, bf4) += D(bf2, bf3) * value_scal_by_deg * Kfactor;
+                  K2_alpha(f2, bf3) += D(bf1, bf4) * value_scal_by_deg * Kfactor;
+                  K2_alpha(f2, bf4) += D(bf1, bf3) * value_scal_by_deg * Kfactor;
+
+                  K1_beta(f1, bf3) += D_beta(bf2, bf4) * value_scal_by_deg * Kfactor;
+                  K1_beta(f1, bf4) += D_beta(bf2, bf3) * value_scal_by_deg * Kfactor;
+                  K2_beta(f2, bf3) += D_beta(bf1, bf4) * value_scal_by_deg * Kfactor;
+                  K2_beta(f2, bf4) += D_beta(bf1, bf3) * value_scal_by_deg * Kfactor;
+                }
+              }
+            }
+          }
+        }
+        else if(is_rhf) {
+          for(std::remove_const_t<decltype(n1)> f1 = 0, f1234 = 0; f1 != n1; ++f1) {
+            const auto bf1 = f1 + bf1_first;
+            for(std::remove_const_t<decltype(n2)> f2 = 0; f2 != n2; ++f2) {
+              const auto bf2 = f2 + bf2_first;
+              for(std::remove_const_t<decltype(n3)> f3 = 0; f3 != n3; ++f3) {
+                const auto bf3 = f3 + bf3_first;
+                for(std::remove_const_t<decltype(n4)> f4 = 0; f4 != n4; ++f4, ++f1234) {
+                  const auto bf4 = f4 + bf4_first;
+                  if(bf1 != bf2 || bf3 != bf4 || bf1 != bf3) continue;
+                  J12(f1, f2) += D34(f3, f4) * value_scal_by_deg;
+                  G(bf3, bf4) += D12(f1, f2) * value_scal_by_deg;
+                }
+              }
+            }
+          }
+        }
+        else if(is_uhf) {
+          for(std::remove_const_t<decltype(n1)> f1 = 0, f1234 = 0; f1 != n1; ++f1) {
+            const auto bf1 = f1 + bf1_first;
+            for(std::remove_const_t<decltype(n2)> f2 = 0; f2 != n2; ++f2) {
+              const auto bf2 = f2 + bf2_first;
+              for(std::remove_const_t<decltype(n3)> f3 = 0; f3 != n3; ++f3) {
+                const auto bf3 = f3 + bf3_first;
+                for(std::remove_const_t<decltype(n4)> f4 = 0; f4 != n4; ++f4, ++f1234) {
+                  const auto bf4 = f4 + bf4_first;
+                  if(bf1 != bf2 || bf3 != bf4 || bf1 != bf3) continue;
+                  auto J34 = D12(f1, f2) * value_scal_by_deg;
+                  J12(f1, f2) += D34(f3, f4) * value_scal_by_deg;
+                  G(bf3, bf4) += J34;
+                  G_beta(bf3, bf4) += J34;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    // Add contributions to (s1,s2) block
+    G.block(bf1_first, bf2_first, n1, n2) += J12.block(0, 0, n1, n2);
+    if(is_uhf) G_beta.block(bf1_first, bf2_first, n1, n2) += J12.block(0, 0, n1, n2);
+
+    // Add contributions to (s1,N) and (s2,N) blocks
+    if(doK) {
+      G.block(bf1_first, 0, n1, N) += K1_alpha.block(0, 0, n1, N);
+      G.block(bf2_first, 0, n2, N) += K2_alpha.block(0, 0, n2, N);
+      if(is_uhf) {
+        G_beta.block(bf1_first, 0, n1, N) += K1_beta.block(0, 0, n1, N);
+        G_beta.block(bf2_first, 0, n2, N) += K2_beta.block(0, 0, n2, N);
+      }
+    }
+  };
+
+  decltype(do_t1) do_t2;
+  double          do_time;
+
+  if(!do_density_fitting) {
+    D_shblk_norm =
+      chem_env.compute_shellblock_norm(obs, D); // matrix of infty-norms of shell blocks
+    if(is_uhf) D_shblk_norm = D_shblk_norm.cwiseMax(chem_env.compute_shellblock_norm(obs, D_beta));
+
+    G.setZero(N, N);
+    if(is_uhf) G_beta.setZero(N, N);
+    if(!scf_data.do_load_bal) block_for(ec, F_dummy(), comp_2bf_lambda);
+    else {
+      for(Eigen::Index i1 = 0; i1 < etensors.taskmap.rows(); i1++)
+        for(Eigen::Index j1 = 0; j1 < etensors.taskmap.cols(); j1++) {
+          if(etensors.taskmap(i1, j1) == -1 || etensors.taskmap(i1, j1) != rank) continue;
+          IndexVector blockid{(tamm::Index) i1, (tamm::Index) j1};
+          comp_2bf_lambda(blockid);
+        }
+      ec.pg().barrier();
+    }
+
+    // Matrix Gt = 0.5 * (G + G.transpose()); G=Gt
+    // Gt     = 0.5 * (G_beta + G_beta.transpose());
+    eigen_to_tamm_tensor_acc(F_alpha_tmp, G);
+    if(is_uhf) eigen_to_tamm_tensor_acc(F_beta_tmp, G_beta);
+
+    do_t2   = std::chrono::high_resolution_clock::now();
+    do_time = std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
+
+    if(rank == 0 && debug)
+      std::cout << std::fixed << std::setprecision(2) << "Fock build: " << do_time << "s, ";
+
+    // ec.pg().barrier();
+  }
+  else {
+    if(scf_data.direct_df) {
+      G.setZero(N, N);
+      compute_2bf_ri_direct(ec, chem_env, scf_data, shell2bf, ttensors, etensors, SchwarzK);
+    }
+    else {
+      compute_2bf_ri(ec, chem_env, scalapack_info, scf_data, shell2bf, ttensors, etensors,
+                     is_3c_init, xHF);
+    }
+  } // end density fitting
+
+  const auto [mu, nu] = scf_data.tAO.labels<2>("all");
+  Tensor<T>& H1       = ttensors.H1;
+  Tensor<T>& F_alpha  = ttensors.F_alpha;
+  Tensor<T>& F_beta   = ttensors.F_beta;
+
+  // symmetrize the result
+  // clang-format off
+  sch 
+      (F_alpha()       = 0.5 * F_alpha_tmp())
+      (F_alpha(mu,nu) += 0.5 * F_alpha_tmp(nu,mu))
+      (F_alpha()      += H1())
+      .execute();
+  // clang-format on
+
+  if(is_uhf) {
+    // clang-format off
+    sch 
+      (F_beta()       = 0.5 * F_beta_tmp())
+      (F_beta(mu,nu) +=  0.5 * F_beta_tmp(nu,mu))
+      (F_beta()      += H1())
+      .execute();
+    // clang-format on
+  }
+}
+
+template<typename T>
 void exachem::scf::SCFIter<T>::scf_diis(
   ExecutionContext& ec, const ChemEnv& chem_env, const TiledIndexSpace& tAO, Tensor<T> F_alpha,
   Tensor<T> F_beta, Tensor<T> err_mat_alpha, Tensor<T> err_mat_beta, int iter, int max_hist,

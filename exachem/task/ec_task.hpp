@@ -13,6 +13,7 @@
 // clang-format off
 #if defined(ENABLE_CC)
 #include "exachem/cc/ccsd/cd_ccsd_os_ann.hpp"
+#include "exachem/cc/ccsd/canonical/ccsd_canonical.hpp"
 #include "exachem/cc/ccsd/canonical/ccsd_cs.hpp"
 #include "exachem/cc/ccsd/canonical/ccsd_os.hpp"
 // #include "exachem/cc/ccsd/qed/qed_ccsd_cs.hpp"

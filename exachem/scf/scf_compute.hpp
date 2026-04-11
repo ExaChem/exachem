@@ -33,8 +33,8 @@ public:
   virtual void compute_shellpair_list(const ExecutionContext& ec, const libint2::BasisSet& shells,
                                       SCFData& scf_data) const;
   virtual void compute_trafo(const libint2::BasisSet& shells, EigenTensors& etensors) const;
-  virtual std::tuple<int, double> compute_NRE(const ExecutionContext&           ec,
-                                              const std::vector<libint2::Atom>& atoms) const;
+  virtual std::tuple<int, double> compute_NRE(const ExecutionContext& ec,
+                                              const ChemEnv&          chem_env) const;
   virtual std::tuple<shellpair_list_t, shellpair_data_t>
                compute_shellpairs(const libint2::BasisSet& bs1,
                                   const libint2::BasisSet& bs2       = libint2::BasisSet(),

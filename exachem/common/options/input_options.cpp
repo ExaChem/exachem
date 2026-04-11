@@ -34,6 +34,17 @@ void SCFOptions::print() {
   print_option("scf_type", scf_type, 18);
   print_option("cuscf", cuscf, 18);
 
+  // Hubbard
+  if(do_hubbard) {
+    std::cout << " Hubbard options {" << std::endl;
+    print_option("t_val", hub_t_val, 20);
+    print_option("U_val", hub_U_val, 20);
+    print_option("nelectrons", hub_nelectrons, 20);
+    print_vec("is_periodic", hub_is_periodic, 19);
+    print_vec("lattice", hub_lattice, 19);
+    std::cout << " }" << std::endl;
+  }
+
   // QED
   print_vec("qed_omegas", qed_omegas, 17);
   print_vec("qed_lambdas", qed_lambdas, 17);
@@ -250,8 +261,8 @@ void TaskOptions::print() {
   print_option("fcidump", fcidump, 18);
   print_option("cd_2e", cd_2e, 18);
   print_option("ccsd", ccsd, 18);
-  print_option("ccsd_sf", ccsd_sf, 18);
   print_option("ccsd_lambda", ccsd_lambda, 18);
+  print_option("ccsd_canonical", ccsd_canonical, 18);
   print_option("eom_ccsd", eom_ccsd, 18);
   print_option("rteom_cc2", rteom_cc2, 18);
   print_option("rteom_ccsd", rteom_ccsd, 18);

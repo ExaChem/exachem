@@ -137,6 +137,14 @@ public:
   double              xc_snK_etol{1e-10};
   double              xc_snK_ktol{1e-10};
 
+  bool             do_hubbard{false}; // Hubbard model SCF
+  double           hub_t_val{1.0};    // hopping parameter
+  double           hub_U_val{4.0};    // on-site parameter
+  int              hub_nelectrons{0}; // number of electrons
+  std::vector<int> hub_lattice{};     // lattice vectors for 2D systems
+
+  std::vector<bool> hub_is_periodic{false, false}; // is periodic system (for 1D,2D systems)
+
   std::map<std::string, std::tuple<int, int>> guess_atom_options;
 
   std::vector<std::string> xc_type;
@@ -169,6 +177,7 @@ public:
   bool                    balance_tiles{true};
   bool                    profile_ccsd{false};
   double                  lshift{0.0};
+  bool                    noprint{false};
   bool                    ccsd_diagnostics{false};
   std::pair<bool, double> tamplitudes{false, 0.05};
   std::vector<int>        cc_rdm{};
@@ -177,6 +186,7 @@ public:
   int    ducc_lvl{2};
   int    qflow_cycles{100};
   double qflow_threshold{1e-3};
+  int    qflow_nproc_pc{0};
   int    ccsd_maxiter{100};
   bool   freeze_atomic{false};
   int    freeze_core{0};
@@ -312,9 +322,9 @@ public:
   bool                         fcidump{false};
   bool                         cd_2e{false};
   bool                         ccsd{false};
-  bool                         ccsd_sf{false};
   bool                         ccsd_t{false};
   bool                         ccsd_lambda{false};
+  bool                         ccsd_canonical{false};
   bool                         eom_ccsd{false};
   bool                         rteom_cc2{false};
   bool                         rteom_ccsd{false};

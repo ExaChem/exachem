@@ -64,6 +64,14 @@ public:
                            TAMMTensors<T>& ttensors, EigenTensors& etensors, bool& is_3c_init,
                            const bool do_density_fitting, double xHF);
 
+  virtual void compute_2bf_hubbard(ExecutionContext& ec, const ChemEnv& chem_env,
+                                   ScalapackInfo& scalapack_info, const SCFData& scf_data,
+                                   const bool                 do_schwarz_screen,
+                                   const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
+                                   const size_t& max_nprim4, TAMMTensors<T>& ttensors,
+                                   EigenTensors& etensors, bool& is_3c_init,
+                                   const bool do_density_fitting, double xHF);
+
   virtual std::tuple<std::vector<int>, std::vector<int>, std::vector<int>>
   compute_2bf_taskinfo(ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data,
                        const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,

@@ -16,12 +16,14 @@ void IniSystemData::initialize(ChemEnv& chem_env) {
   chem_env.sys_data.is_ks            = false;
   chem_env.sys_data.is_qed           = false;
   chem_env.sys_data.is_cuscf         = false;
+  chem_env.sys_data.is_hubbard       = false;
   chem_env.sys_data.do_qed           = false;
   chem_env.sys_data.do_snK           = false;
   chem_env.sys_data.freeze_atomic    = false;
 
   SCFOptions& scf_options           = chem_env.ioptions.scf_options;
   chem_env.sys_data.scf_type_string = scf_options.scf_type;
+  if(scf_options.do_hubbard) chem_env.sys_data.is_hubbard = true;
 
   if(scf_options.scf_type == "restricted") {
     chem_env.sys_data.focc          = 1;

@@ -17,17 +17,20 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
                                          const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
                                          Tensor<T>& f1, cholesky_2e::V2Tensors<T>& v2tensors,
                                          IndexVector& occ_int_vec, IndexVector& virt_int_vec,
-                                         string& pos_str) {
+                                         const int pos, std::stringstream& qfstr) {
   Scheduler   sch{ec};
   ExecutionHW ex_hw = ec.exhw();
+  const auto  rank  = ec.pg().rank();
 
   SystemData& sys_data = chem_env.sys_data;
   // const size_t nelectrons_alpha = sys_data.nelectrons_alpha;
-  const size_t nactoa   = chem_env.ioptions.ccsd_options.nactive_oa;
-  const size_t nactob   = chem_env.ioptions.ccsd_options.nactive_ob;
-  const size_t nactva   = chem_env.ioptions.ccsd_options.nactive_va;
-  const size_t nactvb   = chem_env.ioptions.ccsd_options.nactive_vb;
-  const int    ducc_lvl = chem_env.ioptions.ccsd_options.ducc_lvl;
+  const size_t nactoa     = chem_env.ioptions.ccsd_options.nactive_oa;
+  const size_t nactob     = chem_env.ioptions.ccsd_options.nactive_ob;
+  const size_t nactva     = chem_env.ioptions.ccsd_options.nactive_va;
+  const size_t nactvb     = chem_env.ioptions.ccsd_options.nactive_vb;
+  const int    ducc_lvl   = chem_env.ioptions.ccsd_options.ducc_lvl;
+  const bool   noprint    = chem_env.ioptions.ccsd_options.noprint;
+  const bool   ducc_print = rank == 0 && !noprint;
 
   const TiledIndexSpace& O  = MO("occ");
   const TiledIndexSpace& Oi = MO("occ_int");
@@ -48,7 +51,6 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
   // auto [p1ai,p2ai] = MO.labels<2>("virt_alpha_int");
   // auto [p1bi,p2bi] = MO.labels<2>("virt_beta_int");
 
-  const auto rank = ec.pg().rank();
   std::cout.precision(15);
 
   std::string files_dir    = chem_env.get_files_dir("", "ducc");
@@ -64,7 +66,7 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
   std::string vtiabc_file = files_prefix + ".vtiabc";
   std::string vtabcd_file = files_prefix + ".vtabcd";
 
-  if(rank == 0) {
+  if(ducc_print) {
     std::cout << std::endl << "Executing DUCC routine" << std::endl;
     std::cout << "======================" << std::endl;
   }
@@ -101,7 +103,7 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
   auto bare_energy     = get_scalar(adj_scalar) + rep_energy;
   auto core_energy     = full_scf_energy - bare_energy;
 
-  if(rank == 0) {
+  if(ducc_print) {
     std::cout << "Number of active occupied alpha = " << nactoa << std::endl;
     std::cout << "Number of active occupied beta  = " << nactob << std::endl;
     std::cout << "Number of active virtual alpha  = " << nactva << std::endl;
@@ -198,13 +200,13 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
     chem_env.run_context["ducc"]["level1"]      = false;
     chem_env.run_context["ducc"]["level2"]      = false;
     chem_env.run_context["ducc"]["total_shift"] = get_scalar(total_shift);
-    if(ec.print()) chem_env.write_run_context();
+    if(ducc_print) chem_env.write_run_context();
   }
   // TODO Setup a print statement here.
   auto   cc_t2 = std::chrono::high_resolution_clock::now();
   double ducc_time =
     std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
-  if(rank == 0)
+  if(ducc_print)
     std::cout << std::endl
               << "DUCC: Time taken to compute Bare Hamiltonian: " << std::fixed
               << std::setprecision(2) << ducc_time << " secs" << std::endl;
@@ -224,9 +226,10 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
     .execute(ex_hw);
   // clang-format on
 
-  if(rank == 0) {
-    std::cout << "Bare Active Space SCF Energy: " << std::setprecision(12)
-              << get_scalar(adj_scalar) + rep_energy << std::endl;
+  const auto bas_energy = get_scalar(adj_scalar) + rep_energy;
+  if(ducc_print) {
+    std::cout << "Bare Active Space SCF Energy: " << std::setprecision(12) << bas_energy
+              << std::endl;
   }
 
   // Level 1
@@ -268,19 +271,19 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
       sch(total_shift() += adj_scalar()).execute();
 
       // energy = get_scalar(adj_scalar);
-      // if(rank == 0)std::cout << "FC F2: " << std::setprecision(12) << energy << std::endl;
+      // if(ducc_print)std::cout << "FC F2: " << std::setprecision(12) << energy << std::endl;
 
       ducc_tensors_io(ec, chem_env, ducc_tensors, dt_files, 1, drestart);
 
       chem_env.run_context["ducc"]["level1"]      = true;
       chem_env.run_context["ducc"]["level2"]      = false;
       chem_env.run_context["ducc"]["total_shift"] = get_scalar(total_shift);
-      if(ec.print()) chem_env.write_run_context();
+      if(ducc_print) chem_env.write_run_context();
     }
     cc_t2     = std::chrono::high_resolution_clock::now();
     ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
     ducc_total_time += ducc_time;
-    if(rank == 0)
+    if(ducc_print)
       std::cout
         << std::endl
         << "DUCC: Time taken to compute single commutator of F and V and double commutator of F: "
@@ -301,7 +304,7 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
       sch(total_shift() += adj_scalar()).execute();
 
       // energy = get_scalar(adj_scalar);
-      // if(rank == 0)std::cout << "FC V2: " << std::setprecision(12) << energy << std::endl;
+      // if(ducc_print)std::cout << "FC V2: " << std::setprecision(12) << energy << std::endl;
 
       // TODO: Enable when we want to do partial restarts within this level
       // ducc_tensors_io(ec, chem_env, ducc_tensors, dt_files, 2, drestart);
@@ -312,25 +315,25 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
       sch(total_shift() += adj_scalar()).execute();
 
       // energy = get_scalar(adj_scalar);
-      // if(rank == 0)std::cout << "FC F3: " << std::setprecision(12) << energy << std::endl;
+      // if(ducc_print)std::cout << "FC F3: " << std::setprecision(12) << energy << std::endl;
 
       ducc_tensors_io(ec, chem_env, ducc_tensors, dt_files, 2, drestart);
       chem_env.run_context["ducc"]["level2"]      = true;
       chem_env.run_context["ducc"]["total_shift"] = get_scalar(total_shift);
-      if(ec.print()) chem_env.write_run_context();
+      if(ducc_print) chem_env.write_run_context();
     }
     cc_t2     = std::chrono::high_resolution_clock::now();
     ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
     ducc_total_time += ducc_time;
-    if(rank == 0)
+    if(ducc_print)
       std::cout << std::endl
                 << "DUCC: Time taken to compute double commutator of V and triple commutator of F: "
                 << std::fixed << std::setprecision(2) << ducc_time << " secs" << std::endl;
   }
 
-  if(rank == 0) {
-    std::cout << "Fully Contracted Scalar: " << std::setprecision(12)
-              << get_scalar(total_shift) - full_scf_energy + rep_energy << std::endl;
+  const auto fc_scalar = get_scalar(total_shift) - full_scf_energy + rep_energy;
+  if(ducc_print) {
+    std::cout << "Fully Contracted Scalar: " << std::setprecision(12) << fc_scalar << std::endl;
   }
 
   // Transform ft from Fock operator to one-electron operator.
@@ -363,7 +366,7 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
     (eob_temp(h1i, h2i) = 1.0 * deltaoo(h3i, h4i) * vtijkl(h3i, h1i, h2i, h4i))
     (adj_scalar() += -0.25 * deltaoo(h1i, h2i) * eob_temp(h1i, h2i))
     (total_shift() -= adj_scalar())
-    .deallocate(deltaoo)
+    .deallocate(deltaoo, eob_temp)
     .execute(ex_hw);
   // clang-format on
 
@@ -373,14 +376,14 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
   // Total Shift = SCF-Bare-AS + Fully Contracted Terms - SCF-DUCC-AS + Froz. Core + Out-of-AS SCF
   // Energy Full SCF = SCF-Bare-AS + Froz. Core + Out-of-AS SCF Energy Total Shift = Full SCF +
   // Fully Contracted Terms - SCF-DUCC-AS
-  if(rank == 0 && ducc_lvl > 0) {
+  if(ducc_print && ducc_lvl > 0) {
     std::cout << std::endl
               << "DUCC SCF energy: " << std::setprecision(12) << new_energy + rep_energy
               << std::endl;
     std::cout << "Total Energy Shift: " << std::setprecision(12) << shift << std::endl;
   }
 
-  if(rank == 0) {
+  if(ducc_print) {
     sys_data.results["output"]["DUCC"]["performance"]["total_time"] = ducc_total_time;
     std::cout << std::endl
               << "DUCC: Total compute time: " << std::fixed << std::setprecision(2)
@@ -407,7 +410,7 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
   };
   const std::string results_file = files_prefix + ".ducc.results";
 
-  if(rank == 0) {
+  if(ducc_print) {
     print_blockstr(results_file, "Begin IJ Block");
     // std::cout << "Begin IJ Block" << std::endl;
   }
@@ -420,7 +423,7 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
     return false;
   };
   print_dense_tensor(X1, dp_cond1, results_file, true);
-  if(rank == 0) {
+  if(ducc_print) {
     print_blockstr(results_file, "End IJ Block", true);
     T first_val                                         = tamm::get_tensor_element(X1, {0, 0});
     sys_data.results["output"]["DUCC"]["results"]["X1"] = first_val;
@@ -428,28 +431,28 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
   Tensor<T>::deallocate(X1);
 
   if(nactva > 0) {
-    if(rank == 0) print_blockstr(results_file, "Begin IA Block", true);
+    if(ducc_print) print_blockstr(results_file, "Begin IA Block", true);
     Tensor<T>                                X2       = to_dense_tensor(ec_dense, ftia);
     std::function<bool(std::vector<size_t>)> dp_cond2 = [&](std::vector<size_t> cond) {
       if(cond[0] < nactoa && cond[1] < nactva) return true;
       return false;
     };
     print_dense_tensor(X2, dp_cond2, results_file, true);
-    if(rank == 0) {
+    if(ducc_print) {
       print_blockstr(results_file, "End IA Block", true);
       T first_val                                         = tamm::get_tensor_element(X2, {0, 0});
       sys_data.results["output"]["DUCC"]["results"]["X2"] = first_val;
     }
     Tensor<T>::deallocate(X2);
 
-    if(rank == 0) print_blockstr(results_file, "Begin AB Block", true);
+    if(ducc_print) print_blockstr(results_file, "Begin AB Block", true);
     Tensor<T>                                X3       = to_dense_tensor(ec_dense, ftab);
     std::function<bool(std::vector<size_t>)> dp_cond3 = [&](std::vector<size_t> cond) {
       if(cond[0] < nactva && cond[1] < nactva && cond[0] <= cond[1]) return true;
       return false;
     };
     print_dense_tensor(X3, dp_cond3, results_file, true);
-    if(rank == 0) {
+    if(ducc_print) {
       print_blockstr(results_file, "End AB Block", true);
       T first_val                                         = tamm::get_tensor_element(X3, {0, 0});
       sys_data.results["output"]["DUCC"]["results"]["X3"] = first_val;
@@ -457,14 +460,14 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
     Tensor<T>::deallocate(X3);
   }
 
-  if(rank == 0) print_blockstr(results_file, "Begin IJKL Block", true);
+  if(ducc_print) print_blockstr(results_file, "Begin IJKL Block", true);
   Tensor<T>                                X4       = to_dense_tensor(ec_dense, vtijkl);
   std::function<bool(std::vector<size_t>)> dp_cond4 = [&](std::vector<size_t> cond) {
     if(cond[0] < nactoa && cond[2] < nactoa && nactoa <= cond[1] && nactoa <= cond[3]) return true;
     return false;
   };
   print_dense_tensor(X4, dp_cond4, results_file, true);
-  if(rank == 0) {
+  if(ducc_print) {
     print_blockstr(results_file, "End IJKL Block", true);
     T first_val = tamm::get_tensor_element(X4, {0, 0, 0, 0});
     sys_data.results["output"]["DUCC"]["results"]["X4"] = first_val;
@@ -472,7 +475,7 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
   Tensor<T>::deallocate(X4);
 
   if(nactva > 0) {
-    if(rank == 0) print_blockstr(results_file, "Begin IJAB Block", true);
+    if(ducc_print) print_blockstr(results_file, "Begin IJAB Block", true);
     Tensor<T>                                X5       = to_dense_tensor(ec_dense, vtijab);
     std::function<bool(std::vector<size_t>)> dp_cond5 = [&](std::vector<size_t> cond) {
       if(cond[0] < nactoa && nactoa <= cond[1] && cond[2] < nactva && nactva <= cond[3])
@@ -480,14 +483,14 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
       return false;
     };
     print_dense_tensor(X5, dp_cond5, results_file, true);
-    if(rank == 0) {
+    if(ducc_print) {
       print_blockstr(results_file, "End IJAB Block", true);
       T first_val = tamm::get_tensor_element(X5, {0, 0, 0, 0});
       sys_data.results["output"]["DUCC"]["results"]["X5"] = first_val;
     }
     Tensor<T>::deallocate(X5);
 
-    if(rank == 0) print_blockstr(results_file, "Begin ABCD Block", true);
+    if(ducc_print) print_blockstr(results_file, "Begin ABCD Block", true);
     Tensor<T>                                X6       = to_dense_tensor(ec_dense, vtabcd);
     std::function<bool(std::vector<size_t>)> dp_cond6 = [&](std::vector<size_t> cond) {
       if(cond[0] < nactva && cond[2] < nactva && nactva <= cond[1] && nactva <= cond[3])
@@ -495,14 +498,14 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
       return false;
     };
     print_dense_tensor(X6, dp_cond6, results_file, true);
-    if(rank == 0) {
+    if(ducc_print) {
       print_blockstr(results_file, "End ABCD Block", true);
       T first_val = tamm::get_tensor_element(X6, {0, 0, 0, 0});
       sys_data.results["output"]["DUCC"]["results"]["X6"] = first_val;
     }
     Tensor<T>::deallocate(X6);
 
-    if(rank == 0) print_blockstr(results_file, "Begin AIJB Block", true);
+    if(ducc_print) print_blockstr(results_file, "Begin AIJB Block", true);
     Tensor<T>                                X7         = to_dense_tensor(ec_dense, vtaijb);
     std::function<bool(std::vector<size_t>)> dp_cond7_1 = [&](std::vector<size_t> cond) {
       if(cond[0] < nactva && cond[2] < nactoa && nactoa <= cond[1] && nactva <= cond[3])
@@ -517,14 +520,14 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
       return false;
     };
     print_dense_tensor(X7, dp_cond7_2, results_file, true);
-    if(rank == 0) print_blockstr(results_file, "End AIJB Block", true);
-    if(rank == 0) {
+    if(ducc_print) print_blockstr(results_file, "End AIJB Block", true);
+    if(ducc_print) {
       T first_val = tamm::get_tensor_element(X7, {0, 0, 0, 0});
       sys_data.results["output"]["DUCC"]["results"]["X7"] = first_val;
     }
     Tensor<T>::deallocate(X7);
 
-    if(rank == 0) print_blockstr(results_file, "Begin IJKA Block", true);
+    if(ducc_print) print_blockstr(results_file, "Begin IJKA Block", true);
     Tensor<T>                                X8       = to_dense_tensor(ec_dense, vtijka);
     std::function<bool(std::vector<size_t>)> dp_cond8 = [&](std::vector<size_t> cond) {
       if(cond[0] < nactoa && cond[2] < nactoa && nactoa <= cond[1] && nactva <= cond[3])
@@ -532,14 +535,14 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
       return false;
     };
     print_dense_tensor(X8, dp_cond8, results_file, true);
-    if(rank == 0) {
+    if(ducc_print) {
       print_blockstr(results_file, "End IJKA Block", true);
       T first_val = tamm::get_tensor_element(X8, {0, 0, 0, 0});
       sys_data.results["output"]["DUCC"]["results"]["X8"] = first_val;
     }
     Tensor<T>::deallocate(X8);
 
-    if(rank == 0) print_blockstr(results_file, "Begin IABC Block", true);
+    if(ducc_print) print_blockstr(results_file, "Begin IABC Block", true);
     Tensor<T>                                X9       = to_dense_tensor(ec_dense, vtiabc);
     std::function<bool(std::vector<size_t>)> dp_cond9 = [&](std::vector<size_t> cond) {
       if(cond[0] < nactoa && cond[2] < nactva && nactva <= cond[1] && nactva <= cond[3])
@@ -547,7 +550,7 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
       return false;
     };
     print_dense_tensor(X9, dp_cond9, results_file, true);
-    if(rank == 0) {
+    if(ducc_print) {
       print_blockstr(results_file, "End IABC Block", true);
       T first_val = tamm::get_tensor_element(X9, {0, 0, 0, 0});
       sys_data.results["output"]["DUCC"]["results"]["X9"] = first_val;
@@ -557,7 +560,7 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
 
   cc_t2     = std::chrono::high_resolution_clock::now();
   ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
-  if(rank == 0)
+  if(ducc_print)
     std::cout << "DUCC: Time to write results: " << std::fixed << std::setprecision(2) << ducc_time
               << " secs" << std::endl;
 
@@ -565,12 +568,12 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
 #if defined(USE_NWQSIM)
   if(chem_env.ioptions.task_options.ducc.second == "qflow")
     DUCC_T_QFLOW_Driver(sch, chem_env, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc,
-                        vtabcd, ex_hw, shift, occ_int_vec, virt_int_vec, pos_str);
+                        vtabcd, ex_hw, shift, occ_int_vec, virt_int_vec, pos, qfstr);
 #endif
   free_tensors(ftij, vtijkl, adj_scalar, total_shift, oei);
   if(nactva > 0) { free_tensors(ftia, ftab, vtijka, vtaijb, vtijab, vtiabc, vtabcd); }
 
-  if(rank == 0) chem_env.write_json_data();
+  if(ducc_print) chem_env.write_json_data();
 }
 
 } // namespace exachem::cc::ducc::internal

@@ -21,3 +21,7 @@ set(TASK_SRCS
     ${TASK_SRCDIR}/numerical_gradients.cpp
    )
 
+if (EXACHEM_HAS_PYTHON)
+  list(APPEND TASK_INCLUDES ${TASK_SRCDIR}/geometric.hpp)
+  list(APPEND TASK_SRCS ${TASK_SRCDIR}/geometric.cpp)
+endif()

@@ -7,8 +7,11 @@
  */
 
 #include <exachem/exachem_git.hpp>
-// #include <exachem/task/ec_task.hpp>
+#if defined(TAMM_USE_PYTHON)
+#include <exachem/task/geometric.hpp>
+#else
 #include <exachem/task/geometry_optimizer.hpp>
+#endif
 #include <tamm/tamm_git.hpp>
 
 int main(int argc, char* argv[]) {
@@ -147,7 +150,13 @@ int main(int argc, char* argv[]) {
       exachem::task::NumericalGradients::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
     }
     else if(task_op[0] == "optimize") {
+#if defined(TAMM_USE_PYTHON)
+      // geomeTRIC
+      exachem::geometric::GeomeTRICOptimizer::optimize(ec, chem_env, atoms, ec_atoms, ec_arg2);
+#else
+      // PyBerny
       exachem::task::GeometryOptimizer::geometry_optimizer(ec, chem_env, atoms, ec_atoms, ec_arg2);
+#endif
     }
     else exachem::task::NumericalGradients::compute_energy(ec, chem_env, ec_arg2);
 

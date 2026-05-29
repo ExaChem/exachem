@@ -1295,6 +1295,11 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
       scf_output.print_mulliken(chem_env, scf_data.etensors.D_alpha, scf_data.etensors.D_beta, S);
     }
 
+    // Multipole moments
+    std::vector<double> multipoles =
+      scf_compute.compute_multipoles(ec, chem_env, scf_data, scf_data.ttensors, scf_data.etensors);
+    if(rank == 0) { scf_output.print_multipoles(chem_env, multipoles); }
+
     scf_final_io(ec, chem_env);
     deallocate_main_tensors(ec, chem_env);
 

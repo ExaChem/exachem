@@ -47,6 +47,7 @@ public:
   virtual void print_energies(ExecutionContext& ec, ChemEnv& chem_env, TAMMTensors<T>& ttensors,
                               EigenTensors& etensors, const SCFData& scf_data,
                               ScalapackInfo& scalapack_info) const;
+  virtual void print_multipoles(ChemEnv& chem_env, const std::vector<double>& multipoles) const;
 };
 
 } // namespace exachem::scf

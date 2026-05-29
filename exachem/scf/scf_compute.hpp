@@ -64,6 +64,11 @@ public:
                                const SCFData& scf_data, ScalapackInfo& scalapack_info,
                                TAMMTensors<T>& ttensors, EigenTensors& etensors) const;
 
+  virtual std::vector<double> compute_multipoles(ExecutionContext& ec, const ChemEnv& chem_env,
+                                                 const SCFData&        scf_data,
+                                                 const TAMMTensors<T>& ttensors,
+                                                 const EigenTensors&   etensors) const;
+
   virtual std::pair<double, double> compute_s2(ExecutionContext& ec, const ChemEnv& chem_env,
                                                const SCFData& scf_data) const;
 

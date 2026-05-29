@@ -91,6 +91,19 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
+  // For QED e^T energy expression
+  const TiledIndexSpace& tAO       = scf_data.tAO;
+  const TiledIndexSpace& tAO_ortho = scf_data.tAO_ortho;
+  const auto [mu, nu, ku]          = tAO.labels<3>("all");
+  const auto [mu_o, nu_o, ku_o]    = tAO_ortho.labels<3>("all");
+  Tensor<T> X_a{tAO, tAO_ortho};
+  Tensor<T> Sm1{tAO, tAO};
+  Tensor<T> Pvir{tAO, tAO};
+  Tensor<T> mu_dot_lambda{tAO, tAO};
+  Tensor<T> dP{tAO, tAO};
+  Tensor<T> dPd{tAO, tAO};
+  Tensor<T> scalar{};
+
   const bool is_uhf = sys_data.is_unrestricted;
   const bool is_rhf = sys_data.is_restricted;
   const bool is_ks  = sys_data.is_ks;
@@ -132,34 +145,34 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
       X_a = ttensors.X_alpha;
 #endif
 
-      energy_qed_et              = 0.0;
       std::vector<double> polvec = {0.0, 0.0, 0.0};
       Scheduler           sch{ec};
-      Tensor<T>           ehf_tmp{scf_data.tAO, scf_data.tAO};
-      Tensor<T>           QED_Qxx{scf_data.tAO, scf_data.tAO};
-      Tensor<T>           QED_Qyy{scf_data.tAO, scf_data.tAO};
-      sch.allocate(ehf_tmp, QED_Qxx, QED_Qyy).execute();
+      // clang-format off
+      sch.allocate(Sm1, Pvir, mu_dot_lambda, dP, dPd, scalar)
+      (Sm1(mu, nu) = X_a(mu, mu_o) * X_a(nu, mu_o))
+      (Pvir(mu, nu) = Sm1(mu, nu))
+      (Pvir(mu, nu) -= 0.5 * ttensors.D_last_alpha(mu, nu))
+      .execute();
+      // clang-format on
 
       for(int i = 0; i < sys_data.qed_nmodes; i++) {
-        polvec = scf_options.qed_polvecs[i];
+        for(int j = 0; j < 3; j++)
+          polvec[j] = scf_options.qed_lambdas[i] * scf_options.qed_polvecs[i][j];
 
         // clang-format off
         sch
-          (ehf_tmp("i", "j")  = X_a("i", "k") * X_a("j", "k"))
-          (ehf_tmp("i", "j") -= 0.5 * ttensors.D_last_alpha("i", "j"))
-          (QED_Qxx("i", "j")  = polvec[0] * ttensors.QED_Dx("i", "j"))
-          (QED_Qxx("i", "j") += polvec[1] * ttensors.QED_Dy("i", "j"))
-          (QED_Qxx("i", "j") += polvec[2] * ttensors.QED_Dz("i", "j"))
-          (QED_Qyy("i", "j")  = QED_Qxx("i", "k") * ehf_tmp("k", "j"))
-          (ehf_tmp("i", "j")  = QED_Qyy("i", "k") * QED_Qxx("k", "j"))
+          (mu_dot_lambda(mu, nu)  = polvec[0] * ttensors.QED_Dx(mu, nu))
+          (mu_dot_lambda(mu, nu) += polvec[1] * ttensors.QED_Dy(mu, nu))
+          (mu_dot_lambda(mu, nu) += polvec[2] * ttensors.QED_Dz(mu, nu))
+          (dP(mu, nu)  = mu_dot_lambda(mu, ku) * Pvir(ku, nu))
+          (dPd(mu, nu)  = dP(mu, ku) * mu_dot_lambda(nu, ku))
+	        (scalar() = 0.5 * dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
           .execute();
         // clang-format on
 
-        const double coupl_strength = pow(scf_options.qed_lambdas[i], 2);
-        energy_qed_et +=
-          0.5 * coupl_strength * tt_trace(ec, ttensors.D_last_alpha, ttensors.ehf_tmp);
+        energy_qed_et += tamm::get_scalar(scalar);
       }
-      sch.deallocate(ehf_tmp, QED_Qxx, QED_Qyy).execute();
+      sch.deallocate(Sm1, Pvir, mu_dot_lambda, dP, dPd, scalar).execute();
 
 #if defined(USE_SCALAPACK)
       Tensor<T>::deallocate(X_a);
@@ -183,8 +196,9 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
     if(is_qed) {
       if(do_qed) {
         energy_qed = tt_trace(ec, ttensors.D_last_alpha, ttensors.QED_1body);
-        energy_qed += tt_trace(ec, ttensors.D_last_alpha, ttensors.QED_2body);
-        energy_qed += tt_trace(ec, ttensors.D_last_beta, ttensors.QED_2body_beta);
+        energy_qed += tt_trace(ec, ttensors.D_last_beta, ttensors.QED_1body);
+        energy_qed += 0.5 * tt_trace(ec, ttensors.D_last_alpha, ttensors.QED_2body);
+        energy_qed += 0.5 * tt_trace(ec, ttensors.D_last_beta, ttensors.QED_2body_beta);
       }
       else { energy_qed = scf_data.eqed; }
 
@@ -197,44 +211,41 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
 #else
       X_a = ttensors.X_alpha;
 #endif
-
-      energy_qed_et              = 0.0;
       std::vector<double> polvec = {0.0, 0.0, 0.0};
       Scheduler           sch{ec};
-      Tensor<double>      ehf_tmp{scf_data.tAO, scf_data.tAO};
-      Tensor<double>      ehf_beta_tmp{scf_data.tAO, scf_data.tAO};
-      Tensor<double>      QED_Qxx{scf_data.tAO, scf_data.tAO};
-      Tensor<double>      QED_Qyy{scf_data.tAO, scf_data.tAO};
-      sch.allocate(ehf_tmp, ehf_beta_tmp, QED_Qxx, QED_Qyy).execute();
+      // clang-format off
+      sch.allocate(Sm1, Pvir, mu_dot_lambda, dP, dPd, scalar)
+	 (Sm1(mu, nu) = X_a(mu, mu_o) * X_a(nu, mu_o))
+	 .execute();
+      // clang-format on
 
       for(int i = 0; i < sys_data.qed_nmodes; i++) {
-        polvec = scf_options.qed_polvecs[i];
+        for(int j = 0; j < 3; j++)
+          polvec[j] = scf_options.qed_lambdas[i] * scf_options.qed_polvecs[i][j];
 
         // clang-format off
         sch
-          (ehf_tmp("i", "j")  = X_a("i", "k") * X_a("j", "k"))
-          (ehf_tmp("i", "j") -= 0.5 * ttensors.D_last_alpha("i", "j"))
-          (QED_Qxx("i", "j")  = polvec[0] * ttensors.QED_Dx("i", "j"))
-          (QED_Qxx("i", "j") += polvec[1] * ttensors.QED_Dy("i", "j"))
-          (QED_Qxx("i", "j") += polvec[2] * ttensors.QED_Dz("i", "j"))
-          (QED_Qyy("i", "j")  = QED_Qxx("i", "k") * ehf_tmp("k", "j"))
-          (ehf_tmp("i", "j")  = QED_Qyy("i", "k") * QED_Qxx("k", "j"))
-          
-          (ehf_beta_tmp("i", "j")  = X_a("i", "k") * X_a("j", "k"))
-          (ehf_beta_tmp("i", "j") -= 0.5 * ttensors.D_last_beta("i", "j"))
-          (QED_Qxx("i", "j")  = polvec[0] * ttensors.QED_Dx("i", "j"))
-          (QED_Qxx("i", "j") += polvec[1] * ttensors.QED_Dy("i", "j"))
-          (QED_Qxx("i", "j") += polvec[2] * ttensors.QED_Dz("i", "j"))
-          (QED_Qyy("i", "j")  = QED_Qxx("i", "k") * ehf_beta_tmp("k", "j"))
-          (ehf_beta_tmp("i", "j")  = QED_Qyy("i", "k") * QED_Qxx("k", "j"))
+          (mu_dot_lambda(mu, nu)  = polvec[0] * ttensors.QED_Dx(mu, nu))
+          (mu_dot_lambda(mu, nu) += polvec[1] * ttensors.QED_Dy(mu, nu))
+          (mu_dot_lambda(mu, nu) += polvec[2] * ttensors.QED_Dz(mu, nu))
+          // Alpha
+          (Pvir(mu, nu) = Sm1(mu, nu))
+          (Pvir(mu, nu) -= ttensors.D_last_alpha(mu, nu))
+            (dP(mu, nu)  = mu_dot_lambda(mu, ku) * Pvir(ku, nu))
+            (dPd(mu, nu)  = dP(mu, ku) * mu_dot_lambda(nu, ku))
+          (scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          // Beta
+          (Pvir(mu, nu) = Sm1(mu, nu))
+          (Pvir(mu, nu) -= ttensors.D_last_beta(mu, nu))
+            (dP(mu, nu)  = mu_dot_lambda(mu, ku) * Pvir(ku, nu))
+            (dPd(mu, nu)  = dP(mu, ku) * mu_dot_lambda(nu, ku))
+          (scalar() += dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
           .execute();
         // clang-format on
 
-        const double coupl_strength = pow(scf_options.qed_lambdas[i], 2);
-        energy_qed_et += coupl_strength * tt_trace(ec, ttensors.D_last_alpha, ttensors.ehf_tmp);
-        energy_qed_et += coupl_strength * tt_trace(ec, ttensors.D_last_beta, ttensors.ehf_beta_tmp);
+        energy_qed_et += tamm::get_scalar(scalar);
       }
-      sch.deallocate(ehf_tmp, ehf_beta_tmp, QED_Qxx, QED_Qyy).execute();
+      sch.deallocate(Sm1, Pvir, mu_dot_lambda, dP, dPd, scalar).execute();
 
 #if defined(USE_SCALAPACK)
       Tensor<double>::deallocate(X_a);
@@ -262,6 +273,95 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
       scf_results["energy_qed_et"] = energy_qed_et;
     }
   }
+}
+
+template<typename T>
+void exachem::scf::SCFIO<T>::print_multipoles(ChemEnv&                   chem_env,
+                                              const std::vector<double>& multipoles) const {
+  const auto& atoms = chem_env.atoms;
+
+  std::vector<double> multipoles_nuc(20);
+
+  for(const auto& atom: atoms) {
+    multipoles_nuc[0] += atom.atomic_number;
+    multipoles_nuc[1] += atom.x * atom.atomic_number;
+    multipoles_nuc[2] += atom.y * atom.atomic_number;
+    multipoles_nuc[3] += atom.z * atom.atomic_number;
+    multipoles_nuc[4] += atom.x * atom.x * atom.atomic_number;
+    multipoles_nuc[5] += atom.x * atom.y * atom.atomic_number;
+    multipoles_nuc[6] += atom.x * atom.z * atom.atomic_number;
+    multipoles_nuc[7] += atom.y * atom.y * atom.atomic_number;
+    multipoles_nuc[8] += atom.y * atom.z * atom.atomic_number;
+    multipoles_nuc[9] += atom.z * atom.z * atom.atomic_number;
+    multipoles_nuc[10] += atom.x * atom.x * atom.x * atom.atomic_number;
+    multipoles_nuc[11] += atom.x * atom.x * atom.y * atom.atomic_number;
+    multipoles_nuc[12] += atom.x * atom.x * atom.z * atom.atomic_number;
+    multipoles_nuc[13] += atom.x * atom.y * atom.y * atom.atomic_number;
+    multipoles_nuc[14] += atom.x * atom.y * atom.z * atom.atomic_number;
+    multipoles_nuc[15] += atom.x * atom.z * atom.z * atom.atomic_number;
+    multipoles_nuc[16] += atom.y * atom.y * atom.y * atom.atomic_number;
+    multipoles_nuc[17] += atom.y * atom.y * atom.z * atom.atomic_number;
+    multipoles_nuc[18] += atom.y * atom.z * atom.z * atom.atomic_number;
+    multipoles_nuc[19] += atom.z * atom.z * atom.z * atom.atomic_number;
+  }
+
+  std::cout << std::fixed << std::setprecision(6) << std::endl << std::endl;
+  std::cout << "                      Electron        Nuclear        Total  " << std::endl;
+  std::cout << "                  ------------------------------------------" << std::endl;
+  std::cout << "    Monopole     " << std::setw(14) << multipoles[0] << std::setw(14)
+            << multipoles_nuc[0] << std::setw(14) << multipoles[0] + multipoles_nuc[0] << std::endl;
+  std::cout << std::endl;
+  std::cout << "      Dipole   X " << std::setw(14) << multipoles[1] << std::setw(14)
+            << multipoles_nuc[1] << std::setw(14) << multipoles[1] + multipoles_nuc[1] << std::endl;
+  std::cout << "      Dipole   Y " << std::setw(14) << multipoles[2] << std::setw(14)
+            << multipoles_nuc[2] << std::setw(14) << multipoles[2] + multipoles_nuc[2] << std::endl;
+  std::cout << "      Dipole   Z " << std::setw(14) << multipoles[3] << std::setw(14)
+            << multipoles_nuc[3] << std::setw(14) << multipoles[3] + multipoles_nuc[3] << std::endl;
+  std::cout << std::endl;
+  std::cout << "  Quadrupole  XX " << std::setw(14) << multipoles[4] << std::setw(14)
+            << multipoles_nuc[4] << std::setw(14) << multipoles[4] + multipoles_nuc[4] << std::endl;
+  std::cout << "  Quadrupole  XY " << std::setw(14) << multipoles[5] << std::setw(14)
+            << multipoles_nuc[5] << std::setw(14) << multipoles[5] + multipoles_nuc[5] << std::endl;
+  std::cout << "  Quadrupole  XZ " << std::setw(14) << multipoles[6] << std::setw(14)
+            << multipoles_nuc[6] << std::setw(14) << multipoles[6] + multipoles_nuc[6] << std::endl;
+  std::cout << "  Quadrupole  YY " << std::setw(14) << multipoles[7] << std::setw(14)
+            << multipoles_nuc[7] << std::setw(14) << multipoles[7] + multipoles_nuc[7] << std::endl;
+  std::cout << "  Quadrupole  YZ " << std::setw(14) << multipoles[8] << std::setw(14)
+            << multipoles_nuc[8] << std::setw(14) << multipoles[8] + multipoles_nuc[8] << std::endl;
+  std::cout << "  Quadrupole  ZZ " << std::setw(14) << multipoles[9] << std::setw(14)
+            << multipoles_nuc[9] << std::setw(14) << multipoles[9] + multipoles_nuc[9] << std::endl;
+  std::cout << std::endl;
+  std::cout << "    Octupole XXX " << std::setw(14) << multipoles[10] << std::setw(14)
+            << multipoles_nuc[10] << std::setw(14) << multipoles[10] + multipoles_nuc[10]
+            << std::endl;
+  std::cout << "    Octupole XXY " << std::setw(14) << multipoles[11] << std::setw(14)
+            << multipoles_nuc[11] << std::setw(14) << multipoles[11] + multipoles_nuc[11]
+            << std::endl;
+  std::cout << "    Octupole XXZ " << std::setw(14) << multipoles[12] << std::setw(14)
+            << multipoles_nuc[12] << std::setw(14) << multipoles[12] + multipoles_nuc[12]
+            << std::endl;
+  std::cout << "    Octupole XYY " << std::setw(14) << multipoles[13] << std::setw(14)
+            << multipoles_nuc[13] << std::setw(14) << multipoles[13] + multipoles_nuc[13]
+            << std::endl;
+  std::cout << "    Octupole XYZ " << std::setw(14) << multipoles[14] << std::setw(14)
+            << multipoles_nuc[14] << std::setw(14) << multipoles[14] + multipoles_nuc[14]
+            << std::endl;
+  std::cout << "    Octupole XZZ " << std::setw(14) << multipoles[15] << std::setw(14)
+            << multipoles_nuc[15] << std::setw(14) << multipoles[15] + multipoles_nuc[15]
+            << std::endl;
+  std::cout << "    Octupole YYY " << std::setw(14) << multipoles[16] << std::setw(14)
+            << multipoles_nuc[16] << std::setw(14) << multipoles[16] + multipoles_nuc[16]
+            << std::endl;
+  std::cout << "    Octupole YYZ " << std::setw(14) << multipoles[17] << std::setw(14)
+            << multipoles_nuc[17] << std::setw(14) << multipoles[17] + multipoles_nuc[17]
+            << std::endl;
+  std::cout << "    Octupole YZZ " << std::setw(14) << multipoles[18] << std::setw(14)
+            << multipoles_nuc[18] << std::setw(14) << multipoles[18] + multipoles_nuc[18]
+            << std::endl;
+  std::cout << "    Octupole ZZZ " << std::setw(14) << multipoles[19] << std::setw(14)
+            << multipoles_nuc[19] << std::setw(14) << multipoles[19] + multipoles_nuc[19]
+            << std::endl;
+  std::cout << std::endl;
 }
 
 template<typename T>

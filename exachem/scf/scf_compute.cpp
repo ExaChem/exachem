@@ -658,6 +658,69 @@ std::tuple<shellpair_list_t, shellpair_data_t> exachem::scf::SCFCompute<T>::comp
 } // END of compute_shellpairs()
 
 template<typename T>
+std::vector<double> exachem::scf::SCFCompute<T>::compute_multipoles(
+  ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data,
+  const TAMMTensors<T>& ttensors, const EigenTensors& etensors) const {
+  using libint2::Engine;
+  using libint2::Operator;
+
+  const SystemData&          sys_data       = chem_env.sys_data;
+  const libint2::BasisSet&   shells         = chem_env.shells;
+  auto                       shell2bf       = shells.shell2bf();
+  const std::vector<size_t>& shell_tile_map = scf_data.shell_tile_map;
+
+  Matrix D = tamm_to_eigen_matrix(ttensors.D_last_alpha);
+  if(sys_data.is_unrestricted) { D += tamm_to_eigen_matrix(ttensors.D_last_beta); }
+
+  std::vector<double> multipoles(20);
+  std::vector<double> result(20);
+
+  Engine engine(Operator::emultipole3, exachem::scf::SCFUtil::max_nprim(shells),
+                exachem::scf::SCFUtil::max_l(shells), 0);
+  auto&  buf = (engine.results());
+
+  auto compute_multipole_lambda = [&](const IndexVector& blockid) {
+    const auto bi0 = blockid[0];
+    const auto bi1 = blockid[1];
+
+    const TAMM_SIZE                            size          = ttensors.S1.block_size(blockid);
+    auto                                       block_dims    = ttensors.S1.block_dims(blockid);
+    const auto                                 s1range_end   = shell_tile_map[bi0];
+    std::remove_const_t<decltype(s1range_end)> s1range_start = 0l;
+    if(bi0 > 0) s1range_start = shell_tile_map[bi0 - 1] + 1;
+
+    for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
+      auto n1  = shells[s1].size();
+      auto bf1 = shell2bf[s1];
+
+      const auto                                 s2range_end   = shell_tile_map[bi1];
+      std::remove_const_t<decltype(s2range_end)> s2range_start = 0l;
+      if(bi1 > 0) s2range_start = shell_tile_map[bi1 - 1] + 1;
+
+      for(auto s2 = s2range_start; s2 <= s2range_end; ++s2) {
+        const auto n2  = shells[s2].size();
+        auto       bf2 = shell2bf[s2];
+
+        // compute shell pair; return is the pointer to the buffer
+        engine.compute(shells[s1], shells[s2]);
+        EXPECTS(buf.size() >= multipoles.size());
+        if(buf[0] == nullptr) continue;
+
+        for(int imult = 0; imult < multipoles.size(); imult++) {
+          Eigen::Map<const Matrix> buf_mat(buf[imult], n1, n2);
+          for(int ibf = 0; ibf < n1; ibf++)
+            for(int jbf = 0; jbf < n2; jbf++)
+              multipoles[imult] -= D(bf1 + ibf, bf2 + jbf) * buf_mat(ibf, jbf);
+        }
+      }
+    }
+  };
+  block_for(ec, ttensors.S1(), compute_multipole_lambda);
+  ec.pg().allreduce(multipoles.data(), result.data(), multipoles.size(), tamm::ReduceOp::sum);
+  return result;
+}
+
+template<typename T>
 std::pair<double, double> exachem::scf::SCFCompute<T>::compute_s2(ExecutionContext& ec,
                                                                   const ChemEnv&    chem_env,
                                                                   const SCFData& scf_data) const {

@@ -10,6 +10,7 @@
 #include "exachem/common/cutils.hpp"
 #include "exachem/common/ec_dplot.hpp"
 #include "exachem/common/options/parser_utils.hpp"
+#include "exachem/scf/scf_gradients.hpp"
 #include <functional>
 
 exachem::scf::SCFEngine::SCFEngine(ExecutionContext& exc, ChemEnv& chem_env) {
@@ -404,7 +405,7 @@ void exachem::scf::SCFEngine::scf_final_io(ExecutionContext& ec, const ChemEnv& 
   const auto rank = ec.pg().rank();
 
   if(!chem_env.ioptions.scf_options.noscf) {
-    if(rank == 0) cout << "writing orbitals and density to disk ... ";
+    if(rank == 0) cout << endl << "writing orbitals and density to disk ... ";
     scf_output.rw_md_disk(ec, chem_env, scalapack_info, scf_data.ttensors, scf_data.etensors,
                           files_prefix);
     if(rank == 0) cout << "done." << endl;
@@ -851,6 +852,16 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     sys_info["nelectrons_beta"]  = chem_env.sys_data.nelectrons_beta;
     chem_env.write_sinfo();
   }
+
+  int max_l = 0;
+  // Compute max_l
+  for(auto s: chem_env.shells) {  // loop over each shell
+    for(const auto& c: s.contr) { // loop over contractions.
+      max_l = std::max(c.l, max_l);
+    }
+  }
+
+  if(rank == 0) { std::cout << "Maximum angular momentum = " << max_l << std::endl; }
 
   // Compute non-negligible shell-pair list
 
@@ -1299,6 +1310,12 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     std::vector<double> multipoles =
       scf_compute.compute_multipoles(ec, chem_env, scf_data, scf_data.ttensors, scf_data.etensors);
     if(rank == 0) { scf_output.print_multipoles(chem_env, multipoles); }
+
+    if(chem_env.sys_data.gradient_type == GradientType::Analytical) {
+      SCFGradients scf_gradients;
+      scf_gradients.scf_gradients(ec, chem_env, SchwarzK, scf_data, scalapack_info,
+                                  gauxc_integrator);
+    }
 
     scf_final_io(ec, chem_env);
     deallocate_main_tensors(ec, chem_env);

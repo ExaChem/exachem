@@ -22,5 +22,6 @@ public:
                                   const std::vector<ECAtom>& ec_atoms, const std::string ec_arg2);
 
   static double get_task_energy(ExecutionContext& ec, ChemEnv& chem_env);
+  static Matrix get_analytical_gradients(ExecutionContext& ec, ChemEnv& chem_env);
 };
 } // namespace exachem::task

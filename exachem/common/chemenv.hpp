@@ -61,6 +61,7 @@ public:
   void write_json_data();
 
   Matrix compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A) const;
+  void   print_gradients(Matrix& gradients);
 
   std::string get_files_dir(std::string scf_type = "", std::string mname = "") {
     if(scf_type.empty()) scf_type = ioptions.scf_options.scf_type;

@@ -94,8 +94,7 @@ void ChemEnv::write_json_data() {
 
   results["input"] = jinput;
 
-  std::string l_module = task_string; // cmodule
-  txt_utils::to_lower(l_module);
+  std::string l_module = txt_utils::to_lower(task_string); // cmodule
 
   std::string files_dir = workspace_dir + ioptions.scf_options.scf_type + "/json";
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
@@ -169,4 +168,37 @@ Matrix ChemEnv::compute_shellblock_norm(const libint2::BasisSet& obs, const Matr
   }
 
   return Ash;
+}
+
+void ChemEnv::print_gradients(Matrix& gradients) {
+  std::cout << std::endl
+            << std::setw(40) << task_string << " ENERGY GRADIENTS" << std::endl
+            << std::endl;
+  std::cout << std::setw(9) << "atom" << std::setw(32) << "coordinates" << std::setw(47)
+            << "gradients" << std::endl;
+
+  std::cout << std::setw(10) << "" << std::left << std::setw(16) << std::string(9, ' ') + "x"
+            << std::setw(16) << std::string(9, ' ') + "y" << std::setw(16)
+            << std::string(9, ' ') + "z" << std::setw(16) << std::string(9, ' ') + "x"
+            << std::setw(16) << std::string(9, ' ') + "y" << std::setw(16)
+            << std::string(9, ' ') + "z" << std::endl;
+
+  std::vector<std::string> grad_vec;
+  for(size_t i = 0; i < ec_atoms.size(); i++) {
+    auto ecatom = ec_atoms[i];
+    std::cout << std::setw(6) << std::left << i + 1 << std::setw(4) << ecatom.esymbol << std::right
+              << std::fixed << std::setprecision(10) << std::setw(16) << ecatom.atom.x
+              << std::setw(16) << ecatom.atom.y << std::setw(16) << ecatom.atom.z << std::setw(16)
+              << gradients(i, 0) << std::setw(16) << gradients(i, 1) << std::setw(16)
+              << gradients(i, 2) << std::endl;
+
+    std::ostringstream grad_i;
+    grad_i << std::left << std::setw(4) << ecatom.esymbol << std::right << std::fixed
+           << std::setprecision(10) << gradients(i, 0) << std::setw(16) << gradients(i, 1)
+           << std::setw(16) << gradients(i, 2);
+    grad_vec.push_back(grad_i.str());
+  }
+
+  sys_data.results["output"]["gradients"][task_string] = grad_vec;
+  write_json_data();
 }

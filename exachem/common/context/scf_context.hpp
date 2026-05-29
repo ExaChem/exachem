@@ -27,6 +27,8 @@ public:
   // bool scf_converged{false};
   bool skip_scf{false};
 
+  Matrix scf_gradients;
+
   void update(double hf_energy, double nuc_repl_energy, std::vector<size_t> shell_tile_map,
               tamm::Tensor<TensorType> C_AO, tamm::Tensor<TensorType> F_AO,
               tamm::Tensor<TensorType> C_beta_AO, tamm::Tensor<TensorType> F_beta_AO, bool no_scf) {

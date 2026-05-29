@@ -221,6 +221,14 @@ void ensure_python_initialized() {
   });
 }
 
+void finalize_python() {
+  if(g_python) {
+    py::gil_scoped_acquire gil;
+    g_python.reset();
+    g_python_initialized = false;
+  }
+}
+
 Eigen::RowVectorXd GeomeTRICOptimizer::current_geometry(const std::vector<Atom>& atoms) {
   Eigen::RowVectorXd geom(3 * atoms.size());
   Eigen::Index       c = 0;
@@ -246,8 +254,7 @@ void GeomeTRICOptimizer::optimize(ExecutionContext& ec, ChemEnv& chem_env, std::
     ensure_python_initialized();
     py::gil_scoped_acquire gil;
 
-    int rank = 0;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    const int rank = ec.pg().rank().value();
 
     const fs::path base_workdir = chem_env.get_files_dir();
     const fs::path workdir =

@@ -12,8 +12,7 @@
 #include <string>
 
 namespace txt_utils {
-void        to_upper(std::string& str);
-void        to_lower(std::string& str);
-std::string str_upper(const std::string str);
+std::string to_upper(std::string str);
+std::string to_lower(std::string str);
 bool        strequal_case(const std::string& a, const std::string& b);
 } // namespace txt_utils

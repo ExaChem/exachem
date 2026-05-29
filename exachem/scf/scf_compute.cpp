@@ -683,7 +683,7 @@ std::vector<double> exachem::scf::SCFCompute<T>::compute_multipoles(
     const auto bi0 = blockid[0];
     const auto bi1 = blockid[1];
 
-    const TAMM_SIZE                            size          = ttensors.S1.block_size(blockid);
+    // const TAMM_SIZE                            size          = ttensors.S1.block_size(blockid);
     auto                                       block_dims    = ttensors.S1.block_dims(blockid);
     const auto                                 s1range_end   = shell_tile_map[bi0];
     std::remove_const_t<decltype(s1range_end)> s1range_start = 0l;
@@ -706,10 +706,10 @@ std::vector<double> exachem::scf::SCFCompute<T>::compute_multipoles(
         EXPECTS(buf.size() >= multipoles.size());
         if(buf[0] == nullptr) continue;
 
-        for(int imult = 0; imult < multipoles.size(); imult++) {
+        for(size_t imult = 0; imult < multipoles.size(); imult++) {
           Eigen::Map<const Matrix> buf_mat(buf[imult], n1, n2);
-          for(int ibf = 0; ibf < n1; ibf++)
-            for(int jbf = 0; jbf < n2; jbf++)
+          for(size_t ibf = 0; ibf < n1; ibf++)
+            for(size_t jbf = 0; jbf < n2; jbf++)
               multipoles[imult] -= D(bf1 + ibf, bf2 + jbf) * buf_mat(ibf, jbf);
         }
       }

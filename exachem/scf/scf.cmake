@@ -17,6 +17,7 @@ set(SCF_INCLUDES
     ${SCF_SRCDIR}/scf_outputs.hpp
     ${SCF_SRCDIR}/scf_engine.hpp
     ${SCF_SRCDIR}/scf_tensors.hpp
+    ${SCF_SRCDIR}/scf_gradients.hpp
     )
 
 set(SCF_SRCS
@@ -31,5 +32,6 @@ set(SCF_SRCS
     ${SCF_SRCDIR}/scf_restart.cpp         
     ${SCF_SRCDIR}/scf_outputs.cpp
     ${SCF_SRCDIR}/scf_engine.cpp
+    ${SCF_SRCDIR}/scf_gradients.cpp
     )
 

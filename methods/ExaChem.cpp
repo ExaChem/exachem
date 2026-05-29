@@ -146,13 +146,30 @@ int main(int argc, char* argv[]) {
     std::vector<Atom>   atoms    = chem_env.atoms;
     std::vector<ECAtom> ec_atoms = chem_env.ec_atoms;
 
-    if(task_op[0] == "gradient") {
+    if(txt_utils::strequal_case(task_op[0], "gradient")) {
+      std::string grad_type = (task_op.size() > 1) ? task_op.at(1) : "analytical";
+      if(!task.scf) grad_type = "numerical"; // force numerical for any non-scf task for now
+      if(grad_type == "numerical") chem_env.sys_data.gradient_type = GradientType::Numerical;
+      else chem_env.sys_data.gradient_type = GradientType::Analytical;
       exachem::task::NumericalGradients::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
     }
-    else if(task_op[0] == "optimize") {
+    else if(txt_utils::strequal_case(task_op[0], "optimize")) {
+      std::string grad_type = (task_op.size() > 1) ? task_op.at(1) : "analytical";
+      if(!task.scf) grad_type = "numerical"; // force numerical for any non-scf task for now
+      if(txt_utils::strequal_case(grad_type, "numerical"))
+        chem_env.sys_data.gradient_type = GradientType::Numerical;
+      else chem_env.sys_data.gradient_type = GradientType::Analytical;
 #if defined(TAMM_USE_PYTHON)
-      // geomeTRIC
-      exachem::geometric::GeomeTRICOptimizer::optimize(ec, chem_env, atoms, ec_atoms, ec_arg2);
+      const std::string geom_opt = (task_op.size() == 3) ? task_op.at(2) : "geometric";
+      if(txt_utils::strequal_case(geom_opt, "pyberny")) {
+        exachem::task::GeometryOptimizer::geometry_optimizer(ec, chem_env, atoms, ec_atoms,
+                                                             ec_arg2);
+      }
+      else { // geomeTRIC
+        exachem::geometric::GeomeTRICOptimizer::optimize(ec, chem_env, atoms, ec_atoms, ec_arg2);
+        ec.pg().barrier();
+        exachem::geometric::finalize_python();
+      }
 #else
       // PyBerny
       exachem::task::GeometryOptimizer::geometry_optimizer(ec, chem_env, atoms, ec_atoms, ec_arg2);

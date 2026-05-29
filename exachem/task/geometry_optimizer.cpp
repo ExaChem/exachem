@@ -64,12 +64,13 @@ void GeometryOptimizer::geometry_optimizer(ExecutionContext& ec, ChemEnv& chem_e
                 << std::setprecision(10) << curr_energy
                 << ", Energy Delta = " << std::setprecision(2) << std::scientific
                 << (curr_energy - prev_energy) << ", Gradient norm = " << std::fixed
-                << std::setprecision(6) << gradients.norm() << std::endl;
+                << std::setprecision(6) << gradients.norm() << std::endl
+                << std::endl;
     }
 
     if(gradients.norm() < grad_tol) {
       if(ec.print()) {
-        std::cout << std::endl << "Optimization converged in " << iter << " steps" << std::endl;
+        std::cout << "Optimization converged in " << iter << " steps" << std::endl;
         std::cout << std::endl << std::setw(34) << "Optimized geometry" << std::endl;
         print_geometry(ec, chem_env);
       }

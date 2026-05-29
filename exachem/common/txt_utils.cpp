@@ -9,22 +9,21 @@
 #include "exachem/common/txt_utils.hpp"
 #include <iostream>
 
-void txt_utils::to_upper(std::string& str) {
-  std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+std::string txt_utils::to_upper(std::string str) {
+  std::transform(str.begin(), str.end(), str.begin(),
+                 [](unsigned char c) { return std::toupper(c); });
+  return str;
 }
 
-void txt_utils::to_lower(std::string& str) {
-  std::transform(str.begin(), str.end(), str.begin(), ::tolower);
-}
-
-std::string txt_utils::str_upper(const std::string str) {
-  std::string ustr = str;
-  std::transform(ustr.begin(), ustr.end(), ustr.begin(), ::toupper);
-  return ustr;
+std::string txt_utils::to_lower(std::string str) {
+  std::transform(str.begin(), str.end(), str.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  return str;
 }
 
 bool txt_utils::strequal_case(const std::string& a, const std::string& b) {
   return a.size() == b.size() and
-         std::equal(a.begin(), a.end(), b.begin(),
-                    [](const char a, const char b) { return std::tolower(a) == std::tolower(b); });
+         std::equal(a.begin(), a.end(), b.begin(), [](unsigned char a, unsigned char b) {
+           return std::tolower(a) == std::tolower(b);
+         });
 }

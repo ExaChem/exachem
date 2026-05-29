@@ -10,6 +10,8 @@
 
 namespace exachem::geometric {
 
+void finalize_python();
+
 class GeomeTRICOptimizer {
 public:
   static void optimize(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Atom>& atoms,

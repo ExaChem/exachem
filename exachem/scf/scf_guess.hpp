@@ -48,8 +48,8 @@ public:
 
   virtual Matrix compute_soad(const std::vector<Atom>& atoms);
 
-  virtual void compute_dipole_ints(ExecutionContext& ec, const SCFData& spvars, Tensor<T>& tensorX,
-                                   Tensor<T>& tensorY, Tensor<T>& tensorZ,
+  virtual void compute_dipole_ints(ExecutionContext& ec, const SCFData& scf_data,
+                                   Tensor<T>& tensorX, Tensor<T>& tensorY, Tensor<T>& tensorZ,
                                    const std::vector<libint2::Atom>& atoms,
                                    const libint2::BasisSet& shells, libint2::Operator otype);
   virtual void compute_1body_ints(ExecutionContext& ec, const SCFData& scf_data,
@@ -72,6 +72,10 @@ public:
   template<int ndim>
   void t2e_hf_helper(const ExecutionContext& ec, tamm::Tensor<T>& ttensor, Matrix& etensor,
                      const std::string& ustr = "");
+
+  void compute_1body_ints_deriv(ExecutionContext& ec, const ChemEnv& chem_env, unsigned deriv_order,
+                                const exachem::scf::SCFData& scf_data,
+                                std::vector<Tensor<T>> d1b_tensors, libint2::Operator obtype);
 };
 
 } // namespace exachem::scf

@@ -271,8 +271,7 @@ void exachem::scf::SCFGuess<T>::compute_1body_ints(ExecutionContext& ec, const S
 
     // cout << "s1-start,end = " << s1range_start << ", " << s1range_end << endl;
     for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
-      // auto bf1 = shell2bf[s1]; //shell2bf[s1]; // first basis function in
-      // this shell
+      // auto bf1 = shell2bf[s1]; // first basis function in this shell
       auto n1 = shells[s1].size();
 
       auto                  s2range_end   = shell_tile_map[bi1];
@@ -1631,6 +1630,164 @@ void exachem::scf::SCFGuess<T>::t2e_hf_helper(const ExecutionContext& ec, tamm::
   etensor = Eigen::Map<Matrix>(Hbuf, N, N);
   Hbufv.clear();
   Hbufv.shrink_to_fit();
+}
+
+template<typename T>
+void exachem::scf::SCFGuess<T>::compute_1body_ints_deriv(ExecutionContext&            ec,
+                                                         const ChemEnv&               chem_env,
+                                                         unsigned                     deriv_order,
+                                                         const exachem::scf::SCFData& scf_data,
+                                                         std::vector<Tensor<T>>       d1b_tensors,
+                                                         libint2::Operator            otype) {
+  using libint2::Atom;
+  using libint2::BasisSet;
+  using libint2::Engine;
+  using libint2::Operator;
+  using libint2::Shell;
+
+  // libint2::operator_traits<Operator::X>::nopers = 1 for X=nuclear,kinetic,overlap
+  int nopers{1};
+  /*switch (otype) {
+    case Operator::overlap:
+      nopers  = libint2::operator_traits<Operator::overlap>::nopers;
+      break;
+    case Operator::kinetic:
+      nopers  = libint2::operator_traits<Operator::kinetic>::nopers;
+      break;
+    case Operator::nuclear:
+      nopers  = libint2::operator_traits<Operator::nuclear>::nopers;
+      break;
+  }*/
+
+  const std::vector<Tile>&          AO_tiles       = scf_data.AO_tiles;
+  const std::vector<size_t>&        shell_tile_map = scf_data.shell_tile_map;
+  const libint2::BasisSet&          shells         = chem_env.shells;
+  const std::vector<libint2::Atom>& atoms          = chem_env.atoms;
+
+  const auto natoms   = atoms.size();
+  const auto nresults = nopers * libint2::num_geometrical_derivatives(natoms, deriv_order);
+
+  Engine engine(otype, shells.max_nprim(), shells.max_l(), deriv_order);
+
+  if(otype == Operator::nuclear) {
+    std::vector<std::pair<double, std::array<double, 3>>> q;
+    for(const auto& atom: atoms) {
+      q.push_back({static_cast<double>(atom.atomic_number), {{atom.x, atom.y, atom.z}}});
+    }
+    engine.set_params(q);
+  }
+
+  Tensor<T> tensor1e = d1b_tensors[0];
+
+  auto       shell2atom          = shells.shell2atom(atoms);
+  const auto nderivcenters_shset = 2 + ((otype == Operator::nuclear) ? natoms : 0);
+  auto&      buf                 = (engine.results());
+
+  auto compute_1body_ints_lambda = [&](const IndexVector& blockid) {
+    auto bi0 = blockid[0];
+    auto bi1 = blockid[1];
+
+    const TAMM_SIZE             size       = tensor1e.block_size(blockid);
+    auto                        block_dims = tensor1e.block_dims(blockid);
+    std::vector<std::vector<T>> dbuf(nresults, std::vector<T>(size));
+
+    const auto bd1 = block_dims[1];
+
+    // auto s1 = blockid[0];
+    auto                  s1range_end   = shell_tile_map[bi0];
+    decltype(s1range_end) s1range_start = 0l;
+    if(bi0 > 0) s1range_start = shell_tile_map[bi0 - 1] + 1;
+
+    // cout << "s1-start,end = " << s1range_start << ", " << s1range_end << endl;
+    for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
+      // auto bf1 = shell2bf[s1]; // first basis function in this shell
+      auto n1    = shells[s1].size();
+      auto atom1 = shell2atom[s1];
+
+      auto                  s2range_end   = shell_tile_map[bi1];
+      decltype(s2range_end) s2range_start = 0l;
+      if(bi1 > 0) s2range_start = shell_tile_map[bi1 - 1] + 1;
+
+      // cout << "s2-start,end = " << s2range_start << ", " << s2range_end << endl;
+
+      // cout << "screend shell pair list = " << s2spl << endl;
+      for(auto s2 = s2range_start; s2 <= s2range_end; ++s2) {
+        // for (auto s2: scf_data.obs_shellpair_list.at(s1)) {
+        // auto s2 = blockid[1];
+        // if (s2>s1) continue;
+
+        if(s2 > s1) {
+          auto s2spl = scf_data.obs_shellpair_list.at(s2);
+          if(std::find(s2spl.begin(), s2spl.end(), s1) == s2spl.end()) continue;
+        }
+        else {
+          auto s2spl = scf_data.obs_shellpair_list.at(s1);
+          if(std::find(s2spl.begin(), s2spl.end(), s2) == s2spl.end()) continue;
+        }
+
+        // auto bf2 = shell2bf[s2];
+        const auto n2    = shells[s2].size();
+        auto       atom2 = shell2atom[s2];
+
+        std::vector<T> tbuf(n1 * n2);
+
+        // compute shell pair; return is the pointer to the buffer
+        engine.compute(shells[s1], shells[s2]);
+        if(buf[0] == nullptr) continue;
+
+        std::size_t shellset_idx = 0;
+        for(unsigned long c = 0; c != nderivcenters_shset; ++c) {
+          auto atom     = (c == 0) ? atom1 : ((c == 1) ? atom2 : c - 2);
+          auto op_start = 3 * atom * nopers;
+          auto op_fence = op_start + nopers;
+          for(auto xyz = 0; xyz != 3; ++xyz, op_start += nopers, op_fence += nopers) {
+            for(unsigned int op = op_start; op != op_fence; ++op, ++shellset_idx) {
+              // "map" buffer to a const Eigen Matrix, and copy it to the
+              // corresponding blocks of the result
+              Eigen::Map<const Matrix> buf_mat(buf[shellset_idx], n1, n2);
+              Eigen::Map<Matrix>(&tbuf[0], n1, n2) = buf_mat;
+
+              auto curshelloffset_i = 0U;
+              auto curshelloffset_j = 0U;
+              for(auto x = s1range_start; x < s1; x++) curshelloffset_i += AO_tiles[x];
+              for(auto x = s2range_start; x < s2; x++) curshelloffset_j += AO_tiles[x];
+
+              size_t     ctx  = 0;
+              const auto dimi = curshelloffset_i + AO_tiles[s1];
+              const auto dimj = curshelloffset_j + AO_tiles[s2];
+
+              for(size_t i = curshelloffset_i; i < dimi; i++) {
+                for(size_t j = curshelloffset_j; j < dimj; j++, ctx++) {
+                  dbuf[op][i * bd1 + j] += tbuf[ctx];
+                }
+              }
+
+              // if(s1!=s2){
+              //     std::vector<T> ttbuf(n1*n2);
+              //     Eigen::Map<Matrix>(ttbuf.data(),n2,n1) = buf_mat.transpose();
+              //     // Matrix buf_mat_trans = buf_mat.transpose();
+              //     size_t c = 0;
+              //     for(size_t j = curshelloffset_j; j < dimj; j++) {
+              //       for(size_t i = curshelloffset_i; i < dimi; i++, c++) {
+              //             dbuf[op][j*block_dims[0]+i] = ttbuf[c];
+              //       }
+              //     }
+              // }
+              // tensor1e.put({s2,s1}, ttbuf);
+            } // op
+          }   // xyz
+        }     // c
+
+      } // s2
+    }   // s1
+
+    for(unsigned int i = 0; i < nresults; ++i) {
+      Tensor<T>& tens = d1b_tensors[i];
+      tens.put(blockid, dbuf[i]);
+    }
+  };
+
+  block_for(ec, tensor1e(), compute_1body_ints_lambda);
 }
 
 template class exachem::scf::SCFGuess<double>;

@@ -18,10 +18,15 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
 
   const TaskOptions& task = chem_env.ioptions.task_options;
 
-  for(auto x: task.operation) {
-    if(!(txt_utils::strequal_case(x, "energy") || txt_utils::strequal_case(x, "gradient") ||
-         txt_utils::strequal_case(x, "optimize"))) {
-      tamm_terminate("ERROR: unsupported task operation [" + x + "] specified");
+  static const std::array<std::unordered_set<std::string>, 3> allowed_op = {{
+    {"energy", "optimize", "gradient"}, // [0] default=energy
+    {"numerical", "analytical"},        // [1] optional
+    {"pyberny", "geometric"}            // [2] optional
+  }};
+
+  for(std::size_t i = 0; i < task.operation.size(); ++i) {
+    if(!allowed_op[i].count(txt_utils::to_lower(task.operation[i]))) {
+      tamm_terminate("ERROR: unsupported task operation [" + task.operation[i] + "] specified");
     }
   }
 
@@ -68,11 +73,7 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
     "eom_ccsd", "gfccsd", "rteom_cc2", "rteom_ccsd", "dlpno_ccsd", "dlpno_ccsd_t"};
 
   for(size_t i = 0; i < tvec.size(); ++i) {
-    if(tvec[i]) {
-      std::string task_string = valid_tasks[i];
-      txt_utils::to_upper(task_string);
-      chem_env.task_string = task_string;
-    }
+    if(tvec[i]) { chem_env.task_string = txt_utils::to_upper(valid_tasks[i]); }
   }
 
 #if !defined(USE_MACIS)

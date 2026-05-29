@@ -41,6 +41,7 @@
     "mp2": false,
     "cd_2e": false,
     "ccsd": false,
-    "ccsd_t": false
+    "ccsd_t": false,
+    "operation": ["gradient"]
   }  
 }

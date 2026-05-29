@@ -50,6 +50,11 @@ public:
                            exachem::scf::TAMMTensors<T>& ttensors,
                            exachem::scf::EigenTensors&   etensors,
                            GauXC::XCIntegrator<Matrix>&  xc_integrator) const;
+
+  virtual std::vector<T> compute_exc_grad(ExecutionContext& ec, const ChemEnv& chem_env,
+                                          exachem::scf::TAMMTensors<T>& ttensors,
+                                          exachem::scf::EigenTensors&   etensors,
+                                          GauXC::XCIntegrator<Matrix>&  xc_integrator) const;
 };
 
 } // namespace exachem::scf

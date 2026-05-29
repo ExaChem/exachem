@@ -388,6 +388,48 @@ T SCFGauxc<T>::compute_xcf(ExecutionContext& ec, const ChemEnv& chem_env,
   return EXC;
 }
 
+template<typename T>
+std::vector<T> SCFGauxc<T>::compute_exc_grad(ExecutionContext& ec, const ChemEnv& chem_env,
+                                             exachem::scf::TAMMTensors<T>& ttensors,
+                                             exachem::scf::EigenTensors&   etensors,
+                                             GauXC::XCIntegrator<Matrix>&  xc_integrator) const {
+  const SystemData& sys_data = chem_env.sys_data;
+
+  const bool is_uhf = sys_data.is_unrestricted;
+  const bool is_rhf = sys_data.is_restricted;
+
+  std::vector<T> exc_grad;
+
+#ifdef GAUXC_HAS_DEVICE
+  exachem::scf::SCFCompute<T> scf_compute;
+  Matrix&                     D_alpha = etensors.D_alpha_cart;
+  Matrix&                     D_beta  = etensors.D_beta_cart;
+  const libint2::BasisSet&    shells  = chem_env.shells;
+  scf_compute.compute_sdens_to_cdens(shells, etensors.D_alpha, D_alpha, etensors);
+  if(is_uhf) scf_compute.compute_sdens_to_cdens(shells, etensors.D_beta, D_beta, etensors);
+#else
+  Matrix& D_alpha   = etensors.D_alpha;
+  Matrix& D_beta    = etensors.D_beta;
+#endif
+
+  if(is_rhf) {
+    exc_grad = xc_integrator.eval_exc_grad(0.5 * D_alpha);
+#ifdef GAUXC_HAS_DEVICE
+    D_alpha.resize(0, 0);
+#endif
+  }
+  else if(is_uhf) {
+    exc_grad = xc_integrator.eval_exc_grad((D_alpha + D_beta), (D_alpha - D_beta));
+#ifdef GAUXC_HAS_DEVICE
+    D_alpha.resize(0, 0);
+    D_beta.resize(0, 0);
+#endif
+  }
+  ec.pg().barrier();
+
+  return exc_grad;
+}
+
 template class SCFGauxc<double>;
 
 } // namespace exachem::scf

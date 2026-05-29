@@ -23,6 +23,16 @@ double NumericalGradients::get_task_energy(ExecutionContext& ec, ChemEnv& chem_e
   return energy;
 }
 
+Matrix NumericalGradients::get_analytical_gradients(ExecutionContext& ec, ChemEnv& chem_env) {
+  const TaskOptions& task = chem_env.ioptions.task_options;
+  Matrix             gradients;
+  // TODO:Assumes only 1 task is true
+  if(task.scf) gradients = chem_env.scf_context.scf_gradients;
+  // else tamm_terminate("Analytical gradients not implemented for this task type yet!");
+
+  return gradients;
+}
+
 double NumericalGradients::compute_energy(ExecutionContext& ec, ChemEnv& chem_env,
                                           std::string ec_arg2) {
   // std::cout << "computing energy" << std::endl;
@@ -36,6 +46,13 @@ Matrix NumericalGradients::compute_numerical_gradients(ExecutionContext& ec, Che
                                                        const std::string          ec_arg2) {
   const auto natoms    = chem_env.atoms.size();
   Matrix     gradients = Matrix::Zero(natoms, 3);
+
+  if(ec.print()) {
+    std::cout << std::endl
+              << "ExaChem Numerical Gradients Module" << std::endl
+              << std::string(34, '-') << std::endl
+              << std::endl;
+  }
 
   // TODO: use the movecs and amplitudes from the original geometry as guess for the displaced ones.
   // parallelize the outer loop.
@@ -109,6 +126,13 @@ Matrix NumericalGradients::compute_gradients(ExecutionContext& ec, ChemEnv& chem
                                              const std::vector<Atom>&   atoms,
                                              const std::vector<ECAtom>& ec_atoms,
                                              const std::string          ec_arg2) {
+  // Check
+  const TaskOptions& task = chem_env.ioptions.task_options;
+  if(task.gw || task.fci || task.fcidump || task.cd_2e || task.ccsd_lambda || task.ducc.first ||
+     task.rteom_ccsd || task.gfccsd) {
+    tamm_terminate("Gradients are not available for the task specified");
+  }
+
   // Compute reference energy
   chem_env.atoms       = atoms;
   chem_env.ec_atoms    = ec_atoms;
@@ -120,40 +144,13 @@ Matrix NumericalGradients::compute_gradients(ExecutionContext& ec, ChemEnv& chem
               << std::setprecision(10) << chem_env.task_energy << std::endl;
   }
 
-  Matrix gradients = compute_numerical_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
+  Matrix gradients;
 
-  if(ec.print()) {
-    std::cout << std::endl
-              << std::setw(40) << chem_env.task_string << " ENERGY GRADIENTS" << std::endl
-              << std::endl;
-    std::cout << std::setw(9) << "atom" << std::setw(32) << "coordinates" << std::setw(47)
-              << "gradients" << std::endl;
+  if(chem_env.sys_data.gradient_type == GradientType::Numerical)
+    gradients = compute_numerical_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
+  else gradients = get_analytical_gradients(ec, chem_env);
 
-    std::cout << std::setw(10) << "" << std::left << std::setw(16) << std::string(9, ' ') + "x"
-              << std::setw(16) << std::string(9, ' ') + "y" << std::setw(16)
-              << std::string(9, ' ') + "z" << std::setw(16) << std::string(9, ' ') + "x"
-              << std::setw(16) << std::string(9, ' ') + "y" << std::setw(16)
-              << std::string(9, ' ') + "z" << std::endl;
-
-    std::vector<string> grad_vec;
-    for(size_t i = 0; i < chem_env.ec_atoms.size(); i++) {
-      auto ecatom = chem_env.ec_atoms[i];
-      std::cout << std::setw(6) << std::left << i + 1 << std::setw(4) << ecatom.esymbol
-                << std::right << std::fixed << std::setprecision(10) << std::setw(16)
-                << ecatom.atom.x << std::setw(16) << ecatom.atom.y << std::setw(16) << ecatom.atom.z
-                << std::setw(16) << gradients(i, 0) << std::setw(16) << gradients(i, 1)
-                << std::setw(16) << gradients(i, 2) << std::endl;
-
-      std::ostringstream grad_i;
-      grad_i << std::left << std::setw(4) << ecatom.esymbol << std::right << std::fixed
-             << std::setprecision(10) << gradients(i, 0) << std::setw(16) << gradients(i, 1)
-             << std::setw(16) << gradients(i, 2);
-      grad_vec.push_back(grad_i.str());
-    }
-
-    chem_env.sys_data.results["output"]["gradients"][chem_env.task_string] = grad_vec;
-    chem_env.write_json_data();
-  }
+  if(ec.print()) { chem_env.print_gradients(gradients); }
 
   return gradients;
 }

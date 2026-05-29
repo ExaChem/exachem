@@ -56,6 +56,38 @@ def check_results(ref_energy,cur_energy,ccsd_threshold,en_str):
         return False
     return True
 
+def parse_gradient_row(row):
+    toks = row.split()
+    if len(toks) != 4:
+        return None, None
+    atom = toks[0]
+    try:
+        vec = [float(toks[1]), float(toks[2]), float(toks[3])]
+    except ValueError:
+        return None, None
+    return atom, vec
+
+def check_gradients(ref_gradients, cur_gradients, grad_threshold):
+    if ref_gradients is None or cur_gradients is None:
+        return False, "missing gradients section"
+
+    ref_method, ref_rows = next(iter(ref_gradients.items()))
+    cur_method, cur_rows = next(iter(cur_gradients.items()))
+
+    if len(ref_rows) != len(cur_rows):
+        return False, ref_method, "gradients row count mismatch"
+
+    for i, (r_row, c_row) in enumerate(zip(ref_rows, cur_rows)):
+        r_atom, r_vec = parse_gradient_row(r_row)
+        c_atom, c_vec = parse_gradient_row(c_row)
+        if r_atom != c_atom:
+            return False, ref_method, "atom label mismatch at row " + str(i+1) + ", reference atom: " + str(r_atom) + ", current atom: " + str(c_atom)
+        for j in range(3):
+            if not isclose(r_vec[j], c_vec[j], grad_threshold):
+                return False, ref_method, "gradients mismatch at row " + str(i+1) + " (atom " + str(r_atom) + "), reference value: " + str(r_vec[j]) + ", current value: " + str(c_vec[j])
+
+    return True, ref_method, ""
+
 missing_tests=[]
 for ref_file in ref_files:
     if ref_file not in cur_files and not file_compare:
@@ -83,6 +115,18 @@ for ref_file in ref_files:
     if not isclose(ref_scf_energy, cur_scf_energy, scf_threshold*10):
         print("ERROR: SCF energy does not match. reference: " + str(ref_scf_energy) + ", current: " + str(cur_scf_energy))
         sys.exit(1)
+
+    ref_has_gradient = "gradients" in ref_data.get("output", {})
+    cur_has_gradient = "gradients" in cur_data.get("output", {})
+
+    if ref_has_gradient or cur_has_gradient:
+        ref_gradients = ref_data["output"].get("gradients")
+        cur_gradients = cur_data["output"].get("gradients")
+        print("Checking gradients", end='')
+        gcheck, method, gmsg = check_gradients(ref_gradients, cur_gradients, 1e-6)
+        if not gcheck:
+            print("\n --> ERROR: " + method + " gradients do not match\n     " + gmsg)
+            sys.exit(1)
 
     ccsd_threshold = ref_data["input"]["CC"]["threshold"]
     if "CCSD" in ref_data["output"]:

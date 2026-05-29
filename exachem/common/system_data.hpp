@@ -18,6 +18,7 @@
 
 namespace fs = std::filesystem;
 
+enum class GradientType { Numerical, Analytical };
 class SystemData {
 public:
   int  n_occ_alpha{};
@@ -56,6 +57,8 @@ public:
   std::string scf_type_string;
   std::string input_molecule;
   std::string output_file_prefix;
+
+  GradientType gradient_type{};
 
   // json data
   nlohmann::ordered_json results;

@@ -81,9 +81,8 @@ bool ECMolden::is_comment(const std::string line) {
 
 bool ECMolden::is_in_line(const std::string str, const std::string line) {
   auto        found = true;
-  std::string str_u = str, str_l = str;
-  txt_utils::to_upper(str_u);
-  txt_utils::to_lower(str_l);
+  std::string str_u = txt_utils::to_upper(str);
+  std::string str_l = txt_utils::to_lower(str);
 
   if(is_comment(line)) found = false;
   else {

@@ -77,7 +77,8 @@ void ECOptionParser::initialize(ChemEnv& chem_env) {
   chem_env.atoms.resize(natom);
   // geom_bohr.resize(natom);
 
-  double convert_units = (geom_units == "angstrom") ? ang2bohr : 1.0;
+  chem_env.sys_data.geom_units = (geom_units == "angstrom") ? GeomUnits::angstrom : GeomUnits::bohr;
+  double convert_units         = (geom_units == "angstrom") ? ang2bohr : 1.0;
 
   for(size_t i = 0; i < natom; i++) {
     std::istringstream iss(geometry[i]);

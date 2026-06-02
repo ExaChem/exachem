@@ -11,21 +11,6 @@
 
 namespace exachem::task {
 
-void GeometryOptimizer::update_geometry(std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
-                                        const Eigen::RowVectorXd& new_geometry) {
-  int c = 0;
-  for(size_t i = 0; i < atoms.size(); i++) {
-    atoms[i].x         = new_geometry(0, c++);
-    ec_atoms[i].atom.x = atoms[i].x;
-
-    atoms[i].y         = new_geometry(0, c++);
-    ec_atoms[i].atom.y = atoms[i].y;
-
-    atoms[i].z         = new_geometry(0, c++);
-    ec_atoms[i].atom.z = atoms[i].z;
-  }
-}
-
 void GeometryOptimizer::geometry_optimizer(ExecutionContext& ec, ChemEnv& chem_env,
                                            std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
                                            std::string ec_arg2) {
@@ -79,7 +64,7 @@ void GeometryOptimizer::geometry_optimizer(ExecutionContext& ec, ChemEnv& chem_e
 
     auto new_geometry = pyberny_instance.step(ec, chem_env, curr_energy, gradients);
 
-    update_geometry(atoms, ec_atoms, new_geometry);
+    chem_env.update_geometry(atoms, ec_atoms, new_geometry);
 
     gradient_matrix = NumericalGradients::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
     RowVectorXd new_gradients =

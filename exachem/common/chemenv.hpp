@@ -60,6 +60,10 @@ public:
   void write_run_context();
   void write_json_data();
 
+  double get_task_energy(ExecutionContext& ec, ChemEnv& chem_env);
+  void   update_geometry(std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
+                         const Eigen::RowVectorXd& new_geometry);
+
   Matrix compute_shellblock_norm(const libint2::BasisSet& obs, const Matrix& A) const;
   void   print_gradients(Matrix& gradients);
 

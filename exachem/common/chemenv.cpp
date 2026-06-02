@@ -26,6 +26,21 @@ int ChemEnv::get_nfcore() {
   return ioptions.ccsd_options.freeze_core;
 }
 
+void ChemEnv::update_geometry(std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
+                              const Eigen::RowVectorXd& new_geometry) {
+  int c = 0;
+  for(size_t i = 0; i < atoms.size(); i++) {
+    atoms[i].x         = new_geometry(0, c++);
+    ec_atoms[i].atom.x = atoms[i].x;
+
+    atoms[i].y         = new_geometry(0, c++);
+    ec_atoms[i].atom.y = atoms[i].y;
+
+    atoms[i].z         = new_geometry(0, c++);
+    ec_atoms[i].atom.z = atoms[i].z;
+  }
+}
+
 void ChemEnv::read_run_context() {
   std::string files_prefix = get_files_prefix();
   std::string json_file    = files_prefix + ".runcontext.json";
@@ -87,6 +102,19 @@ void ChemEnv::write_sinfo() {
 
   std::ofstream res_file(json_file, std::ios::out);
   res_file << std::setw(2) << results << std::endl;
+}
+
+double ChemEnv::get_task_energy(ExecutionContext& ec, ChemEnv& chem_env) {
+  const TaskOptions& task   = chem_env.ioptions.task_options;
+  double             energy = 0.0;
+  // TODO:Assumes only 1 task is true
+  if(task.scf) energy = chem_env.scf_context.hf_energy;
+  else if(task.mp2) energy = chem_env.mp2_context.mp2_total_energy;
+  else if(task.cc2) energy = chem_env.cc_context.cc2_total_energy;
+  else if(task.ccsd) energy = chem_env.cc_context.ccsd_total_energy;
+  else if(task.ccsd_t) energy = chem_env.cc_context.ccsd_pt_total_energy;
+
+  return energy;
 }
 
 void ChemEnv::write_json_data() {

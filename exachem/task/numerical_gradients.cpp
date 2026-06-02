@@ -10,19 +10,6 @@
 
 namespace exachem::task {
 
-double NumericalGradients::get_task_energy(ExecutionContext& ec, ChemEnv& chem_env) {
-  const TaskOptions& task   = chem_env.ioptions.task_options;
-  double             energy = 0.0;
-  // TODO:Assumes only 1 task is true
-  if(task.scf) energy = chem_env.scf_context.hf_energy;
-  else if(task.mp2) energy = chem_env.mp2_context.mp2_total_energy;
-  else if(task.cc2) energy = chem_env.cc_context.cc2_total_energy;
-  else if(task.ccsd) energy = chem_env.cc_context.ccsd_total_energy;
-  else if(task.ccsd_t) energy = chem_env.cc_context.ccsd_pt_total_energy;
-
-  return energy;
-}
-
 Matrix NumericalGradients::get_analytical_gradients(ExecutionContext& ec, ChemEnv& chem_env) {
   const TaskOptions& task = chem_env.ioptions.task_options;
   Matrix             gradients;
@@ -37,7 +24,7 @@ double NumericalGradients::compute_energy(ExecutionContext& ec, ChemEnv& chem_en
                                           std::string ec_arg2) {
   // std::cout << "computing energy" << std::endl;
   execute_task(ec, chem_env, ec_arg2);
-  return get_task_energy(ec, chem_env);
+  return chem_env.get_task_energy(ec, chem_env);
 }
 
 Matrix NumericalGradients::compute_numerical_gradients(ExecutionContext& ec, ChemEnv& chem_env,

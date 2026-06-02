@@ -100,7 +100,7 @@ exachem_compute(py::array_t<double, py::array::c_style | py::array::forcecast> c
 
   Eigen::RowVectorXd geom_bohr = numpy_to_rowvec(coords_bohr);
 
-  exachem::task::GeometryOptimizer::update_geometry(*g_atoms, *g_ec_atoms, geom_bohr);
+  g_chem_env->update_geometry(*g_atoms, *g_ec_atoms, geom_bohr);
 
   auto t_atoms    = g_chem_env->atoms;
   auto t_ec_atoms = g_chem_env->ec_atoms;
@@ -401,7 +401,9 @@ void GeomeTRICOptimizer::optimize(ExecutionContext& ec, ChemEnv& chem_env, std::
       final_geom(3 * i + 2) = ptr[3 * i + 2] * exachem::constants::ang2bohr;
     }
 
-    exachem::task::GeometryOptimizer::update_geometry(atoms, ec_atoms, final_geom);
+    chem_env.update_geometry(atoms, ec_atoms, final_geom);
+    chem_env.atoms    = atoms;
+    chem_env.ec_atoms = ec_atoms;
 
     if(ec.print()) {
       std::cout << std::endl << std::setw(34) << "Optimized geometry" << std::endl;

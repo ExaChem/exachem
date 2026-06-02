@@ -63,12 +63,23 @@ void GeometryAnalyzer::print_geometry(ExecutionContext& ec, ChemEnv& chem_env) {
   if(ec.print()) {
     std::stringstream ss;
     ss << std::endl << std::string(70, '-') << std::endl;
-    ss << std::setw(40) << "Geometry in bohr " << std::endl << std::endl;
+    ss << std::setw(40) << "Geometry in "
+       << ((chem_env.sys_data.geom_units == GeomUnits::angstrom) ? "angstrom" : "bohr") << std::endl
+       << std::endl;
     int i = 1;
     for(auto ecatom: chem_env.ec_atoms) {
+      auto x = (chem_env.sys_data.geom_units == GeomUnits::angstrom)
+                 ? ecatom.atom.x * exachem::constants::bohr2ang
+                 : ecatom.atom.x;
+      auto y = (chem_env.sys_data.geom_units == GeomUnits::angstrom)
+                 ? ecatom.atom.y * exachem::constants::bohr2ang
+                 : ecatom.atom.y;
+      auto z = (chem_env.sys_data.geom_units == GeomUnits::angstrom)
+                 ? ecatom.atom.z * exachem::constants::bohr2ang
+                 : ecatom.atom.z;
       ss << std::setw(6) << std::left << i++ << std::setw(4) << ecatom.esymbol << std::right
-         << std::fixed << std::setprecision(10) << std::setw(16) << ecatom.atom.x << std::setw(16)
-         << ecatom.atom.y << std::setw(16) << ecatom.atom.z << std::endl;
+         << std::fixed << std::setprecision(10) << std::setw(16) << x << std::setw(16) << y
+         << std::setw(16) << z << std::endl;
     }
     std::cout << ss.str();
   }

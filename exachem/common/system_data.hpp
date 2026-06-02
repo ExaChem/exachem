@@ -19,6 +19,7 @@
 namespace fs = std::filesystem;
 
 enum class GradientType { Numerical, Analytical };
+enum class GeomUnits { bohr, angstrom };
 class SystemData {
 public:
   int  n_occ_alpha{};
@@ -59,6 +60,7 @@ public:
   std::string output_file_prefix;
 
   GradientType gradient_type{};
+  GeomUnits    geom_units{};
 
   // json data
   nlohmann::ordered_json results;

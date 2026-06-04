@@ -10,6 +10,7 @@
 #include "exachem/common/chemenv.hpp"
 #include "exachem/common/ec_basis.hpp"
 #include "exachem/common/ec_molden.hpp"
+#include "exachem/common/ec_nwmovecs.hpp"
 #include "exachem/common/system_data.hpp"
 #include "exachem/scf/scf_compute.hpp"
 #include "exachem/scf/scf_iter.hpp"
@@ -35,6 +36,7 @@ protected:
   SCFRestart<TensorType> scf_restart;
   SCFIO<TensorType>      scf_output;
   ECMolden               ec_molden;
+  ECNWChem               ec_nwchem;
   SCFData                scf_data;
 
   std::string files_prefix;

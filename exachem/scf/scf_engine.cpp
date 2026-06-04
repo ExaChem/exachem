@@ -530,6 +530,7 @@ void exachem::scf::SCFEngine::compute_update_xc(ExecutionContext& ec, const Chem
 
 void exachem::scf::SCFEngine::process_molden_data(ExecutionContext& ec, ChemEnv& chem_env) {
   ec_molden.check_molden(chem_env.ioptions.scf_options.moldenfile);
+#if 0
   if(ec_molden.molden_file_valid) ec_molden.read_geom_molden(chem_env);
   if(ec_molden.molden_exists && ec_molden.molden_file_valid) {
     chem_env.shells = ec_molden.read_basis_molden(chem_env);
@@ -539,6 +540,7 @@ void exachem::scf::SCFEngine::process_molden_data(ExecutionContext& ec, ChemEnv&
     // gaussians
     set_basis_purity(chem_env, chem_env.shells);
   }
+#endif
 
 } // process_molden_data
 
@@ -753,11 +755,23 @@ exachem::scf::SCFEngine::update_movecs(ExecutionContext& ec, ChemEnv& chem_env) 
     scf_output.rw_mat_disk(C_beta_tamm, fname[FileType::BetaMovecs],
                            chem_env.ioptions.scf_options.debug, true);
 
-  if(rank == 0 && chem_env.ioptions.scf_options.molden) {
+  if(rank == 0 && (chem_env.ioptions.scf_options.molden || chem_env.ioptions.scf_options.nwchem)) {
     Matrix C_a = tamm_to_eigen_matrix(C_alpha_tamm);
-    if(chem_env.sys_data.is_unrestricted)
-      std::cout << "[MOLDEN] molden write for UHF unsupported!" << std::endl;
-    else ec_molden.write_molden(chem_env, C_a, scf_data.etensors.eps_a, files_prefix);
+    if(chem_env.sys_data.is_unrestricted) {
+      Matrix C_b = tamm_to_eigen_matrix(C_beta_tamm);
+      if(chem_env.ioptions.scf_options.molden)
+        ec_molden.write_molden(chem_env, C_a, scf_data.etensors.eps_a, C_b, scf_data.etensors.eps_b,
+                               files_prefix);
+      if(chem_env.ioptions.scf_options.nwchem)
+        ec_nwchem.write_nwmovecs(chem_env, C_a, scf_data.etensors.eps_a, C_b,
+                                 scf_data.etensors.eps_b, files_prefix);
+    }
+    else {
+      if(chem_env.ioptions.scf_options.molden)
+        ec_molden.write_molden(chem_env, C_a, scf_data.etensors.eps_a, files_prefix);
+      if(chem_env.ioptions.scf_options.nwchem)
+        ec_nwchem.write_nwmovecs(chem_env, C_a, scf_data.etensors.eps_a, files_prefix);
+    }
   }
 
   if(chem_env.sys_data.is_ks) schg.deallocate(scf_data.ttensors.VXC_alpha);
@@ -778,6 +792,7 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
   SCFIterationState scf_state;
   auto              hf_t1 = std::chrono::high_resolution_clock::now();
   process_molden_data(exc, chem_env);
+  ec_nwchem.check_nwmovecs(chem_env.ioptions.scf_options.nwmovecsfile);
 
   const int N = chem_env.shells.nbf();
 
@@ -979,7 +994,9 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     // engine precision controls primitive truncation, assume worst-case scenario
     // (all primitive combinations add up constructively)
 
-    if(chem_env.ioptions.scf_options.restart || chem_env.ioptions.scf_options.noscf) {
+    if(chem_env.ioptions.scf_options.restart ||
+       (chem_env.ioptions.scf_options.noscf &&
+        !(ec_molden.molden_file_valid || ec_nwchem.nwmovecs_file_valid))) {
       // This was originally scf_restart.restart()
       scf_restart.run(ec, chem_env, scalapack_info, scf_data.ttensors, scf_data.etensors,
                       files_prefix);
@@ -992,19 +1009,22 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
       }
       ec.pg().barrier();
     }
-    else if(ec_molden.molden_exists) {
+    else if(ec_molden.molden_file_valid || ec_nwchem.nwmovecs_file_valid) {
       auto N      = chem_env.sys_data.nbf_orig;
       auto Northo = chem_env.sys_data.nbf;
 
       scf_data.etensors.C_alpha.setZero(N, Northo);
       if(chem_env.sys_data.is_unrestricted) scf_data.etensors.C_beta.setZero(N, Northo);
 
-      if(rank == 0) {
+      if(rank == 0 && ec_molden.molden_file_valid) {
         cout << endl << "Reading from molden file provided ..." << endl;
-        if(ec_molden.molden_file_valid) {
-          ec_molden.read_molden<TensorType>(chem_env, scf_data.etensors.C_alpha,
-                                            scf_data.etensors.C_beta);
-        }
+        ec_molden.read_molden<TensorType>(chem_env, scf_data.etensors.C_alpha,
+                                          scf_data.etensors.C_beta);
+      }
+      else if(rank == 0 && ec_nwchem.nwmovecs_file_valid) {
+        cout << endl << "Reading from NWChem movecs file provided ..." << endl;
+        ec_nwchem.read_nwmovecs(chem_env, scf_data.etensors.C_alpha, scf_data.etensors.C_beta,
+                                scf_data.etensors.eps_a, scf_data.etensors.eps_b);
       }
 
       scf_compute.compute_density(ec, chem_env, scf_data, scalapack_info, scf_data.ttensors,

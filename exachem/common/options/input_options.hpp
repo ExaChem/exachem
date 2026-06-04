@@ -116,7 +116,9 @@ public:
   int  scalapack_np_row{0};
   int  scalapack_np_col{0};
   bool molden{false};
+  bool nwchem{false};
   std::string         moldenfile{""};
+  std::string         nwmovecsfile{""};
   int                 n_lindep{0};
   int                 writem{1};
   int                 damp{100}; // density mixing parameter

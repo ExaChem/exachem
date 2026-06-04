@@ -13,6 +13,7 @@ set(COMMON_INCLUDES
     ${COMMON_SRCDIR}/ec_basis.hpp
     ${COMMON_SRCDIR}/ec_dplot.hpp
     ${COMMON_SRCDIR}/ec_molden.hpp
+    ${COMMON_SRCDIR}/ec_nwmovecs.hpp 
     ${COMMON_SRCDIR}/constants.hpp
     ${COMMON_SRCDIR}/libint2_includes.hpp
     ${COMMON_SRCDIR}/context/is_context.hpp
@@ -51,6 +52,7 @@ set(COMMON_SRCS
     ${COMMON_SRCDIR}/options/parse_task_options.cpp  
     ${COMMON_SRCDIR}/options/input_options.cpp
     ${COMMON_SRCDIR}/initialize_system_data.cpp
-    ${COMMON_SRCDIR}/ec_molden.cpp                   
+    ${COMMON_SRCDIR}/ec_molden.cpp
+    ${COMMON_SRCDIR}/ec_nwmovecs.cpp                   
     )
 

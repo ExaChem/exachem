@@ -25,7 +25,7 @@ public:
   bool molden_file_valid = false;
 
   template<typename T>
-  void reorder_molden_orbitals(const bool is_spherical, std::vector<AtomInfo>& atominfo,
+  void reorder_molden_orbitals(const bool is_spherical, const libint2::BasisSet& shells,
                                Matrix& smat, Matrix& dmat, const bool reorder_cols = true,
                                const bool reorder_rows = true);
 
@@ -38,6 +38,8 @@ public:
 
   void write_molden(ChemEnv& chem_env, Matrix& C_a, std::vector<double>& eps_a,
                     std::string files_prefix);
+  void write_molden(ChemEnv& chem_env, Matrix& C_a, std::vector<double>& eps_a, Matrix& C_b,
+                    std::vector<double>& eps_b, std::string files_prefix);
 
   // TODO: is this needed? - currently does not make a difference
   libint2::BasisSet read_basis_molden(const ChemEnv& chem_env);

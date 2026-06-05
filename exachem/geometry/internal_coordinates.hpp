@@ -12,9 +12,11 @@
  *
  */
 
-#include "exachem/task/geometry_analysis.hpp"
+#pragma once
 
-namespace exachem::task {
+#include "exachem/geometry/geometry_analysis.hpp"
+
+namespace exachem::geometry {
 
 class InternalCoordinateUtils {
 public:
@@ -83,4 +85,4 @@ public:
 
 InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool torsions);
 
-} // namespace exachem::task
+} // namespace exachem::geometry

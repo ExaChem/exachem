@@ -112,11 +112,25 @@ A task automatically runs the tasks it depends on. For e.g. if **ccsd** is enabl
    * :strong:`default`  : Runs the double unitary CC formalism (DUCC).
    * :strong:`qflow`  : Runs the quantum flow variant.
 
-:operation: ``[default=energy]`` Specifies the calculation that will be performed in the enabled task.
+:operation: ``[default=energy]`` Specifies the calculation that will be performed in the enabled task. ``operation`` is a list whose first element is the calculation type; the optional remaining elements select the gradient method and, for an optimization, the optimizer.
 
    * :strong:`energy`  : Computes the single point energy.
-   * :strong:`gradient`: Computes numerical gradients for the level of theory specified.
-   * :strong:`optimize`: Minimize the energy by varying the molecular structure.
+   * :strong:`gradient`: Computes the gradients for the level of theory specified. An optional second list element selects the gradient method:
+
+     * :strong:`analytical` ``[default for HF/DFT]`` : Use analytical gradients.
+     * :strong:`numerical` ``[default for all other methods]`` : Use numerical (finite-difference) gradients.
+
+     For example, ``"operation": ["gradient", "analytical"]``.
+
+   * :strong:`optimize`: Minimize the energy by varying the molecular structure. Optional second and third list elements select the gradient method and the optimizer, respectively.
+
+     * Second element - gradient method: :strong:`analytical` ``[default for HF/DFT]`` or :strong:`numerical` ``[default for all other methods]`` (same as for **gradient**).
+     * Third element - optimizer:
+
+       * :strong:`geometric` ``[default when Python bindings are enabled]`` : ExaChem calls the Python `geomeTRIC <https://geometric.readthedocs.io>`_ library to perform the geometry optimization.
+       * :strong:`pyberny` : Use the native C++ PyBerny implementation in ExaChem.
+
+     For example, ``"operation": ["optimize", "analytical", "geometric"]`` is the default when Python bindings are enabled, while ``"operation": ["optimize", "analytical", "pyberny"]`` switches to the native C++ PyBerny optimizer.
 
 
 .. _DPLOT:

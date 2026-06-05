@@ -11,9 +11,11 @@
  *
  */
 
-#include "exachem/task/internal_coordinates.hpp"
+#pragma once
 
-namespace exachem::task {
+#include "exachem/geometry/internal_coordinates.hpp"
+
+namespace exachem::optimizers {
 // Forward declarations for free functions implemented in pyberny_impl.cpp
 // For now they are commented out to avoid them being used anywhere else other than pyberny_impl.cpp
 // std::tuple<std::vector<int>, Eigen::MatrixXd> get_init_geometry(ExecutionContext& ec, ChemEnv&
@@ -79,22 +81,22 @@ public:
   OptPoint& operator=(OptPoint&&) noexcept = default;
 };
 
-class Pyberny {
+class PyBerny {
 public:
   // declaring variables
-  OptPoint                           best;
-  OptPoint                           previous;
-  OptPoint                           predicted;
-  OptPoint                           interpolated;
-  OptPoint                           future;
-  Eigen::MatrixXd                    hessian;
-  exachem::task::InternalCoordinates int_coords;
-  bool                               first = true;
-  double                             trust = 0.3;
+  OptPoint                               best;
+  OptPoint                               previous;
+  OptPoint                               predicted;
+  OptPoint                               interpolated;
+  OptPoint                               future;
+  Eigen::MatrixXd                        hessian;
+  exachem::geometry::InternalCoordinates int_coords;
+  bool                                   first = true;
+  double                                 trust = 0.3;
 
   // constructor
-  Pyberny(ExecutionContext& ec, ChemEnv& chem_env) {
-    int_coords = exachem::task::InternalCoords(ec, chem_env, false);
+  PyBerny(ExecutionContext& ec, ChemEnv& chem_env) {
+    int_coords = exachem::geometry::InternalCoords(ec, chem_env, false);
   }
 
   std::tuple<Eigen::RowVectorXd, OptPoint, OptPoint, OptPoint, OptPoint, OptPoint, double,
@@ -102,22 +104,22 @@ public:
   optimizer_berny(ExecutionContext& ec, ChemEnv& chem_env, double energy, Eigen::MatrixXd gradients,
                   bool first, OptPoint best, OptPoint previous, OptPoint predicted,
                   OptPoint interpolated_, OptPoint future, double trust, Eigen::MatrixXd hessian,
-                  exachem::task::InternalCoordinates int_coords);
+                  exachem::geometry::InternalCoordinates int_coords);
 
   // Destructor
-  ~Pyberny() = default;
+  ~PyBerny() = default;
 
   // Copy constructor
-  Pyberny(const Pyberny&) = default;
+  PyBerny(const PyBerny&) = default;
 
   // Move constructor
-  Pyberny(Pyberny&&) noexcept = default;
+  PyBerny(PyBerny&&) noexcept = default;
 
   // Copy assignment
-  Pyberny& operator=(const Pyberny&) = default;
+  PyBerny& operator=(const PyBerny&) = default;
 
   // Move assignment
-  Pyberny& operator=(Pyberny&&) noexcept = default;
+  PyBerny& operator=(PyBerny&&) noexcept = default;
 
   // optimizer function, returns next geometry
   Eigen::RowVectorXd step(ExecutionContext& ec, ChemEnv& chem_env, double curr_energy,
@@ -143,6 +145,10 @@ public:
 
     return new_geometry;
   }
+
+  // Full optimization driver: numerical gradients + berny steps until convergence.
+  static void optimize(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Atom>& atoms,
+                       std::vector<ECAtom>& ec_atoms, std::string ec_arg2);
 };
 
-} // namespace exachem::task
+} // namespace exachem::optimizers

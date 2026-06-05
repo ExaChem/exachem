@@ -1,5 +1,8 @@
 // geometric.cpp
-#include <exachem/task/geometric.hpp>
+
+#include "exachem/optimizers/geometric.hpp"
+#include "exachem/gradients/ec_gradients.hpp"
+#include "exachem/task/task_interface.hpp"
 
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
@@ -8,7 +11,7 @@
 namespace py = pybind11;
 namespace fs = std::filesystem;
 
-namespace exachem::geometric {
+namespace exachem::optimizers {
 
 std::unique_ptr<py::scoped_interpreter> g_python;
 std::once_flag                          g_python_once;
@@ -108,10 +111,9 @@ exachem_compute(py::array_t<double, py::array::c_style | py::array::forcecast> c
   g_chem_env->atoms    = *g_atoms;
   g_chem_env->ec_atoms = *g_ec_atoms;
 
-  const double energy =
-    exachem::task::NumericalGradients::compute_energy(*g_ec, *g_chem_env, *g_ec_arg2);
+  const double energy = exachem::task::compute_energy(*g_ec, *g_chem_env, *g_ec_arg2);
 
-  const Eigen::MatrixXd grad_mat = exachem::task::NumericalGradients::compute_gradients(
+  const Eigen::MatrixXd grad_mat = exachem::gradients::ECGradients::compute_gradients(
     *g_ec, *g_chem_env, *g_atoms, *g_ec_atoms, *g_ec_arg2);
 
   const Eigen::RowVectorXd grad_flat =
@@ -229,7 +231,7 @@ void finalize_python() {
   }
 }
 
-Eigen::RowVectorXd GeomeTRICOptimizer::current_geometry(const std::vector<Atom>& atoms) {
+Eigen::RowVectorXd GeomeTRIC::current_geometry(const std::vector<Atom>& atoms) {
   Eigen::RowVectorXd geom(3 * atoms.size());
   Eigen::Index       c = 0;
 
@@ -242,8 +244,8 @@ Eigen::RowVectorXd GeomeTRICOptimizer::current_geometry(const std::vector<Atom>&
   return geom;
 }
 
-void GeomeTRICOptimizer::optimize(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Atom>& atoms,
-                                  std::vector<ECAtom>& ec_atoms, const std::string& ec_arg2) {
+void GeomeTRIC::optimize(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Atom>& atoms,
+                         std::vector<ECAtom>& ec_atoms, const std::string& ec_arg2) {
   g_ec       = &ec;
   g_chem_env = &chem_env;
   g_atoms    = &atoms;
@@ -334,7 +336,7 @@ void GeomeTRICOptimizer::optimize(ExecutionContext& ec, ChemEnv& chem_env, std::
     kwargs["logIni"]  = logini_path.string();
 
     // kwargs["coordsys"] = ...;
-    // kwargs["maxiter"] = ...;
+    kwargs["maxiter"] = 300;
     // kwargs["transition"] = ...;
     // kwargs["hessian"] = ...;
     // kwargs["constraints"] = ...;
@@ -407,11 +409,11 @@ void GeomeTRICOptimizer::optimize(ExecutionContext& ec, ChemEnv& chem_env, std::
 
     if(ec.print()) {
       std::cout << std::endl << std::setw(34) << "Optimized geometry" << std::endl;
-      exachem::task::print_geometry(ec, chem_env);
+      exachem::geometry::print_geometry(ec, chem_env);
     }
   } catch(const py::error_already_set& e) {
     throw std::runtime_error(std::string("Python/geomeTRIC error: ") + e.what());
   }
 }
 
-} // namespace exachem::geometric
+} // namespace exachem::optimizers

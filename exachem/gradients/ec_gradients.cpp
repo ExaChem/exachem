@@ -6,11 +6,12 @@
  * See LICENSE.txt for details
  */
 
-#include "exachem/task/numerical_gradients.hpp"
+#include "exachem/gradients/ec_gradients.hpp"
+#include "exachem/task/task_interface.hpp"
 
-namespace exachem::task {
+namespace exachem::gradients {
 
-Matrix NumericalGradients::get_analytical_gradients(ExecutionContext& ec, ChemEnv& chem_env) {
+Matrix ECGradients::get_analytical_gradients(ExecutionContext& ec, ChemEnv& chem_env) {
   const TaskOptions& task = chem_env.ioptions.task_options;
   Matrix             gradients;
   // TODO:Assumes only 1 task is true
@@ -20,17 +21,10 @@ Matrix NumericalGradients::get_analytical_gradients(ExecutionContext& ec, ChemEn
   return gradients;
 }
 
-double NumericalGradients::compute_energy(ExecutionContext& ec, ChemEnv& chem_env,
-                                          std::string ec_arg2) {
-  // std::cout << "computing energy" << std::endl;
-  execute_task(ec, chem_env, ec_arg2);
-  return chem_env.get_task_energy(ec, chem_env);
-}
-
-Matrix NumericalGradients::compute_numerical_gradients(ExecutionContext& ec, ChemEnv& chem_env,
-                                                       const std::vector<Atom>&   atoms,
-                                                       const std::vector<ECAtom>& ec_atoms,
-                                                       const std::string          ec_arg2) {
+Matrix ECGradients::compute_numerical_gradients(ExecutionContext& ec, ChemEnv& chem_env,
+                                                const std::vector<Atom>&   atoms,
+                                                const std::vector<ECAtom>& ec_atoms,
+                                                const std::string          ec_arg2) {
   const auto natoms    = chem_env.atoms.size();
   Matrix     gradients = Matrix::Zero(natoms, 3);
 
@@ -68,7 +62,7 @@ Matrix NumericalGradients::compute_numerical_gradients(ExecutionContext& ec, Che
       chem_env.atoms    = patoms;
       chem_env.ec_atoms = pec_atoms;
 
-      const auto energy_pos = compute_energy(ec, chem_env, ec_arg2);
+      const auto energy_pos = exachem::task::compute_energy(ec, chem_env, ec_arg2);
 
       // Displace in the negative direction
       patoms    = atoms;
@@ -88,7 +82,7 @@ Matrix NumericalGradients::compute_numerical_gradients(ExecutionContext& ec, Che
       chem_env.atoms    = patoms;
       chem_env.ec_atoms = pec_atoms;
 
-      const auto energy_neg = compute_energy(ec, chem_env, ec_arg2);
+      const auto energy_neg = exachem::task::compute_energy(ec, chem_env, ec_arg2);
 
       gradients(i, j) = (energy_pos - energy_neg) / (2.0 * delta);
 
@@ -109,10 +103,10 @@ Matrix NumericalGradients::compute_numerical_gradients(ExecutionContext& ec, Che
   return gradients;
 }
 
-Matrix NumericalGradients::compute_gradients(ExecutionContext& ec, ChemEnv& chem_env,
-                                             const std::vector<Atom>&   atoms,
-                                             const std::vector<ECAtom>& ec_atoms,
-                                             const std::string          ec_arg2) {
+Matrix ECGradients::compute_gradients(ExecutionContext& ec, ChemEnv& chem_env,
+                                      const std::vector<Atom>&   atoms,
+                                      const std::vector<ECAtom>& ec_atoms,
+                                      const std::string          ec_arg2) {
   // Check
   const TaskOptions& task = chem_env.ioptions.task_options;
   if(task.gw || task.fci || task.fcidump || task.cd_2e || task.ccsd_lambda || task.ducc.first ||
@@ -123,7 +117,7 @@ Matrix NumericalGradients::compute_gradients(ExecutionContext& ec, ChemEnv& chem
   // Compute reference energy
   chem_env.atoms       = atoms;
   chem_env.ec_atoms    = ec_atoms;
-  chem_env.task_energy = compute_energy(ec, chem_env, ec_arg2);
+  chem_env.task_energy = exachem::task::compute_energy(ec, chem_env, ec_arg2);
 
   if(ec.print()) {
     std::cout << std::endl
@@ -142,4 +136,4 @@ Matrix NumericalGradients::compute_gradients(ExecutionContext& ec, ChemEnv& chem
   return gradients;
 }
 
-} // namespace exachem::task
+} // namespace exachem::gradients

@@ -7,11 +7,7 @@
  */
 
 #include <exachem/exachem_git.hpp>
-#if defined(TAMM_USE_PYTHON)
-#include <exachem/task/geometric.hpp>
-#else
-#include <exachem/task/geometry_optimizer.hpp>
-#endif
+#include <exachem/task/ec_task.hpp>
 #include <tamm/tamm_git.hpp>
 
 int main(int argc, char* argv[]) {
@@ -151,7 +147,7 @@ int main(int argc, char* argv[]) {
       if(!task.scf) grad_type = "numerical"; // force numerical for any non-scf task for now
       if(grad_type == "numerical") chem_env.sys_data.gradient_type = GradientType::Numerical;
       else chem_env.sys_data.gradient_type = GradientType::Analytical;
-      exachem::task::NumericalGradients::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
+      exachem::gradients::ECGradients::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
     }
     else if(txt_utils::strequal_case(task_op[0], "optimize")) {
       std::string grad_type = (task_op.size() > 1) ? task_op.at(1) : "analytical";
@@ -162,20 +158,19 @@ int main(int argc, char* argv[]) {
 #if defined(TAMM_USE_PYTHON)
       const std::string geom_opt = (task_op.size() == 3) ? task_op.at(2) : "geometric";
       if(txt_utils::strequal_case(geom_opt, "pyberny")) {
-        exachem::task::GeometryOptimizer::geometry_optimizer(ec, chem_env, atoms, ec_atoms,
-                                                             ec_arg2);
+        exachem::optimizers::PyBerny::optimize(ec, chem_env, atoms, ec_atoms, ec_arg2);
       }
       else { // geomeTRIC
-        exachem::geometric::GeomeTRICOptimizer::optimize(ec, chem_env, atoms, ec_atoms, ec_arg2);
+        exachem::optimizers::GeomeTRIC::optimize(ec, chem_env, atoms, ec_atoms, ec_arg2);
         ec.pg().barrier();
-        exachem::geometric::finalize_python();
+        exachem::optimizers::finalize_python();
       }
 #else
       // PyBerny
-      exachem::task::GeometryOptimizer::geometry_optimizer(ec, chem_env, atoms, ec_atoms, ec_arg2);
+      exachem::optimizers::PyBerny::optimize(ec, chem_env, atoms, ec_atoms, ec_arg2);
 #endif
     }
-    else exachem::task::NumericalGradients::compute_energy(ec, chem_env, ec_arg2);
+    else exachem::task::compute_energy(ec, chem_env, ec_arg2);
 
     if(ec.print()) chem_env.write_run_context();
 

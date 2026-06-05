@@ -6,9 +6,11 @@
  * See LICENSE.txt for details
  */
 
+#pragma once
+
 #include "exachem/common/chemenv.hpp"
 
-namespace exachem::task {
+namespace exachem::geometry {
 class GeometryAnalyzer {
 public:
   static std::vector<double>       atom_mass;
@@ -73,4 +75,4 @@ inline double specific_bond_angle(ExecutionContext& ec, const int& num_atoms,
   GeometryAnalyzer ga;
   return ga.specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k);
 }
-} // namespace exachem::task
+} // namespace exachem::geometry

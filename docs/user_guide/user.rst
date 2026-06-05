@@ -7,5 +7,6 @@ ExaChem User Guide
     :caption: Contents:
  
     basic_options
+    geometry
     methods
     benchmarks/benchmarks.rst      

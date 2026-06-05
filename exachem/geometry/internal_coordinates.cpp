@@ -12,11 +12,11 @@
  *
  */
 
-#include "exachem/task/internal_coordinates.hpp"
+#include "exachem/geometry/internal_coordinates.hpp"
 #include <queue>
 #include <unordered_set>
 
-namespace exachem::task {
+namespace exachem::geometry {
 
 // Initialize the static member variable with proper scope
 std::vector<double> InternalCoordinateUtils::atom_radii_int = {
@@ -340,7 +340,7 @@ InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool
         if(i != j && bonds[i][j] != 0) {
           for(int k = 0; k < num_atoms; k++) {
             if(i != k && j != k && bonds[j][k] != 0.0 && bonds[i][j] != 0.0 && bonds[j][k] != 0.0 &&
-               exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k) !=
+               exachem::geometry::specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k) !=
                  acos(-1.0)) {
               for(int l = 0; l < num_atoms; l++) {
                 std::vector<int> current = {i, j, k, l};
@@ -357,9 +357,11 @@ InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool
                   // auto                cproduct1 = exachem::task::cross_product(e_jk, e_kl);
                   // double              numerator = exachem::task::dot_product(cproduct0,
                   // cproduct1); double              divisor0 =
-                  //   sin(exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, i, j, k));
+                  //   sin(exachem::geometry::specific_bond_angle(ec, num_atoms, bonds, apuv, i, j,
+                  //   k));
                   // double divisor1 =
-                  //   sin(exachem::task::specific_bond_angle(ec, num_atoms, bonds, apuv, j, k, l));
+                  //   sin(exachem::geometry::specific_bond_angle(ec, num_atoms, bonds, apuv, j, k,
+                  //   l));
 
                   // double divisor   = divisor0 * divisor1;
                   // double cos_value = numerator / divisor;
@@ -407,4 +409,4 @@ InternalCoordinates InternalCoords(ExecutionContext& ec, ChemEnv& chem_env, bool
   return coords;
 }
 
-} // namespace exachem::task
+} // namespace exachem::geometry

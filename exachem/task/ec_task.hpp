@@ -26,12 +26,19 @@
 #include "exachem/cc/cc2/cd_cc2.hpp"
 #endif
 
-#include "exachem/task/pyberny_impl.hpp"
+#include "exachem/task/task_interface.hpp"
 #include "exachem/common/chemenv.hpp"
 #include "exachem/common/options/parse_options.hpp"
 #include "exachem/scf/scf_main.hpp"
 #include "exachem/mp2/cd_mp2.hpp"
+#include "exachem/gradients/ec_gradients.hpp"
+
+#if defined(TAMM_USE_PYTHON)
+#include "exachem/optimizers/geometric.hpp"
+#endif
+#include "exachem/optimizers/pyberny_impl.hpp"
 // clang-format on
+
 using namespace exachem;
 
 #if defined(EC_COMPLEX) and defined(ENABLE_CC)
@@ -39,7 +46,3 @@ using namespace exachem;
 #include "exachem/cc/rteom/rt_eom_cd_ccsd.hpp"
 #include "exachem/fci/fci.hpp"
 #endif
-
-namespace exachem::task {
-void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2);
-} // namespace exachem::task

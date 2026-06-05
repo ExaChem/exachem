@@ -9,10 +9,10 @@
 // contains functions used for calculating geometry
 // internal_coordinates.cpp contains the actual print function
 
-#include "exachem/task/geometry_analysis.hpp"
+#include "exachem/geometry/geometry_analysis.hpp"
 #include <algorithm>
 
-namespace exachem::task {
+namespace exachem::geometry {
 
 // constexpr double ang2bohr = exachem::constants::ang2bohr;
 constexpr double bohr2ang = exachem::constants::bohr2ang;
@@ -882,4 +882,4 @@ void GeometryAnalyzer::cartesian_from_z_matrix(ExecutionContext& ec, const ChemE
   }
 }
 
-} // namespace exachem::task
+} // namespace exachem::geometry

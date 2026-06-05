@@ -879,9 +879,10 @@ void exachem::scf::SCFGuess<T>::scf_diagonalize(Scheduler& sch, const ChemEnv& c
 
   // Remove the level-shift
   if(rank == 0 && scf_data.lshift != 0.0) {
-    for(size_t iocc = 0; iocc < nelectrons_alpha; iocc++) etensors.eps_a[iocc] += scf_data.lshift;
-    if(is_uhf)
-      for(size_t iocc = 0; iocc < nelectrons_beta; iocc++) etensors.eps_b[iocc] += scf_data.lshift;
+    for(int iocc = 0; iocc < nelectrons_alpha; iocc++) etensors.eps_a[iocc] += scf_data.lshift;
+    if(is_uhf) {
+      for(int iocc = 0; iocc < nelectrons_beta; iocc++) etensors.eps_b[iocc] += scf_data.lshift;
+    }
     hl_gap -= scf_data.lshift;
   }
 

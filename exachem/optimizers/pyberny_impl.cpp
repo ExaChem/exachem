@@ -11,12 +11,15 @@
  *
  */
 
-#include "exachem/task/pyberny_impl.hpp"
+#include "exachem/optimizers/pyberny_impl.hpp"
+#include "exachem/gradients/ec_gradients.hpp"
 
-using exachem::task::InternalCoordinate;
-using exachem::task::InternalCoordinates;
+#include <tuple>
 
-namespace exachem::task {
+using exachem::geometry::InternalCoordinate;
+using exachem::geometry::InternalCoordinates;
+
+namespace exachem::optimizers {
 
 std::vector<double> atom_radii_impl = {
   0.38, 0.32, 1.34, 0.9,  0.82, 0.77, 0.75, 0.73, 0.71, 0.69, 1.54, 1.3,  1.18, 1.11, 1.06,
@@ -769,7 +772,7 @@ bool is_converged(Eigen::VectorXd forces, Eigen::VectorXd step, bool on_sphere) 
 
 std::tuple<Eigen::RowVectorXd, OptPoint, OptPoint, OptPoint, OptPoint, OptPoint, double,
            Eigen::MatrixXd>
-Pyberny::optimizer_berny(ExecutionContext& ec, ChemEnv& chem_env, double energy,
+PyBerny::optimizer_berny(ExecutionContext& ec, ChemEnv& chem_env, double energy,
                          Eigen::MatrixXd gradients, bool first, OptPoint best, OptPoint previous,
                          OptPoint predicted, OptPoint interpolated, OptPoint future, double trust,
                          Eigen::MatrixXd hessian, InternalCoordinates int_coords) {
@@ -861,4 +864,80 @@ Pyberny::optimizer_berny(ExecutionContext& ec, ChemEnv& chem_env, double energy,
   return resultant;
 }
 
-} // namespace exachem::task
+void PyBerny::optimize(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Atom>& atoms,
+                       std::vector<ECAtom>& ec_atoms, std::string ec_arg2) {
+  using RowVectorXd = Eigen::RowVectorXd;
+
+  const int    max_steps = 300;
+  const double grad_tol  = 4.5e-4;
+
+  const int   natoms3 = atoms.size() * 3;
+  RowVectorXd geometry(natoms3);
+
+  int c = 0;
+  for(size_t i = 0; i < atoms.size(); i++) {
+    geometry(c++) = atoms[i].x;
+    geometry(c++) = atoms[i].y;
+    geometry(c++) = atoms[i].z;
+  }
+
+  Matrix gradient_matrix =
+    exachem::gradients::ECGradients::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
+  RowVectorXd gradients = Eigen::Map<RowVectorXd>(gradient_matrix.data(), gradient_matrix.size());
+
+  double curr_energy = chem_env.task_energy; // original task energy
+  double prev_energy = curr_energy;
+
+  // initializing optimizer object
+  PyBerny pyberny_instance(ec, chem_env);
+
+  // printing internal coordaintres
+  pyberny_instance.int_coords.print(ec);
+
+  for(int iter = 1; iter < max_steps; iter++) {
+    if(ec.print()) {
+      std::cout << std::endl
+                << "[Optimization] Step " << iter - 1 << ": Energy = " << std::fixed
+                << std::setprecision(10) << curr_energy
+                << ", Energy Delta = " << std::setprecision(2) << std::scientific
+                << (curr_energy - prev_energy) << ", Gradient norm = " << std::fixed
+                << std::setprecision(6) << gradients.norm() << std::endl
+                << std::endl;
+    }
+
+    if(gradients.norm() < grad_tol) {
+      if(ec.print()) {
+        std::cout << "Optimization converged in " << iter << " steps" << std::endl;
+        std::cout << std::endl << std::setw(34) << "Optimized geometry" << std::endl;
+        exachem::geometry::print_geometry(ec, chem_env);
+      }
+      return;
+    }
+
+    auto new_geometry = pyberny_instance.step(ec, chem_env, curr_energy, gradients);
+
+    chem_env.update_geometry(atoms, ec_atoms, new_geometry);
+
+    gradient_matrix =
+      exachem::gradients::ECGradients::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
+    RowVectorXd new_gradients =
+      Eigen::Map<RowVectorXd>(gradient_matrix.data(), gradient_matrix.size());
+
+    // Update for next iteration
+    geometry  = new_geometry;
+    gradients = new_gradients;
+
+    prev_energy = curr_energy;
+    curr_energy = chem_env.task_energy;
+
+  } // max_steps
+
+  if(ec.print()) {
+    std::cout << std::endl
+              << "Geometry optimizer did not converge in " << max_steps << " steps" << std::endl;
+    std::cout << std::endl << std::setw(34) << "Last geometry produced" << std::endl;
+    exachem::geometry::print_geometry(ec, chem_env);
+  }
+}
+
+} // namespace exachem::optimizers

@@ -10,6 +10,11 @@
 
 namespace exachem::task {
 
+double compute_energy(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) {
+  execute_task(ec, chem_env, ec_arg2);
+  return chem_env.get_task_energy(ec, chem_env);
+}
+
 void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
   // if user sets it to empty vector
 
@@ -20,8 +25,9 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
 
   static const std::array<std::unordered_set<std::string>, 3> allowed_op = {{
     {"energy", "optimize", "gradient"}, // [0] default=energy
-    {"numerical", "analytical"},        // [1] optional
-    {"pyberny", "geometric"}            // [2] optional
+    {"numerical", "analytical"}, // [1] default=analytical for SCF, numerical for everything else
+    {"pyberny",
+     "geometric"} // [2] default=geometric if python bindings available, pyberny otherwise
   }};
 
   for(std::size_t i = 0; i < task.operation.size(); ++i) {
@@ -82,8 +88,9 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
 }
 
 void print_internal(ExecutionContext& ec, ChemEnv& chem_env) {
-  GeometryAnalyzer                   geom;
-  exachem::task::InternalCoordinates coords = exachem::task::InternalCoords(ec, chem_env, true);
+  exachem::geometry::GeometryAnalyzer    geom;
+  exachem::geometry::InternalCoordinates coords =
+    exachem::geometry::InternalCoords(ec, chem_env, true);
   coords.print(ec); // prints bonds, angles, and torsions
   ec.pg().barrier();
   auto data_mat  = geom.process_geometry(ec, chem_env);
@@ -105,9 +112,9 @@ void print_internal(ExecutionContext& ec, ChemEnv& chem_env) {
 }
 
 void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) {
-  GeometryAnalyzer geom;
-  const auto       task       = chem_env.ioptions.task_options;
-  const auto       input_file = chem_env.input_file;
+  exachem::geometry::GeometryAnalyzer geom;
+  const auto                          task       = chem_env.ioptions.task_options;
+  const auto                          input_file = chem_env.input_file;
   // TODO: This is redundant if multiple tasks for same geometry are executed.
 
   SCFOptions& scf_options = chem_env.ioptions.scf_options;

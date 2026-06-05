@@ -6,13 +6,13 @@
  * See LICENSE.txt for details
  */
 
-#include "exachem/task/ec_task.hpp"
+#pragma once
 
-namespace exachem::task {
-class NumericalGradients {
+#include "exachem/common/chemenv.hpp"
+
+namespace exachem::gradients {
+class ECGradients {
 public:
-  static double compute_energy(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2);
-
   static Matrix compute_numerical_gradients(ExecutionContext& ec, ChemEnv& chem_env,
                                             const std::vector<Atom>&   atoms,
                                             const std::vector<ECAtom>& ec_atoms,
@@ -23,4 +23,4 @@ public:
 
   static Matrix get_analytical_gradients(ExecutionContext& ec, ChemEnv& chem_env);
 };
-} // namespace exachem::task
+} // namespace exachem::gradients

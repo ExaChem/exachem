@@ -5,23 +5,9 @@ set(TASK_SRCDIR task)
 
 set(TASK_INCLUDES
     ${TASK_SRCDIR}/ec_task.hpp
-    ${TASK_SRCDIR}/geometry_analysis.hpp
-    ${TASK_SRCDIR}/internal_coordinates.hpp
-    ${TASK_SRCDIR}/pyberny_impl.hpp
-    ${TASK_SRCDIR}/geometry_optimizer.hpp
-    ${TASK_SRCDIR}/numerical_gradients.hpp
+    ${TASK_SRCDIR}/task_interface.hpp
     )
 
 set(TASK_SRCS
     ${TASK_SRCDIR}/ec_task.cpp
-    ${TASK_SRCDIR}/geometry_analysis.cpp
-    ${TASK_SRCDIR}/internal_coordinates.cpp
-    ${TASK_SRCDIR}/pyberny_impl.cpp
-    ${TASK_SRCDIR}/geometry_optimizer.cpp
-    ${TASK_SRCDIR}/numerical_gradients.cpp
    )
-
-if (EXACHEM_HAS_PYTHON)
-  list(APPEND TASK_INCLUDES ${TASK_SRCDIR}/geometric.hpp)
-  list(APPEND TASK_SRCS ${TASK_SRCDIR}/geometric.cpp)
-endif()

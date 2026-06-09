@@ -11,8 +11,21 @@ The geometry analysis module first prints bond lengths, where a bond is defined 
 Geometry Optimization
 =====================
 
-We developed a C++ implementation of `PyBerny <https://github.com/jhrmnn/pyberny>`_, which is effectively identical to the original Python implementation. A slight difference is that, due to a discrepancy in how division by zero is handled, certain internal variables are set to zero if their absolute value exceeds 1e25. ExaChem does not support crystal geometries, and therefore that portion of the PyBerny code is not implemented.
+We developed a C++ implementation of `PyBerny <https://github.com/jhrmnn/pyberny>`_, which is effectively identical to the original Python implementation. ExaChem does not support crystal geometries, and therefore that portion of the PyBerny code is not implemented.
 
 ExaChem also provides an interface to `geomeTRIC <https://geometric.readthedocs.io>`_. This interface calls the geomeTRIC Python code directly from within the C++ code, with ExaChem supplying the energies and gradients at each step. It is the default optimizer when Python bindings are enabled. The native C++ PyBerny implementation can also be selected instead via the **TASK** ``operation`` option (see :ref:`TASK`).
 
 Both optimizers run for a maximum of 300 iterations by default.
+
+Installing geomeTRIC
+--------------------
+
+geomeTRIC is an external Python package, installed from its source distribution:
+
+.. code-block:: bash
+
+   git clone https://github.com/leeping/geomeTRIC.git
+   cd geomeTRIC
+   python3 setup.py install --user
+
+geomeTRIC must be installed in the same Python environment that ExaChem was built against, since it is imported by the embedded Python interpreter at runtime.

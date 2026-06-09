@@ -38,10 +38,10 @@ std::tuple<std::vector<int>, Eigen::MatrixXd> get_init_geometry(ExecutionContext
     double x = chem_env.ec_atoms[i].atom.x;
     double y = chem_env.ec_atoms[i].atom.y;
     double z = chem_env.ec_atoms[i].atom.z;
-
-    geometry(i, 0) = x;
-    geometry(i, 1) = y;
-    geometry(i, 2) = z;
+    // converting init geometry to angstrom
+    geometry(i, 0) = x * exachem::constants::bohr2ang;
+    geometry(i, 1) = y * exachem::constants::bohr2ang;
+    geometry(i, 2) = z * exachem::constants::bohr2ang;
   }
 
   std::tuple<std::vector<int>, Eigen::MatrixXd> out = std::make_tuple(atomic_numbers, geometry);
@@ -323,14 +323,6 @@ Eigen::MatrixXd b_matrix(Eigen::MatrixXd geom, InternalCoordinates int_coords) {
       b_mat(i, j * 3)       = B[i][j][0];
       b_mat(i, (j * 3) + 1) = B[i][j][1];
       b_mat(i, (j * 3) + 2) = B[i][j][2];
-    }
-  }
-
-  for(int i = 0; i < int_coords.size(); i++) {
-    for(int j = 0; j < geom.size(); j++) {
-      if(std::isnan(b_mat(i, j)) || b_mat(i, j) > 1e25 || b_mat(i, j) < -1e25) {
-        b_mat(i, j) = 0.0;
-      }
     }
   }
 
@@ -874,13 +866,6 @@ void PyBerny::optimize(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Atom
   const int   natoms3 = atoms.size() * 3;
   RowVectorXd geometry(natoms3);
 
-  int c = 0;
-  for(size_t i = 0; i < atoms.size(); i++) {
-    geometry(c++) = atoms[i].x;
-    geometry(c++) = atoms[i].y;
-    geometry(c++) = atoms[i].z;
-  }
-
   Matrix gradient_matrix =
     exachem::gradients::ECGradients::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);
   RowVectorXd gradients = Eigen::Map<RowVectorXd>(gradient_matrix.data(), gradient_matrix.size());
@@ -916,7 +901,8 @@ void PyBerny::optimize(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Atom
 
     auto new_geometry = pyberny_instance.step(ec, chem_env, curr_energy, gradients);
 
-    chem_env.update_geometry(atoms, ec_atoms, new_geometry);
+    // converting geometry back to bohr
+    chem_env.update_geometry(atoms, ec_atoms, new_geometry * exachem::constants::ang2bohr);
 
     gradient_matrix =
       exachem::gradients::ECGradients::compute_gradients(ec, chem_env, atoms, ec_atoms, ec_arg2);

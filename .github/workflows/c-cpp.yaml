@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         os: 
-          - [self-hosted, ubuntu24]
+          - [self-hosted, rocky10]
           - [self-hosted, macos]
         backend:
           - ga
@@ -35,15 +35,15 @@ jobs:
         use_scalapack:
           - no-scalapack         
         include:
-          - os: [self-hosted, ubuntu24]
+          - os: [self-hosted, rocky10]
             mpi_impl: mpich
             cxx: clang++
             cc: clang
-            fc: flang
+            fc: gfortran
             backend: ga
             use_cuda: no-cuda
             use_scalapack: no-scalapack
-          - os: [self-hosted, ubuntu24]
+          - os: [self-hosted, rocky10]
             mpi_impl: mpich
             cxx: g++
             cc: gcc
@@ -51,7 +51,7 @@ jobs:
             backend: ga
             use_cuda: cuda
             use_scalapack: no-scalapack
-          - os: [self-hosted, ubuntu24]
+          - os: [self-hosted, rocky10]
             mpi_impl: mpich
             cxx: g++
             cc: gcc
@@ -76,7 +76,7 @@ jobs:
             backend: upcxx
             use_cuda: no-cuda
             use_scalapack: no-scalapack
-          - os: [self-hosted, ubuntu24]
+          - os: [self-hosted, rocky10]
             mpi_impl: mpich
             cxx: g++
             cc: gcc
@@ -109,7 +109,7 @@ jobs:
       shell: bash
 
     - name: Set cache path linux
-      if: ${{ matrix.os[1] == 'ubuntu24' }}
+      if: ${{ matrix.os[1] == 'rocky10' }}
       id: set-cache-path-linux
       run: |
         echo "exachem_cache_path=/hpc/software/CI/cache/exachem_cache" >> $GITHUB_ENV
@@ -138,13 +138,15 @@ jobs:
         echo "USE_SCALAPACK=ON" >> $GITHUB_ENV
 
     - name: load llvm
-      if: ${{ matrix.cc == 'clang' && matrix.cxx == 'clang++' && matrix.fc == 'flang' && matrix.os[1] == 'ubuntu24' }}
+      if: ${{ matrix.cc == 'clang' && matrix.cxx == 'clang++' && matrix.fc == 'gfortran' && matrix.os[1] == 'rocky10' }}
       shell: bash
       run: |
         module load llvm/20.1.8
         echo "CC=$(which clang)" >> $GITHUB_ENV
         echo "CXX=$(which clang++)" >> $GITHUB_ENV
-        echo "FC=$(which flang)" >> $GITHUB_ENV
+        echo "FC=$(which gfortran)" >> $GITHUB_ENV
+        echo "LA_VENDOR=IntelMKL" >> $GITHUB_ENV
+        echo "MKLROOT=$MKLROOT" >> $GITHUB_ENV
 
     - name: macos env
       if: ${{ matrix.os[1] == 'macos' }}
@@ -218,7 +220,11 @@ jobs:
         # TAMM build
         git clone https://github.com/NWChemEx/TAMM $GITHUB_WORKSPACE/TAMM
         cd $GITHUB_WORKSPACE/TAMM
-        cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DLINALG_VENDOR=${{ env.LA_VENDOR }} -DGPU_ARCH=70 -DMODULES="CC" -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DUSE_SCALAPACK=${{ env.USE_SCALAPACK }}
+        LINALG_PREFIX_FLAG=""
+        if [[ "${{ env.LA_VENDOR }}" == "IntelMKL" ]]; then
+          LINALG_PREFIX_FLAG="-DLINALG_PREFIX=$MKLROOT"
+        fi
+        cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DLINALG_VENDOR=${{ env.LA_VENDOR }} $LINALG_PREFIX_FLAG -DGPU_ARCH=70 -DMODULES="CC" -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DUSE_SCALAPACK=${{ env.USE_SCALAPACK }}
         cd build
         make -j${{ env.EC_NPROC }}
         make install

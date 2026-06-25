@@ -1,0 +1,36 @@
+<simulation verbosity='medium'>
+  <output prefix='ch4'>
+    <properties filename='out' stride='1'> [step, time, conserved, temperature, potential] </properties>
+    <trajectory filename='pos' stride='10'> positions </trajectory>
+  </output>
+  <total_steps> 50 </total_steps>
+
+  <!-- INET socket matching ExaChem's fixed endpoint (localhost:31415).
+       "name" is arbitrary but must match the <force> reference below. -->
+  <ffsocket name='exachem' mode='inet'>
+    <address> localhost </address>
+    <port> 31415 </port>
+  </ffsocket>
+
+<system>
+    <initialize nbeads='1'>
+      <file mode='xyz' units='angstrom'> ch4.xyz </file>
+      <cell mode='abc' units='angstrom'> [20.0, 20.0, 20.0] </cell>
+      <velocities mode='thermal' units='kelvin'> 300 </velocities>
+    </initialize>
+    <ensemble>
+      <temperature units='kelvin'> 300 </temperature>
+    </ensemble>
+    <forces>
+      <force forcefield='exachem'/>
+    </forces>
+    <motion mode='dynamics'>
+      <dynamics mode='nvt'>
+        <timestep units='femtosecond'> 0.5 </timestep>
+        <thermostat mode='langevin'>
+          <tau units='femtosecond'> 100 </tau>
+        </thermostat>
+      </dynamics>
+    </motion>
+  </system>
+</simulation>

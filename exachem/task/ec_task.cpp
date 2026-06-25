@@ -23,8 +23,8 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
 
   const TaskOptions& task = chem_env.ioptions.task_options;
 
-  static const std::array<std::unordered_set<std::string>, 3> allowed_op = {{
-    {"energy", "optimize", "gradient"}, // [0] default=energy
+  static const std::array<std::unordered_set<std::string>, 5> allowed_op = {{
+    {"energy", "optimize", "gradient", "ipi", "ase"}, // [0] default=energy
     {"numerical", "analytical"}, // [1] default=analytical for SCF, numerical for everything else
     {"pyberny",
      "geometric"} // [2] default=geometric if python bindings available, pyberny otherwise

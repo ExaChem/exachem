@@ -9,4 +9,5 @@ ExaChem User Guide
     basic_options
     geometry
     methods
+    integrations
     benchmarks/benchmarks.rst      

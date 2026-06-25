@@ -37,6 +37,9 @@
 #include "exachem/optimizers/geometric.hpp"
 #endif
 #include "exachem/optimizers/pyberny_impl.hpp"
+
+#include <exachem/integrations/ase/ase_backend.hpp>
+#include <exachem/integrations/ipi/ipi_backend.hpp>
 // clang-format on
 
 using namespace exachem;

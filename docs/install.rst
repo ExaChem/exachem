@@ -42,6 +42,9 @@ Step 1
    CC=gcc CXX=g++ FC=gfortran cmake -DCMAKE_INSTALL_PREFIX=<exachem-install-path> -DMODULES="CC" ..
    make -j4 install
 
+.. note::
+   To enable all Python-related bindings in ExaChem (such as the geomeTRIC geometry-optimizer interface), also add ``-DTAMM_ENABLE_PYTHON=ON`` to the cmake configure line in both Step 1 and Step 2.
+
 Step 2
 
 ::

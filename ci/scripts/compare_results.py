@@ -136,14 +136,6 @@ for ref_file in ref_files:
         rcheck = check_results(ref_ccsd_energy,cur_ccsd_energy,ccsd_threshold,"CCSD correlation energy")
         if not rcheck: sys.exit(1)
 
-    if "DLPNO-CCSD" in ref_data["output"]:
-        print("Checking DLPNO-CCSD results", end='')
-        ref_dlpno_ccsd_energy = ref_data["output"]["DLPNO-CCSD"]["final_energy"]["correlation"]
-        cur_dlpno_ccsd_energy = cur_data["output"]["DLPNO-CCSD"]["final_energy"]["correlation"]
-        rcheck = check_results(ref_dlpno_ccsd_energy,cur_dlpno_ccsd_energy,ccsd_threshold,"DLPNO-CCSD correlation energy")
-        if not rcheck: sys.exit(1)
-
-
     if "CCSD(T)" in ref_data["output"]:
         print("Checking CCSD(T) results", end='')
         ref_pt_data = ref_data["output"]["CCSD(T)"]

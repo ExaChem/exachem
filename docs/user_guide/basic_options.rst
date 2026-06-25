@@ -132,6 +132,13 @@ A task automatically runs the tasks it depends on. For e.g. if **ccsd** is enabl
 
      For example, ``"operation": ["optimize", "analytical", "geometric"]`` is the default when Python bindings are enabled, while ``"operation": ["optimize", "analytical", "pyberny"]`` switches to the native C++ PyBerny optimizer.
 
+   * :strong:`ipi` / :strong:`ase`: Connect ExaChem to an external simulation driver. Instead of computing a single result and exiting, ExaChem runs as a persistent server that returns the energy and forces for each geometry the driver requests, until the driver disconnects. The workflow itself (e.g. molecular dynamics, NEB, path-integral MD) is configured outside ExaChem - in the i-PI XML input or the ASE Python script. An optional second list element selects the gradient method (:strong:`analytical` or :strong:`numerical`, with the same defaults as for **gradient**).
+
+     * :strong:`ipi`  : Act as an `i-PI <https://ipi-code.org>`_ client, connecting to an i-PI server over a socket.
+     * :strong:`ase`  : Act as a force/energy backend for `ASE <https://ase-lib.org>`_ via its ``SocketIOCalculator`` over a UNIX domain socket.
+
+     For example, ``"operation": ["ipi", "analytical"]`` or ``"operation": ["ase", "numerical"]``.
+
 
 .. _DPLOT:
 

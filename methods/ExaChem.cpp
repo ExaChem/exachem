@@ -170,6 +170,21 @@ int main(int argc, char* argv[]) {
       exachem::optimizers::PyBerny::optimize(ec, chem_env, atoms, ec_atoms, ec_arg2);
 #endif
     }
+    else if(txt_utils::strequal_case(task_op[0], "ipi") ||
+            txt_utils::strequal_case(task_op[0], "ase")) {
+      // Run as a persistent force/energy server for an external simulation
+      // driver. The optional 2nd element selects the gradient method.
+      std::string grad_type = (task_op.size() > 1) ? task_op.at(1) : "analytical";
+      if(!task.scf) grad_type = "numerical"; // force numerical for any non-scf task for now
+      if(txt_utils::strequal_case(grad_type, "numerical"))
+        chem_env.sys_data.gradient_type = GradientType::Numerical;
+      else chem_env.sys_data.gradient_type = GradientType::Analytical;
+      if(txt_utils::strequal_case(task_op[0], "ipi")) {
+        exachem::integrations::ipi::run("localhost", 31415, 1, "", ec, chem_env, atoms, ec_atoms,
+                                        ec_arg2);
+      }
+      else { exachem::integrations::ase::run(ec, chem_env, atoms, ec_atoms, ec_arg2); }
+    }
     else exachem::task::compute_energy(ec, chem_env, ec_arg2);
 
     if(ec.print()) chem_env.write_run_context();

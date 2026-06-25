@@ -1,0 +1,27 @@
+{
+  "geometry": {
+    "coordinates": [
+      "C  0.0000  0.0000  0.0000",
+      "H  0.6276  0.6276  0.6276",
+      "H  0.6276 -0.6276 -0.6276",
+      "H -0.6276  0.6276 -0.6276",
+      "H -0.6276 -0.6276  0.6276"
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "cc-pvdz"
+  },
+  "common": {
+    "maxiter": 100
+  },
+  "SCF": {
+    "charge": 0,
+    "multiplicity": 1,
+    "scf_type": "restricted"
+  },
+  "TASK": {
+    "scf": true,
+    "operation": ["ase", "analytical"]
+  }
+}

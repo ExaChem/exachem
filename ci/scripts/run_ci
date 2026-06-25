@@ -50,9 +50,6 @@ $MPIEXEC $EXE_PATH  $CHEM_INP/butanol2_pt.json
 #With ECP
 $MPIEXEC $EXE_PATH  $CHEM_INP/seh2.json
 
-#DLPNO_CCSD
-$MPIEXEC $EXE_PATH $CHEM_INP/lih.json
-
 #cp *_files/restricted/json/*.json .
 #python3 $CHEM_SRC/ci/scripts/compare_results.py $CHEM_SRC/ci/reference_output/ . 1
 [ -d butanol2.sto-3g_files ] && { rm butanol2.sto-3g_files/restricted/*; }

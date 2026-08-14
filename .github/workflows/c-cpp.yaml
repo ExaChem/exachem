@@ -6,7 +6,7 @@ on:
       - docs  
   pull_request:
     branches:
-      - develop
+      - main
   repository_dispatch:
     types: [backend_automation]
   workflow_dispatch:

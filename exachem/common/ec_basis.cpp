@@ -173,8 +173,9 @@ void print_basis_info(const std::vector<libint2::Atom>& atoms, const std::vector
 
 void check_basis_file(ExecutionContext& exc, bool single_basis, const ECAtom& ecatom,
                       bool ecp_check = false) {
-  auto basis_set_file = std::string(DATADIR) + "/basis/" + ecatom.basis + ".g94";
-  if(ecp_check) basis_set_file = std::string(DATADIR) + "/basis/" + ecatom.ecp_basis + ".ecp";
+  auto basis_set_file = std::string(LIBINT_DATADIR) + "/basis/" + ecatom.basis + ".g94";
+  if(ecp_check)
+    basis_set_file = std::string(LIBINT_DATADIR) + "/basis/" + ecatom.ecp_basis + ".ecp";
   int basis_file_exists = 0;
   if(exc.pg().rank() == 0) basis_file_exists = std::filesystem::exists(basis_set_file);
   exc.pg().broadcast(&basis_file_exists, 0);
@@ -197,7 +198,7 @@ void ECBasis::parse_ecps(ExecutionContext& exc, std::vector<lib_atom>& atoms,
     // There is no global ecp basis specification for all atoms.
     // single_basis=false, ecp=true
     check_basis_file(exc, false, ecatom, true);
-    auto ecp_basis_file = std::string(DATADIR) + "/basis/" + ecatom.ecp_basis + ".ecp";
+    auto ecp_basis_file = std::string(LIBINT_DATADIR) + "/basis/" + ecatom.ecp_basis + ".ecp";
     if(exc.pg().rank() == 0) std::cout << "Parsing ECP block in " << ecp_basis_file << std::endl;
     parse_ecp_basis_file(exc, esymbol, atoms, ec_atoms, ecp_basis_file);
   }

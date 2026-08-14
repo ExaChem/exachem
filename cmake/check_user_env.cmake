@@ -45,25 +45,15 @@ if(DEFINED GA_RUNTIME)
     endif()
 endif()
 
-check_compiler_version(C Clang 9)
-check_compiler_version(CXX Clang 9)
+check_compiler_version(C Clang 18)
+check_compiler_version(CXX Clang 18)
 
-check_compiler_version(C AppleClang 15)
-check_compiler_version(CXX AppleClang 15)
+check_compiler_version(C AppleClang 19)
+check_compiler_version(CXX AppleClang 19)
 
-check_compiler_version(C GNU 9.1)
-check_compiler_version(CXX GNU 9.1)
-check_compiler_version(Fortran GNU 9.1)
-
-#TODO:Check for GCC>=9 compatibility
-# check_compiler_version(C Intel 19)
-# check_compiler_version(CXX Intel 19)
-# check_compiler_version(Fortran Intel 19)
-
-#TODO:Check for GCC>=9 compatibility
-check_compiler_version(C PGI 20)
-check_compiler_version(CXX PGI 20)
-check_compiler_version(Fortran PGI 20)
+check_compiler_version(C GNU 14.1)
+check_compiler_version(CXX GNU 14.1)
+check_compiler_version(Fortran GNU 14.1)
 
 find_package(MPI REQUIRED)
 
@@ -97,7 +87,7 @@ if(USE_CUDA)
         message(FATAL_ERROR "CUDA Toolkit not found.")
     endif()
 
-    set(_CUDA_MIN "11.7")
+    set(_CUDA_MIN "12.8")
     if(CMAKE_CUDA_COMPILER_VERSION VERSION_LESS ${_CUDA_MIN})
         message(FATAL_ERROR "CUDA version provided \
         (${CMAKE_CUDA_COMPILER_VERSION}) \

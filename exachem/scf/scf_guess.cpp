@@ -365,8 +365,8 @@ void exachem::scf::SCFGuess<T>::compute_ecp_ints(
   memset(buffer_, 0, size_ * sizeof(double));
 
   // TODO: should be modifiable by user input
-  const double           tolerance = 1e-15;
-  const int              small = 512, large = 4096;
+  const double           tolerance = 1e-17;
+  const int              small = 1024, large = 4096;
   libecpint::ECPIntegral engine(maxam, ecp_maxam, 0, tolerance, small, large);
 
   // From LibECPInt ECPIntegrator::compute_integrals
@@ -1352,7 +1352,7 @@ void exachem::scf::SCFGuess<T>::compute_sad_guess(ExecutionContext& ec, ChemEnv&
             const auto* sp34 = sp34_iter->get();
             ++sp34_iter;
 
-            if(not(do12 or do34 or (do13 and do24) or (do14 and do23))) continue;
+            if(not((do12 and do34) or (do13 and do24) or (do14 and do23))) continue;
 
             const auto Dnorm1234 =
               do_schwarz_screen ? std::max(D_shblk_norm_atom(s1, s4),
@@ -1378,7 +1378,7 @@ void exachem::scf::SCFGuess<T>::compute_sad_guess(ExecutionContext& ec, ChemEnv&
             const auto* buf_1234 = buf[0];
             if(buf_1234 == nullptr) continue; // if all integrals screened out, skip to next quartet
 
-            if(do12 or do34) {
+            if(do12 and do34) {
               for(decltype(n1) f1 = 0, f1234 = 0; f1 != n1; ++f1) {
                 const auto bf1 = f1 + bf1_first;
                 for(decltype(n2) f2 = 0; f2 != n2; ++f2) {

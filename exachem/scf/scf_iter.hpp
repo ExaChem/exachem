@@ -57,6 +57,19 @@ public:
   virtual void init_ri(ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info,
                        const SCFData& scf_data, EigenTensors& etensors, TAMMTensors<T>& ttensors);
 
+  virtual void compute_Vm12(ExecutionContext& ec, const ChemEnv& chem_env,
+                            ScalapackInfo& scalapack_info, const SCFData& scf_data,
+                            EigenTensors& etensors, TAMMTensors<T>& ttensors);
+
+  virtual void compute_ri_jvec(ExecutionContext& ec, const ChemEnv& chem_env,
+                               const SCFData& scf_data, EigenTensors& etensors,
+                               TAMMTensors<T>& ttensors, const Matrix& SchwarzK, Tensor<T>& Jvec);
+
+  virtual void compute_ri_jmat(ExecutionContext& ec, const ChemEnv& chem_env,
+                               const SCFData& scf_data, const Matrix& SchwarzK,
+                               EigenTensors& etensors, TAMMTensors<T>& ttensors,
+                               Eigen::VectorXd& Jvec);
+
   virtual void compute_2bf(ExecutionContext& ec, const ChemEnv& chem_env,
                            ScalapackInfo& scalapack_info, const SCFData& scf_data,
                            const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
@@ -70,6 +83,28 @@ public:
                                  const Matrix& SchwarzK, const size_t& max_nprim4,
                                  TAMMTensors<T>& ttensors, EigenTensors& etensors,
                                  const bool is_3c_init, const bool do_density_fitting, double xHF);
+
+  virtual void compute_2bf_ri_deriv(ExecutionContext& ec, const ChemEnv& chem_env,
+                                    ScalapackInfo& scalapack_info, const SCFData& scf_data,
+                                    const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
+                                    TAMMTensors<T>& ttensors, EigenTensors& etensors,
+                                    const bool& is_direct, double xHF);
+
+  virtual Matrix compute_2c_ints_deriv(ExecutionContext& ec, const ChemEnv& chem_env,
+                                       const SCFData& scf_data, TAMMTensors<T>& ttensors,
+                                       Eigen::VectorXd& Xvec);
+
+  virtual Matrix compute_3c_ints_deriv(ExecutionContext& ec, const ChemEnv& chem_env,
+                                       const SCFData& scf_data, const Matrix& SchwarzK,
+                                       EigenTensors& etensors, TAMMTensors<T>& ttensors,
+                                       Eigen::VectorXd& Xvec);
+
+  virtual Matrix compute_2c_exx_ints_deriv(ExecutionContext& ec, const ChemEnv& chem_env,
+                                           const SCFData& scf_data, TAMMTensors<T>& ttensors,
+                                           Tensor<T>& Xmat);
+
+  virtual Matrix compute_3c_exx_ints_deriv(ExecutionContext& ec, const ChemEnv& chem_env,
+                                           const SCFData& scf_data, Tensor<T>& xyK_alpha);
 
   virtual void compute_2bf_hubbard(ExecutionContext& ec, const ChemEnv& chem_env,
                                    ScalapackInfo& scalapack_info, const SCFData& scf_data,

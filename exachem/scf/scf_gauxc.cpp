@@ -112,9 +112,11 @@ SCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
   auto                            mw = mw_factory.get_instance();
   mw.modify_weights(*gauxc_lb);
 
+  GauXC::functional_type         gauxc_func;
   std::vector<std::string>       xc_vector = scf_options.xc_type;
   std::vector<ExchCXX::XCKernel> kernels   = {};
   std::vector<double>            params(2049, 0.0);
+  ExchCXX::HybCoeffs             hyb_coeffs;
   // int                            kernel_id = -1;
 
   // TODO: Refactor DFT code path when we eventually enable GauXC by default.
@@ -124,43 +126,9 @@ SCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
     if(rank == 0) std::cout << "Functional: " << xcfunc << std::endl;
 
     // First try few functionals defined in ExchCXX
-    if(txt_utils::strequal_case(xcfunc, "BLYP")) {
-      kernels.push_back(
-        ExchCXX::XCKernel(ExchCXX::Backend::builtin, ExchCXX::kernel_map.value("B88"), polar));
-      kernels.push_back(
-        ExchCXX::XCKernel(ExchCXX::Backend::builtin, ExchCXX::kernel_map.value("LYP"), polar));
-    }
-    else if(txt_utils::strequal_case(xcfunc, "PBE")) {
-      kernels.push_back(
-        ExchCXX::XCKernel(ExchCXX::Backend::builtin, ExchCXX::kernel_map.value("PBE_X"), polar));
-      kernels.push_back(
-        ExchCXX::XCKernel(ExchCXX::Backend::builtin, ExchCXX::kernel_map.value("PBE_C"), polar));
-      // SCAN and R2SCAN might not be implemented in current version, fallback to LibXC
-    }
-    else if(txt_utils::strequal_case(xcfunc, "SCAN")) {
-      if(ExchCXX::kernel_map.key_exists("SCAN_X")) {
-        kernels.push_back(
-          ExchCXX::XCKernel(ExchCXX::Backend::builtin, ExchCXX::kernel_map.value("SCAN_X"), polar));
-        kernels.push_back(
-          ExchCXX::XCKernel(ExchCXX::Backend::builtin, ExchCXX::kernel_map.value("SCAN_C"), polar));
-      }
-      else {
-        kernels.push_back(ExchCXX::XCKernel(ExchCXX::libxc_name_string("MGGA_X_SCAN"), polar));
-        kernels.push_back(ExchCXX::XCKernel(ExchCXX::libxc_name_string("MGGA_C_SCAN"), polar));
-      }
-    }
-    else if(txt_utils::strequal_case(xcfunc, "R2SCAN")) {
-      if(ExchCXX::kernel_map.key_exists("R2SCAN_X")) {
-        kernels.push_back(ExchCXX::XCKernel(ExchCXX::Backend::builtin,
-                                            ExchCXX::kernel_map.value("R2SCAN_X"), polar));
-        kernels.push_back(ExchCXX::XCKernel(ExchCXX::Backend::builtin,
-                                            ExchCXX::kernel_map.value("R2SCAN_C"), polar));
-      }
-      else {
-        kernels.push_back(ExchCXX::XCKernel(ExchCXX::libxc_name_string("MGGA_X_R2SCAN"), polar));
-        kernels.push_back(ExchCXX::XCKernel(ExchCXX::libxc_name_string("MGGA_C_R2SCAN"), polar));
-      }
-      // Try using the builtin backend
+    if(ExchCXX::functional_map.key_exists(xcfunc)) {
+      gauxc_func = ExchCXX::XCFunctional(ExchCXX::Backend::builtin,
+                                         ExchCXX::functional_map.value(xcfunc), polar);
     }
     else if(ExchCXX::kernel_map.key_exists(xcfunc)) {
       kernels.push_back(
@@ -168,6 +136,43 @@ SCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
       // Fallback to LibXC
     }
     else {
+      int xc_id = xc_functional_get_number(xcfunc.c_str());
+      if(xc_id < 0) { tamm_terminate("Functional not found in LibXC: " + xcfunc); }
+      xc_func_type kernel_;
+      int          info = xc_func_init(&kernel_, xc_id, XC_UNPOLARIZED);
+
+      if(kernel_.info->flags & XC_FLAGS_VV10)
+        tamm_terminate("VV10 nonlocal correlation functionals are not currently supported");
+
+      bool is_hybrid =
+        (kernel_.info->family == XC_FAMILY_HYB_GGA || kernel_.info->family == XC_FAMILY_HYB_MGGA);
+#if XC_MAJOR_VERSION > 6
+      is_hybrid = is_hybrid || kernel_.info->family == XC_FAMILY_HYB_LDA;
+#endif
+      if(is_hybrid) {
+        int rangesep = 0;
+        if(kernel_.info->flags & XC_FLAGS_HYB_CAM) rangesep++;
+        if(kernel_.info->flags & XC_FLAGS_HYB_CAMY) rangesep++;
+        if(kernel_.info->flags & XC_FLAGS_HYB_LC) rangesep++;
+        if(kernel_.info->flags & XC_FLAGS_HYB_LCY) rangesep++;
+        if(rangesep > 0) {
+          tamm_terminate("Range-separated hybrid functionals are not currently supported");
+          double alpha_, beta_, omega_;
+          xc_hyb_cam_coef(&kernel_, &omega_, &alpha_, &beta_);
+          hyb_coeffs.alpha = alpha_;
+          hyb_coeffs.beta  = beta_;
+          hyb_coeffs.omega = omega_;
+        }
+        else {
+          double alpha_ = xc_hyb_exx_coef(&kernel_);
+          if(hyb_coeffs.alpha > 0.0 && hyb_coeffs.alpha != alpha_) {
+            tamm_terminate("Mismatch between user-specified hybrid functionals");
+          }
+          hyb_coeffs.alpha = alpha_;
+        }
+      }
+      xc_func_end(&kernel_);
+
       kernels.push_back(ExchCXX::XCKernel(ExchCXX::libxc_name_string(xcfunc), polar));
       if(txt_utils::strequal_case(xcfunc, "HYB_GGA_X_QED") ||
          txt_utils::strequal_case(xcfunc, "HYB_GGA_XC_QED") ||
@@ -191,7 +196,7 @@ SCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
     dummy_xc = true;
   }
 
-  GauXC::functional_type gauxc_func = GauXC::functional_type(kernels);
+  if(kernels.size() > 0) gauxc_func = GauXC::functional_type(kernels, hyb_coeffs);
 
   // Initialize GauXC integrator
   GauXC::XCIntegratorFactory<Matrix> integrator_factory(

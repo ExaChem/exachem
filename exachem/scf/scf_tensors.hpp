@@ -30,7 +30,8 @@ public:
   Eigen::Vector<double, Eigen::Dynamic> dfNorm; // Normalization coefficients for DF basis
   std::vector<Matrix>                   trafo_ctos, trafo_stoc;
   Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-    taskmap; // on all ranks for 4c HF only
+                      taskmap; // on all ranks for 4c HF only
+  std::vector<double> multipoles;
 };
 
 template<typename T>
@@ -66,6 +67,7 @@ public:
 
   // derivatives
   std::vector<Tensor<T>> T_deriv, V_deriv, S_deriv;
+  std::vector<Tensor<T>> QED_D_deriv, QED_Q_deriv;
 
   // QED tensors
   Tensor<T> QED_1body;

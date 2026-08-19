@@ -110,13 +110,17 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
   const bool is_qed = sys_data.is_qed;
   const bool do_qed = sys_data.do_qed;
 
-  double nelectrons    = 0.0;
-  double kinetic_1e    = 0.0;
-  double NE_1e         = 0.0;
-  double energy_1e     = 0.0;
-  double energy_2e     = 0.0;
-  double energy_qed    = 0.0;
-  double energy_qed_et = 0.0;
+  Eigen::Matrix3d polarizability  = Eigen::Matrix3d::Zero();
+  Eigen::Matrix3d polarizability2 = Eigen::Matrix3d::Zero();
+  Eigen::Vector3d eigen_polvec    = Eigen::Vector3d::Zero();
+  double          nelectrons      = 0.0;
+  double          kinetic_1e      = 0.0;
+  double          NE_1e           = 0.0;
+  double          energy_1e       = 0.0;
+  double          energy_2e       = 0.0;
+  double          energy_qed      = 0.0;
+  double          energy_qed_et   = 0.0;
+  double          energy_matrix   = 0.0;
   if(is_rhf) {
     nelectrons = tt_trace(ec, ttensors.D_last_alpha, ttensors.S1);
     kinetic_1e = tt_trace(ec, ttensors.D_last_alpha, ttensors.T1);
@@ -135,12 +139,14 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
       }
       else { energy_qed = scf_data.eqed; }
 
-      Tensor<T> X_a;
-
 #if defined(USE_SCALAPACK)
-      X_a = {scf_data.tAO, scf_data.tAO_ortho};
       Tensor<T>::allocate(&ec, X_a);
-      if(scalapack_info.pg.is_valid()) { tamm::from_block_cyclic_tensor(ttensors.X_alpha, X_a); }
+      if(scalapack_info.pg.is_valid()) {
+        Tensor<T> X_dense = from_block_cyclic_tensor(ttensors.X_alpha);
+        tamm::from_dense_tensor(X_dense, X_a);
+        Tensor<T>::deallocate(X_dense);
+      }
+      ec.pg().barrier();
 #else
       X_a = ttensors.X_alpha;
 #endif
@@ -166,17 +172,111 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
           (mu_dot_lambda(mu, nu) += polvec[2] * ttensors.QED_Dz(mu, nu))
           (dP(mu, nu)  = mu_dot_lambda(mu, ku) * Pvir(ku, nu))
           (dPd(mu, nu)  = dP(mu, ku) * mu_dot_lambda(nu, ku))
-	        (scalar() = 0.5 * dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+	  (scalar() = 0.5 * dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
           .execute();
         // clang-format on
 
         energy_qed_et += tamm::get_scalar(scalar);
+
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(0, 0) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(1, 1) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(2, 2) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(0, 1) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(0, 2) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(1, 2) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(1, 0) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(2, 0) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(2, 1) = tamm::get_scalar(scalar);
+
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(0, 0) = -0.5 * tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(1, 1) = -0.5 * tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(2, 2) = -0.5 * tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(0, 1) = -0.5 * tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(0, 2) = -0.5 * tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(1, 2) = -0.5 * tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(1, 0) = -0.5 * tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(2, 0) = -0.5 * tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(2, 1) = -0.5 * tamm::get_scalar(scalar);
       }
       sch.deallocate(Sm1, Pvir, mu_dot_lambda, dP, dPd, scalar).execute();
 
 #if defined(USE_SCALAPACK)
       Tensor<T>::deallocate(X_a);
 #endif
+      eigen_polvec << polvec[0], polvec[1], polvec[2];
+      energy_matrix += 0.5 * eigen_polvec.dot(polarizability * eigen_polvec);
     }
   }
   if(is_uhf) {
@@ -197,17 +297,19 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
       if(do_qed) {
         energy_qed = tt_trace(ec, ttensors.D_last_alpha, ttensors.QED_1body);
         energy_qed += tt_trace(ec, ttensors.D_last_beta, ttensors.QED_1body);
-        energy_qed += 0.5 * tt_trace(ec, ttensors.D_last_alpha, ttensors.QED_2body);
-        energy_qed += 0.5 * tt_trace(ec, ttensors.D_last_beta, ttensors.QED_2body_beta);
+        energy_qed += tt_trace(ec, ttensors.D_last_alpha, ttensors.QED_2body);
+        energy_qed += tt_trace(ec, ttensors.D_last_beta, ttensors.QED_2body_beta);
       }
       else { energy_qed = scf_data.eqed; }
 
-      Tensor<double> X_a;
-
 #if defined(USE_SCALAPACK)
-      X_a = {scf_data.tAO, scf_data.tAO_ortho};
-      Tensor<double>::allocate(&ec, X_a);
-      if(scalapack_info.pg.is_valid()) { tamm::from_block_cyclic_tensor(ttensors.X_alpha, X_a); }
+      Tensor<T>::allocate(&ec, X_a);
+      if(scalapack_info.pg.is_valid()) {
+        Tensor<T> X_dense = from_block_cyclic_tensor(ttensors.X_alpha);
+        tamm::from_dense_tensor(X_dense, X_a);
+        Tensor<T>::deallocate(X_dense);
+      }
+      ec.pg().barrier();
 #else
       X_a = ttensors.X_alpha;
 #endif
@@ -228,28 +330,217 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
           (mu_dot_lambda(mu, nu)  = polvec[0] * ttensors.QED_Dx(mu, nu))
           (mu_dot_lambda(mu, nu) += polvec[1] * ttensors.QED_Dy(mu, nu))
           (mu_dot_lambda(mu, nu) += polvec[2] * ttensors.QED_Dz(mu, nu))
-          // Alpha
-          (Pvir(mu, nu) = Sm1(mu, nu))
-          (Pvir(mu, nu) -= ttensors.D_last_alpha(mu, nu))
-            (dP(mu, nu)  = mu_dot_lambda(mu, ku) * Pvir(ku, nu))
-            (dPd(mu, nu)  = dP(mu, ku) * mu_dot_lambda(nu, ku))
-          (scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
-          // Beta
-          (Pvir(mu, nu) = Sm1(mu, nu))
-          (Pvir(mu, nu) -= ttensors.D_last_beta(mu, nu))
-            (dP(mu, nu)  = mu_dot_lambda(mu, ku) * Pvir(ku, nu))
-            (dPd(mu, nu)  = dP(mu, ku) * mu_dot_lambda(nu, ku))
-          (scalar() += dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+	  // Alpha
+	  (Pvir(mu, nu) = Sm1(mu, nu))
+	  (Pvir(mu, nu) -= ttensors.D_last_alpha(mu, nu))
+          (dP(mu, nu)  = mu_dot_lambda(mu, ku) * Pvir(ku, nu))
+          (dPd(mu, nu)  = dP(mu, ku) * mu_dot_lambda(nu, ku))
+	  (scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+	  // Beta
+	  (Pvir(mu, nu) = Sm1(mu, nu))
+	  (Pvir(mu, nu) -= ttensors.D_last_beta(mu, nu))
+          (dP(mu, nu)  = mu_dot_lambda(mu, ku) * Pvir(ku, nu))
+          (dPd(mu, nu)  = dP(mu, ku) * mu_dot_lambda(nu, ku))
+	  (scalar() += dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
           .execute();
         // clang-format on
 
-        energy_qed_et += tamm::get_scalar(scalar);
+        energy_qed_et += 0.5 * tamm::get_scalar(scalar);
+
+        // Alpha
+        sch(Pvir(mu, nu) = Sm1(mu, nu))(Pvir(mu, nu) -= ttensors.D_last_alpha(mu, nu))(
+          dP(mu, nu) = ttensors.QED_Dx(mu, ku) *
+                       Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(0, 0) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(1, 1) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(2, 2) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(0, 1) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(0, 2) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(1, 2) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(1, 0) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(2, 0) = tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability(2, 1) = tamm::get_scalar(scalar);
+        // Beta
+        sch(Pvir(mu, nu) = Sm1(mu, nu))(Pvir(mu, nu) -= ttensors.D_last_beta(mu, nu))(
+          dP(mu, nu) = ttensors.QED_Dx(mu, ku) *
+                       Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability(0, 0) += tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability(1, 1) += tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability(2, 2) += tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability(0, 1) += tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability(0, 2) += tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability(1, 2) += tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability(1, 0) += tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability(2, 0) += tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) *
+                         Pvir(ku, nu))(dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability(2, 1) += tamm::get_scalar(scalar);
+
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(0, 0) = -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(1, 1) = -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(2, 2) = -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(0, 1) = -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(0, 2) = -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(1, 2) = -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(1, 0) = -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(2, 0) = -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) * ttensors.D_last_alpha(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_alpha(mu, nu))
+          .execute();
+        polarizability2(2, 1) = -tamm::get_scalar(scalar);
+
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) * ttensors.D_last_beta(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability2(0, 0) += -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) * ttensors.D_last_beta(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability2(1, 1) += -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) * ttensors.D_last_beta(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability2(2, 2) += -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) * ttensors.D_last_beta(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability2(0, 1) += -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dx(mu, ku) * ttensors.D_last_beta(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability2(0, 2) += -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) * ttensors.D_last_beta(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dz(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability2(1, 2) += -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dy(mu, ku) * ttensors.D_last_beta(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability2(1, 0) += -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) * ttensors.D_last_beta(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dx(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability2(2, 0) += -tamm::get_scalar(scalar);
+        sch(dP(mu, nu) = ttensors.QED_Dz(mu, ku) * ttensors.D_last_beta(ku, nu))(
+          dPd(mu, nu) = dP(mu, ku) * ttensors.QED_Dy(nu, ku))(
+          scalar() = dPd(mu, nu) * ttensors.D_last_beta(mu, nu))
+          .execute();
+        polarizability2(2, 1) += -tamm::get_scalar(scalar);
       }
       sch.deallocate(Sm1, Pvir, mu_dot_lambda, dP, dPd, scalar).execute();
 
 #if defined(USE_SCALAPACK)
       Tensor<double>::deallocate(X_a);
 #endif
+      eigen_polvec << polvec[0], polvec[1], polvec[2];
+      energy_matrix += 0.5 * eigen_polvec.dot(polarizability * eigen_polvec);
     }
   }
 
@@ -269,6 +560,27 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
     if(is_qed) {
       std::cout << "QED energy        = " << energy_qed << std::endl;
       std::cout << "QED eT energy     = " << energy_qed_et << std::endl;
+      // std::cout << "QED eT energy from matrix = " << energy_matrix << std::endl;
+      Eigen::IOFormat CleanFmt(8, 0, ", ", "\n", "[", "]");
+
+      polarizability2(0, 0) -= scf_data.etensors.multipoles[4];
+      polarizability2(0, 1) -= scf_data.etensors.multipoles[5];
+      polarizability2(0, 2) -= scf_data.etensors.multipoles[6];
+      polarizability2(1, 0) -= scf_data.etensors.multipoles[5];
+      polarizability2(1, 1) -= scf_data.etensors.multipoles[7];
+      polarizability2(1, 2) -= scf_data.etensors.multipoles[8];
+      polarizability2(2, 0) -= scf_data.etensors.multipoles[6];
+      polarizability2(2, 1) -= scf_data.etensors.multipoles[8];
+      polarizability2(2, 2) -= scf_data.etensors.multipoles[9];
+
+      std::cout << "\n Dipole Fluctuation Tensor (QED energy = 0.5 * lambda.dot(matrix * lambda))"
+                << std::endl;
+      std::cout << polarizability2.format(CleanFmt) << std::endl;
+      std::cout
+        << "\n Dipole Fluctuation Tensor (QED eT energy = 0.5 * lambda.dot(matrix * lambda))"
+        << std::endl;
+      std::cout << polarizability.format(CleanFmt) << std::endl;
+
       scf_results["energy_qed"]    = energy_qed;
       scf_results["energy_qed_et"] = energy_qed_et;
     }

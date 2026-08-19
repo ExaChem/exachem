@@ -37,6 +37,11 @@ public:
 
   virtual void compute_qed_emult_ints(ExecutionContext& ec, const ChemEnv& chem_env,
                                       const SCFData& scf_data, TAMMTensors<T>& ttensors) const;
+
+  virtual void compute_qed_emult_ints_deriv(ExecutionContext& ec, const ChemEnv& chem_env,
+                                            unsigned deriv_order, const SCFData& scf_data,
+                                            std::vector<Tensor<T>>& D_deriv,
+                                            std::vector<Tensor<T>>& Q_deriv) const;
 };
 
 } // namespace exachem::scf

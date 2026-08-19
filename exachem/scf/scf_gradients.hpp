@@ -12,6 +12,7 @@
 #include "exachem/common/system_data.hpp"
 #include "exachem/scf/scf_iter.hpp"
 #include "exachem/scf/scf_outputs.hpp"
+#include "exachem/scf/scf_qed.hpp"
 
 namespace exachem::scf {
 
@@ -38,6 +39,7 @@ public:
 protected:
   SCFIter<TensorType>  scf_iter;
   SCFGuess<TensorType> scf_guess;
+  SCFQed<TensorType>   scf_qed;
 };
 
 } // namespace exachem::scf

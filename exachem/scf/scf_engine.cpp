@@ -376,8 +376,8 @@ void exachem::scf::SCFEngine::deallocate_main_tensors(ExecutionContext& ec,
     for(auto x: scf_data.ttensors.D_beta_hist) Tensor<TensorType>::deallocate(x);
   }
   if(scf_data.do_dens_fit) {
-    if(scf_data.direct_df) { Tensor<TensorType>::deallocate(scf_data.ttensors.Vm1); }
-    else { Tensor<TensorType>::deallocate(scf_data.ttensors.xyK); }
+    Tensor<TensorType>::deallocate(scf_data.ttensors.Vm1);
+    if(!scf_data.direct_df) { Tensor<TensorType>::deallocate(scf_data.ttensors.xyK); }
   }
   if(chem_env.sys_data.is_ks) {
     Tensor<TensorType>::deallocate(scf_data.ttensors.VXC_alpha);
@@ -670,9 +670,12 @@ void exachem::scf::SCFEngine::print_write_iteration(ExecutionContext& exc, ChemE
     scf_output.rw_md_disk(exc, chem_env, scalapack_info, scf_data.ttensors, scf_data.etensors,
                           files_prefix);
   }
-  if(chem_env.ioptions.scf_options.debug)
+  if(chem_env.ioptions.scf_options.debug) {
+    scf_data.etensors.multipoles =
+      scf_compute.compute_multipoles(exc, chem_env, scf_data, scf_data.ttensors, scf_data.etensors);
     scf_output.print_energies(exc, chem_env, scf_data.ttensors, scf_data.etensors, scf_data,
                               scalapack_info);
+  }
 
 } // print_energy_iteration
 
@@ -1028,18 +1031,18 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
 
     // pre-compute data for Schwarz bounds
     Matrix SchwarzK;
-    if(!scf_data.do_dens_fit || scf_data.direct_df) {
-      if(N >= chem_env.ioptions.scf_options.restart_size && fs::exists(fname[FileType::Schwarz])) {
-        if(rank == 0) cout << "Read Schwarz matrix from disk ... " << endl;
+    // if(!scf_data.do_dens_fit || scf_data.direct_df) {
+    if(N >= chem_env.ioptions.scf_options.restart_size && fs::exists(fname[FileType::Schwarz])) {
+      if(rank == 0) cout << "Read Schwarz matrix from disk ... " << endl;
 
-        SchwarzK = scf_output.read_scf_mat(fname[FileType::Schwarz]);
-      }
-      else {
-        // if(rank == 0) cout << "pre-computing data for Schwarz bounds... " << endl;
-        SchwarzK = scf_compute.compute_schwarz_ints(ec, scf_data, chem_env.shells);
-        if(rank == 0) scf_output.write_scf_mat(SchwarzK, fname[FileType::Schwarz]);
-      }
+      SchwarzK = scf_output.read_scf_mat(fname[FileType::Schwarz]);
     }
+    else {
+      // if(rank == 0) cout << "pre-computing data for Schwarz bounds... " << endl;
+      SchwarzK = scf_compute.compute_schwarz_ints(ec, scf_data, chem_env.shells);
+      if(rank == 0) scf_output.write_scf_mat(SchwarzK, fname[FileType::Schwarz]);
+    }
+    //}
     hf_t1 = std::chrono::high_resolution_clock::now();
 
     declare_main_tensors(ec, chem_env);
@@ -1406,6 +1409,9 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     if(rank == 0)
       std::cout << std::endl
                 << "Nuclear repulsion energy = " << std::setprecision(15) << enuc << endl;
+
+    scf_data.etensors.multipoles =
+      scf_compute.compute_multipoles(ec, chem_env, scf_data, scf_data.ttensors, scf_data.etensors);
     scf_output.print_energies(ec, chem_env, scf_data.ttensors, scf_data.etensors, scf_data,
                               scalapack_info);
 
@@ -1415,9 +1421,7 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     }
 
     // Multipole moments
-    std::vector<double> multipoles =
-      scf_compute.compute_multipoles(ec, chem_env, scf_data, scf_data.ttensors, scf_data.etensors);
-    if(rank == 0) { scf_output.print_multipoles(chem_env, multipoles); }
+    if(rank == 0) { scf_output.print_multipoles(chem_env, scf_data.etensors.multipoles); }
 
     if(chem_env.ioptions.pdos_options.do_pdos) {
 #if defined(USE_SCALAPACK)

@@ -353,4 +353,128 @@ void exachem::scf::SCFQed<T>::compute_qed_emult_ints(ExecutionContext& ec, const
   block_for(ec, ttensors.QED_Dx(), compute_qed_emult_ints_lambda);
 }
 
+template<typename T>
+void exachem::scf::SCFQed<T>::compute_qed_emult_ints_deriv(
+  ExecutionContext& ec, const ChemEnv& chem_env, unsigned deriv_order, const SCFData& spvars,
+  std::vector<Tensor<T>>& D_deriv, std::vector<Tensor<T>>& Q_deriv) const {
+  using libint2::Atom;
+  using libint2::BasisSet;
+  using libint2::Engine;
+  using libint2::Operator;
+  using libint2::Shell;
+
+  // auto& atoms = chem_env.atoms;
+  const SystemData&        sys_data    = chem_env.sys_data;
+  const SCFOptions&        scf_options = chem_env.ioptions.scf_options;
+  const libint2::BasisSet& shells      = chem_env.shells;
+
+  const std::vector<libint2::Atom>& atoms          = chem_env.atoms;
+  const std::vector<Tile>&          AO_tiles       = spvars.AO_tiles;
+  const std::vector<size_t>&        shell_tile_map = spvars.shell_tile_map;
+  auto                              shell2atom     = shells.shell2atom(atoms);
+
+  int nopers = libint2::operator_traits<Operator::emultipole2>::nopers;
+
+  const auto natoms   = atoms.size();
+  const auto nresults = nopers * libint2::num_geometrical_derivatives(natoms, deriv_order);
+
+  const int   nmodes  = sys_data.qed_nmodes;
+  const auto& lambdas = scf_options.qed_lambdas;
+  const auto& polvecs = scf_options.qed_polvecs;
+
+  Engine engine(Operator::emultipole2, max_nprim(shells), max_l(shells), deriv_order);
+
+  Tensor<T> tensor1e = D_deriv[0];
+  auto&     buf      = (engine.results());
+
+  std::map<int, double> scaling_map = {
+    {1, lambdas[0] * polvecs[0][0]},
+    {2, lambdas[0] * polvecs[0][1]},
+    {3, lambdas[0] * polvecs[0][2]},
+    {4, 0.5 * lambdas[0] * lambdas[0] * polvecs[0][0] * polvecs[0][0]},
+    {5, lambdas[0] * lambdas[0] * polvecs[0][0] * polvecs[0][1]},
+    {6, lambdas[0] * lambdas[0] * polvecs[0][0] * polvecs[0][2]},
+    {7, 0.5 * lambdas[0] * lambdas[0] * polvecs[0][1] * polvecs[0][1]},
+    {8, lambdas[0] * lambdas[0] * polvecs[0][1] * polvecs[0][2]},
+    {9, 0.5 * lambdas[0] * lambdas[0] * polvecs[0][2] * polvecs[0][2]}};
+
+  auto compute_qed_emult_ints_lambda = [&](const IndexVector& blockid) {
+    const auto bi0 = blockid[0];
+    const auto bi1 = blockid[1];
+
+    const TAMM_SIZE             size       = tensor1e.block_size(blockid);
+    auto                        block_dims = tensor1e.block_dims(blockid);
+    std::vector<std::vector<T>> dbuf(2 * 3 * natoms, std::vector<T>(size));
+
+    auto                                       bd1           = block_dims[1];
+    const auto                                 s1range_end   = shell_tile_map[bi0];
+    std::remove_const_t<decltype(s1range_end)> s1range_start = 0l;
+    if(bi0 > 0) s1range_start = shell_tile_map[bi0 - 1] + 1;
+    for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
+      auto                                       n1            = shells[s1].size();
+      auto                                       atom1         = shell2atom[s1];
+      const auto                                 s2range_end   = shell_tile_map[bi1];
+      std::remove_const_t<decltype(s2range_end)> s2range_start = 0l;
+      if(bi1 > 0) s2range_start = shell_tile_map[bi1 - 1] + 1;
+      for(auto s2 = s2range_start; s2 <= s2range_end; ++s2) {
+        if(s2 > s1) {
+          auto s2spl = spvars.obs_shellpair_list.at(s2);
+          if(std::find(s2spl.begin(), s2spl.end(), s1) == s2spl.end()) continue;
+        }
+        else {
+          auto s2spl = spvars.obs_shellpair_list.at(s1);
+          if(std::find(s2spl.begin(), s2spl.end(), s2) == s2spl.end()) continue;
+        }
+        const auto     n2    = shells[s2].size();
+        auto           atom2 = shell2atom[s2];
+        std::vector<T> tbuf(n1 * n2);
+
+        // compute shell pair; return is the pointer to the buffer
+        engine.compute(shells[s1], shells[s2]);
+        if(buf[0] == nullptr) continue;
+        EXPECTS(buf.size() >= nopers * 6);
+
+        std::size_t shellset_idx = 0;
+        for(unsigned long c = 0; c != 2; ++c) {
+          auto atom     = (c == 0) ? atom1 : atom2;
+          auto op_start = 3 * atom * nopers;
+          auto op_fence = op_start + nopers;
+          for(auto xyz = 0; xyz != 3; ++xyz, op_start += nopers, op_fence += nopers) {
+            for(unsigned int op = op_start; op != op_fence; ++op, ++shellset_idx) {
+              int operator_type = shellset_idx % 10;
+              if(operator_type == 0) continue; // Overlap
+
+              int    dbuf_op = operator_type < 4 ? 3 * atom + xyz : 3 * (natoms + atom) + xyz;
+              double scaling = scaling_map[operator_type];
+
+              Eigen::Map<const Matrix> buf_mat(buf[shellset_idx], n1, n2);
+              Eigen::Map<Matrix>(&tbuf[0], n1, n2) = buf_mat;
+
+              auto curshelloffset_i = 0U;
+              auto curshelloffset_j = 0U;
+              for(auto x = s1range_start; x < s1; x++) curshelloffset_i += AO_tiles[x];
+              for(auto x = s2range_start; x < s2; x++) curshelloffset_j += AO_tiles[x];
+
+              size_t     ctx  = 0;
+              const auto dimi = curshelloffset_i + AO_tiles[s1];
+              const auto dimj = curshelloffset_j + AO_tiles[s2];
+
+              for(size_t i = curshelloffset_i; i < dimi; i++) {
+                for(size_t j = curshelloffset_j; j < dimj; j++, ctx++) {
+                  dbuf[dbuf_op][i * bd1 + j] += scaling * tbuf[ctx];
+                }
+              }
+            }
+          }
+        }
+      } // s2
+    }   // s1
+    for(unsigned int i = 0; i < 3 * natoms; ++i) {
+      D_deriv[i].put(blockid, dbuf[i]);
+      Q_deriv[i].put(blockid, dbuf[i + 3 * natoms]);
+    }
+  };
+  block_for(ec, tensor1e(), compute_qed_emult_ints_lambda);
+}
+
 template class exachem::scf::SCFQed<double>;

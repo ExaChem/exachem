@@ -12,6 +12,7 @@
 #include <gauxc/xc_integrator.hpp>
 #include <gauxc/xc_integrator/impl.hpp>
 #include <gauxc/xc_integrator/integrator_factory.hpp>
+#include <xc.h>
 #endif
 
 #if defined(USE_GAUXC)

@@ -585,25 +585,26 @@ void exachem::scf::SCFIter<T>::compute_2c_ints(ExecutionContext& ec, const ChemE
 }
 
 template<typename T>
-void exachem::scf::SCFIter<T>::init_ri(ExecutionContext& ec, const ChemEnv& chem_env,
-                                       ScalapackInfo& scalapack_info, const SCFData& scf_data,
-                                       EigenTensors& etensors, TAMMTensors<T>& ttensors) {
+void exachem::scf::SCFIter<T>::compute_Vm12(ExecutionContext& ec, const ChemEnv& chem_env,
+                                            ScalapackInfo& scalapack_info, const SCFData& scf_data,
+                                            EigenTensors& etensors, TAMMTensors<T>& ttensors) {
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
+  const auto        ndf         = sys_data.ndf;
+  const bool        direct      = scf_data.direct_df;
+  const auto        rank        = ec.pg().rank();
+  const auto        debug       = scf_options.debug;
 
-  const auto ndf    = sys_data.ndf;
-  const bool direct = scf_data.direct_df;
-  const auto rank   = ec.pg().rank();
-  const auto debug  = scf_options.debug;
-
-  auto mu = scf_data.mu, nu = scf_data.nu, ku = scf_data.ku;
-  auto d_mu = scf_data.d_mu, d_nu = scf_data.d_nu, d_ku = scf_data.d_ku;
+  auto& mu   = scf_data.mu;
+  auto& nu   = scf_data.nu;
+  auto& ku   = scf_data.ku;
+  auto& d_mu = scf_data.d_mu;
+  auto& d_nu = scf_data.d_nu;
+  auto& d_ku = scf_data.d_ku;
 
   Scheduler   sch{ec};
   ExecutionHW exhw = ec.exhw();
 
-  Tensor<T>& xyK = ttensors.xyK;
-  Tensor<T>& xyZ = ttensors.xyZ;
   Tensor<T>& Vm1 = ttensors.Vm1;
 
   // Compute 2c integrals
@@ -717,7 +718,7 @@ void exachem::scf::SCFIter<T>::init_ri(ExecutionContext& ec, const ChemEnv& chem
 
   if(rank == 0) {
     std::transform(eps.begin(), eps.end(), eps.begin(), [](auto& c) {
-      if(c < 1.0e-6) {
+      if(c < 1.0e-7) {
         std::cout << "WARNING: small eigenvalue in V: " << std::scientific << c << std::fixed
                   << std::endl;
         return 0.0;
@@ -735,6 +736,31 @@ void exachem::scf::SCFIter<T>::init_ri(ExecutionContext& ec, const ChemEnv& chem
 
   if(rank == 0 && debug)
     std::cout << std::fixed << std::setprecision(2) << "V^-1/2: " << igtime << "s, ";
+}
+
+template<typename T>
+void exachem::scf::SCFIter<T>::init_ri(ExecutionContext& ec, const ChemEnv& chem_env,
+                                       ScalapackInfo& scalapack_info, const SCFData& scf_data,
+                                       EigenTensors& etensors, TAMMTensors<T>& ttensors) {
+  const SystemData& sys_data    = chem_env.sys_data;
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
+
+  const auto ndf    = sys_data.ndf;
+  const bool direct = scf_data.direct_df;
+  const auto rank   = ec.pg().rank();
+  const auto debug  = scf_options.debug;
+
+  auto mu = scf_data.mu, nu = scf_data.nu, ku = scf_data.ku;
+  auto d_mu = scf_data.d_mu, d_nu = scf_data.d_nu, d_ku = scf_data.d_ku;
+
+  Scheduler   sch{ec};
+  ExecutionHW exhw = ec.exhw();
+
+  Tensor<T>& xyK = ttensors.xyK;
+  Tensor<T>& xyZ = ttensors.xyZ;
+  Tensor<T>& Vm1 = ttensors.Vm1;
+
+  compute_Vm12(ec, chem_env, scalapack_info, scf_data, etensors, ttensors);
 
   if(!direct) {
     // Compute 3c ints
@@ -743,18 +769,16 @@ void exachem::scf::SCFIter<T>::init_ri(ExecutionContext& ec, const ChemEnv& chem
 
     // Orthonormalize DF basis
     sch(xyK(mu, nu, d_nu) = xyZ(mu, nu, d_mu) * Vm1(d_mu, d_nu))
-      .deallocate(Vm1, xyZ) // release memory Zxy
+      .deallocate(xyZ) // release memory Zxy
       .execute(exhw);
   }
 }
 
 template<typename T>
-void exachem::scf::SCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, const ChemEnv& chem_env,
-                                                     const SCFData&             scf_data,
-                                                     const std::vector<size_t>& shell2bf,
-                                                     TAMMTensors<T>&            ttensors,
-                                                     EigenTensors&              etensors,
-                                                     const Matrix&              SchwarzK) {
+void exachem::scf::SCFIter<T>::compute_ri_jvec(ExecutionContext& ec, const ChemEnv& chem_env,
+                                               const SCFData& scf_data, EigenTensors& etensors,
+                                               TAMMTensors<T>& ttensors, const Matrix& SchwarzK,
+                                               Tensor<T>& Jvec) {
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
@@ -762,58 +786,24 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, const
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
-  Scheduler sch{ec};
-  // ExecutionHW exhw = ec.exhw();
-
-  const libint2::BasisSet& obs = chem_env.shells;
-
-  const bool debug  = scf_options.debug;
-  const bool is_uhf = sys_data.is_unrestricted;
-  // const bool is_spherical = (scf_options.gaussian_type == "spherical");
-
+  Scheduler  sch{ec};
   const auto rank = ec.pg().rank();
 
+  const libint2::BasisSet& obs         = chem_env.shells;
   const auto               ndf         = sys_data.ndf;
   const libint2::BasisSet& dfbs        = scf_data.dfbs;
+  auto                     shell2bf    = obs.shell2bf();
   auto                     shell2bf_df = dfbs.shell2bf();
-
-  auto mu = scf_data.mu, nu = scf_data.nu, ku = scf_data.ku;
-  auto d_mu = scf_data.d_mu, d_nu = scf_data.d_nu, d_ku = scf_data.d_ku;
+  const auto&              unitshell   = libint2::Shell::unit();
+  auto                     engine      = libint2::Engine(libint2::Operator::coulomb,
+                                                         std::max(dfbs.max_nprim(), obs.max_nprim()),
+                                                         std::max(obs.max_l(), dfbs.max_l()), 0);
 
   double engine_precision = scf_options.tol_int; // default: 1e-22
   double fock_precision   = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
-
-  const auto& unitshell = libint2::Shell::unit();
-  auto        engine    = libint2::Engine(libint2::Operator::coulomb,
-                                          std::max(dfbs.max_nprim(), obs.max_nprim()),
-                                          std::max(obs.max_l(), dfbs.max_l()), 0);
   engine.set(libint2::BraKet::xs_xx);
   engine.set_precision(engine_precision);
   const auto& buf = engine.results();
-
-  Matrix& D      = etensors.D_alpha;
-  Matrix& D_beta = etensors.D_beta;
-  Matrix& G      = etensors.G_alpha;
-  auto&   dfNorm = etensors.dfNorm;
-
-  // auto   shblk = is_spherical ? 2 * obs.max_l() + 1 : ((obs.max_l() + 1) * (obs.max_l() + 2)) /
-  // 2; Matrix Dblk(shblk, shblk);
-
-  Matrix          Jtmp    = Matrix::Zero(1, ndf);
-  Tensor<T>&      F_dummy = ttensors.F_dummy;
-  Tensor<T>&      Vm1     = ttensors.Vm1;
-  IndexSpace      dummy{range(1)};
-  TiledIndexSpace tdummy{dummy};
-  Tensor<T>       Jtmp_tamm{tdummy, scf_data.tdfAO}, Xtmp_tamm{tdummy, scf_data.tdfAO};
-
-  const auto buildJ_start = std::chrono::high_resolution_clock::now();
-
-  sch.allocate(Jtmp_tamm, Xtmp_tamm).execute();
-  sch(Jtmp_tamm() = 0.0).execute();
-
-  Matrix D_shblk_norm;
-  D_shblk_norm = chem_env.compute_shellblock_norm(obs, D); // matrix of infty-norms of shell blocks
-  if(is_uhf) D_shblk_norm += chem_env.compute_shellblock_norm(obs, D_beta);
 
   const auto       max_engine_precision    = std::numeric_limits<double>::epsilon() / 1e10;
   const auto       ln_max_engine_precision = std::log(max_engine_precision);
@@ -822,6 +812,15 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, const
     spdata[0].emplace_back(
       std::make_shared<libint2::ShellPair>(dfbs[s1], unitshell, ln_max_engine_precision));
   }
+
+  Tensor<T>& F_dummy    = ttensors.F_dummy;
+  Matrix     Jtmp       = Matrix::Zero(1, ndf);
+  auto&      dfNorm     = etensors.dfNorm;
+  auto       dfNorm_max = dfNorm.maxCoeff();
+  Matrix     D_shblk_norm;
+  Matrix&    D = etensors.D_alpha;
+  if(sys_data.is_unrestricted) D += etensors.D_beta;
+  D_shblk_norm = chem_env.compute_shellblock_norm(obs, D); // matrix of infty-norms of shell blocks
 
   auto comp_J_lambda = [&](IndexVector blockid) {
     auto s1        = blockid[0];
@@ -843,10 +842,9 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, const
     const auto Norm12  = D_shblk_norm(s1, s2) * SchwarzK(s1, s2);
     const auto Jfactor = (s1 == s2) ? 1.0 : 2.0;
 
-    if(Norm12 * dfNorm.maxCoeff() < fock_precision) return;
+    if(Norm12 * dfNorm_max < fock_precision) return;
 
     Matrix Dblk = D.block(bf1_first, bf2_first, n1, n2);
-    if(is_uhf) Dblk.block(0, 0, n1, n2) += D_beta.block(bf1_first, bf2_first, n1, n2);
 
     auto sp_iter = spdata.at(0).begin();
     for(decltype(s1) s3 = 0; s3 < dfbs.size(); ++s3) {
@@ -871,42 +869,62 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, const
   };
   block_for(ec, F_dummy(), comp_J_lambda);
 
-  eigen_to_tamm_tensor_acc(Jtmp_tamm, Jtmp);
+  if(sys_data.is_unrestricted) D -= etensors.D_beta;
+  eigen_to_tamm_tensor_acc(Jvec, Jtmp);
   ec.pg().barrier();
+}
 
-  // const auto buildJ_stop = std::chrono::high_resolution_clock::now();
-  // const auto buildJ_time =
-  //   std::chrono::duration_cast<std::chrono::duration<double>>((buildJ_stop -
-  //   buildJ_start)).count();
-  // if(rank == 0 && debug) std::cout << "buildJ: " << buildJ_time << "s, ";
+template<typename T>
+void exachem::scf::SCFIter<T>::compute_ri_jmat(ExecutionContext& ec, const ChemEnv& chem_env,
+                                               const SCFData& scf_data, const Matrix& SchwarzK,
+                                               EigenTensors& etensors, TAMMTensors<T>& ttensors,
+                                               Eigen::VectorXd& Jvec) {
+  using libint2::BraKet;
+  using libint2::Engine;
+  using libint2::Operator;
 
-  // const auto buildX_start = std::chrono::high_resolution_clock::now();
-  sch(Xtmp_tamm("i", "j") = Jtmp_tamm("i", "k") * Vm1("k", "j"))(
-    Jtmp_tamm("i", "j") = Xtmp_tamm("i", "k") * Vm1("j", "k"))
-    .deallocate(Xtmp_tamm)
-    .execute();
+  const SystemData& sys_data    = chem_env.sys_data;
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
-  Jtmp.setZero();
-  tamm_to_eigen_tensor(Jtmp_tamm, Jtmp);
-  ec.pg().barrier();
-  Tensor<T>::deallocate(Jtmp_tamm);
-  // const auto buildX_stop = std::chrono::high_resolution_clock::now();
-  // const auto buildX_time =
-  //   std::chrono::duration_cast<std::chrono::duration<double>>((buildX_stop -
-  //   buildX_start)).count();
-  // if(rank == 0 && debug) std::cout << "buildX: " << buildX_time << "s, ";
+  Scheduler  sch{ec};
+  const auto rank = ec.pg().rank();
 
-  // const auto                            buildF_start = std::chrono::high_resolution_clock::now();
-  Eigen::VectorXd                       Jvec(Eigen::Map<Eigen::VectorXd>(Jtmp.data(), Jtmp.cols()));
+  const libint2::BasisSet& obs         = chem_env.shells;
+  const auto               ndf         = sys_data.ndf;
+  const libint2::BasisSet& dfbs        = scf_data.dfbs;
+  auto                     shell2bf    = obs.shell2bf();
+  auto                     shell2bf_df = dfbs.shell2bf();
+  const auto&              unitshell   = libint2::Shell::unit();
+  auto                     engine      = libint2::Engine(libint2::Operator::coulomb,
+                                                         std::max(dfbs.max_nprim(), obs.max_nprim()),
+                                                         std::max(obs.max_l(), dfbs.max_l()), 0);
+
+  double engine_precision = scf_options.tol_int; // default: 1e-22
+  double fock_precision   = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
+  engine.set(libint2::BraKet::xs_xx);
+  engine.set_precision(engine_precision);
+  const auto& buf = engine.results();
+
+  const auto       max_engine_precision    = std::numeric_limits<double>::epsilon() / 1e10;
+  const auto       ln_max_engine_precision = std::log(max_engine_precision);
+  shellpair_data_t spdata(1);
+  for(size_t s1 = 0l; s1 != dfbs.size(); ++s1) {
+    spdata[0].emplace_back(
+      std::make_shared<libint2::ShellPair>(dfbs[s1], unitshell, ln_max_engine_precision));
+  }
+
+  auto&                                 dfNorm = etensors.dfNorm;
   Eigen::Vector<double, Eigen::Dynamic> Jnorm;
   Jnorm.resize(dfbs.size());
   for(size_t s3 = 0; s3 < dfbs.size(); ++s3) {
     Jnorm(s3) =
       Jvec.segment(shell2bf_df[s3], dfbs[s3].size()).lpNorm<Eigen::Infinity>() * dfNorm(s3);
   }
-
   // Scale JVEC to account for permutational symmetry
   Jvec *= 2.0;
+
+  Tensor<T>& F_dummy = ttensors.F_dummy;
+  Matrix&    G       = etensors.G_alpha;
 
   auto comp_df_lambda = [&](IndexVector blockid) {
     auto s1        = blockid[0];
@@ -952,17 +970,60 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, const
     G.block(bf1_first, bf2_first, n1, n2) = J12;
   };
   block_for(ec, F_dummy(), comp_df_lambda);
+}
 
-  eigen_to_tamm_tensor_acc(ttensors.F_alpha_tmp, G);
+template<typename T>
+void exachem::scf::SCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, const ChemEnv& chem_env,
+                                                     const SCFData&             scf_data,
+                                                     const std::vector<size_t>& shell2bf,
+                                                     TAMMTensors<T>&            ttensors,
+                                                     EigenTensors&              etensors,
+                                                     const Matrix&              SchwarzK) {
+  const SystemData& sys_data    = chem_env.sys_data;
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
+
+  Scheduler sch{ec};
+  // ExecutionHW exhw = ec.exhw();
+
+  const bool debug  = scf_options.debug;
+  const bool is_uhf = sys_data.is_unrestricted;
+
+  const auto rank = ec.pg().rank();
+  const auto ndf  = sys_data.ndf;
+
+  Tensor<T>&      Vm1 = ttensors.Vm1;
+  IndexSpace      dummy{range(1)};
+  TiledIndexSpace tdummy{dummy};
+  Tensor<T>       Jtmp_tamm{tdummy, scf_data.tdfAO}, Xtmp_tamm{tdummy, scf_data.tdfAO};
+
+  const auto buildJ_start = std::chrono::high_resolution_clock::now();
+
+  sch.allocate(Jtmp_tamm, Xtmp_tamm).execute();
+  sch(Jtmp_tamm() = 0.0).execute();
+
+  // Compute J vector
+  compute_ri_jvec(ec, chem_env, scf_data, etensors, ttensors, SchwarzK, Jtmp_tamm);
+
+  // Compute solution vector X = V^-1 * J
+  // clang-format off
+  sch(Xtmp_tamm("i", "j") = Jtmp_tamm("i", "k") * Vm1("k", "j"))
+     (Jtmp_tamm("i", "j") = Xtmp_tamm("i", "k") * Vm1("j", "k"))
+     .execute();
+  // clang-format on
+
+  Matrix Jtmp = Matrix::Zero(1, ndf);
+  tamm_to_eigen_tensor(Jtmp_tamm, Jtmp);
   ec.pg().barrier();
+  Tensor<T>::deallocate(Jtmp_tamm, Xtmp_tamm);
 
+  // Compute contribution to Fock matrix
+  Eigen::VectorXd Jvec(Eigen::Map<Eigen::VectorXd>(Jtmp.data(), Jtmp.cols()));
+  compute_ri_jmat(ec, chem_env, scf_data, SchwarzK, etensors, ttensors, Jvec);
+  eigen_to_tamm_tensor_acc(ttensors.F_alpha_tmp, etensors.G_alpha);
+  ec.pg().barrier();
   if(is_uhf) sch(ttensors.F_beta_tmp() = ttensors.F_alpha_tmp()).execute();
 
   const auto buildF_stop = std::chrono::high_resolution_clock::now();
-  // const auto buildF_time =
-  //   std::chrono::duration_cast<std::chrono::duration<double>>((buildF_stop -
-  //   buildF_start)).count();
-  // if(rank == 0 && debug) std::cout << "buildF: " << buildF_time << "s, ";
 
   const auto total_time =
     std::chrono::duration_cast<std::chrono::duration<double>>((buildF_stop - buildJ_start)).count();
@@ -2410,16 +2471,554 @@ void exachem::scf::SCFIter<T>::compute_2bf_deriv(
     ec.pg().barrier();
   }
 
-  // else {
-  //   if(scf_data.direct_df) {
-  //     G.setZero(N, N);
-  //     compute_2bf_ri_direct(ec, chem_env, scf_data, shell2bf, ttensors, etensors, SchwarzK);
-  //   }
-  //   else {
-  //     compute_2bf_ri(ec, chem_env, scalapack_info, scf_data, shell2bf, ttensors, etensors,
-  //                    is_3c_init, xHF);
-  //   }
-  // } // end density fitting
+  else {
+    Ga_deriv = std::vector<Matrix>(nderiv, Matrix::Zero(N, N));
+    if(is_uhf) Gb_deriv = std::vector<Matrix>(nderiv, Matrix::Zero(N, N));
+    compute_2bf_ri_deriv(ec, chem_env, scalapack_info, scf_data, shell2bf, SchwarzK, ttensors,
+                         etensors, scf_data.direct_df, xHF);
+    ec.pg().barrier();
+  } // end density fitting
+}
+
+template<typename T>
+Matrix
+exachem::scf::SCFIter<T>::compute_2c_ints_deriv(ExecutionContext& ec, const ChemEnv& chem_env,
+                                                const SCFData& scf_data, TAMMTensors<T>& ttensors,
+                                                Eigen::VectorXd& Xvec) {
+  using libint2::BasisSet;
+  using libint2::BraKet;
+  using libint2::Engine;
+  using libint2::Operator;
+
+  Matrix     grad       = Matrix::Zero(chem_env.atoms.size(), 3);
+  Matrix     grad_local = Matrix::Zero(chem_env.atoms.size(), 3);
+  Tensor<T>  V_dummy{scf_data.tdfAOt, scf_data.tdfAOt};
+  Tensor<T>& Vm1 = ttensors.Vm1;
+
+  Scheduler sch{ec};
+
+  const BasisSet& dfbs = scf_data.dfbs;
+  size_t          shell_atoms[2];
+  auto            shell2atom  = dfbs.shell2atom(chem_env.atoms);
+  auto            shell2bf_df = dfbs.shell2bf();
+
+  const SCFOptions& scf_options      = chem_env.ioptions.scf_options;
+  double            engine_precision = scf_options.tol_int; // default: 1e-22
+  auto              engine           = Engine(Operator::coulomb, dfbs.max_nprim(), dfbs.max_l(), 1);
+  engine.set(BraKet::xs_xs);
+  engine.set_precision(engine_precision);
+  const auto& results = engine.results();
+
+  auto compute_2body_2index_ints_lambda = [&](const IndexVector& blockid) {
+    const auto s1 = blockid[0];
+    const auto s2 = blockid[1];
+
+    auto n1            = dfbs[s1].size();
+    shell_atoms[0]     = shell2atom[s1];
+    Eigen::VectorXd X1 = Xvec.segment(shell2bf_df[s1], n1);
+
+    auto n2            = dfbs[s2].size();
+    shell_atoms[1]     = shell2atom[s2];
+    Eigen::VectorXd X2 = Xvec.segment(shell2bf_df[s2], n2);
+
+    if(shell_atoms[0] == shell_atoms[1]) return;
+
+    // if (X1.lpNorm<Eigen::Infinity>() * X2.lpNorm<Eigen::Infinity>() < scf_options.tol_sch)
+    // return;
+
+    engine.compute(dfbs[s1], dfbs[s2]);
+    if(results[0] == nullptr) return;
+
+    for(int ibatch = 0; ibatch < 6; ibatch++) {
+      const auto               a    = ibatch / 3;
+      const auto               xyz  = ibatch % 3;
+      const auto               atom = shell_atoms[a];
+      Eigen::Map<const Matrix> buf_mat(results[ibatch], n1, n2);
+      grad_local(atom, xyz) -= X1.dot(buf_mat * X2);
+    }
+  };
+  block_for(ec, V_dummy(), compute_2body_2index_ints_lambda);
+  ec.pg().barrier();
+  return 0.5 * grad_local;
+}
+
+template<typename T>
+Matrix
+exachem::scf::SCFIter<T>::compute_2c_exx_ints_deriv(ExecutionContext& ec, const ChemEnv& chem_env,
+                                                    const SCFData&  scf_data,
+                                                    TAMMTensors<T>& ttensors, Tensor<T>& Xmat) {
+  using libint2::BasisSet;
+  using libint2::BraKet;
+  using libint2::Engine;
+  using libint2::Operator;
+
+  Matrix                     grad_local        = Matrix::Zero(chem_env.atoms.size(), 3);
+  Matrix                     grad              = Matrix::Zero(chem_env.atoms.size(), 3);
+  Tensor<T>&                 Vm1               = ttensors.Vm1;
+  const std::vector<Tile>&   dfAO_tiles        = scf_data.dfAO_tiles;
+  const std::vector<size_t>& df_shell_tile_map = scf_data.df_shell_tile_map;
+
+  Scheduler sch{ec};
+
+  const BasisSet& dfbs = scf_data.dfbs;
+  size_t          shell_atoms[2];
+  auto            shell2atom  = dfbs.shell2atom(chem_env.atoms);
+  auto            shell2bf_df = dfbs.shell2bf();
+
+  const bool        is_unrestricted  = chem_env.sys_data.is_unrestricted;
+  const SCFOptions& scf_options      = chem_env.ioptions.scf_options;
+  double            engine_precision = scf_options.tol_int; // default: 1e-22
+  auto              engine           = Engine(Operator::coulomb, dfbs.max_nprim(), dfbs.max_l(), 1);
+  engine.set(BraKet::xs_xs);
+  engine.set_precision(engine_precision);
+  const auto& results = engine.results();
+
+  auto compute_2body_2index_ints_lambda = [&](const IndexVector& blockid) {
+    const auto bi0 = blockid[0];
+    const auto bi1 = blockid[1];
+
+    const TAMM_SIZE size       = Vm1.block_size(blockid);
+    const auto      block_dims = Vm1.block_dims(blockid);
+    std::vector<T>  dbuf(size);
+    Xmat.get(blockid, dbuf);
+
+    auto                  bd1           = block_dims[1];
+    auto                  s1range_end   = df_shell_tile_map[bi0];
+    decltype(s1range_end) s1range_start = 0l;
+
+    if(bi0 > 0) s1range_start = df_shell_tile_map[bi0 - 1] + 1;
+
+    for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
+      auto n1        = dfbs[s1].size();
+      shell_atoms[0] = shell2atom[s1];
+
+      auto                  s2range_end   = df_shell_tile_map[bi1];
+      decltype(s2range_end) s2range_start = 0l;
+      if(bi1 > 0) s2range_start = df_shell_tile_map[bi1 - 1] + 1;
+
+      for(auto s2 = s2range_start; s2 <= s2range_end; ++s2) {
+        auto n2        = dfbs[s2].size();
+        shell_atoms[1] = shell2atom[s2];
+
+        engine.compute(dfbs[s1], dfbs[s2]);
+        if(results[0] == nullptr) return;
+
+        std::vector<T> tbuf(n1 * n2);
+        tamm::Tile     curshelloffset_i = 0U;
+        tamm::Tile     curshelloffset_j = 0U;
+        for(decltype(s1) x = s1range_start; x < s1; x++) curshelloffset_i += dfAO_tiles[x];
+        for(decltype(s2) x = s2range_start; x < s2; x++) curshelloffset_j += dfAO_tiles[x];
+        const auto dimi = curshelloffset_i + dfAO_tiles[s1];
+        const auto dimj = curshelloffset_j + dfAO_tiles[s2];
+
+        for(int ibatch = 0; ibatch < 6; ibatch++) {
+          const auto               a    = ibatch / 3;
+          const auto               xyz  = ibatch % 3;
+          const auto               atom = shell_atoms[a];
+          Eigen::Map<const Matrix> buf_mat(results[ibatch], n1, n2);
+          Eigen::Map<Matrix>(&tbuf[0], n1, n2) = buf_mat;
+
+          size_t c = 0;
+          for(auto i = curshelloffset_i; i < dimi; i++) {
+            for(auto j = curshelloffset_j; j < dimj; j++, c++) {
+              grad_local(atom, xyz) += dbuf[i * bd1 + j] * tbuf[c];
+            }
+          }
+        }
+      }
+    }
+  };
+  block_for(ec, Vm1(), compute_2body_2index_ints_lambda);
+  ec.pg().barrier();
+  return grad_local;
+}
+
+template<typename T>
+Matrix exachem::scf::SCFIter<T>::compute_3c_ints_deriv(
+  ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data, const Matrix& SchwarzK,
+  EigenTensors& etensors, TAMMTensors<T>& ttensors, Eigen::VectorXd& Xvec) {
+  using libint2::BraKet;
+  using libint2::Engine;
+  using libint2::Operator;
+
+  int    natoms     = chem_env.atoms.size();
+  Matrix grad       = Matrix::Zero(natoms, 3);
+  Matrix grad_local = Matrix::Zero(natoms, 3);
+
+  const SystemData& sys_data    = chem_env.sys_data;
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
+
+  Scheduler  sch{ec};
+  const auto rank = ec.pg().rank();
+
+  const libint2::BasisSet& obs         = chem_env.shells;
+  const auto               ndf         = sys_data.ndf;
+  const libint2::BasisSet& dfbs        = scf_data.dfbs;
+  auto                     shell2bf    = obs.shell2bf();
+  auto                     shell2bf_df = dfbs.shell2bf();
+  const auto&              unitshell   = libint2::Shell::unit();
+  auto                     engine      = libint2::Engine(libint2::Operator::coulomb,
+                                                         std::max(dfbs.max_nprim(), obs.max_nprim()),
+                                                         std::max(obs.max_l(), dfbs.max_l()), 1);
+
+  double engine_precision = scf_options.tol_int; // default: 1e-22
+  engine_precision        = 1e-40;
+  double fock_precision   = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
+  engine.set(libint2::BraKet::xs_xx);
+  engine.set_precision(engine_precision);
+  const auto& results = engine.results();
+
+  size_t shell_atoms[3];
+  auto   shell2atom_df  = dfbs.shell2atom(chem_env.atoms);
+  auto   shell2atom_obs = obs.shell2atom(chem_env.atoms);
+
+  const auto       max_engine_precision    = std::numeric_limits<double>::epsilon() / 1e10;
+  const auto       ln_max_engine_precision = std::log(max_engine_precision);
+  shellpair_data_t spdata(1);
+  for(size_t s1 = 0l; s1 != dfbs.size(); ++s1) {
+    spdata[0].emplace_back(
+      std::make_shared<libint2::ShellPair>(dfbs[s1], unitshell, ln_max_engine_precision));
+  }
+
+  auto&                                 dfNorm = etensors.dfNorm;
+  Eigen::Vector<double, Eigen::Dynamic> Xnorm;
+  Xnorm.resize(dfbs.size());
+  for(size_t s3 = 0; s3 < dfbs.size(); ++s3) {
+    Xnorm(s3) =
+      Xvec.segment(shell2bf_df[s3], dfbs[s3].size()).lpNorm<Eigen::Infinity>() * dfNorm(s3);
+  }
+
+  Tensor<T>& F_dummy = ttensors.F_dummy;
+  Matrix&    D       = etensors.D_alpha;
+  Matrix     D_blk_norm =
+    chem_env.compute_shellblock_norm(obs, D); // matrix of infty-norms of shell blocks
+  ec.pg().barrier();
+
+  auto comp_df_lambda = [&](IndexVector blockid) {
+    auto s1        = blockid[0];
+    auto bf1_first = shell2bf[s1];
+    auto n1        = obs[s1].size();
+    auto sp12_iter = scf_data.obs_shellpair_data.at(s1).begin();
+
+    auto s2     = blockid[1];
+    auto s2spl  = scf_data.obs_shellpair_list.at(s1);
+    auto s2_itr = std::find(s2spl.begin(), s2spl.end(), s2);
+    if(s2_itr == s2spl.end()) return;
+    auto s2_pos    = std::distance(s2spl.begin(), s2_itr);
+    auto bf2_first = shell2bf[s2];
+    auto n2        = obs[s2].size();
+    std::advance(sp12_iter, s2_pos);
+    const auto* sp12 = sp12_iter->get();
+
+    Eigen::VectorXd Dblk = D.block(bf1_first, bf2_first, n1, n2).reshaped<Eigen::RowMajor>();
+
+    const auto Norm12  = SchwarzK(s1, s2) * D_blk_norm(s1, s2);
+    const auto Jfactor = (s1 == s2) ? 1.0 : 2.0;
+
+    if(Norm12 * Xnorm.maxCoeff() < fock_precision) return;
+
+    shell_atoms[1] = shell2atom_obs[s1];
+    shell_atoms[2] = shell2atom_obs[s2];
+
+    auto sp_iter = spdata.at(0).begin();
+    for(decltype(s1) s3 = 0; s3 < dfbs.size(); ++s3) {
+      auto        bf3_first = shell2bf_df[s3];
+      auto        n3        = dfbs[s3].size();
+      const auto* sp        = sp_iter->get();
+      ++sp_iter;
+
+      if(Norm12 * Xnorm(s3) < fock_precision) continue;
+      shell_atoms[0] = shell2atom_df[s3];
+
+      // Translational invariance
+      if(shell_atoms[0] == shell_atoms[1] && shell_atoms[0] == shell_atoms[2]) continue;
+
+      Eigen::VectorXd X1 = Xvec.segment(bf3_first, n3);
+
+      engine.prescale_by(Jfactor);
+      engine.compute2<Operator::coulomb, BraKet::xs_xx, 1>(dfbs[s3], unitshell, obs[s1], obs[s2],
+                                                           sp, sp12);
+      // engine.compute(dfbs[s3], obs[s1], obs[s2]);
+      if(results[0] == nullptr) continue;
+
+      for(int ibatch = 0; ibatch < 9; ibatch++) {
+        const auto               a    = ibatch / 3;
+        const auto               xyz  = ibatch % 3;
+        const auto               atom = shell_atoms[a];
+        Eigen::Map<const Matrix> buf_mat(results[ibatch], n3, n1 * n2);
+        grad_local(atom, xyz) += X1.dot(buf_mat * Dblk);
+      }
+    }
+  };
+  block_for(ec, F_dummy(), comp_df_lambda);
+  ec.pg().barrier();
+  return grad_local;
+}
+
+template<typename T>
+Matrix
+exachem::scf::SCFIter<T>::compute_3c_exx_ints_deriv(ExecutionContext& ec, const ChemEnv& chem_env,
+                                                    const SCFData& scf_data, Tensor<T>& xyK) {
+  using libint2::BraKet;
+  using libint2::Engine;
+  using libint2::Operator;
+
+  Matrix grad_local = Matrix::Zero(chem_env.atoms.size(), 3);
+  Matrix grad       = Matrix::Zero(chem_env.atoms.size(), 3);
+
+  const bool               is_unrestricted = chem_env.sys_data.is_unrestricted;
+  const SCFOptions&        scf_options     = chem_env.ioptions.scf_options;
+  const libint2::BasisSet& obs             = chem_env.shells;
+
+  const auto                 rank           = ec.pg().rank();
+  const auto                 debug          = scf_options.debug;
+  const std::vector<Tile>&   AO_tiles       = scf_data.AO_tiles;
+  const std::vector<size_t>& shell_tile_map = scf_data.shell_tile_map;
+
+  const libint2::BasisSet&   dfbs              = scf_data.dfbs;
+  const std::vector<Tile>&   dfAO_tiles        = scf_data.dfAO_tiles;
+  const std::vector<size_t>& df_shell_tile_map = scf_data.df_shell_tile_map;
+
+  Scheduler sch{ec};
+
+  double      engine_precision = scf_options.tol_int; // default: 1e-22
+  const auto& unitshell        = libint2::Shell::unit();
+  auto        engine           = libint2::Engine(libint2::Operator::coulomb,
+                                                 std::max(obs.max_nprim(), dfbs.max_nprim()),
+                                                 std::max(obs.max_l(), dfbs.max_l()), 1);
+  engine.set(libint2::BraKet::xs_xx);
+  engine.set_precision(engine_precision);
+
+  auto        shell2bf    = obs.shell2bf();
+  auto        shell2bf_df = dfbs.shell2bf();
+  const auto& results     = engine.results();
+
+  size_t shell_atoms[3];
+  auto   shell2atom_df  = dfbs.shell2atom(chem_env.atoms);
+  auto   shell2atom_obs = obs.shell2atom(chem_env.atoms);
+
+  const auto       max_engine_precision    = std::numeric_limits<double>::epsilon() / 1e10;
+  const auto       ln_max_engine_precision = std::log(max_engine_precision);
+  shellpair_data_t spdata(1);
+  for(size_t s1 = 0l; s1 != dfbs.size(); ++s1) {
+    spdata[0].emplace_back(
+      std::make_shared<libint2::ShellPair>(dfbs[s1], unitshell, ln_max_engine_precision));
+  }
+
+  auto compute_2body_fock_dfC_lambda = [&](const IndexVector& blockid) {
+    const auto bi0 = blockid[0];
+    const auto bi1 = blockid[1];
+    const auto bi2 = blockid[2];
+
+    const TAMM_SIZE size       = xyK.block_size(blockid);
+    const auto      block_dims = xyK.block_dims(blockid);
+    std::vector<T>  dbuf(size);
+    xyK.get(blockid, dbuf);
+
+    const auto bd1 = block_dims[1];
+    const auto bd2 = block_dims[2];
+
+    const auto s0range_end = df_shell_tile_map[bi2];
+    // auto n0 = dfbs[s0].size();
+    const auto                                 s1range_end   = shell_tile_map[bi0];
+    std::remove_const_t<decltype(s1range_end)> s1range_start = 0l;
+    if(bi0 > 0) s1range_start = shell_tile_map[bi0 - 1] + 1;
+
+    tamm::Tile curshelloffset_i = 0U;
+    for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
+      // auto n1 = shells[s1].size();
+      const auto                                 dimi          = curshelloffset_i + AO_tiles[s1];
+      const auto                                 s2range_end   = shell_tile_map[bi1];
+      std::remove_const_t<decltype(s2range_end)> s2range_start = 0l;
+      shell_atoms[1]                                           = shell2atom_obs[s1];
+
+      if(bi1 > 0) s2range_start = shell_tile_map[bi1 - 1] + 1;
+
+      tamm::Tile curshelloffset_j = 0U;
+      for(auto s2 = s2range_start; s2 <= s2range_end; ++s2) {
+        //// if (s2>s1) continue;
+        // auto n2 = shells[s2].size();
+        // auto n123 = n0*n1*n2;
+        // std::vector<T> tbuf(n123);
+        shell_atoms[2]                                           = shell2atom_obs[s2];
+        auto                                       dimj          = curshelloffset_j + AO_tiles[s2];
+        std::remove_const_t<decltype(s0range_end)> s0range_start = 0l;
+        if(bi2 > 0) s0range_start = df_shell_tile_map[bi2 - 1] + 1;
+
+        tamm::Tile curshelloffset_k = 0U;
+        for(auto s0 = s0range_start; s0 <= s0range_end; ++s0) {
+          engine.compute(dfbs[s0], obs[s1], obs[s2]);
+          if(results[0] == nullptr) {
+            curshelloffset_k += dfAO_tiles[s0];
+            continue;
+          }
+
+          shell_atoms[0] = shell2atom_df[s0];
+          auto dimk      = curshelloffset_k + dfAO_tiles[s0];
+          for(int ibatch = 0; ibatch < 9; ibatch++) {
+            const auto  a    = ibatch / 3;
+            const auto  xyz  = ibatch % 3;
+            const auto  atom = shell_atoms[a];
+            const auto* buf  = results[ibatch];
+            size_t      c    = 0;
+
+            for(auto k = curshelloffset_k; k < dimk; k++)
+              for(auto i = curshelloffset_i; i < dimi; i++)
+                for(auto j = curshelloffset_j; j < dimj; j++, c++)
+                  grad_local(atom, xyz) -= 2.0 * dbuf[(i * bd1 + j) * bd2 + k] * buf[c];
+          }
+          curshelloffset_k += dfAO_tiles[s0];
+        } // s2
+        curshelloffset_j += AO_tiles[s2];
+      } // s1
+      curshelloffset_i += AO_tiles[s1];
+    } // s0
+  };
+  block_for(ec, xyK(), compute_2body_fock_dfC_lambda);
+  ec.pg().barrier();
+
+  return grad_local;
+}
+
+template<typename T>
+void exachem::scf::SCFIter<T>::compute_2bf_ri_deriv(
+  ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info,
+  const SCFData& scf_data, const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
+  TAMMTensors<T>& ttensors, EigenTensors& etensors, const bool& is_direct, double xHF) {
+  const SystemData& sys_data    = chem_env.sys_data;
+  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
+
+  const bool is_uhf = sys_data.is_unrestricted;
+  const bool is_rhf = sys_data.is_restricted;
+  const bool do_snK = sys_data.do_snK;
+
+  const auto rank  = ec.pg().rank();
+  const auto debug = scf_options.debug;
+
+  auto mu = scf_data.mu, nu = scf_data.nu, ku = scf_data.ku;
+  auto d_mu = scf_data.d_mu, d_nu = scf_data.d_nu, d_ku = scf_data.d_ku;
+  // const tamm::TiledIndexLabel& dCocc_til = scf_data.dCocc_til;
+
+  Scheduler   sch{ec};
+  ExecutionHW exhw = ec.exhw();
+
+  Tensor<T>& xyK = ttensors.xyK;
+  Tensor<T>& Vm1 = ttensors.Vm1;
+
+  size_t          nbf = chem_env.shells.nbf();
+  size_t          ndf = sys_data.ndf;
+  IndexSpace      dummy{range(1)};
+  TiledIndexSpace tdummy{dummy};
+  Tensor<T>       Jtmp_tamm{tdummy, scf_data.tdfAO};
+  Tensor<T>       Jtamm{scf_data.tdfAO};                            // ndf
+  Tensor<T>       Xtamm{scf_data.tdfAO};                            // ndf
+  Tensor<T>       tmp1{scf_data.tAO, scf_data.tAO, scf_data.tdfAO}; // n, n, ndf
+  Tensor<T>       tmp2{scf_data.tAO, scf_data.tAO, scf_data.tdfAO}; // n, n, ndf
+  Tensor<T>       Xtmp1{scf_data.tdfAO, scf_data.tdfAO};            // ndf, ndf
+  Tensor<T>       Xtmp2{scf_data.tdfAO, scf_data.tdfAO};            // ndf, ndf
+
+  auto ig1  = std::chrono::high_resolution_clock::now();
+  auto tig1 = ig1;
+
+  etensors.D_alpha = Eigen::MatrixXd::Zero(nbf, nbf);
+  tamm_to_eigen_tensor(ttensors.D_alpha, etensors.D_alpha);
+  if(is_uhf) {
+    etensors.D_beta = Eigen::MatrixXd::Zero(nbf, nbf);
+    tamm_to_eigen_tensor(ttensors.D_beta, etensors.D_beta);
+  }
+
+  // Coulomb gradient
+  if(is_uhf) {
+    sch(ttensors.D_alpha() += ttensors.D_beta()).execute();
+    etensors.D_alpha += etensors.D_beta;
+  }
+  sch.allocate(Xtamm, Jtamm).execute();
+
+  if(is_direct) {
+    sch.allocate(Jtmp_tamm).execute();
+    compute_ri_jvec(ec, chem_env, scf_data, etensors, ttensors, SchwarzK, Jtmp_tamm);
+
+    Matrix Jtmp = Matrix::Zero(1, ndf);
+    tamm_to_eigen_tensor(Jtmp_tamm, Jtmp);
+    ec.pg().barrier();
+    Tensor<T>::deallocate(Jtmp_tamm);
+
+    std::vector<double> Xvec(Jtmp.data(), Jtmp.data() + Jtmp.size());
+    vector_to_tamm_tensor(Xtamm, Xvec);
+    ec.pg().barrier();
+
+    sch(Jtamm(d_mu) = Xtamm(d_nu) * Vm1(d_nu, d_mu)).execute();
+  }
+  else { sch(Jtamm(d_mu) = xyK(mu, nu, d_mu) * ttensors.D_alpha(mu, nu)).execute(); }
+  sch(Xtamm(d_mu) = Jtamm(d_nu) * Vm1(d_mu, d_nu)).execute();
+  std::vector<double> Xvec_std(ndf);
+  tamm_tensor_to_vector(Xtamm, Xvec_std);
+  ec.pg().barrier();
+  Tensor<T>::deallocate(Jtamm, Xtamm);
+  Eigen::VectorXd Xvec = Eigen::Map<Eigen::VectorXd>(Xvec_std.data(), Xvec_std.size());
+
+  // Two-center integrals derivatives
+  Matrix grad_2c = compute_2c_ints_deriv(ec, chem_env, scf_data, ttensors, Xvec);
+
+  // Three-center integrals derivatives
+  Matrix grad_3c =
+    compute_3c_ints_deriv(ec, chem_env, scf_data, SchwarzK, etensors, ttensors, Xvec);
+
+  if(is_uhf) {
+    sch(ttensors.D_alpha() -= ttensors.D_beta()).execute();
+    etensors.D_alpha -= etensors.D_beta;
+  }
+  auto ig2    = std::chrono::high_resolution_clock::now();
+  auto igtime = std::chrono::duration_cast<std::chrono::duration<double>>((ig2 - ig1)).count();
+  if(rank == 0 && debug)
+    std::cout << " J: " << std::fixed << std::setprecision(2) << igtime << "s, ";
+
+  if(xHF > 0.0 && !do_snK) {
+    ig1 = std::chrono::high_resolution_clock::now();
+
+    // This will require less memory if we use intermediate tensors
+    // in the occupied MO representation
+    T factor = is_rhf ? 0.5 : 1.0;
+    // clang-format off
+    sch.allocate(tmp1, tmp2, Xtmp1).execute();
+    sch(tmp1(mu, nu, d_mu) = xyK(mu, nu, d_nu) * Vm1(d_mu, d_nu))
+       (tmp2(mu, nu, d_mu) = factor * tmp1(ku, nu, d_mu) * ttensors.D_alpha(mu, ku))
+       (xyK(mu, nu, d_mu) = factor * tmp2(mu, ku, d_mu) * ttensors.D_alpha(nu, ku));
+    if(is_uhf) {
+    sch(tmp2(mu, nu, d_mu) = factor * tmp1(ku, nu, d_mu) * ttensors.D_beta(mu, ku))
+       (xyK(mu, nu, d_mu) += factor * tmp2(mu, ku, d_mu) * ttensors.D_beta(nu, ku));
+    }
+    sch(Xtmp1(d_mu, d_nu) = xyK(mu, nu, d_mu) * tmp1(mu, nu, d_nu)).deallocate(tmp1, tmp2).execute();
+    // clang-format on
+
+    // Two-center integrals derivatives
+    factor = is_rhf ? xHF : 0.5 * xHF;
+    grad_2c += factor * compute_2c_exx_ints_deriv(ec, chem_env, scf_data, ttensors, Xtmp1);
+
+    // Three-center integrals derivatives
+    grad_3c += factor * compute_3c_exx_ints_deriv(ec, chem_env, scf_data, xyK);
+
+    sch.deallocate(Xtmp1).execute();
+
+    ig2    = std::chrono::high_resolution_clock::now();
+    igtime = std::chrono::duration_cast<std::chrono::duration<double>>((ig2 - ig1)).count();
+    if(rank == 0 && debug)
+      std::cout << " K: " << std::fixed << std::setprecision(2) << igtime << "s, ";
+  }
+
+  // Reduce the local gradients to the global gradient
+  Matrix grad_local = grad_2c + grad_3c;
+  Matrix grad       = Matrix::Zero(chem_env.atoms.size(), 3);
+  ec.pg().allreduce(&grad_local(0, 0), &grad(0, 0), grad_local.size(), tamm::ReduceOp::sum);
+
+  // Small temporary hack
+  Matrix S_eigen = tamm_to_eigen_matrix(ttensors.S1);
+  for(auto atom = 0, i = 0; atom != chem_env.atoms.size(); ++atom) {
+    for(auto xyz = 0; xyz != 3; ++xyz, ++i) {
+      etensors.Ga_deriv[i] = grad(atom, xyz) / sys_data.nelectrons_alpha * S_eigen;
+      if(is_uhf) etensors.Gb_deriv[i] = grad(atom, xyz) / sys_data.nelectrons_beta * S_eigen;
+    }
+  }
 }
 
 template class exachem::scf::SCFIter<double>;

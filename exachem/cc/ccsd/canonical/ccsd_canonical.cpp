@@ -9,6 +9,10 @@
 
 #include "exachem/cc/ccsd/canonical/ccsd_canonical.hpp"
 #include "exachem/cc/ccsd/ccsd_util.hpp"
+
+#include "exachem/cc/ccsd/canonical/canonical_ccsd_preconditioner.hpp"
+#include "exachem/cc/krylov_solvers.hpp"
+
 using namespace tamm;
 
 namespace exachem::cc::ccsd_canonical {
@@ -365,72 +369,178 @@ ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& M
   Tensor<T>::allocate(&ec, d_e);
   Scheduler sch{ec};
 
+  TensorMap<T> f = oei_spin_blocks<T>(sch, chem_env, d_f1, false);
+  TensorMap<T> eri;
+
+  const TiledIndexSpace Oa = MO("occ_alpha");
+  const TiledIndexSpace Va = MO("virt_alpha");
+  const TiledIndexSpace Ob = MO("occ_beta");
+  const TiledIndexSpace Vb = MO("virt_beta");
+
+  TiledIndexLabel aa, ba, ca, da;
+  TiledIndexLabel ia, ja, ka, la;
+  TiledIndexLabel ab, bb, cb, db;
+  TiledIndexLabel ib, jb, kb, lb;
+
+  std::tie(aa, ba, ca, da) = Va.labels<4>("all");
+  std::tie(ab, bb, cb, db) = Vb.labels<4>("all");
+  std::tie(ia, ja, ka, la) = Oa.labels<4>("all");
+  std::tie(ib, jb, kb, lb) = Ob.labels<4>("all");
+
   print_ccsd_header(ec.print());
 
-  if(!ccsd_restart) {
-    Tensor<T> d_r1_residual{}, d_r2_residual{};
-    Tensor<T>::allocate(&ec, d_r1_residual, d_r2_residual);
+  // *************************************************
+  // Solver selection. The Newton-Krylov solvers read their options directly from
+  // chem_env; only the solver_type/variant selectors and the preconditioner's
+  // Krylov dimension / tolerance are referenced here.
+  const auto& sv = chem_env.ioptions.ccsd_options.solvers;
+  const auto& nk = sv.newton_krylov;
 
-    for(int titer = 0; titer < maxiter; titer += ndiis) {
-      for(int iter = titer; iter < std::min(titer + ndiis, maxiter); iter++) {
-        const auto timer_start = std::chrono::high_resolution_clock::now();
+  if(sv.solver_type == "newton_krylov" || !ccsd_restart) {
+    // Build MP2 initial guess. Skip it whenever the amplitude files exist, i.e. whenever d_t1/d_t2
+    // were read from disk in the driver, so a restart continues from those amplitudes instead of
+    // overwriting d_t2 with the MP2 guess.
 
-        niter   = iter;
-        int off = iter - titer;
+    bool ccsd_nk_restart =
+      chem_env.ioptions.ccsd_options.readt ||
+      ((fs::exists(t1file) && fs::exists(t2file) && fs::exists(chem_env.cd_context.f1file) &&
+        fs::exists(chem_env.cd_context.v2file)));
 
-        sch((d_t1s[off])() = d_t1())((d_t2s[off])() = d_t2()).execute();
+    if(!ccsd_nk_restart && !chem_env.sys_data.is_hubbard) {
+      // clang-format off
+      sch        
+        (d_r2() = 0.0)
+        (d_r2(aa, ba, ia, ja) = d_v2(aa, ba, ia, ja))
+        (d_r2(aa, bb, ia, jb) = d_v2(aa, bb, ia, jb))
+        (d_r2(ab, bb, ib, jb) = d_v2(ab, bb, ib, jb))
+        .execute();
+      // clang-format on
 
-        ccsd_canonical::ccsd_t1(sch, MO, d_r1, d_t1, d_t2, d_f1, d_v2);
-        ccsd_canonical::ccsd_t2(sch, MO, d_r2, d_t1, d_t2, d_f1, d_v2);
+      jacobi(ec, d_r2, d_t2, 0.0, false, p_evl_sorted, n_occ_alpha, n_occ_beta);
+    }
 
-        sch.execute(ec.exhw(), profile);
+    // ===================== Newton-Krylov solver path =====================
+    chem_env.cc_context.ccsd_iter = -1;
 
-        std::tie(residual, energy) = rest(ec, MO, d_r1, d_r2, d_t1, d_t2, d_e, d_r1_residual,
-                                          d_r2_residual, p_evl_sorted, zshiftl, n_occ_alpha,
-                                          n_occ_beta);
+    // std::vector<Tensor<T>> d_t{d_t1, d_t2};
+    // std::vector<Tensor<T>> d_r{d_r1, d_r2};
 
-        update_r2(ec, d_r2());
+    std::vector<Tensor<T>> d_t;
+    d_t.push_back(d_t1);
+    d_t.push_back(d_t2);
 
-        sch((d_r1s[off])() = d_r1())((d_r2s[off])() = d_r2()).execute();
+    std::vector<Tensor<T>> d_r;
+    d_r.push_back(d_r1);
+    d_r.push_back(d_r2);
 
-        ccsd_canonical::ccsd_e(sch, MO, d_e, d_t1, d_t2, d_f1, d_v2);
-        sch.execute(ec.exhw(), profile);
-        energy = get_scalar(d_e);
+    auto residual_fun = [&](const std::vector<Tensor<T>>& x) -> std::vector<Tensor<T>>& {
+      Tensor<T> x_t1 = x.at(0);
+      Tensor<T> x_t2 = x.at(1);
 
-        const auto timer_end = std::chrono::high_resolution_clock::now();
-        auto       iter_time =
-          std::chrono::duration_cast<std::chrono::duration<double>>((timer_end - timer_start))
-            .count();
+      ccsd_canonical::ccsd_t1(sch, MO, d_r1, x_t1, x_t2, d_f1, d_v2);
+      ccsd_canonical::ccsd_t2(sch, MO, d_r2, x_t1, x_t2, d_f1, d_v2);
+      ccsd_canonical::ccsd_e(sch, MO, d_e, x_t1, x_t2, d_f1, d_v2);
 
-        iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
+      sch.execute(ec.exhw(), profile);
+      return d_r;
+    };
 
-        if(writet && ((iter + 1) % writet_iter == 0)) {
-          write_to_disk(d_t1, t1file);
-          write_to_disk(d_t2, t2file);
+    // This is the preconditioner inverse application function input for the preconditioned
+    // Newton-Krylov solver. Thin binding lambdas forwarding to the CCSD preconditioner routines
+    // defined in ccsd_preconditioner.hpp. Kept as lambdas so the solver callable interface is
+    // unchanged.
+    auto preconditioner_inverse_application =
+      [&](const std::vector<Tensor<T>>& vector_to_be_preconditioned) -> std::vector<Tensor<T>> {
+      return exachem::cc::ccsd_os::preconditioner_inverse_application<T>(
+        ec, chem_env, d_e, sch, MO, f, eri, vector_to_be_preconditioned, nk.krylov_dims_precond,
+        nk.gmres_tol);
+    };
+
+    auto precond_action =
+      [&](const std::vector<Tensor<T>>& preconditoned_vector) -> std::vector<Tensor<T>> {
+      return exachem::cc::ccsd_os::preconditioner_action<T>(sch, MO, f, eri, preconditoned_vector);
+    };
+
+    if(sv.solver_type == "newton_krylov") {
+      using namespace exachem::cc::solvers;
+
+      if(nk.variant == "general") {
+        std::tie(residual, energy) = newton_krylov_solver(ec, chem_env, residual_fun, d_e, d_t);
+      }
+      else if(nk.variant == "inexact") {
+        std::tie(residual, energy) =
+          inexact_newton_krylov_solver(ec, chem_env, residual_fun, precond_action, d_e, d_t);
+      }
+      else { // "preconditioned" (default)
+        std::tie(residual, energy) = preconditioned_newton_krylov_solver(
+          ec, chem_env, residual_fun, preconditioner_inverse_application, d_e, d_t);
+      }
+      // amplitudes are written to disk below (shared with the DIIS path)
+    }
+    else {
+      Tensor<T> d_r1_residual{}, d_r2_residual{};
+      Tensor<T>::allocate(&ec, d_r1_residual, d_r2_residual);
+
+      for(int titer = 0; titer < maxiter; titer += ndiis) {
+        for(int iter = titer; iter < std::min(titer + ndiis, maxiter); iter++) {
+          const auto timer_start = std::chrono::high_resolution_clock::now();
+
+          niter   = iter;
+          int off = iter - titer;
+
+          sch((d_t1s[off])() = d_t1())((d_t2s[off])() = d_t2()).execute();
+
+          ccsd_canonical::ccsd_t1(sch, MO, d_r1, d_t1, d_t2, d_f1, d_v2);
+          ccsd_canonical::ccsd_t2(sch, MO, d_r2, d_t1, d_t2, d_f1, d_v2);
+
+          sch.execute(ec.exhw(), profile);
+
+          std::tie(residual, energy) = rest(ec, MO, d_r1, d_r2, d_t1, d_t2, d_e, d_r1_residual,
+                                            d_r2_residual, p_evl_sorted, zshiftl, n_occ_alpha,
+                                            n_occ_beta);
+
+          update_r2(ec, d_r2());
+
+          sch((d_r1s[off])() = d_r1())((d_r2s[off])() = d_r2()).execute();
+
+          ccsd_canonical::ccsd_e(sch, MO, d_e, d_t1, d_t2, d_f1, d_v2);
+          sch.execute(ec.exhw(), profile);
+          energy = get_scalar(d_e);
+
+          const auto timer_end = std::chrono::high_resolution_clock::now();
+          auto       iter_time =
+            std::chrono::duration_cast<std::chrono::duration<double>>((timer_end - timer_start))
+              .count();
+
+          iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
+
+          if(writet && ((iter + 1) % writet_iter == 0)) {
+            write_to_disk(d_t1, t1file);
+            write_to_disk(d_t2, t2file);
+          }
+
+          if(residual < thresh) { break; }
         }
 
-        if(residual < thresh) { break; }
-      }
+        if(residual < thresh || titer + ndiis >= maxiter) { break; }
+        if(ec.pg().rank() == 0) {
+          std::cout << " MICROCYCLE DIIS UPDATE:";
+          std::cout.width(21);
+          std::cout << std::right << std::min(titer + ndiis, maxiter) + 1 << std::endl;
+        }
 
-      if(residual < thresh || titer + ndiis >= maxiter) { break; }
-      if(ec.pg().rank() == 0) {
-        std::cout << " MICROCYCLE DIIS UPDATE:";
-        std::cout.width(21);
-        std::cout << std::right << std::min(titer + ndiis, maxiter) + 1 << std::endl;
+        std::vector<std::vector<Tensor<T>>> rs{d_r1s, d_r2s};
+        std::vector<std::vector<Tensor<T>>> ts{d_t1s, d_t2s};
+        std::vector<Tensor<T>>              next_t{d_t1, d_t2};
+        diis<T>(ec, rs, ts, next_t);
       }
-
-      std::vector<std::vector<Tensor<T>>> rs{d_r1s, d_r2s};
-      std::vector<std::vector<Tensor<T>>> ts{d_t1s, d_t2s};
-      std::vector<Tensor<T>>              next_t{d_t1, d_t2};
-      diis<T>(ec, rs, ts, next_t);
-    }
+      Tensor<T>::deallocate(d_r1_residual, d_r2_residual);
+    } // diis path
 
     if(writet) {
       write_to_disk(d_t1, t1file);
       write_to_disk(d_t2, t2file);
     }
-
-    Tensor<T>::deallocate(d_r1_residual, d_r2_residual);
 
   } // no restart
   else {

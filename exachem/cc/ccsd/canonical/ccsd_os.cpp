@@ -8,7 +8,12 @@
 
 #include "ccsd_os.hpp"
 
+#include "exachem/cc/ccsd/canonical/canonical_ccsd_preconditioner.hpp"
+#include "exachem/cc/krylov_solvers.hpp"
+
 namespace exachem::cc::ccsd_os {
+
+using namespace exachem::cc::solvers;
 
 template<typename T>
 void residuals(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO, const TensorMap<T>& f,
@@ -2633,6 +2638,62 @@ extract_spin_blocks(Scheduler& sch, ChemEnv& chem_env, const Tensor<T>& d_f1,
 }
 
 template<typename T>
+std::vector<Tensor<T>>&
+ccsd_residuals(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO, const TensorMap<T>& f,
+               const TensorMap<T>& eri, TensorMap<T>& t1, TensorMap<T>& t2, Tensor<T>& energy,
+               TensorMap<T>& r1, TensorMap<T>& r2, const std::vector<Tensor<T>>& d_t,
+               std::vector<Tensor<T>>& d_r) {
+  const auto& d_t1 = d_t.at(0);
+  const auto& d_t2 = d_t.at(1);
+  auto&       d_r1 = d_r.at(0);
+  auto&       d_r2 = d_r.at(1);
+
+  const int otiles  = MO("occ").num_tiles();
+  const int vtiles  = MO("virt").num_tiles();
+  const int oatiles = MO("occ_alpha").num_tiles();
+  const int vatiles = MO("virt_alpha").num_tiles();
+
+  const TiledIndexSpace Oa = {MO("occ"), range(oatiles)};
+  const TiledIndexSpace Va = {MO("virt"), range(vatiles)};
+  const TiledIndexSpace Ob = {MO("occ"), range(oatiles, otiles)};
+  const TiledIndexSpace Vb = {MO("virt"), range(vatiles, vtiles)};
+
+  TiledIndexLabel aa, ba;
+  TiledIndexLabel ia, ja;
+  TiledIndexLabel ab, bb;
+  TiledIndexLabel ib, jb;
+
+  std::tie(aa, ba) = Va.labels<2>("all");
+  std::tie(ab, bb) = Vb.labels<2>("all");
+  std::tie(ia, ja) = Oa.labels<2>("all");
+  std::tie(ib, jb) = Ob.labels<2>("all");
+
+  // clang-format off
+  sch
+    (   t1.at("aa")(aa,ia)          = d_t1(aa,ia))
+    (   t1.at("bb")(ab,ib)          = d_t1(ab,ib))
+    (   t2.at("aaaa")(aa,ba,ia,ja)  = d_t2(aa,ba,ia,ja))
+    (   t2.at("abab")(aa,bb,ia,jb)  = d_t2(aa,bb,ia,jb))
+    (   t2.at("bbbb")(ab,bb,ib,jb)  = d_t2(ab,bb,ib,jb))
+    .execute();
+  // clang-format on
+
+  ccsd_os::residuals<T>(sch, chem_env, MO, f, eri, t1, t2, energy, r1, r2);
+
+  // clang-format off
+  sch
+    (   d_r1(aa,ia)          = r1.at("aa")(aa,ia))
+    (   d_r1(ab,ib)          = r1.at("bb")(ab,ib))
+    (   d_r2(aa,ba,ia,ja)    = r2.at("aaaa")(aa,ba,ia,ja))
+    (   d_r2(aa,bb,ia,jb)    = r2.at("abab")(aa,bb,ia,jb))
+    (   d_r2(ab,bb,ib,jb)    = r2.at("bbbb")(ab,bb,ib,jb))
+    .execute();
+  // clang-format on
+
+  return d_r;
+}
+
+template<typename T>
 std::tuple<double, double>
 ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_t1,
                Tensor<T>& d_t2, Tensor<T>& d_r1, Tensor<T>& d_r2, std::vector<Tensor<T>>& d_r1s,
@@ -2652,6 +2713,8 @@ ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& M
   double      residual    = 0.0;
   double      energy      = 0.0;
   int         niter       = 0;
+
+  if(ec.print()) chem_env.ioptions.ccsd_options.print();
 
   const TAMM_SIZE n_occ_alpha = static_cast<TAMM_SIZE>(sys_data.n_occ_alpha);
   const TAMM_SIZE n_occ_beta  = static_cast<TAMM_SIZE>(sys_data.n_occ_beta);
@@ -2719,7 +2782,98 @@ ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& M
     .execute();
   // clang-format on
 
-  if(!ccsd_restart) {
+  // *************************************************
+  // Solver selection. The Newton-Krylov solvers read their options directly from
+  // chem_env; only the solver_type/variant selectors and the preconditioner's
+  // Krylov dimension / tolerance are referenced here.
+  const auto& sv = chem_env.ioptions.ccsd_options.solvers;
+  const auto& nk = sv.newton_krylov;
+
+  // Build MP2 initial guess. Skip it whenever the amplitude files exist, i.e. whenever d_t1/d_t2
+  // were read from disk in the driver, so a restart continues from those amplitudes instead of
+  // overwriting d_t2 with the MP2 guess.
+
+  bool ccsd_nk_restart =
+    chem_env.ioptions.ccsd_options.readt ||
+    ((fs::exists(t1file) && fs::exists(t2file) && fs::exists(chem_env.cd_context.f1file) &&
+      fs::exists(chem_env.cd_context.v2file)));
+
+  if(!ccsd_nk_restart) {
+    sch(d_r2(aa, ba, ia, ja) = eri.at("aaaa_vvoo")(aa, ba, ia, ja))(
+      d_r2(aa, bb, ia, jb) = eri.at("abab_vvoo")(aa, bb, ia, jb))(
+      d_r2(ab, bb, ib, jb) = eri.at("bbbb_vvoo")(ab, bb, ib, jb))
+      .execute();
+
+    jacobi(ec, d_r2, d_t2, 0.0, false, p_evl_sorted, n_occ_alpha, n_occ_beta);
+  }
+
+  std::vector<Tensor<T>> d_t;
+  d_t.push_back(d_t1);
+  d_t.push_back(d_t2);
+
+  std::vector<Tensor<T>> d_r;
+  d_r.push_back(d_r1);
+  d_r.push_back(d_r2);
+
+  // This is the residual function input for the Newton-Krylov solver.
+  auto residual_fun = [&](const std::vector<Tensor<T>>& x) -> std::vector<Tensor<T>>& {
+    return ccsd_residuals<T>(sch, chem_env, MO, f, eri, t1, t2, d_e, r1, r2, x, d_r);
+  };
+
+  // This is the preconditioner inverse application function input for the preconditioned
+  // Newton-Krylov solver. Thin binding lambdas forwarding to the CCSD preconditioner routines
+  // defined in ccsd_preconditioner.hpp. Kept as lambdas so the solver callable interface is
+  // unchanged.
+  auto preconditioner_inverse_application =
+    [&](const std::vector<Tensor<T>>& vector_to_be_preconditioned) -> std::vector<Tensor<T>> {
+    return exachem::cc::ccsd_os::preconditioner_inverse_application<T>(
+      ec, chem_env, d_e, sch, MO, f, eri, vector_to_be_preconditioned, nk.krylov_dims_precond,
+      nk.gmres_tol);
+  };
+
+  auto precond_action =
+    [&](const std::vector<Tensor<T>>& preconditoned_vector) -> std::vector<Tensor<T>> {
+    return preconditioner_action<T>(sch, MO, f, eri, preconditoned_vector);
+  };
+
+  // *************************************************
+
+  chem_env.cc_context.ccsd_iter = -1;
+
+  if(sv.solver_type == "newton_krylov") {
+    // Newton-Krylov solver path. Dispatch to the variant selected via
+    // CC.solvers.newton_krylov.variant (general | preconditioned | inexact).
+    if(nk.variant == "general") {
+      std::tie(residual, energy) = newton_krylov_solver(ec, chem_env, residual_fun, d_e, d_t);
+    }
+    else if(nk.variant == "inexact") {
+      std::tie(residual, energy) =
+        inexact_newton_krylov_solver(ec, chem_env, residual_fun, precond_action, d_e, d_t);
+    }
+    else { // "preconditioned" (default)
+      std::tie(residual, energy) = preconditioned_newton_krylov_solver(
+        ec, chem_env, residual_fun, preconditioner_inverse_application, d_e, d_t);
+    }
+
+    /*
+    // Re-sync the spin-block amplitude maps from the converged d_t1/d_t2.
+    // clang-format off
+    sch
+      (   t1.at("aa")(aa,ia)            = d_t1(aa,ia))
+      (   t1.at("bb")(ab,ib)            = d_t1(ab,ib))
+      (   t2.at("aaaa")(aa,ba,ia,ja)    = d_t2(aa,ba,ia,ja))
+      (   t2.at("abab")(aa,bb,ia,jb)    = d_t2(aa,bb,ia,jb))
+      (   t2.at("bbbb")(ab,bb,ib,jb)    = d_t2(ab,bb,ib,jb))
+      .execute();
+    // clang-format on
+    */
+
+    if(writet) {
+      write_to_disk(d_t1, t1file);
+      write_to_disk(d_t2, t2file);
+    }
+  }
+  else if(!ccsd_restart) {
     Tensor<T> d_r1_residual{}, d_r2_residual{};
     Tensor<T>::allocate(&ec, d_r1_residual, d_r2_residual);
 
@@ -2945,6 +3099,19 @@ template void residuals<double>(Scheduler& sch, ChemEnv& chem_env, const TiledIn
                                 const TensorMap<double>& t1, const TensorMap<double>& t2,
                                 Tensor<double>& energy, TensorMap<double>& r1,
                                 TensorMap<double>& r2);
+
+// template void arnoldi<double>(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
+// TensorMap<double>& t1,
+//                TensorMap<double>& t2, TensorMap<double>& r1, TensorMap<double>& r2,
+//                Tensor<double>& d_r1, Tensor<double>& d_r2,std::vector<Tensor<double>>& Q_1s,
+//                std::vector<Tensor<double>>& Q_2s, TensorMap<double>& f, TensorMap<double>& eri,
+//                int& m, double& pert);
+
+// template void gmres<double>(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO,
+// TensorMap<double>& t1,
+//                TensorMap<double>& t2, TensorMap<double>& r1, TensorMap<double>& r2,
+//                Tensor<double>& d_r1, Tensor<double>& d_r2, TensorMap<double>& f,
+//                TensorMap<double>& eri, int& m, double& pert);
 
 template std::tuple<TensorMap<double>, // fock
                     TensorMap<double>  // eri

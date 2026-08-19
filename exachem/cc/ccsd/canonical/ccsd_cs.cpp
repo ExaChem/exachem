@@ -8,7 +8,12 @@
 
 #include "ccsd_cs.hpp"
 
+#include "exachem/cc/ccsd/canonical/canonical_ccsd_preconditioner.hpp"
+#include "exachem/cc/krylov_solvers.hpp"
+
 namespace exachem::cc::ccsd_cs {
+
+using namespace exachem::cc::solvers;
 
 template<typename T>
 void residuals(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO, const TensorMap<T>& f,
@@ -1094,6 +1099,84 @@ extract_spin_blocks(Scheduler& sch, ChemEnv& chem_env, const Tensor<T>& d_f1,
   return {f, eri};
 }
 
+// ---------------------------------------------------------------------------------------------
+// Newton-Krylov support for closed-shell CCSD.
+//
+// The independent closed-shell amplitudes are d_t1 = aa singles (V,O) and d_t2 = abab doubles
+// (VV,OO). The residual F(x) = {r1[aa], r2[abab]} has the same shape, so the generic
+// exachem::cc::solvers Newton-Krylov machinery drives {d_t1, d_t2} directly. All closed-shell
+// specifics (spin-adaptation, the aa/abab preconditioner, the MP2 guess) live here in ccsd_cs.cpp.
+// ---------------------------------------------------------------------------------------------
+
+// Closed-shell residual F(x): spin-adapt the independent amplitudes d_t (= {aa, abab}) into the
+// full t1/t2 spin blocks, evaluate ccsd_cs::residuals, and extract the independent residuals
+// d_r (= {r1[aa], r2[abab]}). Mirrors ccsd_os::ccsd_residuals; update_r2 is intentionally NOT
+// applied here (it belongs to the DIIS update, not the residual), matching the open-shell path.
+template<typename T>
+std::vector<Tensor<T>>&
+ccsd_residuals(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO, const TensorMap<T>& f,
+               const TensorMap<T>& eri, TensorMap<T>& t1, TensorMap<T>& t2, Tensor<T>& energy,
+               TensorMap<T>& r1, TensorMap<T>& r2, const std::vector<Tensor<T>>& d_t,
+               std::vector<Tensor<T>>& d_r) {
+  const auto& d_t1 = d_t.at(0);
+  const auto& d_t2 = d_t.at(1);
+  auto&       d_r1 = d_r.at(0);
+  auto&       d_r2 = d_r.at(1);
+
+  const int otiles  = MO("occ").num_tiles();
+  const int vtiles  = MO("virt").num_tiles();
+  const int oatiles = MO("occ_alpha").num_tiles();
+  const int vatiles = MO("virt_alpha").num_tiles();
+
+  const TiledIndexSpace Oa = {MO("occ"), range(oatiles)};
+  const TiledIndexSpace Va = {MO("virt"), range(vatiles)};
+  const TiledIndexSpace Ob = {MO("occ"), range(oatiles, otiles)};
+  const TiledIndexSpace Vb = {MO("virt"), range(vatiles, vtiles)};
+
+  TiledIndexLabel aa, ba;
+  TiledIndexLabel ia, ja;
+  TiledIndexLabel ab, bb;
+  TiledIndexLabel ib, jb;
+  std::tie(aa, ba) = Va.labels<2>("all");
+  std::tie(ab, bb) = Vb.labels<2>("all");
+  std::tie(ia, ja) = Oa.labels<2>("all");
+  std::tie(ib, jb) = Ob.labels<2>("all");
+
+  // Spin-adaptation (identical to the block used in the CS DIIS driver):
+  // aa/bb singles from d_t1; aaaa/abab/bbbb doubles from d_t2 (abab).
+  Tensor<T> tmp_aaaa = declare<T>(chem_env, "tmp_aaaa_vvoo");
+  // clang-format off
+  sch
+    (   t1.at("aa")(aa,ia)            = d_t1(aa,ia))
+    .exact_copy(t1.at("bb")(ab, ib), t1.at("aa")(ab, ib))
+    (   t2.at("abab")(aa,bb,ia,jb)    = d_t2(aa,bb,ia,jb))
+    .allocate(tmp_aaaa)
+    (t2.at("aaaa")() = 0.0) (tmp_aaaa() = 0.0)
+    .exact_copy(tmp_aaaa(aa, ba, ia, ja), t2.at("abab")(aa, ba, ia, ja))
+    (t2.at("aaaa")() = tmp_aaaa())
+    (t2.at("aaaa")(aa, ba, ia, ja) -= tmp_aaaa(ba, aa, ia, ja))
+    .deallocate(tmp_aaaa)
+    .exact_copy(t2.at("bbbb")(ab, bb, ib, jb), t2.at("aaaa")(ab, bb, ib, jb))
+    .execute();
+  // clang-format on
+
+  ccsd_cs::residuals<T>(sch, chem_env, MO, f, eri, t1, t2, energy, r1, r2);
+
+  // d_r1/d_r2 are full {V,O}/{V,V,O,O} tensors but only the aa singles / abab doubles blocks are
+  // the independent closed-shell residuals. Zero the full tensors first so the redundant blocks
+  // (bb, aaaa, bbbb) stay zero and don't pollute the packed-vector norm the solver uses.
+  // clang-format off
+  sch
+    (   d_r1()               = 0.0)
+    (   d_r2()               = 0.0)
+    (   d_r1(aa,ia)          = r1.at("aa")(aa,ia))
+    (   d_r2(aa,bb,ia,jb)    = r2.at("abab")(aa,bb,ia,jb))
+    .execute();
+  // clang-format on
+
+  return d_r;
+}
+
 template<typename T>
 std::tuple<double, double>
 ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& MO, Tensor<T>& d_t1,
@@ -1193,7 +1276,64 @@ ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& M
 
   sch.execute(ec.exhw(), profile);
 
-  if(!ccsd_restart) {
+  const auto& sv = chem_env.ioptions.ccsd_options.solvers;
+  const auto& nk = sv.newton_krylov;
+
+  // Closed-shell MP2 initial guess (abab doubles only). Skip it whenever the amplitude files exist,
+  // i.e. d_t1/d_t2 were read from disk, so a restart continues from those amplitudes.
+  bool ccsd_nk_restart =
+    chem_env.ioptions.ccsd_options.readt ||
+    ((fs::exists(t1file) && fs::exists(t2file) && fs::exists(chem_env.cd_context.f1file) &&
+      fs::exists(chem_env.cd_context.v2file)));
+
+  if(!ccsd_nk_restart) {
+    sch(d_r2(aa, bb, ia, jb) = eri.at("abab_vvoo")(aa, bb, ia, jb)).execute();
+    jacobi(ec, d_r2, d_t2, 0.0, false, p_evl_sorted, n_occ_alpha, n_occ_beta);
+  }
+
+  std::vector<Tensor<T>> d_t{d_t1, d_t2};
+  std::vector<Tensor<T>> d_r{d_r1, d_r2};
+
+  // Closed-shell residual F(x) for the Newton-Krylov solver.
+  auto residual_fun = [&](const std::vector<Tensor<T>>& x) -> std::vector<Tensor<T>>& {
+    return ccsd_residuals<T>(sch, chem_env, MO, f, eri, t1, t2, d_e, r1, r2, x, d_r);
+  };
+
+  // Preconditioner: reuse the open-shell diagonal (Fock) preconditioner. The closed-shell NK
+  // vector has the same full {V,O}/{V,V,O,O} shape (setupTensors), so preconditioner_action acts
+  // correctly on the aa singles / abab doubles blocks and yields zero on the redundant blocks.
+  auto precond_action = [&](const std::vector<Tensor<T>>& pv) -> std::vector<Tensor<T>> {
+    return exachem::cc::ccsd_os::preconditioner_action<T>(sch, MO, f, eri, pv);
+  };
+  auto preconditioner_inverse_application =
+    [&](const std::vector<Tensor<T>>& vector_to_be_preconditioned) -> std::vector<Tensor<T>> {
+    return exachem::cc::ccsd_os::preconditioner_inverse_application<T>(
+      ec, chem_env, d_e, sch, MO, f, eri, vector_to_be_preconditioned, nk.krylov_dims_precond,
+      nk.gmres_tol);
+  };
+
+  chem_env.cc_context.ccsd_iter = -1;
+
+  if(sv.solver_type == "newton_krylov") {
+    // Dispatch to the variant selected via CC.solvers.newton_krylov.variant.
+    if(nk.variant == "general") {
+      std::tie(residual, energy) = newton_krylov_solver(ec, chem_env, residual_fun, d_e, d_t);
+    }
+    else if(nk.variant == "inexact") {
+      std::tie(residual, energy) =
+        inexact_newton_krylov_solver(ec, chem_env, residual_fun, precond_action, d_e, d_t);
+    }
+    else { // "preconditioned" (default)
+      std::tie(residual, energy) = preconditioned_newton_krylov_solver(
+        ec, chem_env, residual_fun, preconditioner_inverse_application, d_e, d_t);
+    }
+
+    if(writet) {
+      write_to_disk(d_t1, t1file);
+      write_to_disk(d_t2, t2file);
+    }
+  }
+  else if(!ccsd_restart) {
     Tensor<T> d_r1_residual{}, d_r2_residual{};
     Tensor<T>::allocate(&ec, d_r1_residual, d_r2_residual);
 

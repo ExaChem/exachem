@@ -23,7 +23,7 @@ void ParseCCSDOptions::parse_check(json& jinput) {
   // clang-format off
     const std::vector<string> valid_cc{
       "CCSD(T)",  "DLPNO",        "EOMCCSD",        "RT-EOMCC",     "GFCCSD",
-      "comments", "threshold",    "tilesize",     "ducc_lvl",
+      "comments", "threshold",    "tilesize",     "ducc_lvl", "solvers",
       "lshift",   "ndiis",        "ccsd_maxiter",   "freeze",       "PRINT",
       "readt",    "writet",       "writet_iter",  "debug",
       "nactive_oa", "nactive_ob", "nactive_va", "nactive_vb", 
@@ -73,6 +73,39 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(cc_options.freeze_atomic, jcc_freeze, "atomic");
   parse_option<int>(cc_options.freeze_core, jcc_freeze, "core");
   parse_option<int>(cc_options.freeze_virtual, jcc_freeze, "virtual");
+
+  // CC.solvers : CC amplitude solver selection and options
+  json            jsolvers = jcc["solvers"];
+  SolversOptions& sv       = cc_options.solvers;
+  parse_option<string>(sv.solver_type, jsolvers, "solver_type");
+  if(sv.solver_type != "diis" && sv.solver_type != "newton_krylov") {
+    tamm_terminate(
+      "[INPUT FILE ERROR]: CC.solvers.solver_type must be one of: diis, newton_krylov");
+  }
+
+  // CC.solvers.newton_krylov : options for the Jacobian-free Newton-Krylov solver
+  json                 jnk = jsolvers["newton_krylov"];
+  NewtonKrylovOptions& nk  = sv.newton_krylov;
+  parse_option<string>(nk.variant, jnk, "variant");
+  parse_option<int>(nk.krylov_dims, jnk, "krylov_dims");
+  parse_option<int>(nk.krylov_dims_precond, jnk, "krylov_dims_precond");
+  parse_option<double>(nk.eta, jnk, "eta");
+  parse_option<double>(nk.gamma, jnk, "gamma");
+  parse_option<double>(nk.alpha, jnk, "alpha");
+  parse_option<bool>(nk.adaptive_forcing, jnk, "adaptive_forcing");
+  parse_option<double>(nk.newton_tol, jnk, "newton_tol");
+  parse_option<double>(nk.gmres_tol, jnk, "gmres_tol");
+  // Resolve the tolerance options: an unspecified tol follows the CC threshold.
+  if(nk.newton_tol < 0) nk.newton_tol = cc_options.threshold;
+  if(nk.gmres_tol < 0) nk.gmres_tol = cc_options.threshold;
+  if(nk.variant != "general" && nk.variant != "preconditioned" && nk.variant != "inexact") {
+    tamm_terminate("[INPUT FILE ERROR]: CC.solvers.newton_krylov.variant must be one of: "
+                   "general, preconditioned, inexact");
+  }
+
+  // The Newton-Krylov solver writes restart amplitudes every writet_iter Newton steps; default
+  // that to 1 (every step) unless the user set writet_iter explicitly in the input file.
+  if(sv.solver_type == "newton_krylov" && !jcc.contains("writet_iter")) cc_options.writet_iter = 1;
 
   // RT-EOMCC
   json jrt_eom = jcc["RT-EOMCC"];

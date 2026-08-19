@@ -9,6 +9,11 @@
 
 #include "exachem/cc/ccsd/cd_ccsd_cs_ann.hpp"
 
+#include "exachem/cc/ccsd/cd_ccsd_preconditioner.hpp"
+#include "exachem/cc/krylov_solvers.hpp"
+
+using namespace exachem::cc::solvers;
+
 template<typename T>
 
 void exachem::cc::ccsd::CD_CCSD_CS<T>::ccsd_amp_update(Scheduler& sch, const Tensor<T>& t2_abab,
@@ -717,7 +722,13 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
 
   sch.execute();
 
-  if(!ccsd_restart) {
+  const auto& sv = chem_env.ioptions.ccsd_options.solvers;
+  const auto& nk = sv.newton_krylov;
+
+  // Enter the iterative block for a fresh run OR whenever Newton-Krylov is selected (NK also
+  // resumes from restart amplitudes). A converged non-NK restart falls through to the single energy
+  // evaluation in the else branch below.
+  if(sv.solver_type == "newton_krylov" || !ccsd_restart) {
     // allocate all intermediates
     sch.allocate(_a02V, _a007V);
     CCSE_Tensors<T>::allocate_list(sch, _a004, _a01, _a04, _a05, _a06, _a001, _a006, _a008, _a009,
@@ -738,70 +749,134 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
     Tensor<T> d_r1_residual{}, d_r2_residual{};
     Tensor<T>::allocate(&ec, d_r1_residual, d_r2_residual);
 
-    for(int titer = 0; titer < maxiter; titer += ndiis) {
-      for(int iter = titer; iter < std::min(titer + ndiis, maxiter); iter++) {
-        const auto timer_start = std::chrono::high_resolution_clock::now();
+    // MP2 initial guess (skipped when amplitude files exist). Closed-shell: only the abab doubles
+    // are independent; T2_abab^(1) = (ai|bj) / D from _a004("abab"); T1 stays zero.
+    bool ccsd_nk_restart =
+      chem_env.ioptions.ccsd_options.readt ||
+      ((fs::exists(t1file) && fs::exists(t2file) && fs::exists(chem_env.cd_context.f1file) &&
+        fs::exists(chem_env.cd_context.v2file)));
 
-        niter   = iter;
-        int off = iter - titer;
-        // clang-format off
+    if(!ccsd_nk_restart) {
+      sch(r2_abab(p1_va, p1_vb, h3_oa, h3_ob) = _a004("abab")(p1_va, p1_vb, h3_oa, h3_ob))
+        .execute(exhw);
+      jacobi_cs(ec, r2_abab, t2_abab, 0.0, false, p_evl_sorted, n_occ_alpha, n_vir_alpha);
+    }
+
+    // ===================== Newton-Krylov solver path =====================
+    // Reuses the generic exachem::cc::solvers machinery; closed-shell specifics are the reduced
+    // aa/abab residual and the shared cs preconditioner (cd_ccsd_preconditioner.cpp).
+    chem_env.cc_context.ccsd_iter = -1;
+
+    std::vector<Tensor<T>> d_t{t1_aa, t2_abab};
+    std::vector<Tensor<T>> d_r{r1_aa, r2_abab};
+
+    // Residual F(x): x = {t1_aa, t2_abab}. Derive t2_aaaa, evaluate the closed-shell T1/T2
+    // residuals and the energy. r1_aa/r2_abab are the (reduced) closed-shell residuals directly.
+    auto residual_fun = [&](const std::vector<Tensor<T>>& x) -> std::vector<Tensor<T>>& {
+      // ccsd_t2_cs takes t2_abab by non-const ref (reads only); use handle copies (shared data) so
+      // the const solver-vector elements bind without mutating them.
+      Tensor<T> x_t1 = x.at(0); // t1_aa
+      Tensor<T> x_t2 = x.at(1); // t2_abab
+      ccsd_amp_update(sch, x_t2, t2_aaaa);
+      ccsd_t1_cs(sch, MO, CI, r1_aa, x_t1, x_t2, f1_se, chol3d_se);
+      ccsd_t2_cs(sch, MO, CI, r2_abab, x_t1, x_t2, t2_aaaa, f1_se, chol3d_se);
+      ccsd_e_cs(sch, MO, CI, d_e, x_t1, x_t2, t2_aaaa, f1_se, chol3d_se);
+      sch.execute(exhw, profile);
+      return d_r;
+    };
+
+    // Closed-shell Fock preconditioner (shared, cd_ccsd_preconditioner.cpp) on the reduced blocks.
+    auto precond_action = [&](const std::vector<Tensor<T>>& pv) -> std::vector<Tensor<T>> {
+      return preconditioner_action_cs(sch, MO, f1_oo, f1_vv, pv, exhw);
+    };
+    auto preconditioner_inverse_application =
+      [&](const std::vector<Tensor<T>>& v) -> std::vector<Tensor<T>> {
+      return gmres_solver(ec, chem_env, d_e, precond_action, v, nk.krylov_dims_precond,
+                          nk.gmres_tol);
+    };
+
+    if(sv.solver_type == "newton_krylov") {
+      if(nk.variant == "general") {
+        std::tie(residual, energy) = newton_krylov_solver(ec, chem_env, residual_fun, d_e, d_t);
+      }
+      else if(nk.variant == "inexact") {
+        std::tie(residual, energy) =
+          inexact_newton_krylov_solver(ec, chem_env, residual_fun, precond_action, d_e, d_t);
+      }
+      else { // "preconditioned" (default)
+        std::tie(residual, energy) = preconditioned_newton_krylov_solver(
+          ec, chem_env, residual_fun, preconditioner_inverse_application, d_e, d_t);
+      }
+      // keep t2_aaaa consistent with the converged t2_abab for downstream use
+      ccsd_amp_update(sch, t2_abab, t2_aaaa);
+      sch.execute(exhw);
+    }
+    else {
+      for(int titer = 0; titer < maxiter; titer += ndiis) {
+        for(int iter = titer; iter < std::min(titer + ndiis, maxiter); iter++) {
+          const auto timer_start = std::chrono::high_resolution_clock::now();
+
+          niter   = iter;
+          int off = iter - titer;
+          // clang-format off
             sch
                ((d_t1s[off])()  = t1_aa())
                ((d_t2s[off])()  = t2_abab())
                .execute();
-        // clang-format on
+          // clang-format on
 
-        ccsd_t1_cs(sch, MO, CI, r1_aa, t1_aa, t2_abab, f1_se, chol3d_se);
-        ccsd_t2_cs(sch, MO, CI, r2_abab, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
+          ccsd_t1_cs(sch, MO, CI, r1_aa, t1_aa, t2_abab, f1_se, chol3d_se);
+          ccsd_t2_cs(sch, MO, CI, r2_abab, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
 
-        sch.execute(exhw, profile);
+          sch.execute(exhw, profile);
 
-        std::tie(residual, energy) = rest_cs(ec, MO, r1_aa, r2_abab, t1_aa, t2_abab, d_e,
-                                             d_r1_residual, d_r2_residual, p_evl_sorted, zshiftl,
-                                             n_occ_alpha, n_vir_alpha);
+          std::tie(residual, energy) = rest_cs(ec, MO, r1_aa, r2_abab, t1_aa, t2_abab, d_e,
+                                               d_r1_residual, d_r2_residual, p_evl_sorted, zshiftl,
+                                               n_occ_alpha, n_vir_alpha);
 
-        update_r2(ec, r2_abab());
-        // clang-format off
+          update_r2(ec, r2_abab());
+          // clang-format off
         sch ((d_r1s[off])() = r1_aa())
             ((d_r2s[off])() = r2_abab())
             .execute();
-        // clang-format on
+          // clang-format on
 
-        ccsd_amp_update(sch, t2_abab, t2_aaaa); // update t2_aaaa after jacobi
-        CD_CCSD_CS<T>::ccsd_e_cs(sch, MO, CI, d_e, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
-        sch.execute(exhw, profile);
-        energy = get_scalar(d_e);
+          ccsd_amp_update(sch, t2_abab, t2_aaaa); // update t2_aaaa after jacobi
+          CD_CCSD_CS<T>::ccsd_e_cs(sch, MO, CI, d_e, t1_aa, t2_abab, t2_aaaa, f1_se, chol3d_se);
+          sch.execute(exhw, profile);
+          energy = get_scalar(d_e);
 
-        const auto timer_end = std::chrono::high_resolution_clock::now();
-        auto       iter_time =
-          std::chrono::duration_cast<std::chrono::duration<double>>((timer_end - timer_start))
-            .count();
+          const auto timer_end = std::chrono::high_resolution_clock::now();
+          auto       iter_time =
+            std::chrono::duration_cast<std::chrono::duration<double>>((timer_end - timer_start))
+              .count();
 
-        iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
+          iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
 
-        if(writet && ((iter + 1) % writet_iter == 0)) {
-          write_to_disk(t1_aa, t1file);
-          write_to_disk(t2_abab, t2file);
+          if(writet && ((iter + 1) % writet_iter == 0)) {
+            write_to_disk(t1_aa, t1file);
+            write_to_disk(t2_abab, t2file);
+          }
+
+          if(residual < thresh) { break; }
         }
 
-        if(residual < thresh) { break; }
+        if(residual < thresh || titer + ndiis >= maxiter) { break; }
+        if(ec.pg().rank() == 0) {
+          std::cout << " MICROCYCLE DIIS UPDATE:";
+          std::cout.width(21);
+          std::cout << std::right << std::min(titer + ndiis, maxiter) + 1 << std::endl;
+        }
+
+        std::vector<std::vector<Tensor<T>>> rs{d_r1s, d_r2s};
+        std::vector<std::vector<Tensor<T>>> ts{d_t1s, d_t2s};
+        std::vector<Tensor<T>>              next_t{t1_aa, t2_abab};
+        diis<T>(ec, rs, ts, next_t);
+
+        // update t2_aaaa after diis
+        ccsd_amp_update(sch, t2_abab, t2_aaaa);
+        sch.execute();
       }
-
-      if(residual < thresh || titer + ndiis >= maxiter) { break; }
-      if(ec.pg().rank() == 0) {
-        std::cout << " MICROCYCLE DIIS UPDATE:";
-        std::cout.width(21);
-        std::cout << std::right << std::min(titer + ndiis, maxiter) + 1 << std::endl;
-      }
-
-      std::vector<std::vector<Tensor<T>>> rs{d_r1s, d_r2s};
-      std::vector<std::vector<Tensor<T>>> ts{d_t1s, d_t2s};
-      std::vector<Tensor<T>>              next_t{t1_aa, t2_abab};
-      diis<T>(ec, rs, ts, next_t);
-
-      // update t2_aaaa after diis
-      ccsd_amp_update(sch, t2_abab, t2_aaaa);
-      sch.execute();
     }
 
     if(writet) {

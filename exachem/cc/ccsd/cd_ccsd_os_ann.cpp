@@ -8,6 +8,11 @@
 
 #include "exachem/cc/ccsd/cd_ccsd_os_ann.hpp"
 
+#include "exachem/cc/ccsd/cd_ccsd_preconditioner.hpp"
+#include "exachem/cc/krylov_solvers.hpp"
+
+using namespace exachem::cc::solvers;
+
 template<typename T>
 
 void CD_CCSD_OS<T>::ccsd_amp_update(Scheduler& sch, CCSE_Tensors<T>& t1_vo,
@@ -1034,7 +1039,13 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
   ccsd_amp_update(sch, t1_vo, t2_vvoo, d_t1, d_t2);
   sch.execute();
 
-  if(!ccsd_restart) {
+  const auto& sv = chem_env.ioptions.ccsd_options.solvers;
+  const auto& nk = sv.newton_krylov;
+
+  // Enter the iterative block for a fresh run OR whenever Newton-Krylov is selected (NK also
+  // resumes from restart amplitudes). A converged non-NK restart falls through to the single energy
+  // evaluation in the else branch below.
+  if(sv.solver_type == "newton_krylov" || !ccsd_restart) {
     // allocate all intermediates
     sch.allocate(_a02V_os, _a007V_os);
     CCSE_Tensors<T>::allocate_list(sch, _a004_os, i0_t2_tmp, _a01_os, _a04_os, _a05_os, _a06_os,
@@ -1052,19 +1063,97 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
     Tensor<T> d_r1_residual{}, d_r2_residual{};
     Tensor<T>::allocate(&ec, d_r1_residual, d_r2_residual);
 
-    for(int titer = 0; titer < maxiter; titer += ndiis) {
-      for(int iter = titer; iter < std::min(titer + ndiis, maxiter); iter++) {
-        const auto timer_start = std::chrono::high_resolution_clock::now();
+    // MP2 initial guess (skipped when amplitude files exist, i.e. read from disk on restart).
+    // T2^(1) = <ij||ab> / D, with <ab||ij> reconstructed from _a004_os = (ai|bj): the same-spin
+    // (aaaa/bbbb) blocks are antisymmetrized, the opposite-spin (abab) block is Coulomb only.
+    bool ccsd_nk_restart =
+      chem_env.ioptions.ccsd_options.readt ||
+      ((fs::exists(t1file) && fs::exists(t2file) && fs::exists(chem_env.cd_context.f1file) &&
+        fs::exists(chem_env.cd_context.v2file)));
 
-        niter   = iter;
-        int off = iter - titer;
+    if(!ccsd_nk_restart) {
+      // clang-format off
+      sch
+        (d_r2()                            = 0.0)
+        (d_r2(p1_va, p2_va, h4_oa, h3_oa)  = _a004_os("aaaa")(p1_va, p2_va, h4_oa, h3_oa))
+        (d_r2(p1_va, p2_va, h4_oa, h3_oa) -= _a004_os("aaaa")(p1_va, p2_va, h3_oa, h4_oa))
+        (d_r2(p1_va, p2_vb, h4_oa, h3_ob)  = _a004_os("abab")(p1_va, p2_vb, h4_oa, h3_ob))
+        (d_r2(p1_vb, p2_vb, h4_ob, h3_ob)  = _a004_os("bbbb")(p1_vb, p2_vb, h4_ob, h3_ob))
+        (d_r2(p1_vb, p2_vb, h4_ob, h3_ob) -= _a004_os("bbbb")(p1_vb, p2_vb, h3_ob, h4_ob))
+        .execute(exhw);
+      // clang-format on
+      jacobi(ec, d_r2, d_t2, 0.0, false, p_evl_sorted, n_occ_alpha, n_occ_beta);
+    }
 
-        sch((d_t1s[off])() = d_t1())((d_t2s[off])() = d_t2()).execute();
+    // ===================== Newton-Krylov solver path =====================
+    // Reuses the generic exachem::cc::solvers machinery. All Cholesky-specific pieces (residual
+    // via the CCSE spin-block T1/T2 evaluators, and a Fock preconditioner built from f1_se) are
+    // local lambdas below. Selected via CC.solvers.solver_type = "newton_krylov".
+    chem_env.cc_context.ccsd_iter = -1;
 
-        ccsd_t1_os(sch, MO, CI, /*d_r1,*/ r1_vo, t1_vo, t2_vvoo, f1_se, chol3d_se);
-        ccsd_t2_os(sch, MO, CI, /*d_r2,*/ r2_vvoo, t1_vo, t2_vvoo, f1_se, chol3d_se, i0_t2_tmp);
+    std::vector<Tensor<T>> d_t{d_t1, d_t2};
+    std::vector<Tensor<T>> d_r{d_r1, d_r2};
 
-        // clang-format off
+    // Residual F(x): unpack x into the CCSE spin-block amplitudes, evaluate the T1/T2 residuals and
+    // the energy, and pack the residuals back into d_r1/d_r2 (mirrors the DIIS loop body, without
+    // rest()/jacobi/update_r2).
+    auto residual_fun = [&](const std::vector<Tensor<T>>& x) -> std::vector<Tensor<T>>& {
+      ccsd_amp_update(sch, t1_vo, t2_vvoo, x.at(0), x.at(1));
+      ccsd_t1_os(sch, MO, CI, r1_vo, t1_vo, t2_vvoo, f1_se, chol3d_se);
+      ccsd_t2_os(sch, MO, CI, r2_vvoo, t1_vo, t2_vvoo, f1_se, chol3d_se, i0_t2_tmp);
+      // clang-format off
+      sch
+        (d_r1(p2_va, h1_oa)                = r1_vo("aa")(p2_va, h1_oa))
+        (d_r1(p2_vb, h1_ob)                = r1_vo("bb")(p2_vb, h1_ob))
+        (d_r2(p3_va, p4_va, h2_oa, h1_oa)  = r2_vvoo("aaaa")(p3_va, p4_va, h2_oa, h1_oa))
+        (d_r2(p3_vb, p4_vb, h2_ob, h1_ob)  = r2_vvoo("bbbb")(p3_vb, p4_vb, h2_ob, h1_ob))
+        (d_r2(p3_va, p4_vb, h2_oa, h1_ob)  = r2_vvoo("abab")(p3_va, p4_vb, h2_oa, h1_ob));
+      // clang-format on
+      ccsd_e_os(sch, MO, CI, d_e, t1_vo, t2_vvoo, f1_se, chol3d_se);
+      sch.execute(exhw, profile);
+      return d_r;
+    };
+
+    // Cholesky diagonal (Fock) preconditioner M*y on the full V/O spaces (shared with the CS
+    // driver, defined in cd_ccsd_preconditioner.cpp).
+    auto precond_action = [&](const std::vector<Tensor<T>>& pv) -> std::vector<Tensor<T>> {
+      return exachem::cc::ccsd::preconditioner_action_os(sch, MO, f1_oo, f1_vv, pv, exhw);
+    };
+
+    auto preconditioner_inverse_application =
+      [&](const std::vector<Tensor<T>>& v) -> std::vector<Tensor<T>> {
+      return gmres_solver(ec, chem_env, d_e, precond_action, v, nk.krylov_dims_precond,
+                          nk.gmres_tol);
+    };
+
+    if(sv.solver_type == "newton_krylov") {
+      if(nk.variant == "general") {
+        std::tie(residual, energy) = newton_krylov_solver(ec, chem_env, residual_fun, d_e, d_t);
+      }
+      else if(nk.variant == "inexact") {
+        std::tie(residual, energy) =
+          inexact_newton_krylov_solver(ec, chem_env, residual_fun, precond_action, d_e, d_t);
+      }
+      else { // "preconditioned" (default)
+        std::tie(residual, energy) = preconditioned_newton_krylov_solver(
+          ec, chem_env, residual_fun, preconditioner_inverse_application, d_e, d_t);
+      }
+      // amplitudes are written to disk below (shared with the DIIS path)
+    }
+    else {
+      for(int titer = 0; titer < maxiter; titer += ndiis) {
+        for(int iter = titer; iter < std::min(titer + ndiis, maxiter); iter++) {
+          const auto timer_start = std::chrono::high_resolution_clock::now();
+
+          niter   = iter;
+          int off = iter - titer;
+
+          sch((d_t1s[off])() = d_t1())((d_t2s[off])() = d_t2()).execute();
+
+          ccsd_t1_os(sch, MO, CI, /*d_r1,*/ r1_vo, t1_vo, t2_vvoo, f1_se, chol3d_se);
+          ccsd_t2_os(sch, MO, CI, /*d_r2,*/ r2_vvoo, t1_vo, t2_vvoo, f1_se, chol3d_se, i0_t2_tmp);
+
+          // clang-format off
         sch
           (d_r1(p2_va, h1_oa)                = r1_vo("aa")(p2_va, h1_oa))
           (d_r1(p2_vb, h1_ob)                = r1_vo("bb")(p2_vb, h1_ob))
@@ -1072,44 +1161,44 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
           (d_r2(p3_vb, p4_vb, h2_ob, h1_ob)  = r2_vvoo("bbbb")(p3_vb, p4_vb, h2_ob, h1_ob))
           (d_r2(p3_va, p4_vb, h2_oa, h1_ob)  = r2_vvoo("abab")(p3_va, p4_vb, h2_oa, h1_ob))
           ;
-        // clang-format on
+          // clang-format on
 
-        sch.execute(exhw, profile);
+          sch.execute(exhw, profile);
 
-        std::tie(residual, energy) = rest(ec, MO, d_r1, d_r2, d_t1, d_t2, d_e, d_r1_residual,
-                                          d_r2_residual, p_evl_sorted, zshiftl, n_occ_alpha,
-                                          n_occ_beta);
+          std::tie(residual, energy) = rest(ec, MO, d_r1, d_r2, d_t1, d_t2, d_e, d_r1_residual,
+                                            d_r2_residual, p_evl_sorted, zshiftl, n_occ_alpha,
+                                            n_occ_beta);
 
-        update_r2(ec, d_r2());
-        // clang-format off
+          update_r2(ec, d_r2());
+          // clang-format off
         sch
           ((d_r1s[off])() = d_r1())
           ((d_r2s[off])() = d_r2())
           .execute();
-        // clang-format on
+          // clang-format on
 
-        // update t1,t2 blocks after jacobi
-        ccsd_amp_update(sch, t1_vo, t2_vvoo, d_t1, d_t2);
+          // update t1,t2 blocks after jacobi
+          ccsd_amp_update(sch, t1_vo, t2_vvoo, d_t1, d_t2);
 
-        ccsd_e_os(sch, MO, CI, d_e, t1_vo, t2_vvoo, f1_se, chol3d_se);
-        sch.execute(exhw, profile);
-        energy = get_scalar(d_e);
+          ccsd_e_os(sch, MO, CI, d_e, t1_vo, t2_vvoo, f1_se, chol3d_se);
+          sch.execute(exhw, profile);
+          energy = get_scalar(d_e);
 
-        const auto timer_end = std::chrono::high_resolution_clock::now();
-        auto       iter_time =
-          std::chrono::duration_cast<std::chrono::duration<double>>((timer_end - timer_start))
-            .count();
+          const auto timer_end = std::chrono::high_resolution_clock::now();
+          auto       iter_time =
+            std::chrono::duration_cast<std::chrono::duration<double>>((timer_end - timer_start))
+              .count();
 
-        iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
+          iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
 
-        if(writet && ((iter + 1) % writet_iter == 0)) {
-          write_to_disk(d_t1, t1file);
-          write_to_disk(d_t2, t2file);
-        }
+          if(writet && ((iter + 1) % writet_iter == 0)) {
+            write_to_disk(d_t1, t1file);
+            write_to_disk(d_t2, t2file);
+          }
 
-        if(residual < thresh) {
-          Tensor<T> t2_copy{{V, V, O, O}, {2, 2}};
-          // clang-format off
+          if(residual < thresh) {
+            Tensor<T> t2_copy{{V, V, O, O}, {2, 2}};
+            // clang-format off
           sch.allocate(t2_copy)
             (t2_copy()                     =  1.0 * d_t2())
             (d_t2(p1_va,p2_vb,h4_ob,h3_oa) = -1.0 * t2_copy(p1_va,p2_vb,h3_oa,h4_ob))
@@ -1117,28 +1206,29 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
             (d_t2(p2_vb,p1_va,h4_ob,h3_oa) =  1.0 * t2_copy(p1_va,p2_vb,h3_oa,h4_ob))
             .deallocate(t2_copy)
             .execute();
-          // clang-format on
-          break;
+            // clang-format on
+            break;
+          }
         }
+
+        if(residual < thresh || titer + ndiis >= maxiter) { break; }
+        if(ec.pg().rank() == 0) {
+          std::cout << " MICROCYCLE DIIS UPDATE:";
+          std::cout.width(21);
+          std::cout << std::right << std::min(titer + ndiis, maxiter) + 1;
+          std::cout.width(21);
+          std::cout << std::right << "5" << std::endl;
+        }
+
+        std::vector<std::vector<Tensor<T>>> rs{d_r1s, d_r2s};
+        std::vector<std::vector<Tensor<T>>> ts{d_t1s, d_t2s};
+        std::vector<Tensor<T>>              next_t{d_t1, d_t2};
+        diis<T>(ec, rs, ts, next_t);
+
+        // update t1,t2 blocks after diis
+        ccsd_amp_update(sch, t1_vo, t2_vvoo, d_t1, d_t2);
+        sch.execute();
       }
-
-      if(residual < thresh || titer + ndiis >= maxiter) { break; }
-      if(ec.pg().rank() == 0) {
-        std::cout << " MICROCYCLE DIIS UPDATE:";
-        std::cout.width(21);
-        std::cout << std::right << std::min(titer + ndiis, maxiter) + 1;
-        std::cout.width(21);
-        std::cout << std::right << "5" << std::endl;
-      }
-
-      std::vector<std::vector<Tensor<T>>> rs{d_r1s, d_r2s};
-      std::vector<std::vector<Tensor<T>>> ts{d_t1s, d_t2s};
-      std::vector<Tensor<T>>              next_t{d_t1, d_t2};
-      diis<T>(ec, rs, ts, next_t);
-
-      // update t1,t2 blocks after diis
-      ccsd_amp_update(sch, t1_vo, t2_vvoo, d_t1, d_t2);
-      sch.execute();
     }
 
     if(writet) {

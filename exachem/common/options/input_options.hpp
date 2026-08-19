@@ -189,12 +189,32 @@ public:
   void                             print() override;
 };
 
+// Options for the Jacobian-free Newton-Krylov CC solver (CC.solvers.newton_krylov).
+struct NewtonKrylovOptions {
+  std::string variant{"preconditioned"}; // one of: general, preconditioned, inexact
+  int         krylov_dims{5};
+  int         krylov_dims_precond{10};
+  double      eta{0.5};
+  double      gamma{0.9};
+  double      alpha{1.5};
+  bool        adaptive_forcing{true}; // use the Eisenstat-Walker adaptive forcing term
+  double      newton_tol{-1.0};       // sentinel: <0 means "follow the CC threshold"
+  double      gmres_tol{-1.0};        // sentinel: <0 means "follow the CC threshold"
+};
+
+// CC amplitude solver selection and per-solver options (CC.solvers).
+struct SolversOptions {
+  std::string         solver_type{"diis"}; // one of: diis, newton_krylov
+  NewtonKrylovOptions newton_krylov;
+};
+
 class CCSDOptions: public CommonOptions {
 public:
-  double                  threshold{1e-6};
-  int                     tilesize{40};
-  int                     ndiis{5};
-  int                     writet_iter{ndiis};
+  double threshold{1e-6};
+  int    tilesize{40};
+  int    ndiis{5};
+  int    writet_iter{ndiis}; // overridden to 1 for the newton_krylov solver
+                             // (unless set in the input); see parse_ccsd_options
   bool                    readt{false};
   bool                    writet{false};
   bool                    gf_restart{false};
@@ -221,6 +241,8 @@ public:
   bool   freeze_atomic{false};
   int    freeze_core{0};
   int    freeze_virtual{0};
+
+  SolversOptions solvers;
 
   int    pcore{0};
   int    ntimesteps{10};

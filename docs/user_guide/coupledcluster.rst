@@ -42,7 +42,22 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
       "tamplitudes": [false,0.05],
       "ccsd_diagnostics" : false,
       "rdm": [1,2]
-   }   
+   },
+
+   "solvers": {
+      "solver_type": "diis",
+      "newton_krylov": {
+         "variant": "preconditioned",
+         "krylov_dims": 5,
+         "krylov_dims_precond": 10,
+         "eta": 0.5,
+         "gamma": 0.9,
+         "alpha": 1.5,
+         "adaptive_forcing": true,
+         "newton_tol": 1e-6,
+         "gmres_tol": 1e-6
+      }
+   }
   }
 
 :threshold: ``[default=1e-6]`` Specifies the convergence threshold of iterative solutions of amplitude equations. The threshold refers to the norm of residual, namely, the deviation from the amplitude equations.
@@ -81,6 +96,60 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
    * :strong:`ccsd_diagnostics`: Print CCSD T1, D1, D2 diagnostics.
    * :strong:`tamplitudes`: Write T1,T2 amplitude tensor values above a certain threshold to text files.
    * :strong:`rdm`: Write 1- and 2-RDM (reduced density matrix) tensors to disk as plain text files. Specifying 1 and/or 2 to write the desired RDM tensor. Specifying 1 also computes the CCSD natural orbitals and writes them to the SCF files directory. This option only applies when CCSD Lambda is run.
+
+:solvers: This block selects and configures the iterative solver used to converge the CC amplitude equations.
+
+   * :strong:`solver_type`: ``[default=diis]`` Selects the amplitude solver. One of:
+
+     * :strong:`diis`: The standard DIIS-accelerated Jacobi iteration. This is the default and long-standing CC solver.
+     * :strong:`newton_krylov`: A Jacobian-free Newton-Krylov solver that solves the nonlinear residual equations :math:`F(x)=0` with an inner GMRES (Arnoldi) linear solve at each Newton step. Configured by the ``newton_krylov`` block below.
+
+:newton_krylov: Options for the Newton-Krylov solver. These apply only when ``solver_type`` is set to ``newton_krylov``.
+
+   * :strong:`variant`: ``[default=preconditioned]`` Selects the Newton-Krylov variant. One of:
+
+     * :strong:`general`: Jacobian-free Newton-Krylov with an unpreconditioned inner GMRES solve.
+     * :strong:`preconditioned`: Newton-Krylov with the diagonal (Fock) preconditioner applied to the inner GMRES solve.
+     * :strong:`inexact`: Inexact Newton-Krylov, which solves :math:`M\,\delta x = -F(x)` directly with the preconditioner action as the linear operator (the GMRES analog of fixed-point/energy-denominator updates).
+
+   * :strong:`krylov_dims`: ``[default=5]`` The Krylov subspace dimension (maximum number of Arnoldi steps) for the inner GMRES solve of the linearized system :math:`J\,\delta x = -F(x)` at each Newton iteration.
+   * :strong:`krylov_dims_precond`: ``[default=10]`` The Krylov subspace dimension for the preconditioner's GMRES solve (applying :math:`M^{-1}`). Generally set larger than ``krylov_dims``.
+   * :strong:`eta`: ``[default=0.5]`` The initial Eisenstat-Walker forcing term, which controls how tightly the inner GMRES solve is converged in the early Newton iterations to avoid over-solving.
+   * :strong:`gamma`: ``[default=0.9]`` Coefficient of the Eisenstat-Walker forcing term update :math:`\eta = \gamma\,(\lVert F_k\rVert / \lVert F_{k-1}\rVert)^{\alpha}`.
+   * :strong:`alpha`: ``[default=1.5]`` Exponent of the Eisenstat-Walker forcing term update (see ``gamma``).
+   * :strong:`adaptive_forcing`: ``[default=true]`` When enabled, uses the Eisenstat-Walker adaptive forcing term to stop the inner GMRES solve early (when the residual falls below ``eta`` times the right-hand-side norm), avoiding over-solving the linearized system in the early Newton iterations.
+   * :strong:`newton_tol`: ``[default=threshold]`` Convergence threshold for the outer Newton iterations; the solver stops when the residual norm :math:`\lVert F(x)\rVert` falls below this value. If unspecified, it follows the CCSD ``threshold``.
+   * :strong:`gmres_tol`: ``[default=threshold]`` Convergence threshold for the inner GMRES solve. If unspecified, it follows the CCSD ``threshold``.
+
+Newton-Krylov Solvers
+---------------------
+
+The Newton-Krylov solvers are useful for challenging coupled-cluster calculations, including Hubbard models and strongly correlated systems, where the standard DIIS-accelerated  
+Jacobi iteration may converge slowly or fail to converge. The default solver for such cases is the preconditioned Newton-Krylov variant.
+
+.. note::
+
+   These solvers are currently available for CCSD only, which has a preconditioner (the diagonal Fock preconditioner) available.
+
+:strong:`Choosing a variant`
+
+   * :strong:`preconditioned`: Use when a preconditioner is available and an unpreconditioned GMRES solve is slow or struggles to converge.
+   * :strong:`general`: Use when no preconditioner is available, the Jacobian is already well-conditioned, or to evaluate the effect of the preconditioner.
+   * :strong:`inexact`: Use when the preconditioner provides a good approximation to the Newton step and a cheaper inner solve is preferred. This can also serve as an alternative to fixed-point iteration without explicit energy denominators.
+
+:strong:`Tuning krylov_dims and krylov_dims_precond`
+
+   * ``krylov_dims`` controls the maximum Krylov subspace dimension of the main GMRES solve. Increase it if GMRES stagnates or frequently reaches the dimension limit; decrease it if GMRES converges quickly, to reduce memory usage and orthogonalization costs.
+   * ``krylov_dims_precond`` controls the Krylov subspace dimension of the preconditioner solve. Increase it if the preconditioner is not providing a sufficiently accurate correction; decrease it if the preconditioner is already effective, to reduce computational cost. This is typically chosen to be larger than ``krylov_dims``.
+
+:strong:`Tuning the forcing parameters`
+
+   The parameters ``eta``, ``gamma``, ``alpha``, and ``adaptive_forcing`` control the accuracy of the inner GMRES solve.
+
+   * A larger ``eta`` or ``gamma`` generally allows looser inner solves, reducing computational cost but potentially slowing Newton convergence. If inner solves are unnecessarily expensive, increase ``eta`` or ``gamma``; if they are too loose, decrease ``eta`` or ``gamma``.
+   * A larger ``alpha`` makes the forcing term decrease more rapidly as the nonlinear residual decreases, resulting in tighter inner solves.
+   * With ``adaptive_forcing=false``, the inner GMRES solve uses ``gmres_tol`` directly.
+   * Typical range: :math:`1 < \alpha \le 2` and :math:`0 < \gamma < 1`.
 
 .. note::
 

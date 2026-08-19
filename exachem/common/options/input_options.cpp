@@ -125,6 +125,20 @@ void CCSDOptions::print() {
   print_option("freeze_atomic", freeze_atomic, 22);
   print_option("freeze_core", freeze_core, 22);
   print_option("freeze_virtual", freeze_virtual, 22);
+
+  print_option("solver_type", solvers.solver_type, 22);
+  print_option("nk_variant", solvers.newton_krylov.variant, 22);
+  if(solvers.solver_type == "newton_krylov") {
+    print_option("nk_krylov_dims", solvers.newton_krylov.krylov_dims, 22);
+    print_option("nk_krylov_dims_precond", solvers.newton_krylov.krylov_dims_precond, 22);
+    print_option("nk_eta", solvers.newton_krylov.eta, 22);
+    print_option("nk_gamma", solvers.newton_krylov.gamma, 22);
+    print_option("nk_alpha", solvers.newton_krylov.alpha, 22);
+    print_option("nk_adaptive_forcing", solvers.newton_krylov.adaptive_forcing, 22);
+    print_option("nk_newton_tol", solvers.newton_krylov.newton_tol, 22);
+    print_option("nk_gmres_tol", solvers.newton_krylov.gmres_tol, 22);
+  }
+
   if(lshift != 0) print_option("lshift", lshift, 22);
   if(gf_nprocs_poi > 0) print_option("gf_nprocs_poi", gf_nprocs_poi, 22);
 

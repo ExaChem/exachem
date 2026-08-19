@@ -164,7 +164,20 @@
           "core": 0,
           "virtual": 0
         },
-
+        "solvers":{
+          "solver_type": "diis",
+          "newton_krylov": {
+            "variant": "preconditioned",
+            "krylov_dims": 5,
+            "krylov_dims_precond": 10,
+            "eta": 0.5,
+            "gamma": 0.9,
+            "alpha": 1.5,
+            "adaptive_forcing": true,
+            "newton_tol": 1e-6,
+            "gmres_tol": 1e-6
+          }
+        },
         "readt": false,
         "writet": false,
         "writet_iter": 5,

@@ -19,6 +19,8 @@ public:
   ExecutionContext* sub_ec{nullptr};
   bool              use_subgroup{false};
 
+  int ccsd_iter{0};
+
   // CC2
   bool   task_cc2{false};
   double cc2_correlation_energy{0};

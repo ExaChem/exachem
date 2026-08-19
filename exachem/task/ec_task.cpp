@@ -53,7 +53,8 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
                                   task.rteom_cc2,
                                   task.rteom_ccsd,
                                   task.dlpno_ccsd.first,
-                                  task.dlpno_ccsd_t.first};
+                                  task.dlpno_ccsd_t.first,
+                                  task.embedding};
   if(std::count(tvec.begin(), tvec.end(), true) > 1)
     tamm_terminate("[INPUT FILE ERROR] only a single task can be enabled at once!");
 
@@ -61,8 +62,8 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
     task.sinfo,     task.gw,         task.fci,         task.cd_2e,    task.ducc.first, task.fcidump,
     task.rteom_cc2, task.rteom_ccsd, task.ccsd_lambda, task.eom_ccsd, task.gfccsd};
   const std::vector<std::string> task_nograd = {
-    "sinfo",     "gw",         "fci",         "cd_2e",    "ducc",  "fcidump",
-    "rteom_cc2", "rteom_ccsd", "ccsd_lambda", "eom_ccsd", "gfccsd"};
+    "sinfo",     "gw",         "fci",         "cd_2e",    "ducc",   "fcidump",
+    "rteom_cc2", "rteom_ccsd", "ccsd_lambda", "eom_ccsd", "gfccsd", "embedding"};
 
   if(task.operation[0] == "gradient") {
     for(size_t i = 0; i < tvec_nograd.size(); ++i) {
@@ -74,9 +75,9 @@ void check_task_options(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // TODO: avoid redefining. originally defined in task options parser
   const std::vector<string> valid_tasks{
-    "sinfo",    "scf",    "fci",       "fcidump",    "mp2",        "gw",
-    "cd_2e",    "cc2",    "ducc",      "ccsd",       "ccsd_t",     "ccsd_lambda",
-    "eom_ccsd", "gfccsd", "rteom_cc2", "rteom_ccsd", "dlpno_ccsd", "dlpno_ccsd_t"};
+    "sinfo",     "scf",        "fci",        "fcidump",      "mp2",         "gw",       "cd_2e",
+    "cc2",       "ducc",       "ccsd",       "ccsd_t",       "ccsd_lambda", "eom_ccsd", "gfccsd",
+    "rteom_cc2", "rteom_ccsd", "dlpno_ccsd", "dlpno_ccsd_t", "embedding"};
 
   for(size_t i = 0; i < tvec.size(); ++i) {
     if(tvec[i]) { chem_env.task_string = txt_utils::to_upper(valid_tasks[i]); }
@@ -149,6 +150,7 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
       Tensor<TensorType>::deallocate(chem_env.scf_context.C_beta_AO,
                                      chem_env.scf_context.F_beta_AO);
   }
+  else if(task.embedding) { embedding::embedding_driver(ec, chem_env); }
 #if defined(ENABLE_CC)
   else if(task.mp2) mp2::cd_mp2(ec, chem_env);
   else if(task.cd_2e) cholesky_2e::cholesky_2e_driver(ec, chem_env);

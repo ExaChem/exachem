@@ -84,6 +84,8 @@ public:
   Tensor<T> F_dummy;
   Tensor<T> VXC_alpha;
   Tensor<T> VXC_beta;
+  Tensor<T> Vembedding_alpha;
+  Tensor<T> Vembedding_beta;
 
   Tensor<T> C_alpha;
   Tensor<T> C_beta;

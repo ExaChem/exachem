@@ -235,7 +235,8 @@ void exachem::scf::SCFCompute<T>::compute_cpot_to_spot(const libint2::BasisSet& 
 template<typename T>
 std::tuple<int, double> exachem::scf::SCFCompute<T>::compute_NRE(const ExecutionContext& ec,
                                                                  const ChemEnv& chem_env) const {
-  const std::vector<libint2::Atom>& atoms = chem_env.atoms;
+  const std::vector<libint2::Atom>&                            atoms    = chem_env.atoms;
+  const std::vector<std::pair<double, std::array<double, 3>>>& pcharges = chem_env.pcharges;
 
   // count the number of electrons
   int nelectron = 0;
@@ -245,7 +246,9 @@ std::tuple<int, double> exachem::scf::SCFCompute<T>::compute_NRE(const Execution
   double enuc = 0.0;
   if(chem_env.ioptions.scf_options.do_hubbard) return std::make_tuple(nelectron, enuc);
 
-  auto coord_diff = [](const libint2::Atom& a, const libint2::Atom& b) {
+  double epchg      = 0.0;
+  double enpchg     = 0.0;
+  auto   coord_diff = [](const libint2::Atom& a, const libint2::Atom& b) {
     return std::make_tuple(a.x - b.x, a.y - b.y, a.z - b.z);
   };
   for(size_t i = 0; i < atoms.size(); i++) {
@@ -256,7 +259,29 @@ std::tuple<int, double> exachem::scf::SCFCompute<T>::compute_NRE(const Execution
     }
   }
 
-  return std::make_tuple(nelectron, enuc);
+  for(size_t i = 0; i < atoms.size(); i++)
+    for(size_t j = 0; j < pcharges.size(); j++) {
+      double dxij = atoms[i].x - pcharges[j].second[0];
+      double dyij = atoms[i].y - pcharges[j].second[1];
+      double dzij = atoms[i].z - pcharges[j].second[2];
+      double r    = std::hypot(dxij, dyij, dzij);
+      if(r > 1.0e-6) enpchg += atoms[i].atomic_number * pcharges[j].first / r;
+    }
+
+#if 0
+  for(size_t i = 0; i < pcharges.size(); i++)
+    for(size_t j = i + 1; j < pcharges.size(); j++) {
+      double dxij = pcharges[i].second[0] - pcharges[j].second[0];
+      double dyij = pcharges[i].second[1] - pcharges[j].second[1];
+      double dzij = pcharges[i].second[2] - pcharges[j].second[2];
+      double r = std::hypot(dxij, dyij, dzij);
+      if(r > 1.0e-6)
+        epchg += pcharges[i].first * pcharges[j].first / r;
+    }
+#endif
+  // std::cout << std::setprecision(16) << "Nuclear repulsion energy = " << enuc << std::endl
+  //          << "Bq nuclear interaction energy = " << enpchg << std::endl;
+  return std::make_tuple(nelectron, enuc + enpchg + epchg);
 }
 
 template<typename T>
@@ -359,8 +384,18 @@ void exachem::scf::SCFCompute<T>::compute_hamiltonian(ExecutionContext& ec, cons
 
   const bool is_hubbard = chem_env.sys_data.is_hubbard;
 
-  const std::vector<libint2::Atom>& atoms  = chem_env.atoms;
-  const libint2::BasisSet&          shells = chem_env.shells;
+  const std::vector<libint2::Atom>&                     atoms  = chem_env.atoms;
+  const libint2::BasisSet&                              shells = chem_env.shells;
+  std::vector<std::pair<double, std::array<double, 3>>> pcharges;
+
+  // Create Point Charge Vector
+  for(auto& atom: atoms) {
+    if(atom.atomic_number > 0) {
+      double charge = static_cast<double>(atom.atomic_number);
+      pcharges.push_back({charge, {atom.x, atom.y, atom.z}});
+    }
+  }
+  for(auto& icharge: chem_env.pcharges) { pcharges.push_back(icharge); }
 
   ttensors.H1 = {scf_data.tAO, scf_data.tAO};
   ttensors.S1 = {scf_data.tAO, scf_data.tAO};
@@ -473,7 +508,8 @@ void exachem::scf::SCFCompute<T>::compute_hamiltonian(ExecutionContext& ec, cons
   SCFGuess<T> scf_guess;
   scf_guess.compute_1body_ints(ec, scf_data, ttensors.S1, atoms, shells, Operator::overlap);
   scf_guess.compute_1body_ints(ec, scf_data, ttensors.T1, atoms, shells, Operator::kinetic);
-  scf_guess.compute_1body_ints(ec, scf_data, ttensors.V1, atoms, shells, Operator::nuclear);
+  // scf_guess.compute_1body_ints(ec, scf_data, ttensors.V1, atoms, shells, Operator::nuclear);
+  scf_guess.compute_pchg_ints(ec, scf_data, ttensors.V1, pcharges, shells, Operator::nuclear);
   auto hf_t2   = std::chrono::high_resolution_clock::now();
   auto hf_time = std::chrono::duration_cast<std::chrono::duration<double>>((hf_t2 - hf_t1)).count();
   if(rank == 0)

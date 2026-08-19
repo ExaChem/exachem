@@ -27,8 +27,9 @@ void ECOptionParser::parse_n_check(std::string_view filename, json& jinput) {
   bool parse_result = json::sax_parse(is, &jsax);
   if(!parse_result) tamm_terminate("Error parsing input file");
 
-  const std::vector<std::string> valid_sections{
-    "geometry", "basis", "common", "DPLOT", "SCF", "CD", "GW", "CC", "FCI", "TASK", "comments"};
+  const std::vector<std::string> valid_sections{"geometry",  "basis", "common",  "DPLOT", "SCF",
+                                                "CD",        "GW",    "CC",      "FCI",   "PDOS",
+                                                "EMBEDDING", "TASK",  "comments"};
   for(auto& el: jinput.items()) {
     if(std::find(valid_sections.begin(), valid_sections.end(), el.key()) == valid_sections.end())
       tamm_terminate("INPUT FILE ERROR: Invalid section [" + el.key() + "] in the input file");
@@ -64,6 +65,7 @@ void ECOptionParser::initialize(ChemEnv& chem_env) {
   chem_env.jinput = jinput;
 
   std::vector<string> geometry;
+  std::vector<string> pcharges;
   // std::vector<string> geom_bohr;
   parse_option<double>(exachem::constants::ang2bohr, jinput["geometry"], "ang2au");
   const double ang2bohr = exachem::constants::ang2bohr;
@@ -71,6 +73,7 @@ void ECOptionParser::initialize(ChemEnv& chem_env) {
 
   parse_option<string>(geom_units, jinput["geometry"], "units");
   parse_option<std::vector<string>>(geometry, jinput["geometry"], "coordinates", false);
+  parse_option<std::vector<string>>(pcharges, jinput["geometry"], "pcharges");
   size_t natom = geometry.size();
 
   chem_env.ec_atoms.resize(natom);
@@ -103,15 +106,29 @@ void ECOptionParser::initialize(ChemEnv& chem_env) {
     // geom_bohr[i]     = ss_bohr.str();
   }
   // jgeom_bohr["geometry_bohr"] = geom_bohr;
+  //
+
+  // Point charges
+  size_t npcharges = pcharges.size();
+  chem_env.pcharges.resize(npcharges);
+  for(size_t icharge = 0; icharge < npcharges; icharge++) {
+    std::istringstream iss(pcharges[icharge]);
+    double             charge, x, y, z;
+    iss >> x >> y >> z >> charge;
+    chem_env.pcharges[icharge] = {charge,
+                                  {x * convert_units, y * convert_units, z * convert_units}};
+  }
 }
 
 void ECOptionParser::parse_all_options(ChemEnv& chem_env) {
-  ParseCommonOptions parse_common_options(chem_env);
-  ParseSCFOptions    parse_scf_options(chem_env);
-  ParseCDOptions     parse_cd_options(chem_env);
-  ParseGWOptions     parse_gw_options(chem_env);
-  ParseCCSDOptions   parse_ccsd_options(chem_env);
-  ParseFCIOptions    parse_fci_options(chem_env);
-  ParseTaskOptions   parse_task_options(chem_env);
-  IniSystemData      ini_sys_data(chem_env);
+  ParseCommonOptions    parse_common_options(chem_env);
+  ParseSCFOptions       parse_scf_options(chem_env);
+  ParseCDOptions        parse_cd_options(chem_env);
+  ParseGWOptions        parse_gw_options(chem_env);
+  ParseCCSDOptions      parse_ccsd_options(chem_env);
+  ParseFCIOptions       parse_fci_options(chem_env);
+  ParsePDOSOptions      parse_pdos_options(chem_env);
+  ParseEmbeddingOptions parse_embedding_options(chem_env);
+  ParseTaskOptions      parse_task_options(chem_env);
+  IniSystemData         ini_sys_data(chem_env);
 }

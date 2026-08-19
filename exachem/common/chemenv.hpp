@@ -45,8 +45,11 @@ public:
   std::vector<Atom>   atoms;
   std::vector<ECAtom> ec_atoms;
   libint2::BasisSet   shells;
-  std::string         task_string;
-  double              task_energy{0.0};
+
+  std::vector<std::pair<double, std::array<double, 3>>> pcharges;
+
+  std::string task_string;
+  double      task_energy{0.0};
 
   std::string workspace_dir{};
 

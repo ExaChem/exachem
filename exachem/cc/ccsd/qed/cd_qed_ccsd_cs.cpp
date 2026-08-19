@@ -607,18 +607,18 @@ void qed_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     d_nuc_z += (atoms[i].z * atoms[i].atomic_number) / sys_data.nelectrons;
   }
 
-  double dipole_total_x = dipole_x_elec + d_nuc_x;
-  double dipole_total_y = dipole_y_elec + d_nuc_y;
-  double dipole_total_z = dipole_z_elec + d_nuc_z;
+  double dipole_total_x = dipole_x_elec / sys_data.nelectrons - d_nuc_x;
+  double dipole_total_y = dipole_y_elec / sys_data.nelectrons - d_nuc_y;
+  double dipole_total_z = dipole_z_elec / sys_data.nelectrons - d_nuc_z;
 
   if(rank == 0) {
     std::cout << "----------------------------" << std::endl;
     std::cout << "Electronic dipole expectation value using SCF density: " << std::endl;
-    std::cout << "dipole_x_elec: " << std::fixed << std::setprecision(8) << dipole_x_elec
+    std::cout << "dipole_x_elec: " << std::fixed << std::setprecision(8) << -dipole_x_elec
               << std::endl;
-    std::cout << "dipole_y_elec: " << std::fixed << std::setprecision(8) << dipole_y_elec
+    std::cout << "dipole_y_elec: " << std::fixed << std::setprecision(8) << -dipole_y_elec
               << std::endl;
-    std::cout << "dipole_z_elec: " << std::fixed << std::setprecision(8) << dipole_z_elec
+    std::cout << "dipole_z_elec: " << std::fixed << std::setprecision(8) << -dipole_z_elec
               << std::endl;
 
     std::cout << std::endl
@@ -629,26 +629,26 @@ void qed_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     std::cout << "d_nuc_y: " << d_nuc_y << std::endl;
     std::cout << "d_nuc_z: " << d_nuc_z << std::endl;
 
-    std::cout << std::endl << "<d_e+d_n/N> expectation values: " << std::endl;
+    std::cout << std::endl << "<d_e+d_n> expectation values: " << std::endl;
 
-    std::cout << "dipole_total_x: " << std::fixed << std::setprecision(8) << dipole_total_x
-              << std::endl;
-    std::cout << "dipole_total_y: " << std::fixed << std::setprecision(8) << dipole_total_y
-              << std::endl;
-    std::cout << "dipole_total_z: " << std::fixed << std::setprecision(8) << dipole_total_z
-              << std::endl;
+    std::cout << "dipole_total_x: " << std::fixed << std::setprecision(8)
+              << -dipole_total_x * sys_data.nelectrons << std::endl;
+    std::cout << "dipole_total_y: " << std::fixed << std::setprecision(8)
+              << -dipole_total_y * sys_data.nelectrons << std::endl;
+    std::cout << "dipole_total_z: " << std::fixed << std::setprecision(8)
+              << -dipole_total_z * sys_data.nelectrons << std::endl;
     std::cout << "----------------------------" << std::endl;
   }
 
   // clang-format off
     sch(QED_Dx_new(lam, si)      = QED_Dx(lam, si))  // D-<D>= d_e+dn/N-<de+d_n/N>
-            (QED_Dx_new(lam, si)  += d_nuc_x*S1(lam, si))
+            (QED_Dx_new(lam, si)  -= d_nuc_x*S1(lam, si))
             (QED_Dx_new(lam, si)  -= dipole_total_x*S1(lam, si))
             (QED_Dy_new(lam, si)   = QED_Dy(lam, si))
-            (QED_Dy_new(lam, si)  += d_nuc_y*S1(lam, si))
+            (QED_Dy_new(lam, si)  -= d_nuc_y*S1(lam, si))
             (QED_Dy_new(lam, si)  -= dipole_total_y*S1(lam, si))
             (QED_Dz_new(lam, si)   = QED_Dz(lam, si));
-    (QED_Dz_new(lam, si)  += d_nuc_z*S1(lam, si));
+    (QED_Dz_new(lam, si)  -= d_nuc_z*S1(lam, si));
     (QED_Dz_new(lam, si)  -= dipole_total_z*S1(lam, si));
   // clang-format on
   sch.execute();
@@ -732,17 +732,16 @@ void qed_driver(ExecutionContext& ec, ChemEnv& chem_env) {
               temp_y, temp_z, temp_ao_nuc_x, temp_ao_nuc_y, temp_ao_nuc_z)
     .execute();
 
+  double pol_dip_nuc = d_nuc_x * lambda_x + d_nuc_y * lambda_y + d_nuc_z * lambda_z;
+
   // clang-format off
     sch
-    (temp_x(mu, p) = QED_Dx(mu, nu) * lcao(nu, p)) (dipole_mo_x(p, q) = lcao(mu, p) * temp_x(mu, q))
-    (temp_y(mu, p) = QED_Dy(mu, nu) * lcao(nu, p)) (dipole_mo_y(p, q) = lcao(mu, p) * temp_y(mu, q))
-    (temp_z(mu, p) = QED_Dz(mu, nu) * lcao(nu, p)) (dipole_mo_z(p, q) = lcao(mu, p) * temp_z(mu, q))
-    (temp_ao_nuc_x(mu, nu) = d_nuc_x * S1(mu, nu)) (temp_x(mu, p) = temp_ao_nuc_x(mu, nu) * lcao(nu, p))
-    (temp_ao_nuc_y(mu, nu) = d_nuc_y * S1(mu, nu)) (temp_y(mu, p) = temp_ao_nuc_y(mu, nu) * lcao(nu, p))
-    (temp_ao_nuc_z(mu, nu) = d_nuc_z * S1(mu, nu)) (temp_z(mu, p) = temp_ao_nuc_z(mu, nu) * lcao(nu, p))
-    (d_nuc_x_mo(p, q) = lcao(mu, p) * temp_x(mu, q))
-    (d_nuc_y_mo(p, q) = lcao(mu, p) * temp_y(mu, q))
-    (d_nuc_z_mo(p, q) = lcao(mu, p) * temp_z(mu, q))
+    (QED_Dx_new(mu, nu) = lambda_x * QED_Dx(mu, nu))
+    (QED_Dx_new(mu, nu) += lambda_y * QED_Dy(mu, nu))
+    (QED_Dx_new(mu, nu) += lambda_z * QED_Dz(mu, nu))
+    (QED_Dx_new(mu, nu) -= pol_dip_nuc * S1(mu, nu))
+    (temp_x(mu, p) = QED_Dx_new(mu, nu) * lcao(nu, p))
+    (dipole_mo_x(p, q) = lcao(mu, p) * temp_x(mu, q))
     .execute(ec.exhw());
   // clang-format on
 
@@ -756,26 +755,14 @@ void qed_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   tamm::update_tensor_val(Zx, {num_chol - 3}, lambda_x);
   tamm::update_tensor_val(Zy, {num_chol - 2}, lambda_y);
-  tamm::update_tensor_val(Zz, {num_chol - 1}, lambda_z);
+  tamm::update_tensor_val(Zz, {num_chol - 1}, 1.0);
   sch.execute();
 
   TiledIndexLabel cind;
   std::tie(cind) = CI.labels<1>("all");
 
   // add dipole contributions to the end of the cholesky vectors
-  // clang-format off
-  sch              
-    ( cholVpr(p, q, cind)  +=  dipole_mo_x(p, q) * Zx(cind) )
-    ( cholVpr(p, q, cind)  -=   d_nuc_x_mo(p, q) * Zx(cind) )  
-
-    ( cholVpr(p, q, cind)  += dipole_mo_y(p, q) * Zy(cind) )
-    ( cholVpr(p, q, cind)  -=  d_nuc_y_mo(p, q) * Zy(cind) )  
-
-    ( cholVpr(p, q, cind)  += dipole_mo_z(p, q) * Zz(cind) )
-    ( cholVpr(p, q, cind)  -=  d_nuc_z_mo(p, q) * Zz(cind) )
-  ;
-  // clang-format on
-  sch.execute();
+  sch(cholVpr(p, q, cind) += dipole_mo_x(p, q) * Zz(cind)).execute();
 
   free_tensors(QED_Dx, QED_Dy, QED_Dz, QED_Dx_new, QED_Dy_new, QED_Dz_new, dip_ints, array1,
                dipole_x_exp, dipole_y_exp, dipole_z_exp);

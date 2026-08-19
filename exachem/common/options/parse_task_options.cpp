@@ -19,7 +19,7 @@ void ParseTaskOptions::parse_check(json& jinput) {
     "gw",        "cd_2e",       "cc2",        "ducc",         "ccsd",
     "ccsd_t",    "ccsd_lambda", "eom_ccsd",   "gfccsd",       "ccsd_canonical",
     "rteom_cc2", "rteom_ccsd",  "dlpno_ccsd", "dlpno_ccsd_t", "comments",
-    "operation"};
+    "operation", "embedding"};
 
   for(auto& el: jinput["TASK"].items()) {
     if(std::find(valid_tasks.begin(), valid_tasks.end(), el.key()) == valid_tasks.end())
@@ -50,6 +50,7 @@ void ParseTaskOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(task_options.rteom_cc2, jtask, "rteom_cc2");
   parse_option<bool>(task_options.rteom_ccsd, jtask, "rteom_ccsd");
   parse_option<bool>(task_options.gfccsd, jtask, "gfccsd");
+  parse_option<bool>(task_options.embedding, jtask, "embedding");
 
   parse_option<std::pair<bool, std::string>>(task_options.dlpno_ccsd, jtask, "dlpno_ccsd");
   parse_option<std::pair<bool, std::string>>(task_options.dlpno_ccsd_t, jtask, "dlpno_ccsd_t");

@@ -191,10 +191,12 @@ void exachem::scf::SCFEngine::setup_libecpint(
         const std::array<double, 3> O = {chem_env.atoms[i].x, chem_env.atoms[i].y,
                                          chem_env.atoms[i].z};
         libecpint::ECP              newecp(O.data());
-        for(size_t iprim = 0; iprim < chem_env.ec_atoms[i].ecp_coeffs.size(); iprim++) {
-          newecp.addPrimitive(
-            chem_env.ec_atoms[i].ecp_ns[iprim], chem_env.ec_atoms[i].ecp_ams[iprim],
-            chem_env.ec_atoms[i].ecp_exps[iprim], chem_env.ec_atoms[i].ecp_coeffs[iprim], true);
+        size_t                      nprim = chem_env.ec_atoms[i].ecp_coeffs.size();
+        for(size_t iprim = 0; iprim < nprim; iprim++) {
+          newecp.addPrimitive(chem_env.ec_atoms[i].ecp_ns[iprim],
+                              chem_env.ec_atoms[i].ecp_ams[iprim],
+                              chem_env.ec_atoms[i].ecp_exps[iprim],
+                              chem_env.ec_atoms[i].ecp_coeffs[iprim], iprim == nprim - 1);
         }
         ecps.push_back(newecp);
       }
@@ -343,6 +345,15 @@ void exachem::scf::SCFEngine::declare_main_tensors(ExecutionContext& ec, const C
     if(!scf_data.direct_df) Tensor<TensorType>::allocate(&ec, scf_data.ttensors.xyK);
   }
 
+  if(chem_env.ioptions.scf_options.read_vembedding) {
+    scf_data.ttensors.Vembedding_alpha = {tAO, tAO};
+    Tensor<TensorType>::allocate(&ec, scf_data.ttensors.Vembedding_alpha);
+    if(chem_env.sys_data.is_unrestricted) {
+      scf_data.ttensors.Vembedding_beta = {tAO, tAO};
+      Tensor<TensorType>::allocate(&ec, scf_data.ttensors.Vembedding_beta);
+    }
+  }
+
   // Setup tiled index spaces when a fitting basis is provided
   //  dfCocc;
   IndexSpace dfCocc            = {range(0, chem_env.sys_data.nelectrons_alpha)};
@@ -381,6 +392,12 @@ void exachem::scf::SCFEngine::deallocate_main_tensors(ExecutionContext& ec,
       scf_data.ttensors.QED_1body, scf_data.ttensors.QED_2body);
     if(chem_env.sys_data.is_unrestricted)
       Tensor<TensorType>::deallocate(scf_data.ttensors.QED_2body_beta);
+  }
+
+  if(chem_env.ioptions.scf_options.read_vembedding) {
+    Tensor<TensorType>::deallocate(scf_data.ttensors.Vembedding_alpha);
+    if(chem_env.sys_data.is_unrestricted)
+      Tensor<TensorType>::deallocate(scf_data.ttensors.Vembedding_beta);
   }
 
   Tensor<TensorType>::deallocate(
@@ -678,7 +695,12 @@ bool exachem::scf::SCFEngine::check_convergence(ExecutionContext& exc, const Che
 void exachem::scf::SCFEngine::compute_fock_matrix(ExecutionContext& ec, const ChemEnv& chem_env,
                                                   bool is_uhf, const bool do_schwarz_screen,
                                                   Matrix& SchwarzK, const size_t& max_nprim4,
-                                                  std::vector<size_t>& shell2bf, bool& is_3c_init) {
+                                                  std::vector<size_t>& shell2bf, bool& is_3c_init
+#if defined(USE_GAUXC)
+                                                  ,
+                                                  GauXC::XCIntegrator<Matrix>& gauxc_integrator
+#endif
+) {
   Scheduler sch{ec};
   if(chem_env.sys_data.is_ks) { // or rohf
     sch(scf_data.ttensors.F_alpha_tmp() = 0).execute();
@@ -686,7 +708,9 @@ void exachem::scf::SCFEngine::compute_fock_matrix(ExecutionContext& ec, const Ch
 
     auto xHF_adjust = xHF;
     // TODO: skip for non-CC methods
-    if(!chem_env.ioptions.task_options.scf) xHF_adjust = 1.0;
+    if(!chem_env.ioptions.task_options.scf && !chem_env.ioptions.task_options.embedding)
+      xHF_adjust = 1.0;
+
     // build a new Fock matrix
     if(chem_env.sys_data.is_hubbard) {
       scf_iter.compute_2bf_hubbard(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen,
@@ -697,6 +721,39 @@ void exachem::scf::SCFEngine::compute_fock_matrix(ExecutionContext& ec, const Ch
       scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
                            SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors, is_3c_init,
                            scf_data.do_dens_fit, xHF_adjust);
+    }
+
+    if(chem_env.ioptions.scf_options.read_vembedding) {
+      sch(scf_data.ttensors.F_alpha() += scf_data.ttensors.Vembedding_alpha());
+      if(chem_env.sys_data.is_unrestricted)
+        sch(scf_data.ttensors.F_beta() += scf_data.ttensors.Vembedding_beta());
+      sch.execute();
+    }
+    else if(chem_env.ioptions.task_options.embedding) {
+#if defined(USE_GAUXC)
+      const bool do_snK = chem_env.sys_data.do_snK;
+      if(do_snK)
+        scf_gauxc.compute_exx(ec, chem_env, scf_data, scf_data.ttensors, scf_data.etensors,
+                              gauxc_integrator);
+
+      const bool is_ks = chem_env.sys_data.is_ks;
+      if(is_ks) {
+        gauxc_exc    = scf_gauxc.compute_xcf(ec, chem_env, scf_data.ttensors, scf_data.etensors,
+                                             gauxc_integrator);
+        scf_data.exc = gauxc_exc;
+
+        sch(scf_data.ttensors.F_alpha() += scf_data.ttensors.VXC_alpha());
+        if(is_uhf) {
+          // clang-format off
+          sch
+            (scf_data.ttensors.F_alpha() += scf_data.ttensors.VXC_beta())
+            (scf_data.ttensors.F_beta() += scf_data.ttensors.VXC_alpha())
+            (scf_data.ttensors.F_beta() -= scf_data.ttensors.VXC_beta());
+          // clang-format on
+        }
+        sch.execute();
+      }
+#endif
     }
 
     // Add QED contribution;
@@ -955,8 +1012,12 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     if(chem_env.sys_data.has_ecp) {
       Tensor<TensorType> ECP{tAO, tAO};
       Tensor<TensorType>::allocate(&ec, ECP);
+      sch(ECP() = 0.0).execute();
       scf_guess.compute_ecp_ints(ec, scf_data, ECP, libecp_shells, ecps);
-      sch(scf_data.ttensors.H1() += ECP()).deallocate(ECP).execute();
+      sch(scf_data.ttensors.H1(scf_data.mu, scf_data.nu) += 0.5 * ECP(scf_data.mu, scf_data.nu))(
+        scf_data.ttensors.H1(scf_data.mu, scf_data.nu) += 0.5 * ECP(scf_data.nu, scf_data.mu))
+        .deallocate(ECP)
+        .execute();
     }
 
     /*** =========================== ***/
@@ -982,6 +1043,12 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     hf_t1 = std::chrono::high_resolution_clock::now();
 
     declare_main_tensors(ec, chem_env);
+
+    if(chem_env.ioptions.scf_options.read_vembedding) {
+      scf_output.rw_mat_disk(scf_data.ttensors.Vembedding_alpha, ".vembedding_alpha", false, true);
+      if(chem_env.sys_data.is_unrestricted)
+        scf_output.rw_mat_disk(scf_data.ttensors.Vembedding_beta, ".vembedding_beta", false, true);
+    }
 
     if(scf_data.do_dens_fit) {
       std::tie(scf_data.d_mu, scf_data.d_nu, scf_data.d_ku)    = scf_data.tdfAO.labels<3>("all");
@@ -1202,6 +1269,20 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
         // clang-format on
       }
 
+      if(chem_env.ioptions.scf_options.read_vembedding) {
+        // clang-format off
+        sch
+          (scf_data.ttensors.F_alpha() += scf_data.ttensors.Vembedding_alpha())
+          (scf_data.ttensors.ehf_tamm() += scf_data.ttensors.Vembedding_alpha() * scf_data.ttensors.D_alpha());
+        if(chem_env.sys_data.is_unrestricted) {
+          sch
+            (scf_data.ttensors.F_beta() += scf_data.ttensors.Vembedding_beta())
+            (scf_data.ttensors.ehf_tamm() += scf_data.ttensors.Vembedding_beta() * scf_data.ttensors.D_beta());
+        }
+        sch.execute();
+        // clang-format on
+      }
+
       scf_state.ehf = get_scalar(scf_data.ttensors.ehf_tamm);
 
 #if defined(USE_GAUXC)
@@ -1218,6 +1299,8 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
 
     const bool is_uhf                 = chem_env.sys_data.is_unrestricted;
     bool       scf_main_loop_continue = true;
+
+    // if(chem_env.ioptions.scf_options.maxiter == 0) chem_env.ioptions.scf_options.noscf = true;
 
     do {
       if(chem_env.ioptions.scf_options.noscf) break;
@@ -1309,7 +1392,12 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     if(chem_env.ioptions.dplot_options.cube) write_dplot_data(ec, chem_env);
 
     compute_fock_matrix(ec, chem_env, is_uhf, do_schwarz_screen, SchwarzK, max_nprim4, shell2bf,
-                        scf_state.is_3c_init);
+                        scf_state.is_3c_init
+#if defined(USE_GAUXC)
+                        ,
+                        gauxc_integrator
+#endif
+    );
 
     sch(Fa_global(scf_data.mu, scf_data.nu) = scf_data.ttensors.F_alpha(scf_data.mu, scf_data.nu));
     if(chem_env.sys_data.is_unrestricted)
@@ -1330,6 +1418,36 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     std::vector<double> multipoles =
       scf_compute.compute_multipoles(ec, chem_env, scf_data, scf_data.ttensors, scf_data.etensors);
     if(rank == 0) { scf_output.print_multipoles(chem_env, multipoles); }
+
+    if(chem_env.ioptions.pdos_options.do_pdos) {
+#if defined(USE_SCALAPACK)
+      if(scalapack_info.pg.is_valid()) {
+        tamm::from_block_cyclic_tensor(scf_data.ttensors.C_alpha_BC, scf_data.ttensors.C_alpha);
+        if(chem_env.sys_data.is_unrestricted)
+          tamm::from_block_cyclic_tensor(scf_data.ttensors.C_beta_BC, scf_data.ttensors.C_beta);
+      }
+      if(rank == 0) {
+        scf_data.etensors.C_alpha.resize(chem_env.sys_data.nbf_orig, chem_env.sys_data.nbf);
+        tamm_to_eigen_tensor(scf_data.ttensors.C_alpha, scf_data.etensors.C_alpha);
+        if(chem_env.sys_data.is_unrestricted) {
+          scf_data.etensors.C_beta.resize(chem_env.sys_data.nbf_orig, chem_env.sys_data.nbf);
+          tamm_to_eigen_tensor(scf_data.ttensors.C_beta, scf_data.etensors.C_beta);
+        }
+      }
+#endif
+      if(rank == 0) {
+        Matrix S = tamm_to_eigen_matrix(scf_data.ttensors.S1);
+        ECPDOS ec_pdos;
+        if(chem_env.sys_data.is_restricted) {
+          ec_pdos.write_pdos(chem_env, S, scf_data.etensors.C_alpha, scf_data.etensors.eps_a,
+                             files_prefix);
+        }
+        else {
+          ec_pdos.write_pdos(chem_env, S, scf_data.etensors.C_alpha, scf_data.etensors.eps_a,
+                             scf_data.etensors.C_beta, scf_data.etensors.eps_b, files_prefix);
+        }
+      }
+    }
 
     if(chem_env.sys_data.gradient_type == GradientType::Analytical) {
       SCFGradients scf_gradients;

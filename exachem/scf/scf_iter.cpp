@@ -46,14 +46,21 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
   Tensor<T>& D_beta_tamm      = ttensors.D_beta;
   Tensor<T>& D_last_beta_tamm = ttensors.D_last_beta;
 
+  Tensor<T>& X_alpha = ttensors.X_alpha;
+
+  Tensor<T>& Vembedding_alpha = ttensors.Vembedding_alpha;
+  Tensor<T>& Vembedding_beta  = ttensors.Vembedding_beta;
+
   Scheduler sch{ec};
 
-  const int64_t          N   = sys_data.nbf_orig;
-  const TiledIndexSpace& tAO = scf_data.tAO;
+  const int64_t          N         = sys_data.nbf_orig;
+  const TiledIndexSpace& tAO       = scf_data.tAO;
+  const TiledIndexSpace& tAO_ortho = scf_data.tAO_ortho;
 
   const auto rank         = ec.pg().rank();
   const auto debug        = scf_options.debug;
   const auto [mu, nu, ku] = tAO.labels<3>("all");
+  const auto [mu_o, nu_o] = tAO_ortho.labels<2>("all");
   const int max_hist      = scf_options.diis_hist;
 
   double ehf = 0.0;
@@ -95,6 +102,12 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
     // clang-format on
   }
 
+  // Embedding Potential Contribution
+  if(chem_env.ioptions.scf_options.read_vembedding) {
+    sch(ehf_tamm() += D_last_alpha_tamm() * Vembedding_alpha()).execute();
+    if(is_uhf) sch(ehf_tamm() += D_last_beta_tamm() * Vembedding_beta()).execute();
+  }
+
   ehf = get_scalar(ehf_tamm);
 
 #if defined(USE_GAUXC)
@@ -132,17 +145,40 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
 
   if(is_cuscf) scf_cuscf(ec, chem_env, scf_data, scalapack_info);
 
-  Tensor<T> err_mat_alpha_tamm{tAO, tAO};
-  Tensor<T> err_mat_beta_tamm{tAO, tAO};
+  // Embedding Potential Contribution
+  if(chem_env.ioptions.scf_options.read_vembedding) {
+    sch(F_alpha() += Vembedding_alpha());
+    if(is_uhf) sch(F_beta() += Vembedding_beta());
+    sch.execute();
+  }
+
+  Tensor<T> err_mat_alpha_tamm{tAO_ortho, tAO_ortho};
+  Tensor<T> err_mat_beta_tamm{tAO_ortho, tAO_ortho};
   Tensor<T>::allocate(&ec, err_mat_alpha_tamm);
   if(is_uhf) Tensor<T>::allocate(&ec, err_mat_beta_tamm);
 
+  Tensor<T> X_tmp{tAO, tAO_ortho};
+  Tensor<T> FDS_ortho_tmp{tAO, tAO_ortho};
+  Tensor<T> FDS_ortho{tAO_ortho, tAO_ortho};
+#ifdef USE_SCALAPACK
+  Tensor<T>::allocate(&ec, X_tmp);
+  if(scalapack_info.pg.is_valid()) {
+    Tensor<T> X_dense = from_block_cyclic_tensor(X_alpha);
+    tamm::from_dense_tensor(X_dense, X_tmp);
+    Tensor<T>::deallocate(X_dense);
+  }
+#else
+  X_tmp = X_alpha;
+#endif
+
   // clang-format off
-  sch
-    (FD_alpha_tamm(mu,nu)       = F_alpha(mu,ku)      * D_last_alpha_tamm(ku,nu))
-    (FDS_alpha_tamm(mu,nu)      = FD_alpha_tamm(mu,ku) * S1(ku,nu))
-    (err_mat_alpha_tamm(mu,nu)  = FDS_alpha_tamm(mu,nu))
-    (err_mat_alpha_tamm(mu,nu) -= FDS_alpha_tamm(nu,mu))
+  sch.allocate(FDS_ortho, FDS_ortho_tmp)
+    (FD_alpha_tamm(mu,nu)  = F_alpha(mu,ku)       * D_last_alpha_tamm(ku,nu))
+    (FDS_alpha_tamm(mu,nu) = FD_alpha_tamm(mu,ku) * S1(ku,nu))
+    (FDS_ortho_tmp(mu, mu_o) = FDS_alpha_tamm(mu, nu) * X_tmp(nu, mu_o))
+    (FDS_ortho(mu_o, nu_o)   = X_tmp(mu, mu_o)        * FDS_ortho_tmp(mu, nu_o))
+    (err_mat_alpha_tamm(mu_o,nu_o)  = FDS_ortho(mu_o, nu_o))
+    (err_mat_alpha_tamm(mu_o,nu_o) -= FDS_ortho(nu_o, mu_o))
     .execute();
   // clang-format on
 
@@ -151,11 +187,18 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
     sch
       (FD_beta_tamm(mu,nu)        = F_beta(mu,ku)       * D_last_beta_tamm(ku,nu))
       (FDS_beta_tamm(mu,nu)       = FD_beta_tamm(mu,ku)  * S1(ku,nu))
-      (err_mat_beta_tamm(mu,nu)   = FDS_beta_tamm(mu,nu))
-      (err_mat_beta_tamm(mu,nu)  -= FDS_beta_tamm(nu,mu))
+      (FDS_ortho_tmp(mu, mu_o)        = FDS_beta_tamm(mu, nu) * X_tmp(nu, mu_o))
+      (FDS_ortho(mu_o, nu_o)          = X_tmp(mu, mu_o)       * FDS_ortho_tmp(mu, nu_o))
+      (err_mat_beta_tamm(mu_o,nu_o)   = FDS_ortho(mu_o,nu_o))
+      (err_mat_beta_tamm(mu_o,nu_o)  -= FDS_ortho(nu_o,mu_o))
       .execute();
     // clang-format on
   }
+
+  Tensor<T>::deallocate(FDS_ortho_tmp, FDS_ortho);
+#ifdef USE_SCALAPACK
+  Tensor<T>::deallocate(X_tmp);
+#endif
 
   if(iter >= 1) {
     auto do_t1 = std::chrono::high_resolution_clock::now();
@@ -1704,20 +1747,6 @@ void exachem::scf::SCFIter<T>::scf_diis(
       fock_hist_beta.erase(fock_hist_beta.begin() + maxe);
     }
   }
-  else {
-    if(ndiis == static_cast<int>(max_hist / 2) && n_lindep > 1) {
-      for(auto x: diis_hist_alpha) Tensor<T>::deallocate(x);
-      for(auto x: fock_hist_alpha) Tensor<T>::deallocate(x);
-      diis_hist_alpha.clear();
-      fock_hist_alpha.clear();
-      if(is_uhf) {
-        for(auto x: diis_hist_beta) Tensor<T>::deallocate(x);
-        for(auto x: fock_hist_beta) Tensor<T>::deallocate(x);
-        diis_hist_beta.clear();
-        fock_hist_beta.clear();
-      }
-    }
-  }
 
   Tensor<T> Fcopy{tAO, tAO};
   Tensor<T> Fcopy_beta{tAO, tAO};
@@ -1743,7 +1772,8 @@ void exachem::scf::SCFIter<T>::scf_diis(
 
   // Tensor<T> dhi_trans{tAO, tAO};
   Tensor<T> dhi_trace{};
-  auto [mu, nu] = tAO.labels<2>("all");
+  auto [mu, nu]     = tAO.labels<2>("all");
+  auto [mu_o, nu_o] = scf_data.tAO_ortho.labels<2>("all");
   Tensor<T>::allocate(&ec, dhi_trace); // dhi_trans
 
   // ----- Construct Pulay matrix -----
@@ -1752,7 +1782,7 @@ void exachem::scf::SCFIter<T>::scf_diis(
   for(int i = 0; i < idim; i++) {
     for(int j = i; j < idim; j++) {
       // A(i, j) = (diis_hist[i].transpose() * diis_hist[j]).trace();
-      sch(dhi_trace() = diis_hist_alpha[i](nu, mu) * diis_hist_alpha[j](nu, mu)).execute();
+      sch(dhi_trace() = diis_hist_alpha[i](nu_o, mu_o) * diis_hist_alpha[j](nu_o, mu_o)).execute();
       T dhi           = get_scalar(dhi_trace); // dhi_trace.trace();
       A(i + 1, j + 1) = dhi;
     }
@@ -1762,7 +1792,7 @@ void exachem::scf::SCFIter<T>::scf_diis(
     for(int i = 0; i < idim; i++) {
       for(int j = i; j < idim; j++) {
         // A(i, j) = (diis_hist[i].transpose() * diis_hist[j]).trace();
-        sch(dhi_trace() = diis_hist_beta[i](nu, mu) * diis_hist_beta[j](nu, mu)).execute();
+        sch(dhi_trace() = diis_hist_beta[i](nu_o, mu_o) * diis_hist_beta[j](nu_o, mu_o)).execute();
         T dhi = get_scalar(dhi_trace); // dhi_trace.trace();
         A(i + 1, j + 1) += dhi;
       }

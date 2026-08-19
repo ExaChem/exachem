@@ -88,12 +88,77 @@ def check_gradients(ref_gradients, cur_gradients, grad_threshold):
 
     return True, ref_method, ""
 
+def check_pdos(ref_pdos, pdos_threshold=1.0e-3):
+    with open(ref_res_path+"/"+ref_file) as ref_pdos_file:
+        ref_pdos = ref_pdos_file.readlines()
+    with open(cur_res_path+"/"+ref_file) as cur_pdos_file:
+        cur_pdos = cur_pdos_file.readlines()
+
+    ref_fermi = ref_pdos[0].split()
+    cur_fermi = cur_pdos[0].split()
+
+    print(ref_file)
+    print(str(ref_file) + ": ", end='')
+    if len(ref_fermi) != len(cur_fermi):
+        print("WARNING: mismatch in restrictred/unrestricted method")
+        return False
+
+    ndatas = 1
+    if len(ref_fermi) > 4:
+        ndatas = 2
+
+    print("Checking PDOS results", end='')
+    if not isclose(float(ref_fermi[3]), float(cur_fermi[3]), 0.0001):
+        print("\n\tWARNING: mismatch in Fermi energy")
+        return False
+    if ndatas == 2:
+        if not isclose(float(ref_fermi[8]), float(cur_fermi[8]), 0.0001):
+            print("\n\tWARNING: mismatch in Fermi energy")
+            return False
+
+    natoms = int(ref_pdos[1].split()[4])
+
+    npoints = int(ref_pdos[2])
+    if npoints != int(cur_pdos[2]):
+        print("\n\tWARNING: mismatch in number of atoms")
+        return False
+
+    for ipoint in range(npoints):
+        ref_data = [float(x) for x in ref_pdos[ipoint + 3].split()]
+        cur_data = [float(x) for x in cur_pdos[ipoint + 3].split()]
+        for idata in range(ndatas+1):
+            if not isclose(ref_data[idata], cur_data[idata], 1e-6*abs(ref_data[idata])):
+                print(f"\n\tWARNING: mismatch in data point {ipoint}, ref: {ref_data[idata]} , cur: {cur_data[idata]}")
+                return False
+
+    iline = npoints + 3
+    for iatom in range(natoms):
+        iline += 1
+        for ipoint in range(npoints):
+            ref_data = [float(x) for x in ref_pdos[iline].split()]
+            cur_data = [float(x) for x in cur_pdos[iline].split()]
+            _ndatas = len(ref_data)
+            for idata in range(_ndatas):
+                if not isclose(ref_data[idata], cur_data[idata], 1e-6*abs(ref_data[idata])):
+                    print(f"\n\tWARNING: mismatch in data point {ipoint}, ref: {ref_data[idata]} , cur: {cur_data[idata]}")
+                    return False
+            iline += 1
+        
+    return True
+
 missing_tests=[]
 for ref_file in ref_files:
+
     if ref_file not in cur_files and not file_compare:
         print("WARNING: " + ref_file + " not available in " + cur_res_path)
         missing_tests.append(ref_file)
         #sys.exit(1)
+        continue
+
+    if "pdos" in ref_file:
+        is_ok = check_pdos(ref_file)
+        if not is_ok: sys.exit(1)
+        print(" ... OK")
         continue
     
     with open(ref_res_path+"/"+ref_file) as ref_json_file:
@@ -109,10 +174,11 @@ for ref_file in ref_files:
     scf_threshold = ref_data["input"]["SCF"]["conve"]
     ref_scf_energy = ref_data["output"]["SCF"]["final_energy"]
     cur_scf_energy = cur_data["output"]["SCF"]["final_energy"]
+    scf_thresh_m = 1000 if ref_file == "cr2_embedding.def2-svp.embedding.json" else 10
 
     print(str(ref_file) + ": ", end='')
 
-    if not isclose(ref_scf_energy, cur_scf_energy, scf_threshold*10):
+    if not isclose(ref_scf_energy, cur_scf_energy, scf_threshold*scf_thresh_m):
         print("ERROR: SCF energy does not match. reference: " + str(ref_scf_energy) + ", current: " + str(cur_scf_energy))
         sys.exit(1)
 

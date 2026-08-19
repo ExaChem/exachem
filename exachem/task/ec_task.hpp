@@ -30,6 +30,7 @@
 #include "exachem/common/chemenv.hpp"
 #include "exachem/common/options/parse_options.hpp"
 #include "exachem/scf/scf_main.hpp"
+#include "exachem/embedding/embedding_driver.hpp"
 #include "exachem/mp2/cd_mp2.hpp"
 #include "exachem/gradients/ec_gradients.hpp"
 

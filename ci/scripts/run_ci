@@ -77,6 +77,20 @@ $MPIEXEC $EXE_PATH $CHEM_INP/no.json
 $MPIEXEC $EXE_PATH $CHEM_INP/hub_1d_6s.json
 $MPIEXEC $EXE_PATH $CHEM_INP/hub_2d_16s.json
 
+#Point charges
+$MPIEXEC $EXE_PATH $CHEM_INP/h2o_pcharges.json
+
+#Gradient
+$MPIEXEC $EXE_PATH $CHEM_INP/cr2_gradient.json
+
+#PDOS
+$MPIEXEC $EXE_PATH $CHEM_INP/cr2_pdos.json
+
+#EMBEDDING
+$MPIEXEC $EXE_PATH $CHEM_INP/cr2_embedding.json
+
 cp *_files/restricted/json/*.json .
 cp *_files/unrestricted/json/*.json .
+cp *_files/unrestricted/scf/*.pdos .
+
 python3 $CHEM_SRC/ci/scripts/compare_results.py $CHEM_SRC/ci/reference_output/ . $UPCXX

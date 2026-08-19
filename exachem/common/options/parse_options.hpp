@@ -15,6 +15,8 @@
 #include "exachem/common/options/parse_fci_options.hpp"
 #include "exachem/common/options/parse_gw_options.hpp"
 #include "exachem/common/options/parse_scf_options.hpp"
+#include "exachem/common/options/parse_pdos_options.hpp"
+#include "exachem/common/options/parse_embedding_options.hpp"
 #include "exachem/common/options/parse_task_options.hpp"
 #include "exachem/common/initialize_system_data.hpp"
 // clang-format on

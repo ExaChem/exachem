@@ -34,12 +34,10 @@
   },
   "CC": {
     "threshold": 1e-06,
-    "writet": true
+    "writet": false
   },
   "TASK": {
     "scf": true,
-    "mp2": false,
-    "cd_2e": false,
     "ccsd": false,
     "ccsd_t": false,
     "operation": ["gradient"]

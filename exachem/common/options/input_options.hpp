@@ -91,6 +91,32 @@ public:
   int         orbitals{0};      // highest occupied orbitals
 };
 
+class EmbeddingOptions: public CommonOptions {
+public:
+  std::vector<std::string> high_level{"ccsd"};
+  std::vector<int>         active_atoms{};
+  std::vector<int>         nactive_orbitals{};
+  std::string              partition{"spade"};
+  std::string              projector{"huzinaga"};
+  bool                     freeze_projected{true};
+  bool                     iterative_vembedding{false};
+  bool                     use_ksref{false};
+  double                   lambda{1.0};
+  double                   pao_thresh1{0.05};
+  double                   pao_thresh2{0.0001};
+};
+
+class PDOSOptions: public CommonOptions {
+public:
+  double      emax{0.0};
+  double      emin{0.0};
+  double      fwhm{0.0055};
+  size_t      npoints{500};
+  bool        do_pdos{false};
+  bool        do_mod{false};
+  std::string distribution{"gaussian"};
+};
+
 class SCFOptions: public CommonOptions {
 public:
   int      charge{0};
@@ -109,7 +135,9 @@ public:
   bool     sad{true};
   bool     direct_df{false};
   bool     snK{false};
-  bool     cuscf{false};   // Constrained Unrestricted SCF (type of restricted open-shell)
+  bool     cuscf{false}; // Constrained Unrestricted SCF (type of restricted open-shell)
+  bool     read_vembedding{false};
+  bool     iterative_vembedding{false};
   int  restart_size{2000}; // read/write orthogonalizer, schwarz, etc matrices when N>=restart_size
   int  scalapack_nb{256};
   int  nnodes{1};
@@ -331,6 +359,7 @@ public:
   bool                         rteom_cc2{false};
   bool                         rteom_ccsd{false};
   bool                         gfccsd{false};
+  bool                         embedding{false};
   std::pair<bool, std::string> ducc{false, "default"};
 
   std::pair<bool, std::string> dlpno_ccsd{false, ""};
@@ -343,12 +372,14 @@ class ECOptions {
 public:
   ECOptions() = default;
 
-  CommonOptions common_options;
-  DPlotOptions  dplot_options;
-  SCFOptions    scf_options;
-  CDOptions     cd_options;
-  GWOptions     gw_options;
-  CCSDOptions   ccsd_options;
-  FCIOptions    fci_options;
-  TaskOptions   task_options;
+  CommonOptions    common_options;
+  DPlotOptions     dplot_options;
+  SCFOptions       scf_options;
+  CDOptions        cd_options;
+  GWOptions        gw_options;
+  CCSDOptions      ccsd_options;
+  FCIOptions       fci_options;
+  PDOSOptions      pdos_options;
+  EmbeddingOptions embedding_options;
+  TaskOptions      task_options;
 };

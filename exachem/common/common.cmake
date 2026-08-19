@@ -14,6 +14,7 @@ set(COMMON_INCLUDES
     ${COMMON_SRCDIR}/ec_dplot.hpp
     ${COMMON_SRCDIR}/ec_molden.hpp
     ${COMMON_SRCDIR}/ec_nwmovecs.hpp 
+    ${COMMON_SRCDIR}/ec_pdos.hpp
     ${COMMON_SRCDIR}/constants.hpp
     ${COMMON_SRCDIR}/libint2_includes.hpp
     ${COMMON_SRCDIR}/context/is_context.hpp
@@ -29,6 +30,8 @@ set(COMMON_INCLUDES
     ${COMMON_SRCDIR}/options/parse_fci_options.hpp 
     ${COMMON_SRCDIR}/options/parse_gw_options.hpp                
     ${COMMON_SRCDIR}/options/parse_task_options.hpp  
+    ${COMMON_SRCDIR}/options/parse_pdos_options.hpp
+    ${COMMON_SRCDIR}/options/parse_embedding_options.hpp
     ${COMMON_SRCDIR}/options/input_options.hpp
     ${COMMON_SRCDIR}/options/parser_utils.hpp    
     ${COMMON_SRCDIR}/initialize_system_data.hpp
@@ -50,9 +53,12 @@ set(COMMON_SRCS
     ${COMMON_SRCDIR}/options/parse_fci_options.cpp 
     ${COMMON_SRCDIR}/options/parse_gw_options.cpp                
     ${COMMON_SRCDIR}/options/parse_task_options.cpp  
+    ${COMMON_SRCDIR}/options/parse_pdos_options.cpp
+    ${COMMON_SRCDIR}/options/parse_embedding_options.cpp
     ${COMMON_SRCDIR}/options/input_options.cpp
     ${COMMON_SRCDIR}/initialize_system_data.cpp
     ${COMMON_SRCDIR}/ec_molden.cpp
-    ${COMMON_SRCDIR}/ec_nwmovecs.cpp                   
+    ${COMMON_SRCDIR}/ec_nwmovecs.cpp
+    ${COMMON_SRCDIR}/ec_pdos.cpp
     )
 

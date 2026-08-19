@@ -1,0 +1,42 @@
+{
+  "geometry": {
+    "coordinates": [
+      "Cr1   0.00000000     0.00000000    0.00000000",
+      "Cr2   0.00000000     0.00000000    1.68000000"
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "def2-svp"
+  },
+  "common": {
+    "maxiter": 100
+  },
+  "SCF": {
+    "tol_lindep": 1e-06,
+    "scf_type": "restricted",
+    "conve": 1e-09,
+    "convd": 1e-07,
+    "diis_hist": 10,
+    "DFT": {
+      "xc_type": ["PBE"]
+    }
+  },
+  "CD": {
+    "diagtol": 1e-05
+  },
+  "EMBEDDING": {
+    "active_atoms": [0],
+    "use_ksref": true,
+    "lambda": 1.0e6,
+    "high_level": ["CCSD(T)"],
+    "nactive_mos": [9]
+  },
+  "CC": {
+    "threshold": 1e-06,
+    "writet": false
+  },
+  "TASK": {
+    "embedding": true
+  }  
+}

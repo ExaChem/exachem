@@ -28,6 +28,8 @@ A geometry can be specified as follows:
 
 :coordinates: The element *symbol* followed by the *x y z* coordinates. Additional characters can be added to the element symbol to distinguish between atoms of the same element. For example, the atom labels ``O`` and  ``O34`` will both be interpreted as oxygen atoms, but the program will keep their distinction for further use. An atom label starting with "bq" (e.g. ``bqH``) is interpreted as a ghost atom that contributes only basis functions, not electrons.
 
+:pcharges: The *x y z* coordinates followed by the charge *q* of point charges providing an external potential.
+
 :units: The following possible string values are recognized ``[default=angstrom]``
 
    * :strong:`"bohr"`: Atomic units (A.U.) 
@@ -102,6 +104,7 @@ The **TASK** block of the input file specifies the method to run. Only a single 
    "eom_ccsd": false,
    "rteom_ccsd": false,
    "gfccsd": false,
+   "embedding": false,
    "operation": ["energy"]
  }
 
@@ -163,3 +166,73 @@ The output file is in the Gaussian Cube format.
 
 :orbitals: Specify the highest occupied orbitals for both spins to be plotted. ``[default: 0]``
 
+
+.. _PDOS:
+
+PDOS options
+~~~~~~~~~~~~
+
+This section is used to obtain the projected density of states after an SCF calculation. The output file is in text format with the first block presenting the total density of states followed by *natom* blocks presenting atom-specific l-decomposed projected density of states. For restricted calculations, the columns follow the order *s p d f ...*. For unrestricted calculations the columns follow the order *s(alpha) s(beta) p(alpha) p(beta) d(alpha) d(beta) ...*.
+
+.. code-block:: json
+
+ "PDOS": {
+   "emin": 0.0,
+   "emax": 0.0,
+   "npoints": 100,
+   "distribution": "lorentzian",
+   "fwhm": 0.0055
+ }
+
+:emin: The minimum energy (in Hartrees) to compute the projected density of states. If *emin* is not given, then the projected density of states will be computed starting from 1 Ha below the Fermi level.
+
+:emax: The maximum energy (in Hartrees) to compute the projected density of states. If *emax* is not given, then the projected density of states will be computed up to 1 Ha above the Fermi level.
+
+:npoints: ``[default=100]`` The number of bins in which the range *emin*-*emax* is subdivided.
+
+:distribution: ``[default="lorentzian"]`` A string that identifies the smearing function used to broaden the discrete energy spectrum.
+
+    * :strong:`lorentzian` : A unit-area Lorentzian function is used.
+    * :strong:`gaussian`   : A unit-area Gaussian function is used.
+
+:fwhm: ``[default=0.0055]`` The full-width at half-maximum value in Hartree.
+
+
+.. _EMBEDDING:
+
+EMBEDDING options
+~~~~~~~~~~~~~~~~~
+
+This section is used to define projector-based quantum embedding parameters.
+
+.. code-block:: json
+
+ "EMBEDDING": {
+   "lambda": 1.0e6,
+   "use_ksref": false
+   "projector": "huzinaga",
+   "high_level": ["CCSD"],
+   "pao_thresh1": 0.01,
+   "pao_thresh2": 0.005,
+   "active_atoms": [],
+   "freeze_projected": false,
+ }
+
+:lambda: ``[default=1.0e6]`` The level-shift value used to move the eigenvalues of the projected orbitals.
+
+:use_ksref: If **true**, use a Kohn-Sham reference to start post-HF calculations.
+
+:projector: Type of projector used to keep orthogonality between active and inactive subsystems.
+
+    * :strong:`"huzinaga"`
+    * :strong:`"level"`
+
+:high_level: A string specifying the high-level calculation. It can be a combination of exchange-correlation functionals, or a string identifying the post-HF method.
+
+:pao_thresh1: Threshold to control the number of PAOs kept.
+
+:pao_thresh2: Threshold to control the number of PAOS kept.
+
+:active_atoms: A list of atom indices that defines the active region.
+
+:freeze_projected: Wether the subsequent post-HF method freeze the projected orbitals (occupied and unoccupied) from the environment.

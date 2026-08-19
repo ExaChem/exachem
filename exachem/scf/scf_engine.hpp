@@ -11,6 +11,7 @@
 #include "exachem/common/ec_basis.hpp"
 #include "exachem/common/ec_molden.hpp"
 #include "exachem/common/ec_nwmovecs.hpp"
+#include "exachem/common/ec_pdos.hpp"
 #include "exachem/common/system_data.hpp"
 #include "exachem/scf/scf_compute.hpp"
 #include "exachem/scf/scf_iter.hpp"
@@ -28,7 +29,7 @@ public:
   SCFEngine() = default;
   SCFEngine(ExecutionContext& exc, ChemEnv& chem_env);
 
-protected:
+public:
   SCFCompute<TensorType> scf_compute;
   SCFQed<TensorType>     scf_qed;
   SCFIter<TensorType>    scf_iter;
@@ -116,7 +117,12 @@ protected:
   virtual void compute_fock_matrix(ExecutionContext& ec, const ChemEnv& chem_env, bool is_uhf,
                                    const bool do_schwarz_screen, Matrix& SchwarzK,
                                    const size_t& max_nprim4, std::vector<size_t>& shell2bf,
-                                   bool& is_3c_init);
+                                   bool& is_3c_init
+#if defined(USE_GAUXC)
+                                   ,
+                                   GauXC::XCIntegrator<Matrix>& gauxc_integrator
+#endif
+  );
   virtual void deallocate_main_tensors(ExecutionContext& exc, const ChemEnv& chem_env);
   virtual void scf_final_io(ExecutionContext& ec, const ChemEnv& chem_env);
   virtual void setup_file_paths(const ChemEnv& chem_env);

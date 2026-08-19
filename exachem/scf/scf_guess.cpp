@@ -349,10 +349,13 @@ void exachem::scf::SCFGuess<T>::compute_ecp_ints(
   const std::vector<Tile>&   AO_tiles       = scf_data.AO_tiles;
   const std::vector<size_t>& shell_tile_map = scf_data.shell_tile_map;
 
-  int maxam     = 0;
-  int ecp_maxam = 0;
-  for(const auto& shell: shells)
+  int    maxam     = 0;
+  int    ecp_maxam = 0;
+  double min_alpha = 1e100;
+  for(const auto& shell: shells) {
     if(shell.l > maxam) maxam = shell.l;
+    if(shell.min_exp < min_alpha) min_alpha = shell.min_exp;
+  }
   for(const auto& ecp: ecps)
     if(ecp.L > ecp_maxam) ecp_maxam = ecp.L;
 
@@ -361,7 +364,36 @@ void exachem::scf::SCFGuess<T>::compute_ecp_ints(
   double* buffer_sph_ = new double[size_];
   memset(buffer_, 0, size_ * sizeof(double));
 
-  libecpint::ECPIntegral engine(maxam, ecp_maxam, 0, 1e-17, 1024, 2048);
+  // TODO: should be modifiable by user input
+  const double           tolerance = 1e-15;
+  const int              small = 512, large = 4096;
+  libecpint::ECPIntegral engine(maxam, ecp_maxam, 0, tolerance, small, large);
+
+  // From LibECPInt ECPIntegrator::compute_integrals
+  double thresh =
+    std::pow((maxam + 3) / min_alpha, maxam + 3) * std::pow(M_PI / (2 * maxam + 3.0), 3);
+  thresh /= std::pow(2.0 * exachem::constants::euler, maxam);
+  thresh = 1e-15 / std::sqrt(thresh);
+
+  // Precompute which shells can be skipped based on their distance from the ECP centers
+  // and the shell bounds
+  std::vector<bool> skip_shell(shells.size(), false);
+  for(size_t i = 0; i < shells.size(); i++) {
+    const auto& shell = shells[i];
+    bool        skip  = true;
+    for(const auto& ecp: ecps) {
+      double acx = shell.center()[0] - ecp.center_[0];
+      double acy = shell.center()[1] - ecp.center_[1];
+      double acz = shell.center()[2] - ecp.center_[2];
+      double a2  = acx * acx + acy * acy + acz * acz;
+      double sb  = libecpint::shell_bound(shell.l, shell.min_exp, a2, ecp.min_exp);
+      if(sb > thresh) {
+        skip = false;
+        break;
+      }
+    }
+    skip_shell[i] = skip;
+  }
 
   auto compute_ecp_ints_lambda = [&](const IndexVector& blockid) {
     const auto bi0 = blockid[0];
@@ -373,54 +405,62 @@ void exachem::scf::SCFGuess<T>::compute_ecp_ints(
 
     const auto bd1 = block_dims[1];
 
-    // auto s1 = blockid[0];
     auto                  s1range_end   = shell_tile_map[bi0];
     decltype(s1range_end) s1range_start = 0l;
     if(bi0 > 0) s1range_start = shell_tile_map[bi0 - 1] + 1;
 
-    // cout << "s1-start,end = " << s1range_start << ", " << s1range_end << endl;
     for(auto s1 = s1range_start; s1 <= s1range_end; ++s1) {
-      // auto bf1 = shell2bf[s1]; //shell2bf[s1]; // first basis function in
-      // this shell
+      if(skip_shell[s1]) continue;
       auto n1 = 2 * shells[s1].l + 1;
+
+      const libecpint::GaussianShell& LibECPShell1 = shells[s1];
+      // Screen ECPs based on their distance from the shell and the shell bounds
+      std::vector<int> na;
+      for(size_t i = 0; i < ecps.size(); i++) {
+        const libecpint::ECP& U   = ecps[i];
+        double                acx = LibECPShell1.center()[0] - U.center_[0];
+        double                acy = LibECPShell1.center()[1] - U.center_[1];
+        double                acz = LibECPShell1.center()[2] - U.center_[2];
+        double                a2  = acx * acx + acy * acy + acz * acz;
+        double sb = libecpint::shell_bound(LibECPShell1.l, LibECPShell1.min_exp, a2, U.min_exp);
+        if(sb > thresh) na.push_back(i);
+      }
+      if(na.size() == 0) continue;
 
       auto                  s2range_end   = shell_tile_map[bi1];
       decltype(s2range_end) s2range_start = 0l;
       if(bi1 > 0) s2range_start = shell_tile_map[bi1 - 1] + 1;
 
-      // cout << "s2-start,end = " << s2range_start << ", " << s2range_end << endl;
-
-      // cout << "screend shell pair list = " << s2spl << endl;
       for(auto s2 = s2range_start; s2 <= s2range_end; ++s2) {
-        // for (auto s2: scf_data.obs_shellpair_list.at(s1)) {
-        // auto s2 = blockid[1];
-        // if (s2>s1) continue;
+        if(s2 < s1) continue;
+        if(skip_shell[s2]) continue;
+        const libecpint::GaussianShell& LibECPShell2 = shells[s2];
 
-        if(s2 > s1) {
-          auto s2spl = scf_data.obs_shellpair_list.at(s2);
-          if(std::find(s2spl.begin(), s2spl.end(), s1) == s2spl.end()) continue;
+        // Screen ECPs based on their distance from the shell and the shell bounds
+        std::vector<int> nab;
+        for(size_t i = 0; i < na.size(); i++) {
+          const libecpint::ECP& U   = ecps[na[i]];
+          double                acx = LibECPShell2.center()[0] - U.center_[0];
+          double                acy = LibECPShell2.center()[1] - U.center_[1];
+          double                acz = LibECPShell2.center()[2] - U.center_[2];
+          double                a2  = acx * acx + acy * acy + acz * acz;
+          double sb = libecpint::shell_bound(LibECPShell2.l, LibECPShell2.min_exp, a2, U.min_exp);
+          if(sb > thresh) nab.push_back(na[i]);
         }
-        else {
-          auto s2spl = scf_data.obs_shellpair_list.at(s1);
-          if(std::find(s2spl.begin(), s2spl.end(), s2) == s2spl.end()) continue;
-        }
+        if(nab.size() == 0) continue;
 
-        // auto bf2 = shell2bf[s2];
         const auto n2 = 2 * shells[s2].l + 1;
 
         std::vector<T> tbuf(n1 * n2);
-        // cout << "s1,s2,n1,n2 = "  << s1 << "," << s2 <<
-        //       "," << n1 <<"," << n2 <<endl;
 
         // compute shell pair; return is the pointer to the buffer
-        const libecpint::GaussianShell& LibECPShell1 = shells[s1];
-        const libecpint::GaussianShell& LibECPShell2 = shells[s2];
         size_ = shells[s1].ncartesian() * shells[s2].ncartesian();
         memset(buffer_, 0, size_ * sizeof(double));
-        for(const auto& ecp: ecps) {
-          libecpint::TwoIndex<double> results;
-          engine.compute_shell_pair(ecp, LibECPShell1, LibECPShell2, results);
-          // for (auto v: results.data) std::cout << std::setprecision(6) << v << std::endl;
+        memset(buffer_sph_, 0, size_ * sizeof(double));
+        libecpint::TwoIndex<double> results;
+        for(size_t i = 0; i < nab.size(); i++) {
+          const libecpint::ECP& U = ecps[nab[i]];
+          engine.compute_shell_pair(U, LibECPShell1, LibECPShell2, results);
           std::transform(results.data.begin(), results.data.end(), buffer_, buffer_,
                          std::plus<double>());
         }
@@ -428,7 +468,8 @@ void exachem::scf::SCFGuess<T>::compute_ecp_ints(
 
         // "map" buffer to a const Eigen Matrix, and copy it to the
         // corresponding blocks of the result
-        Eigen::Map<const Matrix> buf_mat(&buffer_sph_[0], n1, n2);
+        Eigen::Map<Matrix> buf_mat(&buffer_sph_[0], n1, n2);
+        if(s1 != s2) buf_mat *= 2.0;
         Eigen::Map<Matrix>(&tbuf[0], n1, n2) = buf_mat;
         // tensor1e.put(blockid, tbuf);
 
@@ -441,26 +482,9 @@ void exachem::scf::SCFGuess<T>::compute_ecp_ints(
         const auto dimi = curshelloffset_i + AO_tiles[s1];
         const auto dimj = curshelloffset_j + AO_tiles[s2];
 
-        // cout << "curshelloffset_i,curshelloffset_j,dimi,dimj = "  << curshelloffset_i << "," <<
-        // curshelloffset_j <<
-        //       "," << dimi <<"," << dimj <<endl;
-
         for(size_t i = curshelloffset_i; i < dimi; i++) {
           for(size_t j = curshelloffset_j; j < dimj; j++, c++) { dbuf[i * bd1 + j] = tbuf[c]; }
         }
-
-        // if(s1!=s2){
-        //     std::vector<T> ttbuf(n1*n2);
-        //     Eigen::Map<Matrix>(ttbuf.data(),n2,n1) = buf_mat.transpose();
-        //     // Matrix buf_mat_trans = buf_mat.transpose();
-        //     size_t c = 0;
-        //     for(size_t j = curshelloffset_j; j < dimj; j++) {
-        //       for(size_t i = curshelloffset_i; i < dimi; i++, c++) {
-        //             dbuf[j*block_dims[0]+i] = ttbuf[c];
-        //       }
-        //     }
-        // }
-        // tensor1e.put({s2,s1}, ttbuf);
       }
     }
     tensor1e.put(blockid, dbuf);
@@ -1126,6 +1150,8 @@ void exachem::scf::SCFGuess<T>::compute_sad_guess(ExecutionContext& ec, ChemEnv&
     tAO_atom  = {AO_atom, AO_opttiles_atom};
     tAOt_atom = {AO_atom, AO_tiles_atom};
 
+    const auto [mu, nu] = tAO_atom.labels<2>("all");
+
     // compute core hamiltonian H and overlap S for the atom
     Tensor<T> H_atom{tAO_atom, tAO_atom};
     Tensor<T> S_atom{tAO_atom, tAO_atom};
@@ -1182,8 +1208,8 @@ void exachem::scf::SCFGuess<T>::compute_sad_guess(ExecutionContext& ec, ChemEnv&
     }
     else { Scheduler{ec}(Q_atom() = 0.0).execute(); }
 
+    Scheduler{ec}(E_atom() = 0.0).execute();
     if(has_ecp) { compute_ecp_ints(ec, scf_data, E_atom, libecp_shells, ecps); }
-    else { Scheduler{ec}(E_atom() = 0.0).execute(); }
 
     // if(rank == 0) cout << "compute one body ints" << endl;
 
@@ -1192,7 +1218,8 @@ void exachem::scf::SCFGuess<T>::compute_sad_guess(ExecutionContext& ec, ChemEnv&
       (H_atom()  = T_atom())
       (H_atom() += V_atom())
       (H_atom() += Q_atom())
-      (H_atom() += E_atom())
+      (H_atom(mu, nu) += 0.5*E_atom(mu, nu))
+      (H_atom(mu, nu) += 0.5*E_atom(nu, mu))
       .deallocate(T_atom, V_atom, Q_atom, E_atom)
       .execute();
     // clang-format on

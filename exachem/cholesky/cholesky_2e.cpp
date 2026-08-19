@@ -541,7 +541,7 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
 #if !defined(USE_UPCXX)
     // cd_tensor_zero(g_d_tamm);
     // cd_tensor_zero(g_r_tamm);
-    // cd_tensor_zero(g_chol_tamm);
+    cd_tensor_zero(g_chol_tamm);
 
     auto write_chol_vectors = [&]() {
       write_to_disk(g_d_tamm, diag_ao_file);
@@ -1064,7 +1064,7 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
 
   ec.pg().barrier();
 
-  if(chem_env.sys_data.do_qed) count += 3; // for storing the 3 extra dipole terms for QED-CC
+  if(chem_env.sys_data.do_qed) count += 1; // for storing the dipole terms for QED-CC
 
   ec.pg().broadcast(&count, 0);
 

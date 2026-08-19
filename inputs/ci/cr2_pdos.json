@@ -1,0 +1,44 @@
+{
+  "geometry": {
+    "coordinates": [
+      "Cr1   0.00000000     0.00000000    0.00000000",
+      "Cr2   0.00000000     0.00000000    1.68000000"
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "def2-svp"
+  },
+  "common": {
+    "maxiter": 100
+  },
+  "SCF": {
+    "tol_lindep": 1e-06,
+    "scf_type": "unrestricted",
+    "conve": 1e-09,
+    "convd": 1e-07,
+    "diis_hist": 10,
+    "lshift": 0.1,
+    "DFT": {
+      "xc_type": ["PBE"]
+    },
+    "guess": {
+      "atom_options":{
+        "Cr1": [0,3],
+        "Cr2": [0,-3]
+      }
+    }
+  },
+  "PDOS": { 
+    "distribution": "lorentzian",
+    "fwhm": 0.0055,
+    "npoints": 100
+  },
+  "CC": {
+    "threshold": 1e-06,
+    "writet": false
+  },  
+  "TASK": {
+    "scf": true
+  }  
+}

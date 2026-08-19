@@ -16,6 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 1000
     strategy:
+      max-parallel: 5
       matrix:
         os: 
           - [self-hosted, rocky10]
@@ -105,14 +106,14 @@ jobs:
       if: ${{ matrix.os[1] == 'macos' }}
       id: set-cache-path-mac
       run: |
-        echo "exachem_cache_path=$HOME/software/CI/cache/exachem_cache" >> $GITHUB_ENV
+        echo "exachem_cache_path=$HOME/software/CI/cache/exachem_cache/${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-${{ matrix.use_cuda }}-${{ matrix.use_scalapack }}" >> $GITHUB_ENV
       shell: bash
 
     - name: Set cache path linux
       if: ${{ matrix.os[1] == 'rocky10' }}
       id: set-cache-path-linux
       run: |
-        echo "exachem_cache_path=/hpc/software/CI/cache/exachem_cache" >> $GITHUB_ENV
+        echo "exachem_cache_path=/hpc/software/CI/cache/exachem_cache/${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-${{ matrix.use_cuda }}-${{ matrix.use_scalapack }}" >> $GITHUB_ENV
       shell: bash
 
     - name: Set build option defaults
@@ -121,8 +122,8 @@ jobs:
         echo "INSTALL_PATH=$GITHUB_WORKSPACE/install" >> $GITHUB_ENV
         echo "USE_CUDA=OFF" >> $GITHUB_ENV
         echo "USE_SCALAPACK=OFF" >> $GITHUB_ENV
-        echo "EC_NPROC=12" >> $GITHUB_ENV
-        echo "LA_VENDOR=BLIS" >> $GITHUB_ENV
+        echo "EC_NPROC=8" >> $GITHUB_ENV
+        echo "LA_VENDOR=OpenBLAS" >> $GITHUB_ENV
       shell: bash
 
     - name: Set cuda build options
@@ -161,7 +162,7 @@ jobs:
       with:
         path: |
           ${{ env.exachem_cache_path }}
-        key: ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-ga-${{ matrix.use_scalapack }}
+        key: ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-ga-${{ matrix.use_cuda }}-${{ matrix.use_scalapack }}
 
     - name: Cache install steps (backend = upcxx)
       if: ${{ matrix.backend == 'upcxx' }}

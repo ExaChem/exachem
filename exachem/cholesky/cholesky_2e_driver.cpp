@@ -195,7 +195,6 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
   }
 
   Tensor<T>& movecs_so = cd_context.movecs_so;
-  if(!cd_context.keep_movecs_so) free_tensors(movecs_so);
 
   auto   hf_t2 = std::chrono::high_resolution_clock::now();
   double cholesky_2e_time =
@@ -243,9 +242,9 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
         .deallocate(tmp,hcore).execute();
     // clang-format on
 
-    ExecutionContext ec_dense{ec.pg(), DistributionKind::dense, MemoryManagerKind::ga};
-    std::string      mop_dir   = files_dir + "/mos_txt/";
-    std::string      mofprefix = mop_dir + chem_env.workspace_dir;
+    ExecutionContext  ec_dense{ec.pg(), DistributionKind::dense, MemoryManagerKind::ga};
+    const std::string mop_dir   = chem_env.get_files_dir("", "mos_txt");
+    const std::string mofprefix = chem_env.get_files_prefix("", "mos_txt");
     if(!fs::exists(mop_dir)) fs::create_directories(mop_dir);
 
     Tensor<T> d_v2            = setupV2<T>(ec, MO, CI, cholVpr, chol_count);
@@ -263,6 +262,8 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
 
     Tensor<T>::deallocate(hcore_dense, d_f1_dense, movecs_so_dense, d_v2_dense);
   }
+
+  if(!cd_context.keep_movecs_so) free_tensors(movecs_so);
 
 } // END of cholesky_2e_driver
 

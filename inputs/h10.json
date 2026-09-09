@@ -27,7 +27,7 @@
   "CC": {
     "threshold": 1e-6,
     "debug": false,
-    "profile_ccsd": false,
+    "profile": false,
     "ccsd_maxiter": 200,
     "DLPNO": {
       "df_basisset": "cc-pv5z-ri",

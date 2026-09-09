@@ -29,7 +29,7 @@ void residuals(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO, con
              t1_2p, t2_2p);
 
   const auto timer_start = std::chrono::high_resolution_clock::now();
-  const auto profile     = chem_env.ioptions.ccsd_options.profile_ccsd;
+  const auto profile     = chem_env.ioptions.ccsd_options.profile;
 
   // Residuals
   resid_part1(sch, MO, tmps, scalars, f, eri, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p, t1_2p,
@@ -163,7 +163,7 @@ std::tuple<double, double> ccsd_v2_driver(
   bool        writet      = chem_env.ioptions.ccsd_options.writet;
   int         writet_iter = chem_env.ioptions.ccsd_options.writet_iter;
   double      zshiftl     = chem_env.ioptions.ccsd_options.lshift;
-  bool        profile     = chem_env.ioptions.ccsd_options.profile_ccsd;
+  bool        profile     = chem_env.ioptions.ccsd_options.profile;
   double      residual    = 0.0;
   double      energy      = 0.0;
   int         niter       = 0;

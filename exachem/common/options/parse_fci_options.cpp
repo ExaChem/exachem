@@ -79,6 +79,7 @@ void ParseFCIOptions::update_common_options(ChemEnv& chem_env) {
   CommonOptions& common_options = chem_env.ioptions.common_options;
 
   fci_options.debug         = common_options.debug;
+  fci_options.profile       = common_options.profile;
   fci_options.maxiter       = common_options.maxiter;
   fci_options.basis         = common_options.basis;
   fci_options.dfbasis       = common_options.dfbasis;

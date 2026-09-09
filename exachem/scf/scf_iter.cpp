@@ -58,7 +58,7 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
   const TiledIndexSpace& tAO_ortho = scf_data.tAO_ortho;
 
   const auto rank         = ec.pg().rank();
-  const auto debug        = scf_options.debug;
+  const auto profile      = scf_options.profile;
   const auto [mu, nu, ku] = tAO.labels<3>("all");
   const auto [mu_o, nu_o] = tAO_ortho.labels<2>("all");
   const int max_hist      = scf_options.diis_hist;
@@ -74,7 +74,7 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
     const auto snK_stop = std::chrono::high_resolution_clock::now();
     const auto snK_time =
       std::chrono::duration_cast<std::chrono::duration<double>>((snK_stop - snK_start)).count();
-    if(rank == 0 && debug)
+    if(rank == 0 && profile)
       std::cout << std::fixed << std::setprecision(2) << "snK: " << snK_time << "s, ";
   }
 #endif
@@ -121,7 +121,7 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
     const auto xcf_stop = std::chrono::high_resolution_clock::now();
     const auto xcf_time =
       std::chrono::duration_cast<std::chrono::duration<double>>((xcf_stop - xcf_start)).count();
-    if(rank == 0 && debug)
+    if(rank == 0 && profile)
       std::cout << std::fixed << std::setprecision(2) << "xcf: " << xcf_time << "s, ";
     if(sys_data.is_qed && !sys_data.do_qed) { scf_data.eqed = gauxc_exc; }
   }
@@ -221,7 +221,7 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
     auto do_time =
       std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
 
-    if(rank == 0 && debug)
+    if(rank == 0 && profile)
       std::cout << std::fixed << std::setprecision(2) << "diis: " << do_time << "s, ";
   }
 
@@ -251,7 +251,7 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
   auto do_t2   = std::chrono::high_resolution_clock::now();
   auto do_time = std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
 
-  if(rank == 0 && debug)
+  if(rank == 0 && profile)
     std::cout << std::fixed << std::setprecision(2) << "diagonalize: " << do_time << "s, ";
   SCFCompute<T> scf_compute;
   scf_compute.compute_density(ec, chem_env, scf_data, scalapack_info, ttensors, etensors);
@@ -389,7 +389,7 @@ void exachem::scf::SCFIter<T>::compute_3c_ints(ExecutionContext& ec, const ChemE
   const libint2::BasisSet& obs         = chem_env.shells;
 
   const auto                 rank           = ec.pg().rank();
-  const auto                 debug          = scf_options.debug;
+  const auto                 profile        = scf_options.profile;
   const std::vector<Tile>&   AO_tiles       = scf_data.AO_tiles;
   const std::vector<size_t>& shell_tile_map = scf_data.shell_tile_map;
 
@@ -479,7 +479,7 @@ void exachem::scf::SCFIter<T>::compute_3c_ints(ExecutionContext& ec, const ChemE
   auto   do_t2 = std::chrono::high_resolution_clock::now();
   double do_time =
     std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
-  if(rank == 0 && debug) std::cout << "2BF-DFC: " << do_time << "s, ";
+  if(rank == 0 && profile) std::cout << "2BF-DFC: " << do_time << "s, ";
 }
 
 template<typename T>
@@ -591,19 +591,13 @@ void exachem::scf::SCFIter<T>::compute_Vm12(ExecutionContext& ec, const ChemEnv&
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
   const auto        ndf         = sys_data.ndf;
-  const bool        direct      = scf_data.direct_df;
   const auto        rank        = ec.pg().rank();
-  const auto        debug       = scf_options.debug;
+  const auto        profile     = scf_options.profile;
 
-  auto& mu   = scf_data.mu;
-  auto& nu   = scf_data.nu;
-  auto& ku   = scf_data.ku;
   auto& d_mu = scf_data.d_mu;
   auto& d_nu = scf_data.d_nu;
-  auto& d_ku = scf_data.d_ku;
 
-  Scheduler   sch{ec};
-  ExecutionHW exhw = ec.exhw();
+  Scheduler sch{ec};
 
   Tensor<T>& Vm1 = ttensors.Vm1;
 
@@ -735,7 +729,7 @@ void exachem::scf::SCFIter<T>::compute_Vm12(ExecutionContext& ec, const ChemEnv&
   auto ig2    = std::chrono::high_resolution_clock::now();
   auto igtime = std::chrono::duration_cast<std::chrono::duration<double>>((ig2 - ig1)).count();
 
-  if(rank == 0 && debug)
+  if(rank == 0 && profile)
     std::cout << std::fixed << std::setprecision(2) << "V^-1/2: " << igtime << "s, ";
 }
 
@@ -743,13 +737,7 @@ template<typename T>
 void exachem::scf::SCFIter<T>::init_ri(ExecutionContext& ec, const ChemEnv& chem_env,
                                        ScalapackInfo& scalapack_info, const SCFData& scf_data,
                                        EigenTensors& etensors, TAMMTensors<T>& ttensors) {
-  const SystemData& sys_data    = chem_env.sys_data;
-  const SCFOptions& scf_options = chem_env.ioptions.scf_options;
-
-  const auto ndf    = sys_data.ndf;
   const bool direct = scf_data.direct_df;
-  const auto rank   = ec.pg().rank();
-  const auto debug  = scf_options.debug;
 
   auto mu = scf_data.mu, nu = scf_data.nu, ku = scf_data.ku;
   auto d_mu = scf_data.d_mu, d_nu = scf_data.d_nu, d_ku = scf_data.d_ku;
@@ -787,8 +775,7 @@ void exachem::scf::SCFIter<T>::compute_ri_jvec(ExecutionContext& ec, const ChemE
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
-  Scheduler  sch{ec};
-  const auto rank = ec.pg().rank();
+  Scheduler sch{ec};
 
   const libint2::BasisSet& obs         = chem_env.shells;
   const auto               ndf         = sys_data.ndf;
@@ -884,14 +871,11 @@ void exachem::scf::SCFIter<T>::compute_ri_jmat(ExecutionContext& ec, const ChemE
   using libint2::Engine;
   using libint2::Operator;
 
-  const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
-  Scheduler  sch{ec};
-  const auto rank = ec.pg().rank();
+  Scheduler sch{ec};
 
   const libint2::BasisSet& obs         = chem_env.shells;
-  const auto               ndf         = sys_data.ndf;
   const libint2::BasisSet& dfbs        = scf_data.dfbs;
   auto                     shell2bf    = obs.shell2bf();
   auto                     shell2bf_df = dfbs.shell2bf();
@@ -986,8 +970,8 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, const
   Scheduler sch{ec};
   // ExecutionHW exhw = ec.exhw();
 
-  const bool debug  = scf_options.debug;
-  const bool is_uhf = sys_data.is_unrestricted;
+  const bool profile = scf_options.profile;
+  const bool is_uhf  = sys_data.is_unrestricted;
 
   const auto rank = ec.pg().rank();
   const auto ndf  = sys_data.ndf;
@@ -1028,7 +1012,7 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, const
 
   const auto total_time =
     std::chrono::duration_cast<std::chrono::duration<double>>((buildF_stop - buildJ_start)).count();
-  if(rank == 0 && debug)
+  if(rank == 0 && profile)
     std::cout << std::fixed << std::setprecision(2) << "DF-J: " << total_time << "s, ";
 };
 
@@ -1046,8 +1030,8 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri(ExecutionContext& ec, const ChemEn
   const bool is_rhf = sys_data.is_restricted;
   const bool do_snK = sys_data.do_snK;
 
-  const auto rank  = ec.pg().rank();
-  const auto debug = scf_options.debug;
+  const auto rank    = ec.pg().rank();
+  const auto profile = scf_options.profile;
 
   auto mu = scf_data.mu, nu = scf_data.nu, ku = scf_data.ku;
   auto d_mu = scf_data.d_mu, d_nu = scf_data.d_nu, d_ku = scf_data.d_ku;
@@ -1087,7 +1071,7 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri(ExecutionContext& ec, const ChemEn
 
   auto ig2    = std::chrono::high_resolution_clock::now();
   auto igtime = std::chrono::duration_cast<std::chrono::duration<double>>((ig2 - ig1)).count();
-  if(rank == 0 && debug)
+  if(rank == 0 && profile)
     std::cout << " J: " << std::fixed << std::setprecision(2) << igtime << "s, ";
 
   if(xHF > 0.0 && !do_snK) {
@@ -1110,14 +1094,14 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri(ExecutionContext& ec, const ChemEn
 
     ig2    = std::chrono::high_resolution_clock::now();
     igtime = std::chrono::duration_cast<std::chrono::duration<double>>((ig2 - ig1)).count();
-    if(rank == 0 && debug)
+    if(rank == 0 && profile)
       std::cout << " K: " << std::fixed << std::setprecision(2) << igtime << "s, ";
   }
 
   auto tig2    = std::chrono::high_resolution_clock::now();
   auto tigtime = std::chrono::duration_cast<std::chrono::duration<double>>((tig2 - tig1)).count();
 
-  if(rank == 0 && debug)
+  if(rank == 0 && profile)
     std::cout << "3c contractions: " << std::fixed << std::setprecision(2) << tigtime << "s, ";
 }
 
@@ -1152,7 +1136,7 @@ void exachem::scf::SCFIter<T>::compute_2bf(
   const double fock_precision = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
   const auto   rank           = ec.pg().rank();
   const auto   N              = sys_data.nbf_orig;
-  const auto   debug          = scf_options.debug;
+  const auto   profile        = scf_options.profile;
 
   auto   do_t1 = std::chrono::high_resolution_clock::now();
   Matrix D_shblk_norm;
@@ -1417,7 +1401,7 @@ void exachem::scf::SCFIter<T>::compute_2bf(
     do_t2   = std::chrono::high_resolution_clock::now();
     do_time = std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
 
-    if(rank == 0 && debug)
+    if(rank == 0 && profile)
       std::cout << std::fixed << std::setprecision(2) << "Fock build: " << do_time << "s, ";
 
     // ec.pg().barrier();
@@ -1487,9 +1471,9 @@ void exachem::scf::SCFIter<T>::compute_2bf_hubbard(
   Tensor<T>& F_beta_tmp  = ttensors.F_beta_tmp;
 
   // const double fock_precision = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
-  const auto rank  = ec.pg().rank();
-  const auto N     = sys_data.nbf_orig;
-  const auto debug = scf_options.debug;
+  const auto rank    = ec.pg().rank();
+  const auto N       = sys_data.nbf_orig;
+  const auto profile = scf_options.profile;
 
   auto   do_t1 = std::chrono::high_resolution_clock::now();
   Matrix D_shblk_norm;
@@ -1726,7 +1710,7 @@ void exachem::scf::SCFIter<T>::compute_2bf_hubbard(
     do_t2   = std::chrono::high_resolution_clock::now();
     do_time = std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
 
-    if(rank == 0 && debug)
+    if(rank == 0 && profile)
       std::cout << std::fixed << std::setprecision(2) << "Fock build: " << do_time << "s, ";
 
     // ec.pg().barrier();
@@ -2136,7 +2120,7 @@ void exachem::scf::SCFIter<T>::compute_2bf_deriv(
   const double fock_precision = std::min(scf_options.tol_sch, 1e-2 * scf_options.conve);
   const auto   rank           = ec.pg().rank();
   const auto   N              = sys_data.nbf_orig;
-  // const auto   debug          = scf_options.debug;
+  // const auto   profile        = scf_options.profile;
 
   // auto   do_t1 = std::chrono::high_resolution_clock::now();
   Matrix D_shblk_norm;
@@ -2491,10 +2475,9 @@ exachem::scf::SCFIter<T>::compute_2c_ints_deriv(ExecutionContext& ec, const Chem
   using libint2::Engine;
   using libint2::Operator;
 
-  Matrix     grad       = Matrix::Zero(chem_env.atoms.size(), 3);
-  Matrix     grad_local = Matrix::Zero(chem_env.atoms.size(), 3);
-  Tensor<T>  V_dummy{scf_data.tdfAOt, scf_data.tdfAOt};
-  Tensor<T>& Vm1 = ttensors.Vm1;
+  Matrix    grad       = Matrix::Zero(chem_env.atoms.size(), 3);
+  Matrix    grad_local = Matrix::Zero(chem_env.atoms.size(), 3);
+  Tensor<T> V_dummy{scf_data.tdfAOt, scf_data.tdfAOt};
 
   Scheduler sch{ec};
 
@@ -2566,7 +2549,6 @@ exachem::scf::SCFIter<T>::compute_2c_exx_ints_deriv(ExecutionContext& ec, const 
   auto            shell2atom  = dfbs.shell2atom(chem_env.atoms);
   auto            shell2bf_df = dfbs.shell2bf();
 
-  const bool        is_unrestricted  = chem_env.sys_data.is_unrestricted;
   const SCFOptions& scf_options      = chem_env.ioptions.scf_options;
   double            engine_precision = scf_options.tol_int; // default: 1e-22
   auto              engine           = Engine(Operator::coulomb, dfbs.max_nprim(), dfbs.max_l(), 1);
@@ -2646,14 +2628,11 @@ Matrix exachem::scf::SCFIter<T>::compute_3c_ints_deriv(
   Matrix grad       = Matrix::Zero(natoms, 3);
   Matrix grad_local = Matrix::Zero(natoms, 3);
 
-  const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
-  Scheduler  sch{ec};
-  const auto rank = ec.pg().rank();
+  Scheduler sch{ec};
 
   const libint2::BasisSet& obs         = chem_env.shells;
-  const auto               ndf         = sys_data.ndf;
   const libint2::BasisSet& dfbs        = scf_data.dfbs;
   auto                     shell2bf    = obs.shell2bf();
   auto                     shell2bf_df = dfbs.shell2bf();
@@ -2767,12 +2746,9 @@ exachem::scf::SCFIter<T>::compute_3c_exx_ints_deriv(ExecutionContext& ec, const 
   Matrix grad_local = Matrix::Zero(chem_env.atoms.size(), 3);
   Matrix grad       = Matrix::Zero(chem_env.atoms.size(), 3);
 
-  const bool               is_unrestricted = chem_env.sys_data.is_unrestricted;
-  const SCFOptions&        scf_options     = chem_env.ioptions.scf_options;
-  const libint2::BasisSet& obs             = chem_env.shells;
+  const SCFOptions&        scf_options = chem_env.ioptions.scf_options;
+  const libint2::BasisSet& obs         = chem_env.shells;
 
-  const auto                 rank           = ec.pg().rank();
-  const auto                 debug          = scf_options.debug;
   const std::vector<Tile>&   AO_tiles       = scf_data.AO_tiles;
   const std::vector<size_t>& shell_tile_map = scf_data.shell_tile_map;
 
@@ -2893,15 +2869,14 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri_deriv(
   const bool is_rhf = sys_data.is_restricted;
   const bool do_snK = sys_data.do_snK;
 
-  const auto rank  = ec.pg().rank();
-  const auto debug = scf_options.debug;
+  const auto rank    = ec.pg().rank();
+  const auto profile = scf_options.profile;
 
   auto mu = scf_data.mu, nu = scf_data.nu, ku = scf_data.ku;
   auto d_mu = scf_data.d_mu, d_nu = scf_data.d_nu, d_ku = scf_data.d_ku;
   // const tamm::TiledIndexLabel& dCocc_til = scf_data.dCocc_til;
 
-  Scheduler   sch{ec};
-  ExecutionHW exhw = ec.exhw();
+  Scheduler sch{ec};
 
   Tensor<T>& xyK = ttensors.xyK;
   Tensor<T>& Vm1 = ttensors.Vm1;
@@ -2918,8 +2893,7 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri_deriv(
   Tensor<T>       Xtmp1{scf_data.tdfAO, scf_data.tdfAO};            // ndf, ndf
   Tensor<T>       Xtmp2{scf_data.tdfAO, scf_data.tdfAO};            // ndf, ndf
 
-  auto ig1  = std::chrono::high_resolution_clock::now();
-  auto tig1 = ig1;
+  auto ig1 = std::chrono::high_resolution_clock::now();
 
   etensors.D_alpha = Eigen::MatrixXd::Zero(nbf, nbf);
   tamm_to_eigen_tensor(ttensors.D_alpha, etensors.D_alpha);
@@ -2971,7 +2945,7 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri_deriv(
   }
   auto ig2    = std::chrono::high_resolution_clock::now();
   auto igtime = std::chrono::duration_cast<std::chrono::duration<double>>((ig2 - ig1)).count();
-  if(rank == 0 && debug)
+  if(rank == 0 && profile)
     std::cout << " J: " << std::fixed << std::setprecision(2) << igtime << "s, ";
 
   if(xHF > 0.0 && !do_snK) {
@@ -3003,7 +2977,7 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri_deriv(
 
     ig2    = std::chrono::high_resolution_clock::now();
     igtime = std::chrono::duration_cast<std::chrono::duration<double>>((ig2 - ig1)).count();
-    if(rank == 0 && debug)
+    if(rank == 0 && profile)
       std::cout << " K: " << std::fixed << std::setprecision(2) << igtime << "s, ";
   }
 
@@ -3014,7 +2988,7 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri_deriv(
 
   // Small temporary hack
   Matrix S_eigen = tamm_to_eigen_matrix(ttensors.S1);
-  for(auto atom = 0, i = 0; atom != chem_env.atoms.size(); ++atom) {
+  for(auto atom = 0, i = 0; atom != (int) chem_env.atoms.size(); ++atom) {
     for(auto xyz = 0; xyz != 3; ++xyz, ++i) {
       etensors.Ga_deriv[i] = grad(atom, xyz) / sys_data.nelectrons_alpha * S_eigen;
       if(is_uhf) etensors.Gb_deriv[i] = grad(atom, xyz) / sys_data.nelectrons_beta * S_eigen;

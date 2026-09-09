@@ -43,18 +43,17 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
   if(rank0) std::cout << "\n" << header << "\n";
 
   // Get embedding options
-  const std::string& projector           = chem_env.ioptions.embedding_options.projector;
-  const double       lambda              = chem_env.ioptions.embedding_options.lambda;
-  const bool         freeze_projected    = chem_env.ioptions.embedding_options.freeze_projected;
-  const bool        iterative_vembedding = chem_env.ioptions.embedding_options.iterative_vembedding;
-  std::vector<int>& n_acc_mos            = chem_env.ioptions.embedding_options.nactive_orbitals;
-  const std::string&              partition    = chem_env.ioptions.embedding_options.partition;
-  const std::vector<int>&         active_atoms = chem_env.ioptions.embedding_options.active_atoms;
-  const std::vector<std::string>& high_level   = chem_env.ioptions.embedding_options.high_level;
-  const bool                      do_spade     = partition == "SPADE";
-  const bool                      huzinaga     = projector == "HUZINAGA";
-  const double                    pao_thresh1  = chem_env.ioptions.embedding_options.pao_thresh1;
-  const double                    pao_thresh2  = chem_env.ioptions.embedding_options.pao_thresh2;
+  const std::string&      projector          = chem_env.ioptions.embedding_options.projector;
+  const double            lambda             = chem_env.ioptions.embedding_options.lambda;
+  const bool              freeze_projected   = chem_env.ioptions.embedding_options.freeze_projected;
+  std::vector<int>&       n_acc_mos          = chem_env.ioptions.embedding_options.nactive_orbitals;
+  const std::string&      partition          = chem_env.ioptions.embedding_options.partition;
+  const std::vector<int>& active_atoms       = chem_env.ioptions.embedding_options.active_atoms;
+  const std::vector<std::string>& high_level = chem_env.ioptions.embedding_options.high_level;
+  const bool                      do_spade   = partition == "SPADE";
+  const bool                      huzinaga   = projector == "HUZINAGA";
+  const double                    pao_thresh1 = chem_env.ioptions.embedding_options.pao_thresh1;
+  const double                    pao_thresh2 = chem_env.ioptions.embedding_options.pao_thresh2;
 
   // Get energy of full system
   SCFEngine scf_engine(ec, chem_env);
@@ -64,7 +63,6 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
   const int                   N        = chem_env.shells.nbf();
   const int                   NMO      = chem_env.sys_data.nbf;
   std::vector<libint2::Atom>& atoms    = chem_env.atoms;
-  libint2::BasisSet&          shells   = chem_env.shells;
   SCFData&                    scf_data = scf_engine.scf_data;
   scf::TAMMTensors<T>&        ttensors = scf_data.ttensors;
   scf::EigenTensors&          etensors = scf_data.etensors;
@@ -412,8 +410,10 @@ Matrix spade(const Matrix& S12, const Matrix& C_occ, const std::vector<int> indi
 
   lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, Nocc, CTC.data(), Nocc, eigvals.data());
   Matrix eigenvectors = CTC.transpose();
-  size_t n_act_mos;
-  double maxdelta = 0.0;
+  size_t n_act_mos    = 0;
+  // seeded below any possible gap so the first delta always wins. syevd returns ascending
+  // eigenvalues, so a degenerate spectrum would otherwise leave n_act_mos unassigned
+  double maxdelta = -1.0;
   if(n_acc_mos == 0) {
     for(size_t ival = 0; ival < eigvals.size() - 1; ival++) {
       double delta = (eigvals[ival + 1] - eigvals[ival]);
@@ -442,7 +442,7 @@ Matrix paos(const Matrix& S, const Matrix& C_occ, const std::vector<int> indices
 
   Matrix           SC = S(indicesToKeep, Eigen::placeholders::all) * c_pao;
   std::vector<int> active_paos;
-  for(size_t ipao = 0; ipao < N; ipao++) {
+  for(size_t ipao = 0; ipao < (size_t) N; ipao++) {
     double norb = c_pao(indicesToKeep, ipao).dot(SC.col(ipao));
     if(std::abs(norb) > pao_thresh1) { active_paos.push_back(ipao); }
   }

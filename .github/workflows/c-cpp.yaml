@@ -102,20 +102,6 @@ jobs:
         echo "simd=$(${GITHUB_WORKSPACE}/.github/workflows/scripts/check_simd.sh)" >> $GITHUB_ENV
       shell: bash
 
-    - name: Set cache path mac
-      if: ${{ matrix.os[1] == 'macos' }}
-      id: set-cache-path-mac
-      run: |
-        echo "exachem_cache_path=$HOME/software/CI/cache/exachem_cache/${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-${{ matrix.use_cuda }}-${{ matrix.use_scalapack }}" >> $GITHUB_ENV
-      shell: bash
-
-    - name: Set cache path linux
-      if: ${{ matrix.os[1] == 'rocky10' }}
-      id: set-cache-path-linux
-      run: |
-        echo "exachem_cache_path=/hpc/software/CI/cache/exachem_cache/${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-${{ matrix.use_cuda }}-${{ matrix.use_scalapack }}" >> $GITHUB_ENV
-      shell: bash
-
     - name: Set build option defaults
       id: set-build-option-defaults
       run: |
@@ -161,8 +147,10 @@ jobs:
       uses: actions/cache@v4
       with:
         path: |
-          ${{ env.exachem_cache_path }}
-        key: ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-ga-${{ matrix.use_cuda }}-${{ matrix.use_scalapack }}
+          ${{ github.workspace }}/install
+        key: ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-ga-${{ matrix.use_cuda }}-${{ matrix.use_scalapack }}-${{ github.run_id }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-ga-${{ matrix.use_cuda }}-${{ matrix.use_scalapack }}-
 
     - name: Cache install steps (backend = upcxx)
       if: ${{ matrix.backend == 'upcxx' }}
@@ -170,8 +158,10 @@ jobs:
       uses: actions/cache@v4
       with:
         path: |
-          ${{ env.exachem_cache_path }}
-        key: ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-upcxx
+          ${{ github.workspace }}/install
+        key: ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-upcxx-${{ github.run_id }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-upcxx-
 
 
     - name: show-mpi
@@ -202,16 +192,6 @@ jobs:
         make -j${{ env.EC_NPROC }} all
         make install
 
-    - name: find cache
-      id: find_cache
-      if: ${{ steps.exachem-cache-install.outputs.cache-hit == 'true' || steps.exachem-upcxx-cache-install.outputs.cache-hit == 'true' }}
-      run: |
-        pwd
-        ls -lart
-        mkdir -p ${{ env.INSTALL_PATH }} ${{ env.exachem_cache_path }} || true
-        rsync -av  ${{ env.exachem_cache_path }}/* ${{ env.INSTALL_PATH }}/.
-        ls -lrt ${{ env.INSTALL_PATH }} || true
-
     - name: build exachem (backend = ga)
       if: ${{ matrix.backend == 'ga' }}
       id: build_exachem
@@ -229,17 +209,13 @@ jobs:
         cd build
         make -j${{ env.EC_NPROC }}
         make install
-        mkdir -p  ${{ env.exachem_cache_path }} || true
-        rsync -av --exclude="*tamm*" ${{ env.INSTALL_PATH }}/* ${{ env.exachem_cache_path }}/.
 
-        # Chem build
+        # ExaChem build
         cd $GITHUB_WORKSPACE
         cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES="CC" -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }}
         cd build
         make -j${{ env.EC_NPROC }}
         make install
-        # mkdir -p  ${{ env.exachem_cache_path }} || true
-        # rsync -av --exclude="*tamm*" ${{ env.INSTALL_PATH }}/* ${{ env.exachem_cache_path }}/.
 
     - name: build exachem (backend = upcxx)
       if: ${{ matrix.backend == 'upcxx' }}
@@ -258,10 +234,8 @@ jobs:
         cd build
         UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make -j${{ env.EC_NPROC }}
         UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make install
-        mkdir -p  ${{ env.exachem_cache_path }} || true
-        rsync -av --exclude="*tamm*" ${{ env.INSTALL_PATH }}/* ${{ env.exachem_cache_path }}/.
 
-        # Chem build
+        # ExaChem build
         cd $GITHUB_WORKSPACE
         UPCXX_CODEMODE=O3 CXX=upcxx cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES=CC -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DUSE_UPCXX=ON -DMPIRUN_EXECUTABLE=${{ env.CI_MPIEXEC }}
         cd build

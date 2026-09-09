@@ -177,7 +177,7 @@ TensorMap<T> oei_spin_blocks(Scheduler& sch, ChemEnv& chem_env, const Tensor<T>&
   std::vector<std::string> one_body_blocks = {"aa_oo", "aa_ov", "aa_vo", "aa_vv",
                                               "bb_oo", "bb_ov", "bb_vo", "bb_vv"};
 
-  auto set_label = [&Oa, &Va, &Ob, &Vb, &CI](TiledIndexLabel& label, char spin, char occ) {
+  auto set_label = [&Oa, &Va, &Ob, &Vb](TiledIndexLabel& label, char spin, char occ) {
     if(spin == 'a') {
       if(occ == 'v') std::tie(label) = Va.labels<1>("all");
       else std::tie(label) = Oa.labels<1>("all");

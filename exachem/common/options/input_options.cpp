@@ -93,6 +93,7 @@ void SCFOptions::print() {
   print_option("restart_size", restart_size, 18);
   print_option("restart", restart, 18);
   print_option("debug", debug, 18);
+  print_option("profile", profile, 18);
   if(restart) print_option("noscf", noscf, 18);
   // if(sad) print_option("sad", sad, 18);
   if(mulliken_analysis || mos_txt || mo_vectors_analysis.first) {
@@ -145,7 +146,7 @@ void CCSDOptions::print() {
   print_option("readt", readt, 22);
   print_option("writet", writet, 22);
   print_option("writet_iter", writet_iter, 22);
-  print_option("profile_ccsd", profile_ccsd, 22);
+  print_option("profile", profile, 22);
   print_option("balance_tiles", balance_tiles, 22);
 
   if(!dlpno_dfbasis.empty()) print_option("dlpno_dfbasis", dlpno_dfbasis, 22);
@@ -166,7 +167,6 @@ void CCSDOptions::print() {
     print_option("gf_os", gf_os, 22);
     print_option("gf_cs", gf_cs, 22);
     print_option("gf_restart", gf_restart, 22);
-    print_option("gf_profile", gf_profile, 22);
     print_option("gf_itriples", gf_itriples, 22);
     print_option("gf_ndiis", gf_ndiis, 22);
     print_option("gf_ngmres", gf_ngmres, 22);
@@ -218,6 +218,7 @@ void CommonOptions::print() {
   print_option("ang2au factor", exachem::constants::ang2bohr, 14, 10);
   // print_option("natoms_max", natoms_max, 14);
   print_option("debug", debug, 14);
+  print_option("profile", profile, 14);
   if(!file_prefix.empty()) print_option("file_prefix", file_prefix, 14);
   if(!output_dir.empty()) print_option("output_dir", output_dir, 14);
 

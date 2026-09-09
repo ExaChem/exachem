@@ -364,7 +364,6 @@ void exachem::scf::SCFQed<T>::compute_qed_emult_ints_deriv(
   using libint2::Shell;
 
   // auto& atoms = chem_env.atoms;
-  const SystemData&        sys_data    = chem_env.sys_data;
   const SCFOptions&        scf_options = chem_env.ioptions.scf_options;
   const libint2::BasisSet& shells      = chem_env.shells;
 
@@ -375,10 +374,10 @@ void exachem::scf::SCFQed<T>::compute_qed_emult_ints_deriv(
 
   int nopers = libint2::operator_traits<Operator::emultipole2>::nopers;
 
-  const auto natoms   = atoms.size();
-  const auto nresults = nopers * libint2::num_geometrical_derivatives(natoms, deriv_order);
+  const auto natoms = atoms.size();
+  // const auto nresults = nopers * libint2::num_geometrical_derivatives(natoms, deriv_order);
 
-  const int   nmodes  = sys_data.qed_nmodes;
+  // const int nmodes = chem_env.sys_data.qed_nmodes;
   const auto& lambdas = scf_options.qed_lambdas;
   const auto& polvecs = scf_options.qed_polvecs;
 
@@ -432,7 +431,7 @@ void exachem::scf::SCFQed<T>::compute_qed_emult_ints_deriv(
         // compute shell pair; return is the pointer to the buffer
         engine.compute(shells[s1], shells[s2]);
         if(buf[0] == nullptr) continue;
-        EXPECTS(buf.size() >= nopers * 6);
+        EXPECTS(buf.size() >= static_cast<size_t>(nopers * 6));
 
         std::size_t shellset_idx = 0;
         for(unsigned long c = 0; c != 2; ++c) {

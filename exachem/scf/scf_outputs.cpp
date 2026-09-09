@@ -786,9 +786,9 @@ void exachem::scf::SCFIO<T>::rw_md_disk(ExecutionContext& ec, const ChemEnv& che
                                         ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors,
                                         EigenTensors& etensors, const std::string& files_prefix,
                                         bool read) const {
-  const auto rank   = ec.pg().rank();
-  const bool is_uhf = chem_env.sys_data.is_unrestricted;
-  const auto debug  = chem_env.ioptions.scf_options.debug;
+  const auto rank    = ec.pg().rank();
+  const bool is_uhf  = chem_env.sys_data.is_unrestricted;
+  const auto profile = chem_env.ioptions.scf_options.profile;
 
   const std::string movecsfile_alpha  = files_prefix + ".alpha.movecs";
   const std::string densityfile_alpha = files_prefix + ".alpha.density";
@@ -820,28 +820,28 @@ void exachem::scf::SCFIO<T>::rw_md_disk(ExecutionContext& ec, const ChemEnv& che
 #if !defined(USE_SERIAL_IO)
   if(read) {
     if(rank == 0) cout << "Reading movecs and density files from disk ... ";
-    read_from_disk_group(ec, tensor_list, tensor_fnames, debug);
+    read_from_disk_group(ec, tensor_list, tensor_fnames, profile);
     if(rank == 0) cout << "done" << endl;
   }
-  else write_to_disk_group(ec, tensor_list, tensor_fnames, debug);
+  else write_to_disk_group(ec, tensor_list, tensor_fnames, profile);
 
 #else
   if(read) {
     if(rank == 0) cout << "Reading movecs and density files from disk ... ";
-    rw_mat_disk(ttensors.C_alpha, movecsfile_alpha, debug, true);
-    rw_mat_disk(ttensors.D_alpha, densityfile_alpha, debug, true);
+    rw_mat_disk(ttensors.C_alpha, movecsfile_alpha, profile, true);
+    rw_mat_disk(ttensors.D_alpha, densityfile_alpha, profile, true);
     if(is_uhf) {
-      rw_mat_disk(ttensors.C_beta, movecsfile_beta, debug, true);
-      rw_mat_disk(ttensors.D_beta, densityfile_beta, debug, true);
+      rw_mat_disk(ttensors.C_beta, movecsfile_beta, profile, true);
+      rw_mat_disk(ttensors.D_beta, densityfile_beta, profile, true);
     }
     if(rank == 0) cout << "done" << endl;
   }
   else {
-    rw_mat_disk(ttensors.C_alpha, movecsfile_alpha, debug);
-    rw_mat_disk(ttensors.D_alpha, densityfile_alpha, debug);
+    rw_mat_disk(ttensors.C_alpha, movecsfile_alpha, profile);
+    rw_mat_disk(ttensors.D_alpha, densityfile_alpha, profile);
     if(is_uhf) {
-      rw_mat_disk(ttensors.C_beta, movecsfile_beta, debug);
-      rw_mat_disk(ttensors.D_beta, densityfile_beta, debug);
+      rw_mat_disk(ttensors.C_beta, movecsfile_beta, profile);
+      rw_mat_disk(ttensors.D_beta, densityfile_beta, profile);
     }
   }
 #endif

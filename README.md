@@ -26,7 +26,7 @@ Build instructions are available [here](https://exachem.readthedocs.io/en/latest
 ## ExaChem Citation
 #### Please cite the following reference when publishing results obtained with ExaChem. 
 
-Panyala, Ajay; Bauman, Nicholas; Mejia Rodriguez, Daniel; Pathak, Himadri; Peng, Bo; Marcus Liebenthal; Murphy, David; Nandipati, Giridhar; Mutlu, Erdal; Krishnamoorthy, Sriram; Apra, Edo; Xantheas, Sotiris; Govind, Niranjan; Kowalski, Karol. **ExaChem: Open Source Exascale Computational Chemistry Software.** https://github.com/ExaChem/exachem [DOI:10.11578/dc.20230628.1](https://doi.org/10.11578/dc.20230628.1)
+A. Panyala, N. P. Bauman, D. Mejia Rodriguez, N. Govind, K. Kowalski, E. Apra, A. Bagusetty, K. Kleiner, S. Krishnamoorthy, M. Liebenthal, C. D. Mapa, D. Murphy, E. Mutlu, G. Nandipati, B. Peng, H. Pathak, S. Xantheas. **ExaChem: Open Source Exascale Computational Chemistry Software.** https://github.com/ExaChem/exachem [DOI:10.11578/dc.20260828.3](https://doi.org/10.11578/dc.20260828.3)
 
 #### Please cite the following reference in addition if using the ground-state closed-shell CCSD and CCSD(T) capabilities.
 
@@ -34,7 +34,7 @@ Kowalski, Karol, Bair, Raymond, Bauman, Nicholas P., Boschen, Jeffery S., Bylask
 
 ## Acknowledgements
 
-The TAMM library (core infrastructure and current optimizations), the ground-state formulations of the closed-shell CCSD, and CCSD(T) methods have been supported by the [NWChemEx](https://nwchemex.github.io/NWChemEx) project, funded through the [Exascale Computing Project ECP](https://www.exascaleproject.org) (17-SC-20-SC), a collaborative effort of the U.S. Department of Energy Office of Science and the National Nuclear Security Administration. 
+The TAMM library (core infrastructure and initial optimizations), the ground-state formulations of the closed-shell CCSD, and CCSD(T) methods have been supported by the [NWChemEx](https://nwchemex.github.io/NWChemEx) project, funded through the [Exascale Computing Project ECP](https://www.exascaleproject.org) (17-SC-20-SC), a collaborative effort of the U.S. Department of Energy Office of Science and the National Nuclear Security Administration. 
 
 The development of additional TAMM infrastructure extensions, optimizations and methodologies (HF, MP2, CC2, CCSD-Lambda, EOM-CCSD, RT-EOM-CCSD, and GFCCSD) are supported by the Center for **S**calable **P**redictive Methods for **E**xcitations and **C**orrelated Phenomena  [(SPEC)](https://spec.labworks.org/home) under FWP 70942.
 

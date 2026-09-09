@@ -143,7 +143,7 @@ void exachem::scf::SCFGradients::scf_gradients(ExecutionContext& ec, ChemEnv& ch
       }
     }
     if(is_qed) {
-      const int   nmodes  = chem_env.sys_data.qed_nmodes;
+      // const int nmodes = chem_env.sys_data.qed_nmodes;
       const auto& lambdas = chem_env.ioptions.scf_options.qed_lambdas;
       const auto& polvecs = chem_env.ioptions.scf_options.qed_polvecs;
 

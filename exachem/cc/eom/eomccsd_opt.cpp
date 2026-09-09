@@ -274,7 +274,7 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
   double eomthresh = ccsd_options.eom_threshold;
   //    double x2guessthresh = 0.6; //THRESHOLD FOR X2 INITIAL GUESS (LATER IMPLEMENTATION)
   const int  microeomiter = ccsd_options.eom_microiter; // Number of iterations in a microcycle
-  const bool profile      = ccsd_options.profile_ccsd;
+  const bool profile      = ccsd_options.profile;
 
   const TiledIndexSpace& O = MO("occ");
   const TiledIndexSpace& V = MO("virt");

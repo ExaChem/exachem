@@ -72,6 +72,7 @@ protected:
 class CommonOptions: public PrintOptions {
 public:
   bool         debug{false};
+  bool         profile{false};
   int          maxiter{100};
   std::string  basis{"sto-3g"};
   std::string  dfbasis{};
@@ -223,9 +224,7 @@ public:
   bool                    gf_os{false};
   bool                    gf_cs{true};
   bool                    gf_itriples{false};
-  bool                    gf_profile{false};
   bool                    balance_tiles{true};
-  bool                    profile_ccsd{false};
   double                  lshift{0.0};
   bool                    noprint{false};
   bool                    ccsd_diagnostics{false};

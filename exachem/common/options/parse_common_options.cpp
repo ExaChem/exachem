@@ -63,6 +63,7 @@ void ParseCommonOptions::parse(ChemEnv& chem_env) {
   if(jinput.contains("common")) {
     parse_option<int>(common_options.maxiter, jinput["common"], "maxiter");
     parse_option<bool>(common_options.debug, jinput["common"], "debug");
+    parse_option<bool>(common_options.profile, jinput["common"], "profile");
     parse_option<std::string>(common_options.file_prefix, jinput["common"], "file_prefix");
     parse_option<std::string>(common_options.output_dir, jinput["common"], "output_dir");
   }

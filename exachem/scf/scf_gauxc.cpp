@@ -139,7 +139,8 @@ SCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
       int xc_id = xc_functional_get_number(xcfunc.c_str());
       if(xc_id < 0) { tamm_terminate("Functional not found in LibXC: " + xcfunc); }
       xc_func_type kernel_;
-      int          info = xc_func_init(&kernel_, xc_id, XC_UNPOLARIZED);
+      if(xc_func_init(&kernel_, xc_id, XC_UNPOLARIZED) != 0)
+        tamm_terminate("LibXC failed to initialize functional: " + xcfunc);
 
       if(kernel_.info->flags & XC_FLAGS_VV10)
         tamm_terminate("VV10 nonlocal correlation functionals are not currently supported");

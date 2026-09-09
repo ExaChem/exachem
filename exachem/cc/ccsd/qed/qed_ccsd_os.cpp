@@ -84,7 +84,7 @@ std::tuple<double, double> ccsd_v2_driver(
   bool        writet      = chem_env.ioptions.ccsd_options.writet;
   int         writet_iter = chem_env.ioptions.ccsd_options.writet_iter;
   double      zshiftl     = chem_env.ioptions.ccsd_options.lshift;
-  bool        profile     = chem_env.ioptions.ccsd_options.profile_ccsd;
+  bool        profile     = chem_env.ioptions.ccsd_options.profile;
   double      residual    = 0.0;
   double      energy      = 0.0;
   int         niter       = 0;

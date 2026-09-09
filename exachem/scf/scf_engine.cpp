@@ -90,7 +90,6 @@ void exachem::scf::SCFEngine::reset_tolerences(ExecutionContext& exc, ChemEnv& c
 void exachem::scf::SCFEngine::write_dplot_data(ExecutionContext& ec, ChemEnv& chem_env) {
   const auto& dplot_opt = chem_env.ioptions.dplot_options;
   const bool  is_uhf    = chem_env.sys_data.is_unrestricted;
-  const auto  rank      = ec.pg().rank();
 
   // if(dplot_opt.density == "spin") // TODO
   // else plot total density by default when cube=true
@@ -105,6 +104,7 @@ void exachem::scf::SCFEngine::write_dplot_data(ExecutionContext& ec, ChemEnv& ch
   tamm_to_eigen_tensor(scf_data.ttensors.C_alpha, scf_data.etensors.C_alpha);
   if(is_uhf) tamm_to_eigen_tensor(scf_data.ttensors.C_beta, scf_data.etensors.C_beta);
 #else
+  const auto rank = ec.pg().rank();
   if(rank != 0) {
     scf_data.etensors.C_alpha.resize(chem_env.sys_data.nbf_orig, chem_env.sys_data.nbf);
     if(is_uhf) {
@@ -235,14 +235,14 @@ void exachem::scf::SCFEngine::scf_orthogonalizer(ExecutionContext& ec, ChemEnv& 
         scf_data.ttensors.X_alpha.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
         Tensor<TensorType>::allocate(&scalapack_info.ec, scf_data.ttensors.X_alpha);
         scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
-                               chem_env.ioptions.scf_options.debug, true);
+                               chem_env.ioptions.scf_options.profile, true);
       }
     }
 #else
     scf_data.ttensors.X_alpha = {scf_data.tAO, scf_data.tAO_ortho};
     sch.allocate(scf_data.ttensors.X_alpha).execute();
     scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
-                           chem_env.ioptions.scf_options.debug, true);
+                           chem_env.ioptions.scf_options.profile, true);
 #endif
   }
   else {
@@ -258,10 +258,10 @@ void exachem::scf::SCFEngine::scf_orthogonalizer(ExecutionContext& ec, ChemEnv& 
 #if defined(USE_SCALAPACK)
       if(scalapack_info.pg.is_valid())
         scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
-                               chem_env.ioptions.scf_options.debug);
+                               chem_env.ioptions.scf_options.profile);
 #else
       scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
-                             chem_env.ioptions.scf_options.debug);
+                             chem_env.ioptions.scf_options.profile);
 #endif
     }
   }
@@ -429,24 +429,24 @@ void exachem::scf::SCFEngine::scf_final_io(ExecutionContext& ec, const ChemEnv& 
   }
 
   scf_output.rw_mat_disk(scf_data.ttensors.H1, fname[FileType::Hcore],
-                         chem_env.ioptions.scf_options.debug);
+                         chem_env.ioptions.scf_options.profile);
   if(chem_env.sys_data.is_ks) {
     // write vxc to disk
     scf_output.rw_mat_disk(scf_data.ttensors.VXC_alpha, fname[FileType::VxcAlpha],
-                           chem_env.ioptions.scf_options.debug);
+                           chem_env.ioptions.scf_options.profile);
     if(chem_env.sys_data.is_unrestricted)
       scf_output.rw_mat_disk(scf_data.ttensors.VXC_beta, fname[FileType::VxcBeta],
-                             chem_env.ioptions.scf_options.debug);
+                             chem_env.ioptions.scf_options.profile);
   }
   if(chem_env.sys_data.is_qed) {
     scf_output.rw_mat_disk(scf_data.ttensors.QED_Dx, fname[FileType::QEDDx],
-                           chem_env.ioptions.scf_options.debug);
+                           chem_env.ioptions.scf_options.profile);
     scf_output.rw_mat_disk(scf_data.ttensors.QED_Dy, fname[FileType::QEDDy],
-                           chem_env.ioptions.scf_options.debug);
+                           chem_env.ioptions.scf_options.profile);
     scf_output.rw_mat_disk(scf_data.ttensors.QED_Dz, fname[FileType::QEDDz],
-                           chem_env.ioptions.scf_options.debug);
+                           chem_env.ioptions.scf_options.profile);
     scf_output.rw_mat_disk(scf_data.ttensors.QED_Qxx, fname[FileType::QEDQxx],
-                           chem_env.ioptions.scf_options.debug);
+                           chem_env.ioptions.scf_options.profile);
   }
 } // scf_final_io
 
@@ -499,8 +499,8 @@ void exachem::scf::SCFEngine::add_snk_contribution(ExecutionContext& ec, const C
     const auto snK_stop = std::chrono::high_resolution_clock::now();
     const auto snK_time =
       std::chrono::duration_cast<std::chrono::duration<double>>((snK_stop - snK_start)).count();
-    const auto debug = chem_env.ioptions.scf_options.debug;
-    if(rank == 0 && debug)
+    const auto profile = chem_env.ioptions.scf_options.profile;
+    if(rank == 0 && profile)
       std::cout << std::fixed << std::setprecision(2) << "snK: " << snK_time << "s, ";
   }
 } // add_nk_contribution
@@ -519,8 +519,8 @@ void exachem::scf::SCFEngine::compute_update_xc(ExecutionContext& ec, const Chem
     const auto xcf_stop = std::chrono::high_resolution_clock::now();
     const auto xcf_time =
       std::chrono::duration_cast<std::chrono::duration<double>>((xcf_stop - xcf_start)).count();
-    const auto debug = chem_env.ioptions.scf_options.debug;
-    if(rank == 0 && debug)
+    const auto profile = chem_env.ioptions.scf_options.profile;
+    if(rank == 0 && profile)
       std::cout << std::fixed << std::setprecision(2) << "xcf: " << xcf_time << "s, ";
     if(chem_env.sys_data.is_qed && !chem_env.sys_data.do_qed) { scf_data.eqed = gauxc_exc; }
   }
@@ -810,10 +810,10 @@ exachem::scf::SCFEngine::update_movecs(ExecutionContext& ec, ChemEnv& chem_env) 
   schg.execute();
 
   scf_output.rw_mat_disk(C_alpha_tamm, fname[FileType::AlphaMovecs],
-                         chem_env.ioptions.scf_options.debug, true);
+                         chem_env.ioptions.scf_options.profile, true);
   if(chem_env.sys_data.is_unrestricted)
     scf_output.rw_mat_disk(C_beta_tamm, fname[FileType::BetaMovecs],
-                           chem_env.ioptions.scf_options.debug, true);
+                           chem_env.ioptions.scf_options.profile, true);
 
   if(rank == 0 && (chem_env.ioptions.scf_options.molden || chem_env.ioptions.scf_options.nwchem)) {
     Matrix C_a = tamm_to_eigen_matrix(C_alpha_tamm);

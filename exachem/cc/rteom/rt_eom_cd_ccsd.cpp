@@ -566,7 +566,7 @@ void RT_EOM_CD_CCSD<T>::rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec,
   const bool   writet      = chem_env.ioptions.ccsd_options.writet;
   const int    writet_iter = chem_env.ioptions.ccsd_options.writet_iter;
   // double zshiftl     = chem_env.ioptions.ccsd_options.lshift;
-  const bool profile = chem_env.ioptions.ccsd_options.profile_ccsd;
+  const bool profile = chem_env.ioptions.ccsd_options.profile;
   // T    residual = 0.0;
   // T    energy   = 0.0;
   // int    niter       = 0;

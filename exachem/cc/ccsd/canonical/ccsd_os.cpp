@@ -44,7 +44,7 @@ void residuals(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO, con
   TensorMap<T> tmps, scalars;
 
   const auto timer_start = std::chrono::high_resolution_clock::now();
-  const auto profile     = chem_env.ioptions.ccsd_options.profile_ccsd;
+  const auto profile     = chem_env.ioptions.ccsd_options.profile;
 
   {
     tmps["bin1_aa_oo"]     = declare<T>(chem_env, "bin1_aa_oo");
@@ -2709,7 +2709,7 @@ ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& M
   bool        writet      = chem_env.ioptions.ccsd_options.writet;
   int         writet_iter = chem_env.ioptions.ccsd_options.writet_iter;
   double      zshiftl     = chem_env.ioptions.ccsd_options.lshift;
-  bool        profile     = chem_env.ioptions.ccsd_options.profile_ccsd;
+  bool        profile     = chem_env.ioptions.ccsd_options.profile;
   double      residual    = 0.0;
   double      energy      = 0.0;
   int         niter       = 0;

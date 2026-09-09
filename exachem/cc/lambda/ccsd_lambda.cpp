@@ -460,7 +460,7 @@ std::tuple<double, double> exachem::cc::ccsd_lambda::CCSDLambda_Engine<T>::lambd
   const int    maxiter  = chem_env.ioptions.ccsd_options.ccsd_maxiter;
   const int    ndiis    = chem_env.ioptions.ccsd_options.ndiis;
   const double thresh   = chem_env.ioptions.ccsd_options.threshold;
-  const bool   profile  = chem_env.ioptions.ccsd_options.profile_ccsd;
+  const bool   profile  = chem_env.ioptions.ccsd_options.profile;
 
   const TAMM_SIZE n_occ_alpha = static_cast<TAMM_SIZE>(sys_data.n_occ_alpha);
   const TAMM_SIZE n_occ_beta  = static_cast<TAMM_SIZE>(sys_data.n_occ_beta);

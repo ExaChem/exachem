@@ -614,7 +614,7 @@ void exachem::scf::SCFCompute<T>::compute_density(ExecutionContext& ec, const Ch
   auto do_t2   = std::chrono::high_resolution_clock::now();
   auto do_time = std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
 
-  if(rank == 0 && scf_options.debug)
+  if(rank == 0 && scf_options.profile)
     std::cout << std::fixed << std::setprecision(2) << "density: " << do_time << "s " << std::endl;
 }
 

@@ -46,8 +46,8 @@ void ECOptionParser::parse_n_check(std::string_view filename, json& jinput) {
                      "] in the input file");
   }
 
-  const std::vector<std::string> valid_common{"comments", "maxiter", "debug", "file_prefix",
-                                              "output_dir"};
+  const std::vector<std::string> valid_common{"comments", "maxiter",     "debug",
+                                              "profile",  "file_prefix", "output_dir"};
   if(jinput.contains("common")) {
     for(auto& el: jinput["common"].items()) {
       if(std::find(valid_common.begin(), valid_common.end(), el.key()) == valid_common.end()) {

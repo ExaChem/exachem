@@ -79,7 +79,7 @@
     "writet_iter": 5,
 
     "debug": false,
-    "profile_ccsd": false,
+    "profile": false,
     "balance_tiles": true
   },
 

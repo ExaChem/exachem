@@ -24,6 +24,8 @@ int main(int argc, char* argv[]) {
     std::cout << tamm_git_info() << std::endl;
   }
 
+  auto ec_t1 = std::chrono::high_resolution_clock::now();
+
   std::ostringstream cur_date;
   if(rank == 0) {
     auto current_time   = std::chrono::system_clock::now();
@@ -190,6 +192,13 @@ int main(int argc, char* argv[]) {
     if(ec.print()) chem_env.write_run_context();
 
   } // loop over input files
+
+  auto                          ec_t2       = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> ec_duration = ec_t2 - ec_t1;
+  if(rank == 0)
+    std::cout << std::endl
+              << "Total ExaChem runtime: " << ec_duration.count() << " secs" << std::endl
+              << std::endl;
 
   ec.flush_and_sync();
   ec.pg().destroy_coll();

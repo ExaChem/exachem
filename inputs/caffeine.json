@@ -49,7 +49,7 @@
     "CCSD(T)": {
       "ccsdt_tilesize": 28
     },
-    "profile_ccsd": false,
+    "profile": false,
     "EOMCCSD": {
       "eom_nroots": 4
     }

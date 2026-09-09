@@ -157,7 +157,7 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   const size_t ndiis        = ccsd_options.gf_ndiis;
   const double gf_eta       = ccsd_options.gf_eta;
-  const bool   gf_profile   = ccsd_options.gf_profile;
+  const bool   gf_profile   = ccsd_options.profile;
   const double gf_threshold = ccsd_options.gf_threshold;
 
   const double omega_min_ip  = ccsd_options.gf_omega_min_ip;

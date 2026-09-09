@@ -24,7 +24,7 @@ void ParseSCFOptions::parse_check(json& jinput) {
   const std::vector<std::string> valid_scf{"charge", "multiplicity", "lshift", "tol_int", "tol_sch",
     "tol_lindep", "conve", "convd", "diis_hist","tilesize","df_tilesize",
     "damp","writem","nnodes","restart","noscf", "molden", "moldenfile", "guess",
-    "debug","scf_type", "n_lindep","restart_size","scalapack_nb",
+    "debug","profile","scf_type", "n_lindep","restart_size","scalapack_nb",
     "scalapack_np_row", "scalapack_np_col", "ext_data_path", "PRINT",
     "qed_omegas", "qed_lambdas", "qed_volumes", "qed_polvecs", "hubbard",
     "direct_df", "DFT", "cuscf", "comments", "nwchem", "nwmovecsfile"};
@@ -76,6 +76,7 @@ void ParseSCFOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(scf_options.restart, jscf, "restart");
   parse_option<bool>(scf_options.noscf, jscf, "noscf");
   parse_option<bool>(scf_options.debug, jscf, "debug");
+  parse_option<bool>(scf_options.profile, jscf, "profile");
   parse_option<std::string>(scf_options.scf_type, jscf, "scf_type");
   parse_option<bool>(scf_options.cuscf, jscf, "cuscf");
   parse_option<bool>(scf_options.direct_df, jscf, "direct_df");
@@ -182,6 +183,7 @@ void ParseSCFOptions::update_common_options(ChemEnv& chem_env) {
   CommonOptions& common_options = chem_env.ioptions.common_options;
 
   scf_options.debug         = common_options.debug;
+  scf_options.profile       = common_options.profile;
   scf_options.maxiter       = common_options.maxiter;
   scf_options.basis         = common_options.basis;
   scf_options.dfbasis       = common_options.dfbasis;

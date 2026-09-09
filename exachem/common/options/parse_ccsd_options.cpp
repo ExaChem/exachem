@@ -28,7 +28,7 @@ void ParseCCSDOptions::parse_check(json& jinput) {
       "readt",    "writet",       "writet_iter",  "debug",
       "nactive_oa", "nactive_ob", "nactive_va", "nactive_vb", 
       "qflow_cycles", "qflow_threshold", "qflow_nproc_pc",
-      "profile_ccsd", "balance_tiles",  "ext_data_path"};
+      "profile",      "balance_tiles",  "ext_data_path"};
   // clang-format on
   for(auto& el: jinput["CC"].items()) {
     if(std::find(valid_cc.begin(), valid_cc.end(), el.key()) == valid_cc.end())
@@ -60,7 +60,7 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(cc_options.writet, jcc, "writet");
   parse_option<int>(cc_options.writet_iter, jcc, "writet_iter");
   parse_option<bool>(cc_options.balance_tiles, jcc, "balance_tiles");
-  parse_option<bool>(cc_options.profile_ccsd, jcc, "profile_ccsd");
+  parse_option<bool>(cc_options.profile, jcc, "profile");
   parse_option<string>(cc_options.ext_data_path, jcc, "ext_data_path");
 
   json jcc_print = jcc["PRINT"];
@@ -155,7 +155,6 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(cc_options.gf_os      , jgfcc, "gf_os");
   parse_option<bool>(cc_options.gf_cs      , jgfcc, "gf_cs");
   parse_option<bool>(cc_options.gf_restart , jgfcc, "gf_restart");
-  parse_option<bool>(cc_options.gf_profile , jgfcc, "gf_profile");
   parse_option<bool>(cc_options.gf_itriples, jgfcc, "gf_itriples");
 
   parse_option<int>   (cc_options.gf_ndiis            , jgfcc, "gf_ndiis");
@@ -203,6 +202,7 @@ void ParseCCSDOptions::update_common_options(ChemEnv& chem_env) {
   CommonOptions& common_options = chem_env.ioptions.common_options;
 
   cc_options.debug         = common_options.debug;
+  cc_options.profile       = common_options.profile;
   cc_options.maxiter       = common_options.maxiter;
   cc_options.basis         = common_options.basis;
   cc_options.dfbasis       = common_options.dfbasis;

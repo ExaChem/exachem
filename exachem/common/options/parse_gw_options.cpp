@@ -44,6 +44,7 @@ void ParseGWOptions::update_common_options(ChemEnv& chem_env) {
   CommonOptions& common_options = chem_env.ioptions.common_options;
 
   gw_options.debug         = common_options.debug;
+  gw_options.profile       = common_options.profile;
   gw_options.maxiter       = common_options.maxiter;
   gw_options.basis         = common_options.basis;
   gw_options.dfbasis       = common_options.dfbasis;

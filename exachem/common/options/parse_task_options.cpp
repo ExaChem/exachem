@@ -65,6 +65,7 @@ void ParseTaskOptions::update_common_options(ChemEnv& chem_env) {
   CommonOptions& common_options = chem_env.ioptions.common_options;
 
   task_options.debug         = common_options.debug;
+  task_options.profile       = common_options.profile;
   task_options.maxiter       = common_options.maxiter;
   task_options.basis         = common_options.basis;
   task_options.dfbasis       = common_options.dfbasis;

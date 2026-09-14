@@ -29,7 +29,7 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
    "writet_iter": 5,
  
    "debug": false,
-   "profile_ccsd": false,
+   "profile": false,
 
    "freeze": {
       "atomic": false,
@@ -80,9 +80,9 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
 
 :writet_iter: ``[default=ndiis]`` This option requires ``writet=true``. An integer that determines the frequency of writing tensors to disk for restart purposes. The tensors are written to disk after every *writet_iter* iterations. 
 
-:debug: ``[default=false]`` enable verbose printing for debugging a CC calculation.
+:debug: ``[default=false]`` enable diagnostic printing for CC calculations.
 
-:profile_ccsd: ``[default=false]`` When enabled, writes a csv file containing the performance data for every tensor contraction. Useful for profiling contractions in a single iteration by setting ``ccsd_maxiter=1``.
+:profile: ``[default=false]`` When enabled, writes a csv file containing the performance data for every tensor contraction. Useful for profiling contractions. Also applies to the sub-sections (*EOMCCSD*, *GFCCSD*, etc).
 
 :freeze: This block allows specifying freezing options. Some of the lowest-lying core orbitals and/or some of the highest-lying virtual orbitals may be excluded using this block. No orbitals are frozen by default.
 
@@ -260,7 +260,9 @@ The RT-EOMCCSD procedure is described in the following paper.
    "rt_multiplier": 0.5
  }
 
-:pcore: ``[default=0]`` The occupied orbital with its corresponding index needs to be moved to a virtual orbital while maintaining a hole in the occupied subspace. The SCF eigenvector analysis assists in selecting the appropriate index for this orbital. Note that the value for `pcore` orbitals should be provided starting from 1, rather than 0. The *RT-EOMCCSD* calculation currently requires the **exachem** executable to be run twice. For the first run, task ``cd_2e`` needs to be enabled and ``scf_type`` set to ``restricted`` in the SCF block. In this run, a *Hartree-Fock* calculation is performed, the coefficient matrix and the fock matrix (in MSO basis) are written to disk. The subsequent run skips *Hartree-Fock*, reads these matrices and performs the actual *RT-EOMCCSD* calculation. This run requires ``scf_type`` set to ``unrestricted`` with the appropriate `charge` and `multiplicity` values in the SCF block and task ``rteom_ccsd`` enabled.
+:pcore: ``[default=0]`` The occupied orbital with its corresponding index needs to be moved to a virtual orbital while maintaining a hole in the occupied subspace. The SCF eigenvector analysis assists in selecting the appropriate index for this orbital. Note that the value for `pcore` orbitals should be provided starting from 1, rather than 0. A value greater than 0 is required for an *RT-EOMCCSD* calculation.
+
+The input file for an *RT-EOMCCSD* calculation describes the closed-shell **reference** system: the SCF block must have ``scf_type`` set to ``restricted`` with the charge and multiplicity of the neutral system, and task ``rteom_ccsd`` enabled. The *RT-EOMCCSD* calculation itself is performed on the **core-hole** state, obtained by removing one beta electron from the orbital selected by `pcore` while keeping the reference orbitals. When task ``rteom_ccsd`` is specified, **exachem** runs both steps automatically: a *Hartree-Fock* calculation on the reference system, after which the coefficient matrix and the fock matrix (in MSO basis) are written to disk; then the SCF options are rewritten for the core-hole system (``charge`` + 1, ``multiplicity`` 2, ``scf_type`` ``unrestricted``, ``noscf``) and the reference matrices are read back to set up and run the *RT-EOMCCSD* calculation.
 
 :rt_threshold: ``[default=1e-6]`` Specifies the convergence threshold for the time-dependent EOMCCSD calculation.
 

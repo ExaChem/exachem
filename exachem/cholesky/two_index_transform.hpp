@@ -143,10 +143,13 @@ public:
 
     std::string err_msg{};
 
-    const int pcore = chem_env.ioptions.ccsd_options.pcore - 1; // 0-based indexing
+    // pcore (RT-EOMCC core-hole orbital) is only meaningful for the RT-EOMCC tasks
+    const TaskOptions& task     = chem_env.ioptions.task_options;
+    const bool         is_rteom = task.rteom_ccsd || task.rteom_cc2;
+    const int pcore = is_rteom ? chem_env.ioptions.ccsd_options.pcore - 1 : -1; // 0-based indexing
 
     if(rank == 0) {
-      cout << std::endl << "-----------------------------------------------------" << endl;
+      cout << std::endl << std::string(60, '-') << endl;
       cout << "Begin 2-index transformation ... " << endl;
       cout << std::endl
            << "nAO, nMO, nelectrons = " << nao << ", " << N << ", " << n_occ_alpha + n_occ_beta
@@ -283,10 +286,10 @@ public:
       std::cout << std::endl
                 << "Time taken for Fao->Fmo transform: " << std::fixed << std::setprecision(2)
                 << hf_time << " secs" << endl;
-      cout << std::endl << "-----------------------------------------------------" << endl;
+      cout << std::endl << std::string(60, '-') << endl;
     }
-    if(pcore >= 0 && is_rhf)
-      tamm_terminate("[RHF] pcore>=0 selected, fock and movecs written to disk");
+    if(pcore >= 0 && is_rhf && rank == 0)
+      cout << "[RT-EOMCC] reference (RHF) fock and movecs written to disk" << endl;
   }
 }; // class TwoIndexTransform
 

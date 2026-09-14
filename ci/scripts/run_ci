@@ -65,7 +65,6 @@ $MPIEXEC $EXE_PATH $CHEM_INP/h2o_ducc.json
 
 #RT-EOM-CCSD
 $MPIEXEC $EXE_PATH $CHEM_INP/ozone.json
-$MPIEXEC $EXE_PATH $CHEM_INP/ozone_td.json
 
 #DFT
 $MPIEXEC $EXE_PATH $CHEM_INP/cr2.json

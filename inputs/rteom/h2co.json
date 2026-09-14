@@ -1,0 +1,51 @@
+{
+  "geometry": {
+    "coordinates": [
+     "H    0.000000000000000   0.942900000000000  -0.587600000000000",
+     "H    0.000000000000000  -0.942900000000000  -0.587600000000000",	    
+     "C    0.000000000000000   0.000000000000000   0.000000000000000",
+     "O    0.000000000000000   0.000000000000000   1.205000000000000"  
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "cc-pvdz"
+  },
+  "common": {
+    "maxiter": 150,
+    "file_prefix": "h2co",
+    "comments": {
+      "system": "formaldehyde"
+    } 
+  },
+  "SCF": {
+    "conve": 1e-9,
+    "convd": 1e-8,    
+    "scf_type": "restricted",
+    "PRINT": {
+      "mulliken": false,
+      "mo_vectors" : [true,0.15]
+    }    
+  },
+  "CD": {
+    "diagtol": 1e-6
+  },
+  "CC": {
+    "threshold": 1e-8,
+    "writet": true,
+    "debug": false,
+    "writet_iter": 1000,
+
+    "RT-EOMCC": {
+      "pcore"  : 1,
+      "ntimesteps": 20000,
+      "rt_microiter": 20,
+      "rt_threshold": 1e-6,
+      "rt_step_size": 0.025,
+      "rt_multiplier": 0.5
+    }
+  },
+  "TASK": {
+    "rteom_ccsd": true
+  }  
+}

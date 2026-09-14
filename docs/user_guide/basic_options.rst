@@ -53,7 +53,9 @@ Some common options supported are as follows:
 :maxiter: An integer used to specify the maximum number of iterations for all sections below.
    This value can be changed on a per section basis. ``[default: 100]``
 
-:debug: A boolean used to turn on debugging mode. ``[default: false]``
+:debug: A boolean used to turn on diagnostic output that helps verify a calculation is *correct*. ``[default: false]``
+
+:profile: A boolean used to turn on performance output - per-phase timings and the instrumentation that goes with them. ``[default: false]``
 
 :file_prefix: A string indicating the prefix for the name of the workspace folder where the results of a run are stored.
    It also forms the prefix for the files written to the workspace folder. The *default prefix* is the name of the input file without the *.json* extension.

@@ -47,6 +47,9 @@
         "debug": {
           "type": "boolean"
         },
+        "profile": {
+          "type": "boolean"
+        },
         "file_prefix": {
           "type": "string"
         },
@@ -139,6 +142,9 @@
           }
         },
         "debug": {
+          "type": "boolean"
+        },
+        "profile": {
           "type": "boolean"
         },
         "restart_size": {
@@ -334,7 +340,7 @@
         "debug": {
           "type": "boolean"
         },
-        "profile_ccsd": {
+        "profile": {
           "type": "boolean"
         },
         "balance_tiles": {
@@ -442,9 +448,6 @@
               "type": "boolean"
             },
             "gf_cs": {
-              "type": "boolean"
-            },
-            "gf_profile": {
               "type": "boolean"
             },
             "gf_restart": {

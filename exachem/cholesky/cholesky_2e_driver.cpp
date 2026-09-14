@@ -120,6 +120,15 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
 
     exachem::cholesky_2e::TwoIndexTransform<T> tit;
     tit.two_index_transform(ec, chem_env);
+
+    // RT-EOMCC reference (RHF) phase: two_index_transform has written the fock and movecs
+    // needed by the core-hole (UHF) phase; the RHF cholesky vectors are not needed.
+    const TaskOptions& task = chem_env.ioptions.task_options;
+    if((task.rteom_ccsd || task.rteom_cc2) && sys_data.is_restricted) {
+      Tensor<T>::deallocate(cd_context.d_f1, movecs_so, C_AO, F_AO);
+      return;
+    }
+
     if(do_cholesky) exachem::cholesky_2e::cholesky_2e<T>(ec, chem_env);
 
     MO = chem_env.is_context.MSO; // modified if freezing

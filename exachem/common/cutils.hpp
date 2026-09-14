@@ -27,9 +27,13 @@ using namespace tamm;
 //   return const_cast<T&>(v);
 // }
 
-inline auto sum_tensor_sizes = [](auto&&... t) {
-  return ((compute_tensor_size(t) + ...) * 8) / (1024 * 1024 * 1024.0);
-};
+// size of a tensor in GiB, accounting for the element type
+template<typename T>
+inline double tensor_size_gib(const Tensor<T>& t) {
+  return (compute_tensor_size(t) * sizeof(T)) / (1024 * 1024 * 1024.0);
+}
+
+inline auto sum_tensor_sizes = [](auto&&... t) { return (tensor_size_gib(t) + ...); };
 
 inline auto free_vec_tensors = [](auto&&... vecx) {
   (std::for_each(vecx.begin(), vecx.end(), [](auto& t) { t.deallocate(); }), ...);

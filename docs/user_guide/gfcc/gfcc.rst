@@ -389,13 +389,6 @@ The following shows the input file for the CCSD/GFCCSD calculation.
 
   Enable restart for all steps of the GFCC calculation.
 
-**gf_profile**
-   :sep:`|` :aspect:`Type:` bool
-   :sep:`|` :aspect:`Default:` false
-   :sep:`|`
-
-  Prints profiling information.
-
 Output File
 ~~~~~~~~~~~
 

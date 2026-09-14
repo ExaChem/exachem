@@ -7,6 +7,7 @@ set(RTEOM_SRCS
     )
 
 set(RTEOM_INCLUDES
+    ${RTEOM_SRCDIR}/rt_eom_common.hpp
     ${RTEOM_SRCDIR}/rt_eom_cd_ccsd.hpp
     )
 

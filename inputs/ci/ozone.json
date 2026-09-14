@@ -30,11 +30,12 @@
       "pcore": 1,
       "ntimesteps": 10,
       "rt_microiter": 10,
+      "rt_threshold": 1e-6,
       "rt_step_size": 0.025,
       "rt_multiplier": 0.5
     }    
   },
   "TASK": {
-    "cd_2e": true
+    "rteom_ccsd": true
   }
 }

@@ -8,6 +8,7 @@
 
 #include "exachem/cc/rteom/rt_eom_cd_ccsd.hpp"
 #include "exachem/cc/ccsd/ccsd_util.hpp"
+#include "exachem/cc/rteom/rt_eom_common.hpp"
 #include "exachem/cholesky/cholesky_2e_driver.hpp"
 
 using namespace tamm;
@@ -975,7 +976,11 @@ void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   const auto  rank     = ec.pg().rank();
   SystemData& sys_data = chem_env.sys_data;
 
+  // phase 1: reference (RHF) SCF; phase 2: core-hole (UHF, noscf) SCF + cholesky
+  const json ref_scf_results = rteom_reference_scf(ec, chem_env);
   cholesky_2e::cholesky_2e_driver(ec, chem_env);
+  // the core-hole SCF pass only sets up the environment; report the reference SCF instead
+  chem_env.sys_data.results["output"]["SCF"] = ref_scf_results;
 
   std::string files_dir    = chem_env.get_files_dir();
   std::string files_prefix = chem_env.get_files_prefix();

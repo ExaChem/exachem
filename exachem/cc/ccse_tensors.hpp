@@ -47,10 +47,9 @@ public:
     sch.execute();
   }
 
-  T sum_tensor_sizes() {
-    T total_size{};
-    for(auto x: allocated_tensors)
-      total_size += (compute_tensor_size(x) * 8) / (1024 * 1024 * 1024.0);
+  double sum_tensor_sizes() {
+    double total_size{};
+    for(auto x: allocated_tensors) total_size += tensor_size_gib(x);
     return total_size;
   }
 

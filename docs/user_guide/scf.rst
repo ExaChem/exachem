@@ -33,6 +33,7 @@ The values listed below are the defaults where few options are automatically adj
    "nnodes": 1,
    "writem": 1,
    "debug": false,
+   "profile": false,
    "restart": false,
    "noscf": false,
    "scf_type": "restricted",
@@ -120,7 +121,11 @@ The values listed below are the defaults where few options are automatically adj
 
 :noscf: ``[default=false]`` Computes only the SCF energy upon restart.
 
-:debug: ``[default=false]`` enable verbose printing for debugging a calculation.
+:debug: ``[default=false]`` enable diagnostic printing for checking that a calculation is
+   *correct*: electron counts from :math:`\mathrm{tr}(DS)`, 
+   multipole moments, per-contribution gradient breakdown, etc.
+
+:profile: ``[default=false]`` enable performance printing: per-phase timings (*Fock build*, *diagonalization*, etc).
 
 :scf_type: ``[default=restricted]``  The following values are supported
 

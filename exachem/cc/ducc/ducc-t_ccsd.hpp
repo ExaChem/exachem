@@ -335,7 +335,7 @@ auto op7 = (
           -1.0 * (LTOp)v2tensors.v2iabc(m, c, a, e) * (LTOp)t2(b, e, i, m) +    // PT ORDER = 2
           -(1.0/2.0) * (LTOp)v2tensors.v2ijka(m, n, i, a) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 2, Zero because of T_int
            1.0 * (LTOp)t1(a, m) * (LTOp)v2tensors.v2ijab(i, m, c, b) +    // PT ORDER = 3, Zero because of T_int
-          -1.0 * (LTOp)v2tensors.v2abcd(c, b, e, a) * (LTOp)t1(e, i)      // PT ORDER = 3
+          -1.0 * (LTOp)v2tensors.v2abcd(c, b, e, a) * (LTOp)t1(e, i) +    // PT ORDER = 3
           -1.0 * (LTOp)v2tensors.v2iajb(m, c, i, a) * (LTOp)t1(b, m) +    // PT ORDER = 3, Zero because of T_int
            1.0 * (LTOp)v2tensors.v2iajb(m, b, i, a) * (LTOp)t1(c, m)      // PT ORDER = 3, Zero because of T_int
            );
@@ -452,7 +452,7 @@ auto op2 = (
           -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, b) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 2
            (1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 3
           -(1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(e, m) * (LTOp)t1(a, n) +    // PT ORDER = 3, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, b) * (LTOp)t2(a, e, m, n)      // PT ORDER = 3
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, b) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 3
           -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)f1(n, e) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 3, Zero because of T_int
            1.0 * (LTOp)t1(b, m) * (LTOp)f1(n, m) * (LTOp)t1(a, n) +    // PT ORDER = 4, Zero because of T_int
           -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)f1(a, e) * (LTOp)t1(e, m) +    // PT ORDER = 4, Zero because of T_int
@@ -473,7 +473,7 @@ auto op3 = (
            1.0 * (LTOp)t1(e, m) * (LTOp)f1(e, f) * (LTOp)t2(a, f, i, m) +    // PT ORDER = 3
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, i) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 3
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(a, f) * (LTOp)t2(e, f, i, m) +    // PT ORDER = 3
-          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(a, m) * (LTOp)t1(e, i)      // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(a, m) * (LTOp)t1(e, i) +    // PT ORDER = 4
           -1.0 * (LTOp)f1(m, e) * (LTOp)t1(e, i) * (LTOp)t1(a, m) +    // PT ORDER = 4, Zero because of T_int
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, i) * (LTOp)t1(a, m)      // PT ORDER = 4, Zero because of T_int
            );
@@ -1281,7 +1281,7 @@ auto op3 = (
           -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, i) * (LTOp)t1(a, m) * (LTOp)t1(f, n) +    // PT ORDER = 5, Zero because of T_int
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, m) * (LTOp)t1(e, i) * (LTOp)t1(a, n) +    // PT ORDER = 6, Zero because of T_int
            (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, i) * (LTOp)t1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 6, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(a, f) * (LTOp)t1(e, i) * (LTOp)t1(f, m)      // PT ORDER = 6
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(a, f) * (LTOp)t1(e, i) * (LTOp)t1(f, m) +    // PT ORDER = 6
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, f) * (LTOp)t1(f, i) * (LTOp)t1(a, m)      // PT ORDER = 6, Zero because of T_int
            );
 

@@ -17,7 +17,8 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
                                          const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
                                          Tensor<T>& f1, cholesky_2e::V2Tensors<T>& v2tensors,
                                          IndexVector& occ_int_vec, IndexVector& virt_int_vec,
-                                         const int pos, std::stringstream& qfstr) {
+                                         const int pos, std::stringstream& qfstr,
+                                         QflowTimers& qflow_timers) {
   Scheduler   sch{ec};
   ExecutionHW ex_hw = ec.exhw();
   const auto  rank  = ec.pg().rank();
@@ -331,6 +332,8 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
                 << std::fixed << std::setprecision(2) << ducc_time << " secs" << std::endl;
   }
 
+  cc_t1 = std::chrono::high_resolution_clock::now();
+
   const auto fc_scalar = get_scalar(total_shift) - full_scf_energy + rep_energy;
   if(ducc_print) {
     std::cout << "Fully Contracted Scalar: " << std::setprecision(12) << fc_scalar << std::endl;
@@ -370,6 +373,11 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
     .execute(ex_hw);
   // clang-format on
 
+  cc_t2     = std::chrono::high_resolution_clock::now();
+  ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
+  ducc_total_time += ducc_time;
+  qflow_timers.ducc_time += ducc_total_time;
+
   auto new_energy = get_scalar(adj_scalar);
   auto shift      = get_scalar(total_shift);
 
@@ -394,181 +402,185 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
   // PRINT STATEMENTS
   // TODO: Everything is assuming closed shell. For open shell calculations,
   //       formats starting from the tensor contractions to printing must be reconsidered.
-  cc_t1 = std::chrono::high_resolution_clock::now();
-  ExecutionContext ec_dense{ec.pg(), DistributionKind::dense,
-                            MemoryManagerKind::ga}; // create ec_dense once
-  // const auto       nelectrons       = sys_data.nelectrons;
-  auto print_blockstr = [](std::string filename, std::string val, bool append = false) {
-    if(!filename.empty()) {
-      std::ofstream tos;
-      if(append) tos.open(filename + ".txt", std::ios::app);
-      else tos.open(filename + ".txt", std::ios::out);
-      if(!tos) std::cerr << "Error opening file " << filename << std::endl;
-      tos << val << std::endl;
-      tos.close();
+  // X1-X9 below are only used for the default (non-QFlow) DUCC task
+  if(chem_env.ioptions.task_options.ducc.second != "qflow") {
+    cc_t1 = std::chrono::high_resolution_clock::now();
+    ExecutionContext ec_dense{ec.pg(), DistributionKind::dense,
+                              MemoryManagerKind::ga}; // create ec_dense once
+    // const auto       nelectrons       = sys_data.nelectrons;
+    auto print_blockstr = [](std::string filename, std::string val, bool append = false) {
+      if(!filename.empty()) {
+        std::ofstream tos;
+        if(append) tos.open(filename + ".txt", std::ios::app);
+        else tos.open(filename + ".txt", std::ios::out);
+        if(!tos) std::cerr << "Error opening file " << filename << std::endl;
+        tos << val << std::endl;
+        tos.close();
+      }
+    };
+    const std::string results_file = files_prefix + ".ducc.results";
+
+    if(ducc_print) {
+      print_blockstr(results_file, "Begin IJ Block");
+      // std::cout << "Begin IJ Block" << std::endl;
     }
-  };
-  const std::string results_file = files_prefix + ".ducc.results";
 
-  if(ducc_print) {
-    print_blockstr(results_file, "Begin IJ Block");
-    // std::cout << "Begin IJ Block" << std::endl;
-  }
-
-  Tensor<T>                                X1       = to_dense_tensor(ec_dense, ftij);
-  std::function<bool(std::vector<size_t>)> dp_cond1 = [&](std::vector<size_t> cond) {
-    if(cond[0] < nactoa && cond[1] < nactoa && cond[0] <= cond[1]) return true;
-    // if(cond[0] < nelectrons_alpha && cond[1] < nelectrons_alpha && cond[0] <= cond[1]) return
-    // true;
-    return false;
-  };
-  print_dense_tensor(X1, dp_cond1, results_file, true);
-  if(ducc_print) {
-    print_blockstr(results_file, "End IJ Block", true);
-    T first_val                                         = tamm::get_tensor_element(X1, {0, 0});
-    sys_data.results["output"]["DUCC"]["results"]["X1"] = first_val;
-  }
-  Tensor<T>::deallocate(X1);
-
-  if(nactva > 0) {
-    if(ducc_print) print_blockstr(results_file, "Begin IA Block", true);
-    Tensor<T>                                X2       = to_dense_tensor(ec_dense, ftia);
-    std::function<bool(std::vector<size_t>)> dp_cond2 = [&](std::vector<size_t> cond) {
-      if(cond[0] < nactoa && cond[1] < nactva) return true;
+    Tensor<T>                                X1       = to_dense_tensor(ec_dense, ftij);
+    std::function<bool(std::vector<size_t>)> dp_cond1 = [&](std::vector<size_t> cond) {
+      if(cond[0] < nactoa && cond[1] < nactoa && cond[0] <= cond[1]) return true;
+      // if(cond[0] < nelectrons_alpha && cond[1] < nelectrons_alpha && cond[0] <= cond[1]) return
+      // true;
       return false;
     };
-    print_dense_tensor(X2, dp_cond2, results_file, true);
+    print_dense_tensor(X1, dp_cond1, results_file, true);
     if(ducc_print) {
-      print_blockstr(results_file, "End IA Block", true);
-      T first_val                                         = tamm::get_tensor_element(X2, {0, 0});
-      sys_data.results["output"]["DUCC"]["results"]["X2"] = first_val;
+      print_blockstr(results_file, "End IJ Block", true);
+      T first_val                                         = tamm::get_tensor_element(X1, {0, 0});
+      sys_data.results["output"]["DUCC"]["results"]["X1"] = first_val;
     }
-    Tensor<T>::deallocate(X2);
+    Tensor<T>::deallocate(X1);
 
-    if(ducc_print) print_blockstr(results_file, "Begin AB Block", true);
-    Tensor<T>                                X3       = to_dense_tensor(ec_dense, ftab);
-    std::function<bool(std::vector<size_t>)> dp_cond3 = [&](std::vector<size_t> cond) {
-      if(cond[0] < nactva && cond[1] < nactva && cond[0] <= cond[1]) return true;
-      return false;
-    };
-    print_dense_tensor(X3, dp_cond3, results_file, true);
-    if(ducc_print) {
-      print_blockstr(results_file, "End AB Block", true);
-      T first_val                                         = tamm::get_tensor_element(X3, {0, 0});
-      sys_data.results["output"]["DUCC"]["results"]["X3"] = first_val;
+    if(nactva > 0) {
+      if(ducc_print) print_blockstr(results_file, "Begin IA Block", true);
+      Tensor<T>                                X2       = to_dense_tensor(ec_dense, ftia);
+      std::function<bool(std::vector<size_t>)> dp_cond2 = [&](std::vector<size_t> cond) {
+        if(cond[0] < nactoa && cond[1] < nactva) return true;
+        return false;
+      };
+      print_dense_tensor(X2, dp_cond2, results_file, true);
+      if(ducc_print) {
+        print_blockstr(results_file, "End IA Block", true);
+        T first_val                                         = tamm::get_tensor_element(X2, {0, 0});
+        sys_data.results["output"]["DUCC"]["results"]["X2"] = first_val;
+      }
+      Tensor<T>::deallocate(X2);
+
+      if(ducc_print) print_blockstr(results_file, "Begin AB Block", true);
+      Tensor<T>                                X3       = to_dense_tensor(ec_dense, ftab);
+      std::function<bool(std::vector<size_t>)> dp_cond3 = [&](std::vector<size_t> cond) {
+        if(cond[0] < nactva && cond[1] < nactva && cond[0] <= cond[1]) return true;
+        return false;
+      };
+      print_dense_tensor(X3, dp_cond3, results_file, true);
+      if(ducc_print) {
+        print_blockstr(results_file, "End AB Block", true);
+        T first_val                                         = tamm::get_tensor_element(X3, {0, 0});
+        sys_data.results["output"]["DUCC"]["results"]["X3"] = first_val;
+      }
+      Tensor<T>::deallocate(X3);
     }
-    Tensor<T>::deallocate(X3);
-  }
 
-  if(ducc_print) print_blockstr(results_file, "Begin IJKL Block", true);
-  Tensor<T>                                X4       = to_dense_tensor(ec_dense, vtijkl);
-  std::function<bool(std::vector<size_t>)> dp_cond4 = [&](std::vector<size_t> cond) {
-    if(cond[0] < nactoa && cond[2] < nactoa && nactoa <= cond[1] && nactoa <= cond[3]) return true;
-    return false;
-  };
-  print_dense_tensor(X4, dp_cond4, results_file, true);
-  if(ducc_print) {
-    print_blockstr(results_file, "End IJKL Block", true);
-    T first_val = tamm::get_tensor_element(X4, {0, 0, 0, 0});
-    sys_data.results["output"]["DUCC"]["results"]["X4"] = first_val;
-  }
-  Tensor<T>::deallocate(X4);
-
-  if(nactva > 0) {
-    if(ducc_print) print_blockstr(results_file, "Begin IJAB Block", true);
-    Tensor<T>                                X5       = to_dense_tensor(ec_dense, vtijab);
-    std::function<bool(std::vector<size_t>)> dp_cond5 = [&](std::vector<size_t> cond) {
-      if(cond[0] < nactoa && nactoa <= cond[1] && cond[2] < nactva && nactva <= cond[3])
+    if(ducc_print) print_blockstr(results_file, "Begin IJKL Block", true);
+    Tensor<T>                                X4       = to_dense_tensor(ec_dense, vtijkl);
+    std::function<bool(std::vector<size_t>)> dp_cond4 = [&](std::vector<size_t> cond) {
+      if(cond[0] < nactoa && cond[2] < nactoa && nactoa <= cond[1] && nactoa <= cond[3])
         return true;
       return false;
     };
-    print_dense_tensor(X5, dp_cond5, results_file, true);
+    print_dense_tensor(X4, dp_cond4, results_file, true);
     if(ducc_print) {
-      print_blockstr(results_file, "End IJAB Block", true);
-      T first_val = tamm::get_tensor_element(X5, {0, 0, 0, 0});
-      sys_data.results["output"]["DUCC"]["results"]["X5"] = first_val;
+      print_blockstr(results_file, "End IJKL Block", true);
+      T first_val = tamm::get_tensor_element(X4, {0, 0, 0, 0});
+      sys_data.results["output"]["DUCC"]["results"]["X4"] = first_val;
     }
-    Tensor<T>::deallocate(X5);
+    Tensor<T>::deallocate(X4);
 
-    if(ducc_print) print_blockstr(results_file, "Begin ABCD Block", true);
-    Tensor<T>                                X6       = to_dense_tensor(ec_dense, vtabcd);
-    std::function<bool(std::vector<size_t>)> dp_cond6 = [&](std::vector<size_t> cond) {
-      if(cond[0] < nactva && cond[2] < nactva && nactva <= cond[1] && nactva <= cond[3])
-        return true;
-      return false;
-    };
-    print_dense_tensor(X6, dp_cond6, results_file, true);
-    if(ducc_print) {
-      print_blockstr(results_file, "End ABCD Block", true);
-      T first_val = tamm::get_tensor_element(X6, {0, 0, 0, 0});
-      sys_data.results["output"]["DUCC"]["results"]["X6"] = first_val;
+    if(nactva > 0) {
+      if(ducc_print) print_blockstr(results_file, "Begin IJAB Block", true);
+      Tensor<T>                                X5       = to_dense_tensor(ec_dense, vtijab);
+      std::function<bool(std::vector<size_t>)> dp_cond5 = [&](std::vector<size_t> cond) {
+        if(cond[0] < nactoa && nactoa <= cond[1] && cond[2] < nactva && nactva <= cond[3])
+          return true;
+        return false;
+      };
+      print_dense_tensor(X5, dp_cond5, results_file, true);
+      if(ducc_print) {
+        print_blockstr(results_file, "End IJAB Block", true);
+        T first_val = tamm::get_tensor_element(X5, {0, 0, 0, 0});
+        sys_data.results["output"]["DUCC"]["results"]["X5"] = first_val;
+      }
+      Tensor<T>::deallocate(X5);
+
+      if(ducc_print) print_blockstr(results_file, "Begin ABCD Block", true);
+      Tensor<T>                                X6       = to_dense_tensor(ec_dense, vtabcd);
+      std::function<bool(std::vector<size_t>)> dp_cond6 = [&](std::vector<size_t> cond) {
+        if(cond[0] < nactva && cond[2] < nactva && nactva <= cond[1] && nactva <= cond[3])
+          return true;
+        return false;
+      };
+      print_dense_tensor(X6, dp_cond6, results_file, true);
+      if(ducc_print) {
+        print_blockstr(results_file, "End ABCD Block", true);
+        T first_val = tamm::get_tensor_element(X6, {0, 0, 0, 0});
+        sys_data.results["output"]["DUCC"]["results"]["X6"] = first_val;
+      }
+      Tensor<T>::deallocate(X6);
+
+      if(ducc_print) print_blockstr(results_file, "Begin AIJB Block", true);
+      Tensor<T>                                X7         = to_dense_tensor(ec_dense, vtaijb);
+      std::function<bool(std::vector<size_t>)> dp_cond7_1 = [&](std::vector<size_t> cond) {
+        if(cond[0] < nactva && cond[2] < nactoa && nactoa <= cond[1] && nactva <= cond[3])
+          return true;
+        return false;
+      };
+      print_dense_tensor(X7, dp_cond7_1, results_file, true);
+
+      std::function<bool(std::vector<size_t>)> dp_cond7_2 = [&](std::vector<size_t> cond) {
+        if(cond[0] < nactva && nactoa <= cond[1] && nactoa <= cond[2] && cond[3] < nactva)
+          return true;
+        return false;
+      };
+      print_dense_tensor(X7, dp_cond7_2, results_file, true);
+      if(ducc_print) print_blockstr(results_file, "End AIJB Block", true);
+      if(ducc_print) {
+        T first_val = tamm::get_tensor_element(X7, {0, 0, 0, 0});
+        sys_data.results["output"]["DUCC"]["results"]["X7"] = first_val;
+      }
+      Tensor<T>::deallocate(X7);
+
+      if(ducc_print) print_blockstr(results_file, "Begin IJKA Block", true);
+      Tensor<T>                                X8       = to_dense_tensor(ec_dense, vtijka);
+      std::function<bool(std::vector<size_t>)> dp_cond8 = [&](std::vector<size_t> cond) {
+        if(cond[0] < nactoa && cond[2] < nactoa && nactoa <= cond[1] && nactva <= cond[3])
+          return true;
+        return false;
+      };
+      print_dense_tensor(X8, dp_cond8, results_file, true);
+      if(ducc_print) {
+        print_blockstr(results_file, "End IJKA Block", true);
+        T first_val = tamm::get_tensor_element(X8, {0, 0, 0, 0});
+        sys_data.results["output"]["DUCC"]["results"]["X8"] = first_val;
+      }
+      Tensor<T>::deallocate(X8);
+
+      if(ducc_print) print_blockstr(results_file, "Begin IABC Block", true);
+      Tensor<T>                                X9       = to_dense_tensor(ec_dense, vtiabc);
+      std::function<bool(std::vector<size_t>)> dp_cond9 = [&](std::vector<size_t> cond) {
+        if(cond[0] < nactoa && cond[2] < nactva && nactva <= cond[1] && nactva <= cond[3])
+          return true;
+        return false;
+      };
+      print_dense_tensor(X9, dp_cond9, results_file, true);
+      if(ducc_print) {
+        print_blockstr(results_file, "End IABC Block", true);
+        T first_val = tamm::get_tensor_element(X9, {0, 0, 0, 0});
+        sys_data.results["output"]["DUCC"]["results"]["X9"] = first_val;
+      }
+      Tensor<T>::deallocate(X9);
     }
-    Tensor<T>::deallocate(X6);
 
-    if(ducc_print) print_blockstr(results_file, "Begin AIJB Block", true);
-    Tensor<T>                                X7         = to_dense_tensor(ec_dense, vtaijb);
-    std::function<bool(std::vector<size_t>)> dp_cond7_1 = [&](std::vector<size_t> cond) {
-      if(cond[0] < nactva && cond[2] < nactoa && nactoa <= cond[1] && nactva <= cond[3])
-        return true;
-      return false;
-    };
-    print_dense_tensor(X7, dp_cond7_1, results_file, true);
-
-    std::function<bool(std::vector<size_t>)> dp_cond7_2 = [&](std::vector<size_t> cond) {
-      if(cond[0] < nactva && nactoa <= cond[1] && nactoa <= cond[2] && cond[3] < nactva)
-        return true;
-      return false;
-    };
-    print_dense_tensor(X7, dp_cond7_2, results_file, true);
-    if(ducc_print) print_blockstr(results_file, "End AIJB Block", true);
-    if(ducc_print) {
-      T first_val = tamm::get_tensor_element(X7, {0, 0, 0, 0});
-      sys_data.results["output"]["DUCC"]["results"]["X7"] = first_val;
-    }
-    Tensor<T>::deallocate(X7);
-
-    if(ducc_print) print_blockstr(results_file, "Begin IJKA Block", true);
-    Tensor<T>                                X8       = to_dense_tensor(ec_dense, vtijka);
-    std::function<bool(std::vector<size_t>)> dp_cond8 = [&](std::vector<size_t> cond) {
-      if(cond[0] < nactoa && cond[2] < nactoa && nactoa <= cond[1] && nactva <= cond[3])
-        return true;
-      return false;
-    };
-    print_dense_tensor(X8, dp_cond8, results_file, true);
-    if(ducc_print) {
-      print_blockstr(results_file, "End IJKA Block", true);
-      T first_val = tamm::get_tensor_element(X8, {0, 0, 0, 0});
-      sys_data.results["output"]["DUCC"]["results"]["X8"] = first_val;
-    }
-    Tensor<T>::deallocate(X8);
-
-    if(ducc_print) print_blockstr(results_file, "Begin IABC Block", true);
-    Tensor<T>                                X9       = to_dense_tensor(ec_dense, vtiabc);
-    std::function<bool(std::vector<size_t>)> dp_cond9 = [&](std::vector<size_t> cond) {
-      if(cond[0] < nactoa && cond[2] < nactva && nactva <= cond[1] && nactva <= cond[3])
-        return true;
-      return false;
-    };
-    print_dense_tensor(X9, dp_cond9, results_file, true);
-    if(ducc_print) {
-      print_blockstr(results_file, "End IABC Block", true);
-      T first_val = tamm::get_tensor_element(X9, {0, 0, 0, 0});
-      sys_data.results["output"]["DUCC"]["results"]["X9"] = first_val;
-    }
-    Tensor<T>::deallocate(X9);
-  }
-
-  cc_t2     = std::chrono::high_resolution_clock::now();
-  ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
-  if(ducc_print)
-    std::cout << "DUCC: Time to write results: " << std::fixed << std::setprecision(2) << ducc_time
-              << " secs" << std::endl;
+    cc_t2     = std::chrono::high_resolution_clock::now();
+    ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
+    if(ducc_print)
+      std::cout << "DUCC: Time to write results: " << std::fixed << std::setprecision(2)
+                << ducc_time << " secs" << std::endl;
+  } // task_options.ducc.second != "qflow"
 
 // qflow
 #if defined(USE_NWQSIM)
   if(chem_env.ioptions.task_options.ducc.second == "qflow")
     DUCC_T_QFLOW_Driver(sch, chem_env, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc,
-                        vtabcd, ex_hw, shift, occ_int_vec, virt_int_vec, pos, qfstr);
+                        vtabcd, ex_hw, shift, occ_int_vec, virt_int_vec, pos, qfstr, qflow_timers);
 #endif
   free_tensors(ftij, vtijkl, adj_scalar, total_shift, oei);
   if(nactva > 0) { free_tensors(ftia, ftab, vtijka, vtaijb, vtijab, vtiabc, vtabcd); }

@@ -523,6 +523,7 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   using T = double;
 
   CCContext& cc_context      = chem_env.cc_context;
+  cc_context.use_subgroup    = true;
   cc_context.keep.fvt12_full = true;
   cc_context.compute.set(true, true); // compute ft12 and v2 in full
 
@@ -755,7 +756,9 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // Main loop
   for(int cycle = cycle_start; cycle < cycles; ++cycle) {
+    auto cycle_t1       = std::chrono::high_resolution_clock::now();
     cc_context.qf_cycle = cycle + 1;
+    QflowTimers cycle_timers{};
     if(rank == 0) std::cout << "Cycle " << cc_context.qf_cycle << " of " << cycles << std::endl;
 
     t1file_qflow = cc_context.t1file_qflow + ".cycle" + std::to_string(cc_context.qf_cycle);
@@ -802,6 +805,7 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       std::cout << "Total number of process groups = " << num_pg << std::endl;
       std::cout << "Total number of combinations = " << ncombinations << std::endl;
       std::cout << "No of processes used to compute each combination = " << subranks << std::endl;
+      std::cout << std::endl;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////
@@ -899,7 +903,8 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         // Call DUCC
         DUCCInternal<T> ducc_internal;
         ducc_internal.DUCC_T_CCSD_Driver(chem_env, sub_ec, MO_AS, dt1_sub, dt2_sub, d_f1_sub,
-                                         v2tensors_sub, occ_int_vec, virt_int_vec, pos + 1, qfstr);
+                                         v2tensors_sub, occ_int_vec, virt_int_vec, pos + 1, qfstr,
+                                         cycle_timers);
 
         std::string qflow_tmp_json_file = files_prefix + "_qflow_tmp_" + pos_str + ".json";
 
@@ -1075,13 +1080,36 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       write_qflow_results(ec, chem_env);
     } // restart
 
+    auto cycle_t2 = std::chrono::high_resolution_clock::now();
+    auto cycletime =
+      std::chrono::duration_cast<std::chrono::duration<double>>((cycle_t2 - cycle_t1)).count();
+
+    double avg_ducc_time      = ec.pg().reduce(&cycle_timers.ducc_time, ReduceOp::sum, 0);
+    double avg_vqe_solve_time = ec.pg().reduce(&cycle_timers.vqe_solve_time, ReduceOp::sum, 0);
+
+    if(rank == 0) {
+      avg_ducc_time /= nranks;
+      avg_vqe_solve_time /= num_pg;
+
+      std::cout << std::fixed << std::setprecision(2);
+      std::cout << "Total time for cycle " << cc_context.qf_cycle << ": " << cycletime << " secs"
+                << std::endl;
+      std::cout << " --> Avg DUCC time: " << avg_ducc_time << " secs" << std::endl;
+      std::cout << " --> Avg VQE Solve time: " << avg_vqe_solve_time << " secs" << std::endl
+                << std::endl;
+    }
+
   } // end cycles
 
   write_qflow_results(ec, chem_env);
   auto cc_t2  = std::chrono::high_resolution_clock::now();
   auto qftime = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
 
-  if(rank == 0) { std::cout << "Total QFlow time: " << qftime << std::endl; }
+  if(rank == 0) {
+    std::cout << "Total QFlow time: " << std::fixed << std::setprecision(2) << qftime << " secs"
+              << std::endl
+              << std::endl;
+  }
 
   v2tensors.deallocate();
   if(!do_hubbard) free_tensors(cholVpr);
@@ -1099,7 +1127,8 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
                          const Tensor<T>& vtijkl, const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
                          const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
                          ExecutionHW ex_hw, T shift, IndexVector& occ_int_vec,
-                         IndexVector& virt_int_vec, const int pos, std::stringstream& qfstr) {
+                         IndexVector& virt_int_vec, const int pos, std::stringstream& qfstr,
+                         QflowTimers& qflow_timers) {
   const auto   rank   = sch.ec().pg().rank();
   const size_t nactoa = chem_env.ioptions.ccsd_options.nactive_oa;
   // const size_t nactob = chem_env.ioptions.ccsd_options.nactive_ob;
@@ -1494,8 +1523,13 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
     // opts.initial_parameters = {0.1, 0.2, 0.3, ...}; // Must match parameter count for the ansatz
     // (UCCSD)
 
+    auto vqe_solve_t1 = std::chrono::high_resolution_clock::now();
     auto [nwqsim_energy, vqe_converged, nwqsim_parameters] =
       qflow_nwqsim(ham_terms, nactoa * 2, "CPU", opts);
+    auto vqe_solve_t2 = std::chrono::high_resolution_clock::now();
+    qflow_timers.vqe_solve_time +=
+      std::chrono::duration_cast<std::chrono::duration<double>>((vqe_solve_t2 - vqe_solve_t1))
+        .count();
 
     sys_data.results["output"]["QFlow"]["results"]["converged"] = vqe_converged;
 
@@ -1544,12 +1578,10 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
 }
 
 using T = double;
-template void DUCC_T_QFLOW_Driver<T>(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
-                                     const Tensor<T>& ftij, const Tensor<T>& ftia,
-                                     const Tensor<T>& ftab, const Tensor<T>& vtijkl,
-                                     const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
-                                     const Tensor<T>& vtijab, const Tensor<T>& vtiabc,
-                                     const Tensor<T>& vtabcd, ExecutionHW ex_hw, T shift,
-                                     IndexVector& occ_int_vec, IndexVector& virt_int_vec,
-                                     const int pos, std::stringstream& qfstr);
+template void DUCC_T_QFLOW_Driver<T>(
+  Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO, const Tensor<T>& ftij,
+  const Tensor<T>& ftia, const Tensor<T>& ftab, const Tensor<T>& vtijkl, const Tensor<T>& vtijka,
+  const Tensor<T>& vtaijb, const Tensor<T>& vtijab, const Tensor<T>& vtiabc,
+  const Tensor<T>& vtabcd, ExecutionHW ex_hw, T shift, IndexVector& occ_int_vec,
+  IndexVector& virt_int_vec, const int pos, std::stringstream& qfstr, QflowTimers& qflow_timers);
 } // namespace exachem::cc::ducc

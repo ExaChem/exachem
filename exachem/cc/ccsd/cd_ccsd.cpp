@@ -116,13 +116,19 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
   exachem::cc2::CD_CC2_CS_Engine<T> cc2cs_engine;
   CD_CCSD_OS<T>                     ccsd_os_ann;
   CD_CCSD_CS<T>                     ccsd_cs_ann;
+
+  std::string task_str = "CCSD";
+  if(cc_context.task_cc2) task_str = "CC2";
+
   if(is_rhf) {
-    if(ccsd_restart && use_subgroup) {
+    if(use_subgroup) {
       if(cc_context.sub_pg.is_valid()) {
-        const int ppn = ec.ppn();
+        const int ppn       = ec.ppn();
+        const int cc_nnodes = nsranks / ppn;
         if(rank == 0)
-          std::cout << "Executing with " << nsranks << " ranks (" << nsranks / ppn << " nodes)"
-                    << std::endl;
+          std::cout << std::endl
+                    << "Number of nodes, processes per node used for " << task_str << ": "
+                    << cc_nnodes << ", " << ppn << std::endl;
         if(cc_context.task_cc2) {
           std::tie(residual, corr_energy) =
             cc2cs_engine.run(chem_env, *(cc_context.sub_ec), MO, CI, d_t1, d_t2, d_f1, d_r1, d_r2,
@@ -153,12 +159,14 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
     }
   }
   else {
-    if(ccsd_restart && use_subgroup) {
+    if(use_subgroup) {
       if(cc_context.sub_pg.is_valid()) {
-        const int ppn = ec.ppn();
+        const int ppn       = ec.ppn();
+        const int cc_nnodes = nsranks / ppn;
         if(rank == 0)
-          std::cout << "Executing with " << nsranks << " ranks (" << nsranks / ppn << " nodes)"
-                    << std::endl;
+          std::cout << std::endl
+                    << "Number of nodes, processes per node used for " << task_str << ": "
+                    << cc_nnodes << ", " << ppn << std::endl;
 
         if(cc_context.task_cc2) {
           exachem::cc2::CD_CC2_OS_Engine<T> cc2_os_engine;
@@ -189,8 +197,6 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
     }
   }
 
-  std::string task_str = "CCSD";
-  if(cc_context.task_cc2) task_str = "CC2";
   ccsd_stats(ec, chem_env.scf_context.hf_energy, residual, corr_energy, ccsd_options.threshold,
              task_str);
 

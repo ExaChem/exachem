@@ -195,10 +195,12 @@ int main(int argc, char* argv[]) {
 
   auto                          ec_t2       = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> ec_duration = ec_t2 - ec_t1;
-  if(rank == 0)
+  if(rank == 0) {
     std::cout << std::endl
-              << "Total ExaChem runtime: " << ec_duration.count() << " secs" << std::endl
+              << "Total ExaChem runtime: " << std::fixed << std::setprecision(2)
+              << ec_duration.count() << " secs" << std::endl
               << std::endl;
+  }
 
   ec.flush_and_sync();
   ec.pg().destroy_coll();

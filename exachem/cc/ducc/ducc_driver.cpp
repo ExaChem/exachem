@@ -39,7 +39,7 @@ void DUCCDriver::execute(ExecutionContext& ec, ChemEnv& chem_env) {
 
   IndexVector       occ_int_vec;
   IndexVector       virt_int_vec;
-  int               pos;
+  int               pos{0};
   std::stringstream qfstr;
 
   exachem::cc::ducc::internal::DUCCInternal<double> ducc_internal;

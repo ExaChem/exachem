@@ -33,6 +33,18 @@ public:
 // Wrapper function for backward compatibility
 void ducc_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
+// Per-rank timings accumulated across all combinations of a QFlow cycle.
+struct QflowTimers {
+  double ducc_time{0};      // DUCC_T_CCSD_Driver core (H_0 + level1 + level2 + finalization)
+  double vqe_solve_time{0}; // qflow_nwqsim call in DUCC_T_QFLOW_Driver
+};
+
+// Dummy sink for callers (e.g. the non-QFlow DUCC task) that don't need timings.
+inline QflowTimers& unused_qflow_timers() {
+  static QflowTimers t;
+  return t;
+}
+
 #if defined(USE_NWQSIM)
 void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
@@ -42,7 +54,8 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
                          const Tensor<T>& vtijkl, const Tensor<T>& vtijka, const Tensor<T>& vtaijb,
                          const Tensor<T>& vtijab, const Tensor<T>& vtiabc, const Tensor<T>& vtabcd,
                          ExecutionHW ex_hw, T shift, IndexVector& occ_int_vec,
-                         IndexVector& virt_int_vec, const int pos, std::stringstream& qfstr);
+                         IndexVector& virt_int_vec, const int pos, std::stringstream& qfstr,
+                         QflowTimers& qflow_timers);
 #endif
 
 } // namespace exachem::cc::ducc
@@ -59,7 +72,8 @@ public:
                                   const TiledIndexSpace& MO, Tensor<T>& t1, Tensor<T>& t2,
                                   Tensor<T>& f1, cholesky_2e::V2Tensors<T>& v2tensors,
                                   IndexVector& occ_int_vec, IndexVector& virt_int_vec,
-                                  const int pos, std::stringstream& qfstr);
+                                  const int pos, std::stringstream& qfstr,
+                                  QflowTimers& qflow_timers = unused_qflow_timers());
 
   virtual void reset_ducc_runcontext(ExecutionContext& ec, ChemEnv& chem_env) {
     CCSDOptions& ccsd_options                  = chem_env.ioptions.ccsd_options;

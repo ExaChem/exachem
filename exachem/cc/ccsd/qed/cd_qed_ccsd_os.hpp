@@ -12,7 +12,7 @@
 
 using namespace tamm;
 
-namespace exachem::cc::cd_qed_ccsd_cs {
+namespace exachem::cc::cd_qed_ccsd_os {
 
 template<typename T>
 void build_tmps(Scheduler& sch, ChemEnv& chem_env, TensorMap<T>& tmps, TensorMap<T>& scalars,
@@ -49,4 +49,4 @@ double residuals(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
 
 void qed_driver(ExecutionContext& ec, ChemEnv& chem_env);
 
-}; // namespace exachem::cc::cd_qed_ccsd_cs
+}; // namespace exachem::cc::cd_qed_ccsd_os

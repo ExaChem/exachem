@@ -847,8 +847,8 @@ void qed_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
   if(rank == 0)
     std::cout << std::endl
-              << "Time taken for spin-orbital canonical QED-CCSD: " << std::fixed
-              << std::setprecision(2) << ccsd_time << " secs" << std::endl;
+              << "Time taken for canonical QED-CCSD: " << std::fixed << std::setprecision(2)
+              << ccsd_time << " secs" << std::endl;
 
   cc_print(chem_env, d_t1, d_t2, files_prefix);
 

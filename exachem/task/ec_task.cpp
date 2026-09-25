@@ -157,7 +157,7 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
   else if(task.ccsd) {
     if(chem_env.sys_data.is_hubbard) cc::ccsd_canonical::ccsd_canonical_driver(ec, chem_env);
     else if(chem_env.sys_data.do_qed) {
-      if(chem_env.sys_data.is_unrestricted) cc::qed_ccsd_os::qed_driver(ec, chem_env);
+      if(chem_env.sys_data.is_unrestricted) cc::cd_qed_ccsd_os::qed_driver(ec, chem_env);
       else cc::cd_qed_ccsd_cs::qed_driver(ec, chem_env);
     }
     else cc::ccsd::cd_ccsd_driver(ec, chem_env);

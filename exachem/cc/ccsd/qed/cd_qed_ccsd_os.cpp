@@ -6,14 +6,18 @@
  * See LICENSE.txt for details
  */
 
-#include "cd_qed_ccsd_cs.hpp"
-#include "residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_1.hpp"
-#include "residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_2.hpp"
-#include "residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_3.hpp"
-#include "residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_resid_4.hpp"
-#include "residuals/cd_qed_ccsd_cs/cd_qed_ccsd_cs_tmps.hpp"
+#include "cd_qed_ccsd_os.hpp"
+#include "residuals/cd_qed_ccsd_os/cd_qed_ccsd_os_resid_1.hpp"
+#include "residuals/cd_qed_ccsd_os/cd_qed_ccsd_os_resid_2.hpp"
+#include "residuals/cd_qed_ccsd_os/cd_qed_ccsd_os_resid_3.hpp"
+#include "residuals/cd_qed_ccsd_os/cd_qed_ccsd_os_resid_4.hpp"
+#include "residuals/cd_qed_ccsd_os/cd_qed_ccsd_os_resid_5.hpp"
+#include "residuals/cd_qed_ccsd_os/cd_qed_ccsd_os_resid_6.hpp"
+#include "residuals/cd_qed_ccsd_os/cd_qed_ccsd_os_resid_7.hpp"
+#include "residuals/cd_qed_ccsd_os/cd_qed_ccsd_os_resid_8.hpp"
+#include "residuals/cd_qed_ccsd_os/cd_qed_ccsd_os_tmps.hpp"
 
-namespace exachem::cc::cd_qed_ccsd_cs {
+namespace exachem::cc::cd_qed_ccsd_os {
 
 template<typename T>
 void correlation_energy(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
@@ -164,6 +168,14 @@ double residuals(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpace& MO,
               t1_2p, t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
   resid_part4(sch, chem_env, tmps, scalars, f, chol, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p,
               t1_2p, t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
+  resid_part5(sch, chem_env, tmps, scalars, f, chol, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p,
+              t1_2p, t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
+  resid_part6(sch, chem_env, tmps, scalars, f, chol, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p,
+              t1_2p, t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
+  resid_part7(sch, chem_env, tmps, scalars, f, chol, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p,
+              t1_2p, t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
+  resid_part8(sch, chem_env, tmps, scalars, f, chol, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p, t0_2p,
+              t1_2p, t2_2p, energy, r1, r2, r0_1p, r1_1p, r2_1p, r0_2p, r1_2p, r2_2p);
 
   sch.execute(sch.ec().exhw(), profile);
 
@@ -300,13 +312,23 @@ std::tuple<double, double> ccsd_v2_driver(
 
     TensorMap<T> r1, r2, r1_1p, r2_1p, r1_2p, r2_2p;
 
-    r1["aa"]    = declare<T>(chem_env, "aa_vo");
-    r1_1p["aa"] = declare<T>(chem_env, "aa_vo");
-    r1_2p["aa"] = declare<T>(chem_env, "aa_vo");
+    r1["aa"]   = declare<T>(chem_env, "aa_vo");
+    r1["bb"]   = declare<T>(chem_env, "bb_vo");
+    r2["aaaa"] = declare<T>(chem_env, "aaaa_vvoo");
+    r2["abab"] = declare<T>(chem_env, "abab_vvoo");
+    r2["bbbb"] = declare<T>(chem_env, "bbbb_vvoo");
 
-    r2["abab"]    = declare<T>(chem_env, "abab_vvoo");
+    r1_1p["aa"]   = declare<T>(chem_env, "aa_vo");
+    r1_1p["bb"]   = declare<T>(chem_env, "bb_vo");
+    r2_1p["aaaa"] = declare<T>(chem_env, "aaaa_vvoo");
     r2_1p["abab"] = declare<T>(chem_env, "abab_vvoo");
+    r2_1p["bbbb"] = declare<T>(chem_env, "bbbb_vvoo");
+
+    r1_2p["aa"]   = declare<T>(chem_env, "aa_vo");
+    r1_2p["bb"]   = declare<T>(chem_env, "bb_vo");
+    r2_2p["aaaa"] = declare<T>(chem_env, "aaaa_vvoo");
     r2_2p["abab"] = declare<T>(chem_env, "abab_vvoo");
+    r2_2p["bbbb"] = declare<T>(chem_env, "bbbb_vvoo");
 
     // allocate tensors
     for(auto& [name, t]: t1) sch.allocate(t);
@@ -338,63 +360,25 @@ std::tuple<double, double> ccsd_v2_driver(
     // clang-format off
     auto extract_amplitudes = [&]() {        
       sch
-      (t1.at("aa")(aa, ia) = d_t1(aa, ia))
-      (t1_1p.at("aa")(aa, ia) = d_t1_1p(aa, ia))
-      (t1_2p.at("aa")(aa, ia) = d_t1_2p(aa, ia))
-
-      (t2.at("abab")(aa, bb, ia, jb) = d_t2(aa, bb, ia, jb))
-      (t2_1p.at("abab")(aa, bb, ia, jb) = d_t2_1p(aa, bb, ia, jb))
-      (t2_2p.at("abab")(aa, bb, ia, jb) = d_t2_2p(aa, bb, ia, jb))
-      .execute();
-
-      Tensor<T> tmp_aaaa = declare<T>(chem_env, "aaaa_vvoo");
-      sch.allocate(tmp_aaaa)
-
-      // bb <= aa
-      (t1.at("bb")() = 0.0)
-      (t1_1p.at("bb")() = 0.0)
-      (t1_2p.at("bb")() = 0.0)
+      (   t1.at("aa")(aa,ia)    = d_t1(aa, ia))
+      (t1_1p.at("aa")(aa,ia) = d_t1_1p(aa, ia))
+      (t1_2p.at("aa")(aa,ia) = d_t1_2p(aa, ia))
       
-      .exact_copy(t1.at("bb")(ab, ib), t1.at("aa")(ab, ib))
-      .exact_copy(t1_1p.at("bb")(ab, ib), t1_1p.at("aa")(ab, ib))
-      .exact_copy(t1_2p.at("bb")(ab, ib), t1_2p.at("aa")(ab, ib))
+      (   t1.at("bb")(ab,ib)    = d_t1(ab, ib))
+      (t1_1p.at("bb")(ab,ib) = d_t1_1p(ab, ib))
+      (t1_2p.at("bb")(ab,ib) = d_t1_2p(ab, ib))
 
-      // aaaa <= abab - baab - abba + baba
-      (t2.at("aaaa")() = 0.0) (tmp_aaaa() = 0.0)
-      .exact_copy(tmp_aaaa(aa, ba, ia, ja), t2.at("abab")(aa, ba, ia, ja))
-      (t2.at("aaaa")() = tmp_aaaa())
-      (t2.at("aaaa")(aa, ba, ia, ja) -= tmp_aaaa(ba, aa, ia, ja))
-
-      (t2_1p.at("aaaa")() = 0.0) (tmp_aaaa() = 0.0)
-      .exact_copy(tmp_aaaa(aa, ba, ia, ja), t2_1p.at("abab")(aa, ba, ia, ja))
-      (t2_1p.at("aaaa")() = tmp_aaaa())
-      (t2_1p.at("aaaa")(aa, ba, ia, ja) -= tmp_aaaa(ba, aa, ia, ja))
-
-      (t2_2p.at("aaaa")() = 0.0) (tmp_aaaa() = 0.0)
-      .exact_copy(tmp_aaaa(aa, ba, ia, ja), t2_2p.at("abab")(aa, ba, ia, ja))
-      (t2_2p.at("aaaa")() = tmp_aaaa())
-      (t2_2p.at("aaaa")(aa, ba, ia, ja) -= tmp_aaaa(ba, aa, ia, ja))
+      (   t2.at("aaaa")(aa,ba,ia,ja)    = d_t2(aa, ba, ia, ja))
+      (t2_1p.at("aaaa")(aa,ba,ia,ja) = d_t2_1p(aa, ba, ia, ja))
+      (t2_2p.at("aaaa")(aa,ba,ia,ja) = d_t2_2p(aa, ba, ia, ja))
       
-      // bbbb <= aaaa
-      .exact_copy(t2.at("bbbb")(ab, bb, ib, jb), t2.at("aaaa")(ab, bb, ib, jb))
-      .exact_copy(t2_1p.at("bbbb")(ab, bb, ib, jb), t2_1p.at("aaaa")(ab, bb, ib, jb))
-      .exact_copy(t2_2p.at("bbbb")(ab, bb, ib, jb), t2_2p.at("aaaa")(ab, bb, ib, jb))
-
-      // add to full tensors
-      ( d_t1(ab, ib) = t1.at("bb")(ab,ib) )
-      ( d_t1_1p(ab, ib) = t1_1p.at("bb")(ab,ib) )
-      ( d_t1_2p(ab, ib) = t1_2p.at("bb")(ab,ib) )
-
-      ( d_t2(aa, ba, ia, ja) = t2.at("aaaa")(aa,ba,ia,ja) )
-      ( d_t2_1p(aa, ba, ia, ja) = t2_1p.at("aaaa")(aa,ba,ia,ja) )
-      ( d_t2_2p(aa, ba, ia, ja) = t2_2p.at("aaaa")(aa,ba,ia,ja) )
-
-      ( d_t2(ab, bb, ib, jb) = t2.at("bbbb")(ab,bb,ib,jb) )
-      ( d_t2_1p(ab, bb, ib, jb) = t2_1p.at("bbbb")(ab,bb,ib,jb) )
-      ( d_t2_2p(ab, bb, ib, jb) = t2_2p.at("bbbb")(ab,bb,ib,jb) )
+      (   t2.at("abab")(aa,bb,ia,jb)    = d_t2(aa, bb, ia, jb))
+      (t2_1p.at("abab")(aa,bb,ia,jb) = d_t2_1p(aa, bb, ia, jb))
+      (t2_2p.at("abab")(aa,bb,ia,jb) = d_t2_2p(aa, bb, ia, jb))
       
-      .deallocate(tmp_aaaa)
-
+      (   t2.at("bbbb")(ab,bb,ib,jb)    = d_t2(ab, bb, ib, jb))
+      (t2_1p.at("bbbb")(ab,bb,ib,jb) = d_t2_1p(ab, bb, ib, jb))
+      (t2_2p.at("bbbb")(ab,bb,ib,jb) = d_t2_2p(ab, bb, ib, jb))
       .execute();
     };
     // clang-format on
@@ -416,10 +400,10 @@ std::tuple<double, double> ccsd_v2_driver(
                 ((d_t2_1ps[off])() = d_t2_1p())
                 ((d_t1_2ps[off])() = d_t1_2p())
                 ((d_t2_2ps[off])() = d_t2_2p()).execute();
-        // clang-format on        
+        // clang-format on
 
         // modified energy equation
-        cd_qed_ccsd_cs::residuals(sch, chem_env, MO, f, chol, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p,
+        cd_qed_ccsd_os::residuals(sch, chem_env, MO, f, chol, dp, w0, t1, t2, t0_1p, t1_1p, t2_1p,
                                   t0_2p, t1_2p, t2_2p, d_e, r1, r2, d_r0_1p, r1_1p, r2_1p, d_r0_2p,
                                   r1_2p, r2_2p);
         sch.execute(ec.exhw(), profile);
@@ -432,11 +416,22 @@ std::tuple<double, double> ccsd_v2_driver(
         (   d_r1(aa, ia)    = r1.at("aa")(aa, ia))
         (d_r1_1p(aa, ia) = r1_1p.at("aa")(aa, ia))
         (d_r1_2p(aa, ia) = r1_2p.at("aa")(aa, ia))
+        
+        (   d_r1(ab, ib)    = r1.at("bb")(ab, ib))
+        (d_r1_1p(ab, ib) = r1_1p.at("bb")(ab, ib))
+        (d_r1_2p(ab, ib) = r1_2p.at("bb")(ab, ib))
+
+        (   d_r2(aa, ba, ia, ja)    = r2.at("aaaa")(aa, ba, ia, ja))
+        (d_r2_1p(aa, ba, ia, ja) = r2_1p.at("aaaa")(aa, ba, ia, ja))
+        (d_r2_2p(aa, ba, ia, ja) = r2_2p.at("aaaa")(aa, ba, ia, ja))
 
         (   d_r2(aa, bb, ia, jb)    = r2.at("abab")(aa, bb, ia, jb))
         (d_r2_1p(aa, bb, ia, jb) = r2_1p.at("abab")(aa, bb, ia, jb))
         (d_r2_2p(aa, bb, ia, jb) = r2_2p.at("abab")(aa, bb, ia, jb))
-        
+
+        (   d_r2(ab, bb, ib, jb)    = r2.at("bbbb")(ab, bb, ib, jb))
+        (d_r2_1p(ab, bb, ib, jb) = r2_1p.at("bbbb")(ab, bb, ib, jb))
+        (d_r2_2p(ab, bb, ib, jb) = r2_2p.at("bbbb")(ab, bb, ib, jb))
         .execute(ec.exhw(), profile);
         // clang-format on
 
@@ -470,7 +465,7 @@ std::tuple<double, double> ccsd_v2_driver(
         sch     ((d_r1s[off])()    = d_r1())
                 ((d_r2s[off])()    = d_r2())
                 ((d_r1_1ps[off])() = d_r1_1p())
-                ((d_r2_1ps[off])()  = d_r2_1p())
+                ((d_r2_1ps[off])() = d_r2_1p())
                 ((d_r1_2ps[off])() = d_r1_2p())
                 ((d_r2_2ps[off])() = d_r2_2p()).execute();
         // clang-format on
@@ -527,24 +522,6 @@ std::tuple<double, double> ccsd_v2_driver(
 
     Tensor<T>::deallocate(d_r1_residual, d_r2_residual, d_r1_1p_residual, d_r2_1p_residual,
                           d_r1_2p_residual, d_r2_2p_residual);
-
-    // add bb, aaaa and bbbb to full tensors
-    // clang-format off
-    sch
-
-    (    d_t1(ab,ib)       =      t1.at("bb")(ab,ib) )
-    ( d_t1_1p(ab,ib)       =   t1_1p.at("bb")(ab,ib) )
-    ( d_t1_2p(ab,ib)       =   t1_2p.at("bb")(ab,ib) )
-
-    (    d_t2(aa,ba,ia,ja) =    t2.at("aaaa")(aa,ba,ia,ja) )
-    ( d_t2_1p(aa,ba,ia,ja) = t2_1p.at("aaaa")(aa,ba,ia,ja) )
-    ( d_t2_2p(aa,ba,ia,ja) = t2_2p.at("aaaa")(aa,ba,ia,ja) )
-
-    (    d_t2(ab,bb,ib,jb) =    t2.at("bbbb")(ab,bb,ib,jb) )
-    ( d_t2_1p(ab,bb,ib,jb) = t2_1p.at("bbbb")(ab,bb,ib,jb) )
-    ( d_t2_2p(ab,bb,ib,jb) = t2_2p.at("bbbb")(ab,bb,ib,jb) )
-    .execute();
-    // clang-format on
 
     // deallocate tensors
     for(auto& [name, t]: t1) sch.deallocate(t);
@@ -1119,4 +1096,4 @@ template std::tuple<TensorMap<double>, // fock
 extract_spin_blocks(Scheduler& sch, ChemEnv& chem_env, const Tensor<double>& d_f1,
                     const Tensor<double>& cholVpr, const Tensor<double>& dip);
 
-}; // namespace exachem::cc::cd_qed_ccsd_cs
+}; // namespace exachem::cc::cd_qed_ccsd_os

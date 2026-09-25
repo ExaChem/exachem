@@ -12,7 +12,6 @@
 #include "exachem/cc/ccsd/canonical/ccsd_os.hpp"
 #include "exachem/cc/ccsd/cd_ccsd_os_ann.hpp"
 #include "exachem/cc/ccsd/qed/cd_qed_ccsd_cs.hpp"
-#include "exachem/cc/ccsd/qed/qed_ccsd_os.hpp"
 #include "exachem/cc/ccsd_t/ccsd_t_fused_driver.hpp"
 // #include "exachem/cc/ccsdt/cd_ccsdt_os.hpp"
 #include "exachem/cc/cc2/cd_cc2.hpp"

@@ -151,6 +151,7 @@ void execute_task(ExecutionContext& ec, ChemEnv& chem_env, std::string ec_arg2) 
                                      chem_env.scf_context.F_beta_AO);
   }
   else if(task.embedding) { embedding::embedding_driver(ec, chem_env); }
+  else if(task.gw) gw::gw_driver(ec, chem_env);
 #if defined(ENABLE_CC)
   else if(task.mp2) mp2::cd_mp2(ec, chem_env);
   else if(task.cd_2e) cholesky_2e::cholesky_2e_driver(ec, chem_env);

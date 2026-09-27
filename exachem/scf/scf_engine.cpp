@@ -705,7 +705,11 @@ void exachem::scf::SCFEngine::compute_fock_matrix(ExecutionContext& ec, const Ch
 #endif
 ) {
   Scheduler sch{ec};
-  if(chem_env.sys_data.is_ks) { // or rohf
+  // For GW the reference Fock matrix must be the converged KS Fock (including Vxc) — the matrix
+  // the last SCF iteration diagonalized — so that diag(C^T F C) gives the KS eigenvalues. CC
+  // methods instead want the HF-like Fock built from the KS orbitals, hence the rebuild below.
+  const bool keep_ks_fock = chem_env.sys_data.is_ks && chem_env.ioptions.task_options.gw;
+  if(chem_env.sys_data.is_ks && !keep_ks_fock) { // or rohf
     sch(scf_data.ttensors.F_alpha_tmp() = 0).execute();
     if(chem_env.sys_data.is_unrestricted) sch(scf_data.ttensors.F_beta_tmp() = 0).execute();
 
@@ -947,11 +951,21 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
   // Fock matrices allocated on world group
 
   Tensor<TensorType> Fa_global, Fb_global;
+  Tensor<TensorType> VXCa_global, VXCb_global;
+  const bool         keep_vxc = chem_env.sys_data.is_ks && chem_env.ioptions.task_options.gw;
 
   Fa_global = {scf_data.tAO, scf_data.tAO};
   Fb_global = {scf_data.tAO, scf_data.tAO};
   schg.allocate(Fa_global);
   if(chem_env.sys_data.is_unrestricted) schg.allocate(Fb_global);
+  if(keep_vxc) {
+    VXCa_global = {scf_data.tAO, scf_data.tAO};
+    schg.allocate(VXCa_global);
+    if(chem_env.sys_data.is_unrestricted) {
+      VXCb_global = {scf_data.tAO, scf_data.tAO};
+      schg.allocate(VXCb_global);
+    }
+  }
   schg.execute();
 
   setup_density_fitting(exc, chem_env);
@@ -1405,6 +1419,20 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     sch(Fa_global(scf_data.mu, scf_data.nu) = scf_data.ttensors.F_alpha(scf_data.mu, scf_data.nu));
     if(chem_env.sys_data.is_unrestricted)
       sch(Fb_global(scf_data.mu, scf_data.nu) = scf_data.ttensors.F_beta(scf_data.mu, scf_data.nu));
+    if(keep_vxc) {
+      // GauXC returns the UKS potential as a (scalar, spin-difference) pair:
+      // ttensors.VXC_alpha is the scalar part, ttensors.VXC_beta the difference part
+      // (see the Fock build above: Fa += Va + Vb, Fb += Va - Vb). Convert to per-channel
+      // here so nothing outside SCF ever sees the internal representation.
+      // clang-format off
+      sch(VXCa_global(scf_data.mu, scf_data.nu) = scf_data.ttensors.VXC_alpha(scf_data.mu, scf_data.nu));
+      if(chem_env.sys_data.is_unrestricted) {
+        sch(VXCa_global(scf_data.mu, scf_data.nu) += scf_data.ttensors.VXC_beta(scf_data.mu, scf_data.nu))
+           (VXCb_global(scf_data.mu, scf_data.nu)  = scf_data.ttensors.VXC_alpha(scf_data.mu, scf_data.nu))
+           (VXCb_global(scf_data.mu, scf_data.nu) += -1.0 * scf_data.ttensors.VXC_beta(scf_data.mu, scf_data.nu));
+      }
+      // clang-format on
+    }
     sch.execute();
     if(rank == 0)
       std::cout << std::endl
@@ -1525,4 +1553,10 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
 
   chem_env.scf_context.update(scf_state.ehf, enuc, scf_data.shell_tile_map, C_alpha_tamm, Fa_global,
                               C_beta_tamm, Fb_global, chem_env.ioptions.scf_options.noscf);
+  chem_env.scf_context.xHF = scf_data.xHF;
+  if(keep_vxc) {
+    chem_env.scf_context.VXC_alpha_AO = VXCa_global;
+    if(chem_env.sys_data.is_unrestricted) chem_env.scf_context.VXC_beta_AO = VXCb_global;
+    chem_env.scf_context.has_vxc = true;
+  }
 } // END of scf_hf(ExecutionContext& exc, ChemEnv& chem_env)

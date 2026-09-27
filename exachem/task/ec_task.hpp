@@ -49,3 +49,5 @@ using namespace exachem;
 #include "exachem/cc/rteom/rt_eom_cd_ccsd.hpp"
 #include "exachem/fci/fci.hpp"
 #endif
+
+#include "exachem/gw/gw.hpp"

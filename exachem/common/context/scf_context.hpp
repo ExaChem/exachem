@@ -21,8 +21,16 @@ public:
   tamm::Tensor<TensorType> F_AO;
   tamm::Tensor<TensorType> C_beta_AO;
   tamm::Tensor<TensorType> F_beta_AO;
-  bool                     no_scf;
-  bool                     do_df;
+  // Exchange-correlation potential per spin channel (alpha, beta), AO basis.
+  // Allocated on the world group only when a downstream task asks for it
+  // (currently GW) and the reference is KS; otherwise left unallocated.
+  tamm::Tensor<TensorType> VXC_alpha_AO;
+  tamm::Tensor<TensorType> VXC_beta_AO;
+  bool                     has_vxc{false};
+  // Fraction of exact (HF) exchange in the reference functional; 1.0 for HF.
+  double xHF{1.0};
+  bool   no_scf;
+  bool   do_df;
 
   // bool scf_converged{false};
   bool skip_scf{false};

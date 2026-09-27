@@ -1,0 +1,34 @@
+{
+  "geometry": {
+    "coordinates": [
+      "N  0.0  0.0  0.0",
+      "N  0.0  0.0  1.0"
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "def2-tzvp",
+    "df_basisset": "def2-universal-jkfit"
+  },
+  "common": {
+    "maxiter": 100
+  },
+  "SCF": {
+    "conve": 1e-10,
+    "convd": 1e-08,
+    "DFT": {
+      "xc_type": ["PBE"]
+    }
+  },
+  "GW": {
+    "method": "sdgw",
+    "cdbasis": "def2-tzvp-rifit",
+    "noqpa": -1,
+    "nvqpa": 10,
+    "ieta": 0.01,
+    "evgw": true
+  },
+  "TASK": {
+    "gw": true
+  }
+}

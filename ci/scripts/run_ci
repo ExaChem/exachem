@@ -76,6 +76,9 @@ $MPIEXEC $EXE_PATH $CHEM_INP/no.json
 $MPIEXEC $EXE_PATH $CHEM_INP/hub_1d_6s.json
 $MPIEXEC $EXE_PATH $CHEM_INP/hub_2d_16s.json
 
+#GW
+$MPIEXEC $EXE_PATH $CHEM_INP/n2_gw.json
+
 #Point charges
 $MPIEXEC $EXE_PATH $CHEM_INP/h2o_pcharges.json
 

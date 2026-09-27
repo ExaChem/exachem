@@ -194,7 +194,7 @@ for ref_file in ref_files:
             print("\n --> ERROR: " + method + " gradients do not match\n     " + gmsg)
             sys.exit(1)
 
-    ccsd_threshold = ref_data["input"]["CC"]["threshold"]
+    ccsd_threshold = ref_data["input"].get("CC", {}).get("threshold", 1e-6)
     if "CCSD" in ref_data["output"]:
         #print("Checking CCSD results")
         ref_ccsd_energy = ref_data["output"]["CCSD"]["final_energy"]["correlation"]
@@ -334,6 +334,29 @@ for ref_file in ref_files:
                     rcheck &= False
                     
             if not rcheck: sys.exit(1)
+
+    if "GW" in ref_data["output"]:
+        print("Checking GW results", end='')
+        gw_tol = 1.0e-2  # eV, absolute: QP equations are solved to 5 meV (|residual| or bracket width)
+        ref_gw = ref_data["output"]["GW"]
+        cur_gw = cur_data["output"]["GW"]
+        rcheck = True
+        for spin in ref_gw["fermi_level_eV"]:
+            rcheck &= check_results(ref_gw["fermi_level_eV"][spin], cur_gw["fermi_level_eV"][spin], gw_tol, "Fermi level (" + spin + ")")
+        for it in ref_gw["iterations"]:           # G0W0, G1W1, ...
+            for spin in ref_gw["iterations"][it]:  # alpha, beta
+                ref_qp = ref_gw["iterations"][it][spin]
+                cur_qp = cur_gw["iterations"][it][spin]
+                if ref_qp["state"] != cur_qp["state"]:
+                    print("\n --> ERROR: " + it + " " + spin + ": QP window differs")
+                    rcheck = False
+                    continue
+                for k, st in enumerate(ref_qp["state"]):
+                    rcheck &= check_results(ref_qp["energy_eV"][k], cur_qp["energy_eV"][k], gw_tol, it + " " + spin + ": state " + str(st))
+                    if ref_qp["converged"][k] != cur_qp["converged"][k]:
+                        print("\n --> ERROR: " + it + " " + spin + ": state " + str(st) + " convergence flag differs")
+                        rcheck = False
+        if not rcheck: sys.exit(1)
 
     if "S2" in ref_data["output"]["SCF"]:
         ref_s2 = ref_data["output"]["SCF"]["S2"]

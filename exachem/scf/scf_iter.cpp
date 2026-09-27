@@ -588,9 +588,8 @@ template<typename T>
 void exachem::scf::SCFIter<T>::compute_Vm12(ExecutionContext& ec, const ChemEnv& chem_env,
                                             ScalapackInfo& scalapack_info, const SCFData& scf_data,
                                             EigenTensors& etensors, TAMMTensors<T>& ttensors) {
-  const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
-  const auto        ndf         = sys_data.ndf;
+  const auto        ndf         = scf_data.dfbs.nbf(); // == sys_data.ndf for SCF's own DF basis
   const auto        rank        = ec.pg().rank();
   const auto        profile     = scf_options.profile;
 

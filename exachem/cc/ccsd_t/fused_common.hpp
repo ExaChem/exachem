@@ -14,6 +14,8 @@
 #include "exachem/cc/ccsd_t/ccsd_t_all_fused_singles.hpp"
 #include "exachem/cc/ccsd_t/ccsd_t_common.hpp"
 
+#include "tamm/kernels/cpu_permute.hpp"
+
 #include <vector>
 
 template<typename T>

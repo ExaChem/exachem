@@ -205,9 +205,9 @@ public:
         // create a plan (shared_ptr)
 
         // To-Do (JK): Do we need to transpose this?
-        auto plan = hptt::create_plan(perm, ndim, 1, &k_a[0], size, nullptr, 0, &k_a_sort[0],
-                                      nullptr, hptt::ESTIMATE, 1, nullptr, true);
-        plan->execute();
+        size_t r_size[ndim] = {static_cast<size_t>(size[perm[0]]),
+                               static_cast<size_t>(size[perm[1]])};
+        tamm::kernels::cpu::permute(&k_a_sort[0], &k_a[0], ndim, r_size, perm, 1.0, 0.0);
         value = k_a_sort;
       }
 
@@ -307,9 +307,10 @@ public:
           int size[4] = {(int) k_range[h3b], (int) k_range[h2b], (int) k_range[p6b],
                          (int) k_range[p5b]};
 
-          auto plan = hptt::create_plan(perm, 4, 1.0, &k_b[0], size, nullptr, 0, &k_b_sort[0],
-                                        nullptr, hptt::ESTIMATE, 1, nullptr, true);
-          plan->execute();
+          size_t r_size[4] = {
+            static_cast<size_t>(size[perm[0]]), static_cast<size_t>(size[perm[1]]),
+            static_cast<size_t>(size[perm[2]]), static_cast<size_t>(size[perm[3]])};
+          tamm::kernels::cpu::permute(&k_b_sort[0], &k_b[0], 4, r_size, perm, 1.0, 0.0);
         }
         value = k_b_sort;
       }

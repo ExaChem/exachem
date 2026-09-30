@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -55,14 +55,12 @@ public:
   // A is conditioned to max_condition_number
   template<typename T>
   static std::tuple<size_t, double, double>
-  gensqrtinv(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
-             ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors, bool symmetric = false,
-             double threshold = 1e-5);
+  gensqrtinv(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data, TAMMTensors<T>& ttensors,
+             bool symmetric = false, double threshold = 1e-5);
   template<typename T>
   static std::tuple<Matrix, size_t, double, double>
   gensqrtinv_atscf(ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data,
-                   ScalapackInfo& scalapack_info, Tensor<T> S1, TiledIndexSpace& tao_atom,
-                   bool symmetric, double threshold);
+                   Tensor<T> S1, TiledIndexSpace& tao_atom, bool symmetric, double threshold);
 
   static size_t max_nprim(const libint2::BasisSet& shells) {
     size_t n = 0;

@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -310,7 +310,6 @@ std::tuple<std::vector<size_t>, std::vector<Tile>, std::vector<Tile>>
 exachem::scf::SCFCompute<T>::compute_AO_tiles(const ExecutionContext& ec, const ChemEnv& chem_env,
                                               const libint2::BasisSet& shells,
                                               const bool               is_df) const {
-  const auto        rank        = ec.pg().rank();
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   int tile_size = scf_options.AO_tilesize;
@@ -350,7 +349,6 @@ exachem::scf::SCFCompute<T>::compute_AO_tiles(const ExecutionContext& ec, const 
 template<typename T>
 void exachem::scf::SCFCompute<T>::compute_orthogonalizer(ExecutionContext& ec, ChemEnv& chem_env,
                                                          SCFData&        scf_data,
-                                                         ScalapackInfo&  scalapack_info,
                                                          TAMMTensors<T>& ttensors) const {
   auto              hf_t1       = std::chrono::high_resolution_clock::now();
   const auto        rank        = ec.pg().rank();
@@ -362,8 +360,8 @@ void exachem::scf::SCFCompute<T>::compute_orthogonalizer(ExecutionContext& ec, C
   double       S_condition_number;
   const double S_condition_number_threshold = scf_options.tol_lindep;
 
-  std::tie(obs_rank, S_condition_number, XtX_condition_number) = SCFUtil::gensqrtinv<T>(
-    ec, chem_env, scf_data, scalapack_info, ttensors, false, S_condition_number_threshold);
+  std::tie(obs_rank, S_condition_number, XtX_condition_number) =
+    SCFUtil::gensqrtinv<T>(ec, chem_env, scf_data, ttensors, false, S_condition_number_threshold);
 
   // TODO: Redeclare TAMM S1 with new dims?
   auto hf_t2   = std::chrono::high_resolution_clock::now();
@@ -529,10 +527,8 @@ void exachem::scf::SCFCompute<T>::compute_hamiltonian(ExecutionContext& ec, cons
 
 template<typename T>
 void exachem::scf::SCFCompute<T>::compute_density(ExecutionContext& ec, const ChemEnv& chem_env,
-                                                  const SCFData&  scf_data,
-                                                  ScalapackInfo&  scalapack_info,
-                                                  TAMMTensors<T>& ttensors,
-                                                  EigenTensors&   etensors) const {
+                                                  const SCFData& scf_data, TAMMTensors<T>& ttensors,
+                                                  EigenTensors& etensors) const {
   auto do_t1 = std::chrono::high_resolution_clock::now();
 
   // using T         = T;
@@ -546,14 +542,15 @@ void exachem::scf::SCFCompute<T>::compute_density(ExecutionContext& ec, const Ch
   const auto        is_uhf      = sys_data.is_unrestricted;
 
 #if defined(USE_SCALAPACK)
-  if(scalapack_info.pg.is_valid()) {
-    Tensor<T> C_a   = from_block_cyclic_tensor(ttensors.C_alpha_BC);
+  const tamm::ScalapackGrid& grid = tamm::find_scalapack_grid(ec);
+  if(grid.participates()) {
+    Tensor<T> C_a   = grid.from_block_cyclic_dense(ttensors.C_alpha_BC);
     Tensor<T> C_o_a = tensor_block(C_a, {0, 0}, {sys_data.nbf_orig, sys_data.nelectrons_alpha});
     from_dense_tensor(C_o_a, ttensors.C_occ_a);
     Tensor<T>::deallocate(C_a, C_o_a);
 
     if(is_uhf) {
-      Tensor<T> C_b   = from_block_cyclic_tensor(ttensors.C_beta_BC);
+      Tensor<T> C_b   = grid.from_block_cyclic_dense(ttensors.C_beta_BC);
       Tensor<T> C_o_b = tensor_block(C_b, {0, 0}, {sys_data.nbf_orig, sys_data.nelectrons_beta});
       from_dense_tensor(C_o_b, ttensors.C_occ_b);
       Tensor<T>::deallocate(C_b, C_o_b);

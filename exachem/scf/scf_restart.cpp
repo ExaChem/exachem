@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -54,13 +54,12 @@ void exachem::scf::SCFRestart<T>::run(const ExecutionContext& ec, ChemEnv& chem_
 }
 template<typename T>
 void exachem::scf::SCFRestart<T>::run(ExecutionContext& ec, const ChemEnv& chem_env,
-                                      ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors,
-                                      EigenTensors&      etensors,
+                                      TAMMTensors<T>& ttensors, EigenTensors& etensors,
                                       const std::string& files_prefix) const {
   const auto N      = chem_env.sys_data.nbf_orig;
   const auto Northo = N - chem_env.sys_data.n_lindep;
   EXPECTS(Northo == chem_env.sys_data.nbf);
   SCFIO<T> scf_io;
-  scf_io.rw_md_disk(ec, chem_env, scalapack_info, ttensors, etensors, files_prefix, true);
+  scf_io.rw_md_disk(ec, chem_env, ttensors, etensors, files_prefix, true);
 }
 template class exachem::scf::SCFRestart<double>;

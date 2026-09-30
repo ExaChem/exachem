@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -10,10 +10,6 @@
 
 #include "exachem/scf/scf_common.hpp"
 #include "exachem/scf/scf_compute.hpp"
-
-#if defined(TAMM_USE_ELPA)
-#include <elpa/elpa.h>
-#endif
 
 namespace exachem::scf {
 
@@ -36,6 +32,13 @@ private:
   ///         corresponding to the orbital ordering.
 
   const std::vector<T> compute_ao_occupation_vector(size_t Z);
+
+  /// Solves F C = e S C for one spin channel (alpha, or beta if \c is_beta) via the
+  /// orthogonalizer X, filling that channel's C and eps.
+  /// @return the channel's HOMO-LUMO gap on ranks that hold eps; std::numeric_limits<T>::max()
+  ///         elsewhere or when the gap is undefined (no occupied or no virtual orbitals)
+  T diagonalize_spin(ExecutionContext& ec, const SystemData& sys_data, TAMMTensors<T>& ttensors,
+                     EigenTensors& etensors, bool is_beta);
 
 public:
   SCFGuess()          = default;
@@ -62,12 +65,10 @@ public:
                                  const std::vector<std::pair<double, std::array<double, 3>>>& q,
                                  const libint2::BasisSet& shells, libint2::Operator otype);
   virtual void scf_diagonalize(Scheduler& sch, const ChemEnv& chem_env, SCFData& scf_data,
-                               ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors,
-                               EigenTensors& etensors);
+                               TAMMTensors<T>& ttensors, EigenTensors& etensors);
 
   virtual void compute_sad_guess(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
-                                 ScalapackInfo& scalapack_info, EigenTensors& etensors,
-                                 TAMMTensors<T>& ttensors);
+                                 EigenTensors& etensors, TAMMTensors<T>& ttensors);
 
   template<int ndim>
   void t2e_hf_helper(const ExecutionContext& ec, tamm::Tensor<T>& ttensor, Matrix& etensor,

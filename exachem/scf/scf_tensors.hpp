@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -81,7 +81,6 @@ public:
   Tensor<T> F_beta;
   Tensor<T> F_alpha_tmp; // computed via call to compute_2bf(...)
   Tensor<T> F_beta_tmp;
-  Tensor<T> F_BC; // block-cyclic Fock matrix used in the scalapack code path
   // not allocated, shell tiled. tensor structure used to identify shell blocks in compute_2bf
   Tensor<T> F_dummy;
   Tensor<T> VXC_alpha;

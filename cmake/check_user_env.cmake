@@ -37,14 +37,6 @@ macro(check_compiler_version lang_arg comp_type comp_version)
     endif()
 endmacro()
 
-set(GA_RUNTIME_TAMM MPI_RMA OPENIB MPI-PR MPI-TS MPI_2SIDED MPI_PROGRESS_RANK)
-if(DEFINED GA_RUNTIME)
-    list(FIND GA_RUNTIME_TAMM ${GA_RUNTIME} _index)
-    if(${_index} EQUAL -1)
-        message(FATAL_ERROR "ExaChem only supports building GA using one of ${GA_RUNTIME_TAMM}, default is MPI-PR")
-    endif()
-endif()
-
 check_compiler_version(C Clang 18)
 check_compiler_version(CXX Clang 18)
 

@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -28,8 +28,7 @@ public:
 
   virtual void run(const ExecutionContext& ec, ChemEnv& chem_env,
                    const std::string& files_prefix) const;
-  virtual void run(ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-                   TAMMTensors<T>& ttensors, EigenTensors& etensors,
-                   const std::string& files_prefix) const;
+  virtual void run(ExecutionContext& ec, const ChemEnv& chem_env, TAMMTensors<T>& ttensors,
+                   EigenTensors& etensors, const std::string& files_prefix) const;
 };
 } // namespace exachem::scf

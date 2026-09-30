@@ -9,12 +9,13 @@
 #include "exachem/scf/scf_iter.hpp"
 
 template<typename T>
-std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
-  ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info, const int& iter,
-  SCFData& scf_data, TAMMTensors<T>& ttensors, EigenTensors& etensors
+std::tuple<T, T>
+exachem::scf::SCFIter<T>::scf_iter_body(ExecutionContext& ec, const ChemEnv& chem_env,
+                                        const int& iter, SCFData& scf_data,
+                                        TAMMTensors<T>& ttensors, EigenTensors& etensors
 #if defined(USE_GAUXC)
-  ,
-  GauXC::XCIntegrator<Matrix>& gauxc_integrator
+                                        ,
+                                        GauXC::XCIntegrator<Matrix>& gauxc_integrator
 #endif
 ) {
 
@@ -143,7 +144,7 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
   }
 #endif
 
-  if(is_cuscf) scf_cuscf(ec, chem_env, scf_data, scalapack_info);
+  if(is_cuscf) scf_cuscf(ec, chem_env, scf_data);
 
   // Embedding Potential Contribution
   if(chem_env.ioptions.scf_options.read_vembedding) {
@@ -162,13 +163,9 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
   Tensor<T> FDS_ortho{tAO_ortho, tAO_ortho};
 #ifdef USE_SCALAPACK
   Tensor<T>::allocate(&ec, X_tmp);
-  if(scalapack_info.pg.is_valid()) {
-    Tensor<T> X_dense = from_block_cyclic_tensor(X_alpha);
-    tamm::from_dense_tensor(X_dense, X_tmp);
-    Tensor<T>::deallocate(X_dense);
-  }
+  tamm::find_scalapack_grid(ec).from_block_cyclic(X_alpha, X_tmp);
 #else
-  X_tmp = X_alpha;
+  X_tmp             = X_alpha;
 #endif
 
   // clang-format off
@@ -246,7 +243,7 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
 
   auto        do_t1 = std::chrono::high_resolution_clock::now();
   SCFGuess<T> scf_guess;
-  scf_guess.scf_diagonalize(sch, chem_env, scf_data, scalapack_info, ttensors, etensors);
+  scf_guess.scf_diagonalize(sch, chem_env, scf_data, ttensors, etensors);
 
   auto do_t2   = std::chrono::high_resolution_clock::now();
   auto do_time = std::chrono::duration_cast<std::chrono::duration<double>>((do_t2 - do_t1)).count();
@@ -254,7 +251,7 @@ std::tuple<T, T> exachem::scf::SCFIter<T>::scf_iter_body(
   if(rank == 0 && profile)
     std::cout << std::fixed << std::setprecision(2) << "diagonalize: " << do_time << "s, ";
   SCFCompute<T> scf_compute;
-  scf_compute.compute_density(ec, chem_env, scf_data, scalapack_info, ttensors, etensors);
+  scf_compute.compute_density(ec, chem_env, scf_data, ttensors, etensors);
 
   double rmsd = 0.0;
   // clang-format off
@@ -586,10 +583,10 @@ void exachem::scf::SCFIter<T>::compute_2c_ints(ExecutionContext& ec, const ChemE
 
 template<typename T>
 void exachem::scf::SCFIter<T>::compute_Vm12(ExecutionContext& ec, const ChemEnv& chem_env,
-                                            ScalapackInfo& scalapack_info, const SCFData& scf_data,
-                                            EigenTensors& etensors, TAMMTensors<T>& ttensors) {
+                                            const SCFData& scf_data, EigenTensors& etensors,
+                                            TAMMTensors<T>& ttensors) {
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
-  const auto        ndf         = scf_data.dfbs.nbf(); // == sys_data.ndf for SCF's own DF basis
+  const int         ndf         = scf_data.dfbs.nbf(); // == sys_data.ndf for SCF's own DF basis
   const auto        rank        = ec.pg().rank();
   const auto        profile     = scf_options.profile;
 
@@ -608,7 +605,6 @@ void exachem::scf::SCFIter<T>::compute_Vm12(ExecutionContext& ec, const ChemEnv&
   compute_2c_ints(ec, chem_env, etensors, scf_data, ttensors);
 
   // Obtain inverse (square root) of V
-  Matrix         V;
   std::vector<T> eps(ndf);
 
   const auto ig1 = std::chrono::high_resolution_clock::now();
@@ -617,98 +613,7 @@ void exachem::scf::SCFIter<T>::compute_Vm12(ExecutionContext& ec, const ChemEnv&
   Tensor<T> eps_tamm{scf_data.tdfAO};
   Tensor<T>::allocate(&ec, v_tmp, eps_tamm);
 
-#if defined(USE_SCALAPACK)
-  Tensor<T> V_sca;
-  if(scalapack_info.pg.is_valid()) {
-    blacspp::Grid*                  blacs_grid       = scalapack_info.blacs_grid.get();
-    const auto&                     grid             = *blacs_grid;
-    scalapackpp::BlockCyclicDist2D* blockcyclic_dist = scalapack_info.blockcyclic_dist.get();
-    const tamm::Tile                mb               = blockcyclic_dist->mb();
-
-    TiledIndexSpace tN_bc{IndexSpace{range(ndf)}, mb};
-    Tensor<T>       S_BC{tN_bc, tN_bc};
-    V_sca = {tN_bc, tN_bc};
-    S_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-    V_sca.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-    Tensor<T>::allocate(&scalapack_info.ec, S_BC, V_sca);
-
-    tamm::to_block_cyclic_tensor(Vm1, S_BC);
-
-    auto desc_lambda = [&](const int64_t M, const int64_t N) {
-      auto [M_loc, N_loc] = (*blockcyclic_dist).get_local_dims(M, N);
-      return (*blockcyclic_dist).descinit_noerror(M, N, M_loc);
-    };
-
-    if(grid.ipr() >= 0 and grid.ipc() >= 0) {
-      auto desc_S = desc_lambda(ndf, ndf);
-      auto desc_V = desc_lambda(ndf, ndf);
-
-#if defined(TAMM_USE_ELPA)
-      elpa_t handle;
-      int    error;
-
-      // Initialize ELPA
-      if(elpa_init(20221109) != ELPA_OK) tamm_terminate("ELPA API not supported");
-
-      // Get and ELPA handle
-      handle = elpa_allocate(&error);
-      if(error != ELPA_OK) tamm_terminate("Could not create ELPA handle");
-
-      auto [na_rows, na_cols] = (*blockcyclic_dist).get_local_dims(ndf, ndf);
-
-      // Set parameters
-      elpa_set(handle, "na", ndf, &error);
-      elpa_set(handle, "nev", ndf, &error);
-      elpa_set(handle, "local_nrows", static_cast<int>(na_rows), &error);
-      elpa_set(handle, "local_ncols", static_cast<int>(na_cols), &error);
-      elpa_set(handle, "nblk", static_cast<int>(mb), &error);
-      elpa_set(handle, "mpi_comm_parent", scalapack_info.pg.comm_c2f(), &error);
-      elpa_set(handle, "process_row", static_cast<int>(grid.ipr()), &error);
-      elpa_set(handle, "process_col", static_cast<int>(grid.ipc()), &error);
-#if defined(USE_CUDA)
-      elpa_set(handle, "nvidia-gpu", static_cast<int>(1), &error);
-      // elpa_set(handle, "use_gpu_id", 1, &error);
-#endif
-      error = elpa_setup(handle);
-      if(error != ELPA_OK) tamm_terminate(" ERROR: Could not setup ELPA");
-
-      elpa_set(handle, "solver", ELPA_SOLVER_2STAGE, &error);
-#if defined(USE_CUDA)
-      elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_NVIDIA_GPU, &error);
-#else
-      elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_AVX2_BLOCK2, &error);
-#endif
-      // elpa_set(handle, "debug", 1, &error);
-      // if (rank == 0 ) std::cout << " Calling ELPA " << std::endl;
-      elpa_eigenvectors(handle, S_BC.access_local_buf(), eps.data(), V_sca.access_local_buf(),
-                        &error);
-      if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA Eigendecompoistion failed");
-
-      // Clean-up
-      elpa_deallocate(handle, &error);
-      elpa_uninit(&error);
-      if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA deallocation failed");
-
-#else
-      /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, desc_S[2],
-                                   S_BC.access_local_buf(), 1, 1, desc_S, eps.data(),
-                                   V_sca.access_local_buf(), 1, 1, desc_V);
-#endif
-    }
-
-    Tensor<T>::deallocate(S_BC);
-    tamm::from_block_cyclic_tensor(V_sca, v_tmp);
-    Tensor<T>::deallocate(V_sca);
-  }
-#else
-  if(rank == 0) {
-    V.setZero(ndf, ndf);
-    tamm_to_eigen_tensor(Vm1, V);
-
-    lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, ndf, V.data(), ndf, eps.data());
-    tamm::eigen_to_tamm_tensor(v_tmp, V);
-  }
-#endif
+  tamm::eigensolve(ec, Vm1, v_tmp, eps, ec.exhw());
 
   if(rank == 0) {
     std::transform(eps.begin(), eps.end(), eps.begin(), [](auto& c) {
@@ -734,8 +639,8 @@ void exachem::scf::SCFIter<T>::compute_Vm12(ExecutionContext& ec, const ChemEnv&
 
 template<typename T>
 void exachem::scf::SCFIter<T>::init_ri(ExecutionContext& ec, const ChemEnv& chem_env,
-                                       ScalapackInfo& scalapack_info, const SCFData& scf_data,
-                                       EigenTensors& etensors, TAMMTensors<T>& ttensors) {
+                                       const SCFData& scf_data, EigenTensors& etensors,
+                                       TAMMTensors<T>& ttensors) {
   const bool direct = scf_data.direct_df;
 
   auto mu = scf_data.mu, nu = scf_data.nu, ku = scf_data.ku;
@@ -748,7 +653,7 @@ void exachem::scf::SCFIter<T>::init_ri(ExecutionContext& ec, const ChemEnv& chem
   Tensor<T>& xyZ = ttensors.xyZ;
   Tensor<T>& Vm1 = ttensors.Vm1;
 
-  compute_Vm12(ec, chem_env, scalapack_info, scf_data, etensors, ttensors);
+  compute_Vm12(ec, chem_env, scf_data, etensors, ttensors);
 
   if(!direct) {
     // Compute 3c ints
@@ -1017,7 +922,6 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri_direct(ExecutionContext& ec, const
 
 template<typename T>
 void exachem::scf::SCFIter<T>::compute_2bf_ri(ExecutionContext& ec, const ChemEnv& chem_env,
-                                              ScalapackInfo&             scalapack_info,
                                               const SCFData&             scf_data,
                                               const std::vector<size_t>& shell2bf,
                                               TAMMTensors<T>& ttensors, EigenTensors& etensors,
@@ -1105,11 +1009,13 @@ void exachem::scf::SCFIter<T>::compute_2bf_ri(ExecutionContext& ec, const ChemEn
 }
 
 template<typename T>
-void exachem::scf::SCFIter<T>::compute_2bf(
-  ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-  const SCFData& scf_data, const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
-  const Matrix& SchwarzK, const size_t& max_nprim4, TAMMTensors<T>& ttensors,
-  EigenTensors& etensors, bool& is_3c_init, const bool do_density_fitting, double xHF) {
+void exachem::scf::SCFIter<T>::compute_2bf(ExecutionContext& ec, const ChemEnv& chem_env,
+                                           const SCFData& scf_data, const bool do_schwarz_screen,
+                                           const std::vector<size_t>& shell2bf,
+                                           const Matrix& SchwarzK, const size_t& max_nprim4,
+                                           TAMMTensors<T>& ttensors, EigenTensors& etensors,
+                                           bool& is_3c_init, const bool do_density_fitting,
+                                           double xHF) {
   using libint2::Operator;
 
   const SystemData&        sys_data    = chem_env.sys_data;
@@ -1410,10 +1316,7 @@ void exachem::scf::SCFIter<T>::compute_2bf(
       G.setZero(N, N);
       compute_2bf_ri_direct(ec, chem_env, scf_data, shell2bf, ttensors, etensors, SchwarzK);
     }
-    else {
-      compute_2bf_ri(ec, chem_env, scalapack_info, scf_data, shell2bf, ttensors, etensors,
-                     is_3c_init, xHF);
-    }
+    else { compute_2bf_ri(ec, chem_env, scf_data, shell2bf, ttensors, etensors, is_3c_init, xHF); }
   } // end density fitting
 
   const auto [mu, nu] = scf_data.tAO.labels<2>("all");
@@ -1443,10 +1346,10 @@ void exachem::scf::SCFIter<T>::compute_2bf(
 
 template<typename T>
 void exachem::scf::SCFIter<T>::compute_2bf_hubbard(
-  ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-  const SCFData& scf_data, const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
-  const Matrix& SchwarzK, const size_t& max_nprim4, TAMMTensors<T>& ttensors,
-  EigenTensors& etensors, bool& is_3c_init, const bool do_density_fitting, double xHF) {
+  ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data,
+  const bool do_schwarz_screen, const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
+  const size_t& max_nprim4, TAMMTensors<T>& ttensors, EigenTensors& etensors, bool& is_3c_init,
+  const bool do_density_fitting, double xHF) {
   using libint2::Operator;
 
   const SystemData&        sys_data    = chem_env.sys_data;
@@ -1719,10 +1622,7 @@ void exachem::scf::SCFIter<T>::compute_2bf_hubbard(
       G.setZero(N, N);
       compute_2bf_ri_direct(ec, chem_env, scf_data, shell2bf, ttensors, etensors, SchwarzK);
     }
-    else {
-      compute_2bf_ri(ec, chem_env, scalapack_info, scf_data, shell2bf, ttensors, etensors,
-                     is_3c_init, xHF);
-    }
+    else { compute_2bf_ri(ec, chem_env, scf_data, shell2bf, ttensors, etensors, is_3c_init, xHF); }
   } // end density fitting
 
   const auto [mu, nu] = scf_data.tAO.labels<2>("all");
@@ -1940,7 +1840,7 @@ void exachem::scf::SCFIter<T>::scf_diis(
 
 template<typename T>
 void exachem::scf::SCFIter<T>::scf_cuscf(ExecutionContext& ec, const ChemEnv& chem_env,
-                                         SCFData& scf_data, ScalapackInfo& scalapack_info) {
+                                         SCFData& scf_data) {
   tamm::Scheduler sch{ec};
 
   const auto    rank    = ec.pg().rank();
@@ -1969,11 +1869,7 @@ void exachem::scf::SCFIter<T>::scf_cuscf(ExecutionContext& ec, const ChemEnv& ch
 #if defined(USE_SCALAPACK)
   Tensor<T> X_comp = {scf_data.tAO, scf_data.tAO_ortho};
   sch.allocate(X_comp).execute();
-  if(scalapack_info.pg.is_valid()) {
-    Tensor<T> X_dense = from_block_cyclic_tensor(scf_data.ttensors.X_alpha);
-    from_dense_tensor(X_dense, X_comp);
-    Tensor<T>::deallocate(X_dense);
-  }
+  tamm::find_scalapack_grid(ec).from_block_cyclic(scf_data.ttensors.X_alpha, X_comp);
   ec.pg().barrier();
 #else
   Tensor<T>& X_comp = scf_data.ttensors.X_alpha;
@@ -1992,54 +1888,12 @@ void exachem::scf::SCFIter<T>::scf_cuscf(ExecutionContext& ec, const ChemEnv& ch
     .execute();
   // clang-format on
 
-#if defined(USE_SCALAPACK)
   sch.allocate(V_ortho).execute();
-  if(scalapack_info.pg.is_valid()) {
-    Tensor<T> D_ortho_BC = {scf_data.tNortho_bc, scf_data.tNortho_bc};
-    Tensor<T> V_ortho_BC = {scf_data.tNortho_bc, scf_data.tNortho_bc};
-    D_ortho_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-    V_ortho_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-    Tensor<T>::allocate(&scalapack_info.ec, D_ortho_BC, V_ortho_BC);
-
-    blacspp::Grid*                  blacs_grid       = scalapack_info.blacs_grid.get();
-    scalapackpp::BlockCyclicDist2D* blockcyclic_dist = scalapack_info.blockcyclic_dist.get();
-
-    auto desc_lambda = [&](const int64_t M, const int64_t N) {
-      auto [M_loc, N_loc] = (*blockcyclic_dist).get_local_dims(M, N);
-      return (*blockcyclic_dist).descinit_noerror(M, N, M_loc);
-    };
-
-    const auto& grid = *blacs_grid;
-    if(grid.ipr() >= 0 and grid.ipc() >= 0) {
-      auto desc         = desc_lambda(Northo, Northo);
-      auto D_ortho_lptr = D_ortho_BC.access_local_buf();
-      auto V_ortho_lptr = V_ortho_BC.access_local_buf();
-
-      tamm::to_block_cyclic_tensor(D_ortho, D_ortho_BC);
-      scalapack_info.pg.barrier();
-
-      scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, Northo, D_ortho_lptr, 1,
-                          1, desc, eps.data(), V_ortho_lptr, 1, 1, desc);
-    }
-    scalapack_info.pg.barrier();
-    Tensor<T> V_dense = from_block_cyclic_tensor(V_ortho_BC);
-    from_dense_tensor(V_dense, V_ortho);
-    scalapack_info.pg.barrier();
-
-    Tensor<T>::deallocate(D_ortho_BC, V_ortho_BC);
-    Tensor<T>::deallocate(V_dense);
-  }
-  ec.pg().barrier();
+  tamm::eigensolve(ec, D_ortho, V_ortho, eps, ec.exhw());
   if(rank == 0) tamm_to_eigen_tensor(V_ortho, P_MO);
   ec.pg().barrier();
+  sch.deallocate(V_ortho).execute();
 
-  Tensor<T>::deallocate(V_ortho);
-#else
-  if(rank == 0) {
-    tamm_to_eigen_tensor(D_ortho, P_MO);
-    lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, Northo, P_MO.data(), Northo, eps.data());
-  }
-#endif
   if(rank == 0) {
     Matrix P_MO_reversed = P_MO.transpose().rowwise().reverse();
     eigen_to_tamm_tensor(D_ortho, P_MO_reversed);
@@ -2092,10 +1946,10 @@ void exachem::scf::SCFIter<T>::scf_cuscf(ExecutionContext& ec, const ChemEnv& ch
 
 template<typename T>
 void exachem::scf::SCFIter<T>::compute_2bf_deriv(
-  ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-  const SCFData& scf_data, const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
-  const Matrix& SchwarzK, const size_t& max_nprim4, TAMMTensors<T>& ttensors,
-  EigenTensors& etensors, const bool is_3c_init, const bool do_density_fitting, double xHF) {
+  ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data,
+  const bool do_schwarz_screen, const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
+  const size_t& max_nprim4, TAMMTensors<T>& ttensors, EigenTensors& etensors, const bool is_3c_init,
+  const bool do_density_fitting, double xHF) {
   using libint2::Operator;
   const int deriv_order = 1;
 
@@ -2458,8 +2312,8 @@ void exachem::scf::SCFIter<T>::compute_2bf_deriv(
   else {
     Ga_deriv = std::vector<Matrix>(nderiv, Matrix::Zero(N, N));
     if(is_uhf) Gb_deriv = std::vector<Matrix>(nderiv, Matrix::Zero(N, N));
-    compute_2bf_ri_deriv(ec, chem_env, scalapack_info, scf_data, shell2bf, SchwarzK, ttensors,
-                         etensors, scf_data.direct_df, xHF);
+    compute_2bf_ri_deriv(ec, chem_env, scf_data, shell2bf, SchwarzK, ttensors, etensors,
+                         scf_data.direct_df, xHF);
     ec.pg().barrier();
   } // end density fitting
 }
@@ -2858,9 +2712,9 @@ exachem::scf::SCFIter<T>::compute_3c_exx_ints_deriv(ExecutionContext& ec, const 
 
 template<typename T>
 void exachem::scf::SCFIter<T>::compute_2bf_ri_deriv(
-  ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-  const SCFData& scf_data, const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
-  TAMMTensors<T>& ttensors, EigenTensors& etensors, const bool& is_direct, double xHF) {
+  ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data,
+  const std::vector<size_t>& shell2bf, const Matrix& SchwarzK, TAMMTensors<T>& ttensors,
+  EigenTensors& etensors, const bool& is_direct, double xHF) {
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 

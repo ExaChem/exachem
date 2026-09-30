@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -96,11 +96,9 @@ void exachem::scf::SCFEngine::write_dplot_data(ExecutionContext& ec, ChemEnv& ch
   /* else */ EC_DPLOT::write_dencube(ec, chem_env, scf_data.etensors.D_alpha,
                                      scf_data.etensors.D_beta, files_prefix);
 #if defined(USE_SCALAPACK)
-  if(scalapack_info.pg.is_valid()) {
-    tamm::from_block_cyclic_tensor(scf_data.ttensors.C_alpha_BC, scf_data.ttensors.C_alpha);
-    if(is_uhf)
-      tamm::from_block_cyclic_tensor(scf_data.ttensors.C_beta_BC, scf_data.ttensors.C_beta);
-  }
+  const tamm::ScalapackGrid& grid = tamm::find_scalapack_grid(ec);
+  grid.from_block_cyclic(scf_data.ttensors.C_alpha_BC, scf_data.ttensors.C_alpha);
+  if(is_uhf) grid.from_block_cyclic(scf_data.ttensors.C_beta_BC, scf_data.ttensors.C_beta);
   tamm_to_eigen_tensor(scf_data.ttensors.C_alpha, scf_data.etensors.C_alpha);
   if(is_uhf) tamm_to_eigen_tensor(scf_data.ttensors.C_beta, scf_data.etensors.C_beta);
 #else
@@ -226,17 +224,13 @@ void exachem::scf::SCFEngine::scf_orthogonalizer(ExecutionContext& ec, ChemEnv& 
 
 #if defined(USE_SCALAPACK)
     {
-      const tamm::Tile _mb =
-        chem_env.ioptions.scf_options.scalapack_nb; //(scalapack_info.blockcyclic_dist)->mb();
-      scf_data.tN_bc      = TiledIndexSpace{IndexSpace{range(chem_env.sys_data.nbf_orig)}, _mb};
-      scf_data.tNortho_bc = TiledIndexSpace{IndexSpace{range(chem_env.sys_data.nbf)}, _mb};
-      if(scalapack_info.pg.is_valid()) {
-        scf_data.ttensors.X_alpha = {scf_data.tN_bc, scf_data.tNortho_bc};
-        scf_data.ttensors.X_alpha.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-        Tensor<TensorType>::allocate(&scalapack_info.ec, scf_data.ttensors.X_alpha);
+      const tamm::ScalapackGrid& grid = tamm::find_scalapack_grid(ec);
+      scf_data.tN_bc                  = grid.index_space(chem_env.sys_data.nbf_orig);
+      scf_data.tNortho_bc             = grid.index_space(chem_env.sys_data.nbf);
+      scf_data.ttensors.X_alpha = grid.allocate<TensorType>(scf_data.tN_bc, scf_data.tNortho_bc);
+      if(grid.participates())
         scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
                                chem_env.ioptions.scf_options.profile, true);
-      }
     }
 #else
     scf_data.ttensors.X_alpha = {scf_data.tAO, scf_data.tAO_ortho};
@@ -246,7 +240,7 @@ void exachem::scf::SCFEngine::scf_orthogonalizer(ExecutionContext& ec, ChemEnv& 
 #endif
   }
   else {
-    scf_compute.compute_orthogonalizer(ec, chem_env, scf_data, scalapack_info, scf_data.ttensors);
+    scf_compute.compute_orthogonalizer(ec, chem_env, scf_data, scf_data.ttensors);
 
     if(rank == 0) {
       json jX;
@@ -256,7 +250,7 @@ void exachem::scf::SCFEngine::scf_orthogonalizer(ExecutionContext& ec, ChemEnv& 
 
     if(N >= chem_env.ioptions.scf_options.restart_size) {
 #if defined(USE_SCALAPACK)
-      if(scalapack_info.pg.is_valid())
+      if(tamm::find_scalapack_grid(ec).participates())
         scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
                                chem_env.ioptions.scf_options.profile);
 #else
@@ -267,18 +261,11 @@ void exachem::scf::SCFEngine::scf_orthogonalizer(ExecutionContext& ec, ChemEnv& 
   }
 
 #if defined(USE_SCALAPACK)
-  if(scalapack_info.pg.is_valid()) {
-    scf_data.ttensors.F_BC = {scf_data.tN_bc, scf_data.tN_bc};
-    scf_data.ttensors.F_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-    scf_data.ttensors.C_alpha_BC = {scf_data.tN_bc, scf_data.tNortho_bc};
-    scf_data.ttensors.C_alpha_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-    Tensor<TensorType>::allocate(&scalapack_info.ec, scf_data.ttensors.F_BC,
-                                 scf_data.ttensors.C_alpha_BC);
-    if(chem_env.sys_data.is_unrestricted) {
-      scf_data.ttensors.C_beta_BC = {scf_data.tN_bc, scf_data.tNortho_bc};
-      scf_data.ttensors.C_beta_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-      Tensor<TensorType>::allocate(&scalapack_info.ec, scf_data.ttensors.C_beta_BC);
-    }
+  {
+    const tamm::ScalapackGrid& grid = tamm::find_scalapack_grid(ec);
+    scf_data.ttensors.C_alpha_BC = grid.allocate<TensorType>(scf_data.tN_bc, scf_data.tNortho_bc);
+    if(chem_env.sys_data.is_unrestricted)
+      scf_data.ttensors.C_beta_BC = grid.allocate<TensorType>(scf_data.tN_bc, scf_data.tNortho_bc);
   }
 #endif
 
@@ -423,8 +410,7 @@ void exachem::scf::SCFEngine::scf_final_io(ExecutionContext& ec, const ChemEnv& 
 
   if(!chem_env.ioptions.scf_options.noscf) {
     if(rank == 0) cout << endl << "writing orbitals and density to disk ... ";
-    scf_output.rw_md_disk(ec, chem_env, scalapack_info, scf_data.ttensors, scf_data.etensors,
-                          files_prefix);
+    scf_output.rw_md_disk(ec, chem_env, scf_data.ttensors, scf_data.etensors, files_prefix);
     if(rank == 0) cout << "done." << endl;
   }
 
@@ -667,14 +653,12 @@ void exachem::scf::SCFEngine::print_write_iteration(ExecutionContext& exc, ChemE
   }
   if(scf_state.iter % chem_env.ioptions.scf_options.writem == 0 ||
      chem_env.ioptions.scf_options.writem == 1) {
-    scf_output.rw_md_disk(exc, chem_env, scalapack_info, scf_data.ttensors, scf_data.etensors,
-                          files_prefix);
+    scf_output.rw_md_disk(exc, chem_env, scf_data.ttensors, scf_data.etensors, files_prefix);
   }
   if(chem_env.ioptions.scf_options.debug) {
     scf_data.etensors.multipoles =
       scf_compute.compute_multipoles(exc, chem_env, scf_data, scf_data.ttensors, scf_data.etensors);
-    scf_output.print_energies(exc, chem_env, scf_data.ttensors, scf_data.etensors, scf_data,
-                              scalapack_info);
+    scf_output.print_energies(exc, chem_env, scf_data.ttensors, scf_data.etensors, scf_data);
   }
 
 } // print_energy_iteration
@@ -720,13 +704,13 @@ void exachem::scf::SCFEngine::compute_fock_matrix(ExecutionContext& ec, const Ch
 
     // build a new Fock matrix
     if(chem_env.sys_data.is_hubbard) {
-      scf_iter.compute_2bf_hubbard(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen,
-                                   shell2bf, SchwarzK, max_nprim4, scf_data.ttensors,
-                                   scf_data.etensors, is_3c_init, scf_data.do_dens_fit, xHF_adjust);
+      scf_iter.compute_2bf_hubbard(ec, chem_env, scf_data, do_schwarz_screen, shell2bf, SchwarzK,
+                                   max_nprim4, scf_data.ttensors, scf_data.etensors, is_3c_init,
+                                   scf_data.do_dens_fit, xHF_adjust);
     }
     else {
-      scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
-                           SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors, is_3c_init,
+      scf_iter.compute_2bf(ec, chem_env, scf_data, do_schwarz_screen, shell2bf, SchwarzK,
+                           max_nprim4, scf_data.ttensors, scf_data.etensors, is_3c_init,
                            scf_data.do_dens_fit, xHF_adjust);
     }
 
@@ -987,9 +971,13 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
   if(pg.is_valid()) {
     ExecutionContext ec{pg, DistributionKind::nw, MemoryManagerKind::ga};
 
-#if defined(USE_SCALAPACK)
-    setup_scalapack_info(ec, chem_env, scalapack_info, pgdata);
-#endif
+    // The ScaLAPACK grid of the SCF process group (a no-op in builds without ScaLAPACK); it is
+    // released with the group at the end of the SCF.
+    const SCFOptions& scf_opts = chem_env.ioptions.scf_options;
+    tamm::scalapack_grid(ec, {.N   = chem_env.sys_data.nbf_orig,
+                              .npr = scf_opts.scalapack_np_row,
+                              .npc = scf_opts.scalapack_np_col,
+                              .nb  = scf_opts.scalapack_nb});
 
 #if defined(USE_GAUXC)
     GauXC::XCIntegrator<Matrix> gauxc_integrator = get_gauxc_integrator(ec, chem_env);
@@ -1070,8 +1058,7 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     if(scf_data.do_dens_fit) {
       std::tie(scf_data.d_mu, scf_data.d_nu, scf_data.d_ku)    = scf_data.tdfAO.labels<3>("all");
       std::tie(scf_data.d_mup, scf_data.d_nup, scf_data.d_kup) = scf_data.tdfAOt.labels<3>("all");
-      scf_iter.init_ri(ec, chem_env, scalapack_info, scf_data, scf_data.etensors,
-                       scf_data.ttensors);
+      scf_iter.init_ri(ec, chem_env, scf_data, scf_data.etensors, scf_data.ttensors);
     }
     // const auto do_schwarz_screen = SchwarzK.cols() != 0 && SchwarzK.rows() != 0;
 
@@ -1082,8 +1069,7 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
        (chem_env.ioptions.scf_options.noscf &&
         !(ec_molden.molden_file_valid || ec_nwchem.nwmovecs_file_valid))) {
       // This was originally scf_restart.restart()
-      scf_restart.run(ec, chem_env, scalapack_info, scf_data.ttensors, scf_data.etensors,
-                      files_prefix);
+      scf_restart.run(ec, chem_env, scf_data.ttensors, scf_data.etensors, files_prefix);
       if(!scf_data.do_dens_fit || scf_data.direct_df || chem_env.sys_data.is_ks ||
          chem_env.sys_data.do_snK) {
         tamm_to_eigen_tensor(scf_data.ttensors.D_alpha, scf_data.etensors.D_alpha);
@@ -1111,8 +1097,7 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
                                 scf_data.etensors.eps_a, scf_data.etensors.eps_b);
       }
 
-      scf_compute.compute_density(ec, chem_env, scf_data, scalapack_info, scf_data.ttensors,
-                                  scf_data.etensors);
+      scf_compute.compute_density(ec, chem_env, scf_data, scf_data.ttensors, scf_data.etensors);
       // X=C?
 
       ec.pg().barrier();
@@ -1120,8 +1105,7 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     else {
       if(!chem_env.sys_data.is_hubbard) {
         if(rank == 0) cout << "Superposition of Atomic Density Guess ..." << endl;
-        scf_guess.compute_sad_guess(ec, chem_env, scf_data, scalapack_info, scf_data.etensors,
-                                    scf_data.ttensors);
+        scf_guess.compute_sad_guess(ec, chem_env, scf_data, scf_data.etensors, scf_data.ttensors);
         ec.pg().barrier();
       }
       else { // Guess for Hubbard model
@@ -1244,14 +1228,14 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
 
       // F_alpha = H1 + F_alpha_tmp
       if(chem_env.sys_data.is_hubbard) {
-        scf_iter.compute_2bf_hubbard(
-          ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4,
-          scf_data.ttensors, scf_data.etensors, scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
+        scf_iter.compute_2bf_hubbard(ec, chem_env, scf_data, do_schwarz_screen, shell2bf, SchwarzK,
+                                     max_nprim4, scf_data.ttensors, scf_data.etensors,
+                                     scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
       }
       else {
-        scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
-                             SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors,
-                             scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
+        scf_iter.compute_2bf(ec, chem_env, scf_data, do_schwarz_screen, shell2bf, SchwarzK,
+                             max_nprim4, scf_data.ttensors, scf_data.etensors, scf_state.is_3c_init,
+                             scf_data.do_dens_fit, xHF);
       }
 
       // Add QED contribution
@@ -1335,14 +1319,14 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
 
       // build a new Fock matrix
       if(chem_env.sys_data.is_hubbard) {
-        scf_iter.compute_2bf_hubbard(
-          ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf, SchwarzK, max_nprim4,
-          scf_data.ttensors, scf_data.etensors, scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
+        scf_iter.compute_2bf_hubbard(ec, chem_env, scf_data, do_schwarz_screen, shell2bf, SchwarzK,
+                                     max_nprim4, scf_data.ttensors, scf_data.etensors,
+                                     scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
       }
       else {
-        scf_iter.compute_2bf(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
-                             SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors,
-                             scf_state.is_3c_init, scf_data.do_dens_fit, xHF);
+        scf_iter.compute_2bf(ec, chem_env, scf_data, do_schwarz_screen, shell2bf, SchwarzK,
+                             max_nprim4, scf_data.ttensors, scf_data.etensors, scf_state.is_3c_init,
+                             scf_data.do_dens_fit, xHF);
       }
 
       // Add QED contribution
@@ -1351,7 +1335,7 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
       }
 
       std::tie(scf_state.ehf, scf_state.rmsd) = scf_iter.scf_iter_body(
-        ec, chem_env, scalapack_info, scf_state.iter, scf_data, scf_data.ttensors, scf_data.etensors
+        ec, chem_env, scf_state.iter, scf_data, scf_data.ttensors, scf_data.etensors
 #if defined(USE_GAUXC)
         ,
         gauxc_integrator
@@ -1440,8 +1424,7 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
 
     scf_data.etensors.multipoles =
       scf_compute.compute_multipoles(ec, chem_env, scf_data, scf_data.ttensors, scf_data.etensors);
-    scf_output.print_energies(ec, chem_env, scf_data.ttensors, scf_data.etensors, scf_data,
-                              scalapack_info);
+    scf_output.print_energies(ec, chem_env, scf_data.ttensors, scf_data.etensors, scf_data);
 
     if(rank == 0 && chem_env.ioptions.scf_options.mulliken_analysis && scf_state.is_conv) {
       Matrix S = tamm_to_eigen_matrix(scf_data.ttensors.S1);
@@ -1453,11 +1436,10 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
 
     if(chem_env.ioptions.pdos_options.do_pdos) {
 #if defined(USE_SCALAPACK)
-      if(scalapack_info.pg.is_valid()) {
-        tamm::from_block_cyclic_tensor(scf_data.ttensors.C_alpha_BC, scf_data.ttensors.C_alpha);
-        if(chem_env.sys_data.is_unrestricted)
-          tamm::from_block_cyclic_tensor(scf_data.ttensors.C_beta_BC, scf_data.ttensors.C_beta);
-      }
+      const tamm::ScalapackGrid& grid = tamm::find_scalapack_grid(ec);
+      grid.from_block_cyclic(scf_data.ttensors.C_alpha_BC, scf_data.ttensors.C_alpha);
+      if(chem_env.sys_data.is_unrestricted)
+        grid.from_block_cyclic(scf_data.ttensors.C_beta_BC, scf_data.ttensors.C_beta);
       if(rank == 0) {
         scf_data.etensors.C_alpha.resize(chem_env.sys_data.nbf_orig, chem_env.sys_data.nbf);
         tamm_to_eigen_tensor(scf_data.ttensors.C_alpha, scf_data.etensors.C_alpha);
@@ -1483,8 +1465,7 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
 
     if(chem_env.sys_data.gradient_type == GradientType::Analytical) {
       SCFGradients scf_gradients;
-      scf_gradients.scf_gradients(ec, chem_env, SchwarzK, scf_data, scalapack_info,
-                                  gauxc_integrator);
+      scf_gradients.scf_gradients(ec, chem_env, SchwarzK, scf_data, gauxc_integrator);
     }
 
     scf_final_io(ec, chem_env);
@@ -1493,13 +1474,10 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     ec.flush_and_sync();
 
 #if defined(USE_SCALAPACK)
-    if(scalapack_info.pg.is_valid()) {
-      Tensor<TensorType>::deallocate(scf_data.ttensors.F_BC, scf_data.ttensors.X_alpha,
-                                     scf_data.ttensors.C_alpha_BC);
+    if(tamm::find_scalapack_grid(ec).participates()) {
+      Tensor<TensorType>::deallocate(scf_data.ttensors.X_alpha, scf_data.ttensors.C_alpha_BC);
       if(chem_env.sys_data.is_unrestricted)
         Tensor<TensorType>::deallocate(scf_data.ttensors.C_beta_BC);
-      scalapack_info.ec.flush_and_sync();
-      scalapack_info.ec.pg().destroy_coll();
     }
 #else
     sch.deallocate(scf_data.ttensors.X_alpha);

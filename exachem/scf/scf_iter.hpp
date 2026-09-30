@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -26,13 +26,12 @@ protected:
                         std::vector<Tensor<T>>& fock_hist_alpha,
                         std::vector<Tensor<T>>& fock_hist_beta);
 
-  virtual void scf_cuscf(ExecutionContext& ec, const ChemEnv& chem_env, SCFData& scf_data,
-                         ScalapackInfo& scalapack_info);
+  virtual void scf_cuscf(ExecutionContext& ec, const ChemEnv& chem_env, SCFData& scf_data);
 
   virtual void compute_2bf_ri(ExecutionContext& ec, const ChemEnv& chem_env,
-                              ScalapackInfo& scalapack_info, const SCFData& scf_data,
-                              const std::vector<size_t>& shell2bf, TAMMTensors<T>& ttensors,
-                              EigenTensors& etensors, bool& is_3c_init, double xHF);
+                              const SCFData& scf_data, const std::vector<size_t>& shell2bf,
+                              TAMMTensors<T>& ttensors, EigenTensors& etensors, bool& is_3c_init,
+                              double xHF);
 
   virtual void compute_3c_ints(ExecutionContext& ec, const ChemEnv& chem_env,
                                const SCFData& scf_data, Tensor<T>& xyZ);
@@ -54,11 +53,10 @@ public:
   SCFIter(SCFIter&&) noexcept            = default;
   SCFIter& operator=(SCFIter&&) noexcept = default;
 
-  virtual void init_ri(ExecutionContext& ec, const ChemEnv& chem_env, ScalapackInfo& scalapack_info,
-                       const SCFData& scf_data, EigenTensors& etensors, TAMMTensors<T>& ttensors);
+  virtual void init_ri(ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data,
+                       EigenTensors& etensors, TAMMTensors<T>& ttensors);
 
-  virtual void compute_Vm12(ExecutionContext& ec, const ChemEnv& chem_env,
-                            ScalapackInfo& scalapack_info, const SCFData& scf_data,
+  virtual void compute_Vm12(ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data,
                             EigenTensors& etensors, TAMMTensors<T>& ttensors);
 
   virtual void compute_ri_jvec(ExecutionContext& ec, const ChemEnv& chem_env,
@@ -70,25 +68,23 @@ public:
                                EigenTensors& etensors, TAMMTensors<T>& ttensors,
                                Eigen::VectorXd& Jvec);
 
-  virtual void compute_2bf(ExecutionContext& ec, const ChemEnv& chem_env,
-                           ScalapackInfo& scalapack_info, const SCFData& scf_data,
+  virtual void compute_2bf(ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data,
                            const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
                            const Matrix& SchwarzK, const size_t& max_nprim4,
                            TAMMTensors<T>& ttensors, EigenTensors& etensors, bool& is_3c_init,
                            const bool do_density_fitting, double xHF);
 
   virtual void compute_2bf_deriv(ExecutionContext& ec, const ChemEnv& chem_env,
-                                 ScalapackInfo& scalapack_info, const SCFData& scf_data,
-                                 const bool do_schwarz_screen, const std::vector<size_t>& shell2bf,
-                                 const Matrix& SchwarzK, const size_t& max_nprim4,
-                                 TAMMTensors<T>& ttensors, EigenTensors& etensors,
-                                 const bool is_3c_init, const bool do_density_fitting, double xHF);
+                                 const SCFData& scf_data, const bool do_schwarz_screen,
+                                 const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
+                                 const size_t& max_nprim4, TAMMTensors<T>& ttensors,
+                                 EigenTensors& etensors, const bool is_3c_init,
+                                 const bool do_density_fitting, double xHF);
 
   virtual void compute_2bf_ri_deriv(ExecutionContext& ec, const ChemEnv& chem_env,
-                                    ScalapackInfo& scalapack_info, const SCFData& scf_data,
-                                    const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
-                                    TAMMTensors<T>& ttensors, EigenTensors& etensors,
-                                    const bool& is_direct, double xHF);
+                                    const SCFData& scf_data, const std::vector<size_t>& shell2bf,
+                                    const Matrix& SchwarzK, TAMMTensors<T>& ttensors,
+                                    EigenTensors& etensors, const bool& is_direct, double xHF);
 
   virtual Matrix compute_2c_ints_deriv(ExecutionContext& ec, const ChemEnv& chem_env,
                                        const SCFData& scf_data, TAMMTensors<T>& ttensors,
@@ -107,8 +103,7 @@ public:
                                            const SCFData& scf_data, Tensor<T>& xyK_alpha);
 
   virtual void compute_2bf_hubbard(ExecutionContext& ec, const ChemEnv& chem_env,
-                                   ScalapackInfo& scalapack_info, const SCFData& scf_data,
-                                   const bool                 do_schwarz_screen,
+                                   const SCFData& scf_data, const bool do_schwarz_screen,
                                    const std::vector<size_t>& shell2bf, const Matrix& SchwarzK,
                                    const size_t& max_nprim4, TAMMTensors<T>& ttensors,
                                    EigenTensors& etensors, bool& is_3c_init,
@@ -121,9 +116,8 @@ public:
                        EigenTensors& etensors, const bool cs1s2 = false);
 
   virtual std::tuple<T, T> scf_iter_body(ExecutionContext& ec, const ChemEnv& chem_env,
-                                         ScalapackInfo& scalapack_info, const int& iter,
-                                         SCFData& scf_data, TAMMTensors<T>& ttensors,
-                                         EigenTensors& etensors
+                                         const int& iter, SCFData& scf_data,
+                                         TAMMTensors<T>& ttensors, EigenTensors& etensors
 #if defined(USE_GAUXC)
                                          ,
                                          GauXC::XCIntegrator<Matrix>& gauxc_integrator

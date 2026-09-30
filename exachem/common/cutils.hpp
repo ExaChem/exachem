@@ -15,13 +15,6 @@
 // clang-format on
 using namespace tamm;
 
-#if defined(USE_SCALAPACK)
-#include <blacspp/grid.hpp>
-#include <scalapackpp/block_cyclic_matrix.hpp>
-#include <scalapackpp/eigenvalue_problem/sevp.hpp>
-#include <scalapackpp/pblas/gemm.hpp>
-#endif
-
 // template<class T>
 // inline T& unconst_cast(const T& v) {
 //   return const_cast<T&>(v);
@@ -44,44 +37,21 @@ inline auto free_tensors = [](auto&&... t) { ((t.deallocate()), ...); };
 inline void check_memory_requirements(ExecutionContext& ec, double calc_mem) {
   auto minfo = ec.mem_info();
   if(calc_mem > static_cast<double>(minfo.total_cpu_mem)) {
-    ec.print_mem_info();
+    ec.print_execution_environment();
     std::string err_msg = "ERROR: Insufficient CPU memory, required = " + std::to_string(calc_mem) +
                           "GiB, available = " + std::to_string(minfo.total_cpu_mem) + " GiB";
     tamm_terminate(err_msg);
   }
 }
 
-#if !defined(USE_SCALAPACK)
-struct ScalapackInfo {
-  bool use_scalapack{false};
-};
-#endif
-
 // Contains node, ppn information used for creating a smaller process group from world group
 struct ProcGroupData {
   int spg_nnodes{}; // number of nodes in smaller process group
   int ppn{};        // processes per node
   int spg_nranks{}; // number of rank in smaller process group
-  // #nodes used for scalapack operations can further be a subset of the smaller process group
-  int scalapack_nnodes{};
-  int scalapack_nranks{};
 
   auto unpack() { return std::make_tuple(spg_nnodes, ppn, spg_nranks); }
 };
-
-#if defined(USE_SCALAPACK)
-struct ScalapackInfo {
-  int64_t                                         npr{}, npc{}, scalapack_nranks{};
-  bool                                            use_scalapack{true};
-  tamm::ProcGroup                                 pg;
-  tamm::ExecutionContext                          ec;
-  std::unique_ptr<blacspp::Grid>                  blacs_grid;
-  std::unique_ptr<scalapackpp::BlockCyclicDist2D> blockcyclic_dist;
-};
-
-void setup_scalapack_info(tamm::ExecutionContext& ec, ChemEnv& chem_env,
-                          ScalapackInfo& scalapack_info, ProcGroupData& pgdata);
-#endif
 
 // Nbf, % of nodes, % of Nbf, nnodes from input file
 ProcGroupData get_spg_data(ExecutionContext& ec, const size_t N, const int node_p,

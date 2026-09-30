@@ -179,8 +179,8 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
   ec.pg().barrier();
 
   // Write Updated Tensors to disk (for a noscf calculation)
-  scf_engine.scf_output.rw_md_disk(ec, chem_env, scf_engine.scalapack_info, scf_data.ttensors,
-                                   scf_data.etensors, scf_engine.files_prefix, false);
+  scf_engine.scf_output.rw_md_disk(ec, chem_env, scf_data.ttensors, scf_data.etensors,
+                                   scf_engine.files_prefix, false);
 
   // Deallocate unneeded tensors
   Tensor<TensorType>::deallocate(chem_env.scf_context.C_AO, chem_env.scf_context.F_AO);

@@ -1,15 +1,12 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
 
 #include "exachem/scf/scf_common.hpp"
-#if defined(TAMM_USE_ELPA)
-#include <elpa/elpa.h>
-#endif
 
 template<typename T>
 std::vector<size_t> exachem::scf::SCFUtil::sort_indexes(const std::vector<T>& v, bool reverse) {
@@ -35,9 +32,10 @@ std::vector<size_t> exachem::scf::SCFUtil::sort_indexes(const std::vector<T>& v,
 //
 // A is conditioned to max_condition_number
 template<typename T>
-std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv(
-  ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data, ScalapackInfo& scalapack_info,
-  exachem::scf::TAMMTensors<T>& ttensors, bool symmetric, double threshold) {
+std::tuple<size_t, double, double>
+exachem::scf::SCFUtil::gensqrtinv(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
+                                  exachem::scf::TAMMTensors<T>& ttensors, bool symmetric,
+                                  double threshold) {
   SystemData& sys_data    = chem_env.sys_data;
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -51,101 +49,20 @@ std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv(
   const int64_t N = sys_data.nbf_orig;
 
   // TODO: avoid eigen matrices
-  Matrix         X, V;
+  Matrix         X;
   std::vector<T> eps(N);
 
+  // Eigen decompose S -> V s V**T, row i of V = eigenvector i
 #if defined(USE_SCALAPACK)
-  Tensor<T> V_sca;
-  if(scalapack_info.pg.is_valid()) {
-    blacspp::Grid*                  blacs_grid       = scalapack_info.blacs_grid.get();
-    const auto&                     grid             = *blacs_grid;
-    scalapackpp::BlockCyclicDist2D* blockcyclic_dist = scalapack_info.blockcyclic_dist.get();
-    const tamm::Tile                mb               = blockcyclic_dist->mb();
-
-    scf_data.tN_bc         = TiledIndexSpace{IndexSpace{range(sys_data.nbf_orig)}, mb};
-    TiledIndexSpace& tN_bc = scf_data.tN_bc;
-    Tensor<T>        S_BC{tN_bc, tN_bc};
-    V_sca = {tN_bc, tN_bc};
-    S_BC.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-    V_sca.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-    Tensor<T>::allocate(&scalapack_info.ec, S_BC, V_sca);
-
-    tamm::to_block_cyclic_tensor(ttensors.S1, S_BC);
-
-    auto desc_lambda = [&](const int64_t M, const int64_t N) {
-      auto [M_loc, N_loc] = (*blockcyclic_dist).get_local_dims(M, N);
-      return (*blockcyclic_dist).descinit_noerror(M, N, M_loc);
-    };
-
-    if(grid.ipr() >= 0 and grid.ipc() >= 0) {
-      auto desc_S = desc_lambda(N, N);
-      auto desc_V = desc_lambda(N, N);
-
-#if defined(TAMM_USE_ELPA)
-      elpa_t handle;
-      int    error;
-
-      // Initialize ELPA
-      if(elpa_init(20221109) != ELPA_OK) tamm_terminate("ELPA API not supported");
-
-      // Get and ELPA handle
-      handle = elpa_allocate(&error);
-      if(error != ELPA_OK) tamm_terminate("Could not create ELPA handle");
-
-      auto [na_rows, na_cols] = (*blockcyclic_dist).get_local_dims(N, N);
-
-      // Set parameters
-      elpa_set(handle, "na", static_cast<int>(N), &error);
-      elpa_set(handle, "nev", static_cast<int>(N), &error);
-      elpa_set(handle, "local_nrows", static_cast<int>(na_rows), &error);
-      elpa_set(handle, "local_ncols", static_cast<int>(na_cols), &error);
-      elpa_set(handle, "nblk", static_cast<int>(mb), &error);
-      elpa_set(handle, "mpi_comm_parent", scalapack_info.pg.comm_c2f(), &error);
-      elpa_set(handle, "process_row", static_cast<int>(grid.ipr()), &error);
-      elpa_set(handle, "process_col", static_cast<int>(grid.ipc()), &error);
-#if defined(USE_CUDA)
-      elpa_set(handle, "nvidia-gpu", static_cast<int>(1), &error);
-      // elpa_set(handle, "use_gpu_id", 1, &error);
-#endif
-      error = elpa_setup(handle);
-      if(error != ELPA_OK) tamm_terminate(" ERROR: Could not setup ELPA");
-
-      elpa_set(handle, "solver", ELPA_SOLVER_2STAGE, &error);
-#if defined(USE_CUDA)
-      elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_NVIDIA_GPU, &error);
+  // V is TAMM-dense (for tensor_block below) and lives on the ScaLAPACK grid's ranks
+  const tamm::ScalapackGrid& grid = tamm::find_scalapack_grid(ec);
+  scf_data.tN_bc                  = grid.index_space(sys_data.nbf_orig);
+  Tensor<T> V                     = grid.allocate_dense<T>(scf_data.tN_bc, scf_data.tN_bc);
 #else
-      elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_AVX2_BLOCK2, &error);
+  Tensor<T> V{scf_data.tAO, scf_data.tAO};
+  sch.allocate(V).execute();
 #endif
-      // elpa_set(handle, "debug", 1, &error);
-      // if (rank == 0 ) std::cout << " Calling ELPA " << std::endl;
-      elpa_eigenvectors(handle, S_BC.access_local_buf(), eps.data(), V_sca.access_local_buf(),
-                        &error);
-      if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA Eigendecompoistion failed");
-
-      // Clean-up
-      elpa_deallocate(handle, &error);
-      elpa_uninit(&error);
-      if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA deallocation failed");
-#else
-      /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, desc_S[2],
-                                   S_BC.access_local_buf(), 1, 1, desc_S, eps.data(),
-                                   V_sca.access_local_buf(), 1, 1, desc_V);
-#endif
-    }
-
-    Tensor<T>::deallocate(S_BC);
-  }
-
-#else
-
-  if(world_rank == 0) {
-    // Eigen decompose S -> VsV**T
-    V.resize(N, N);
-    tamm_to_eigen_tensor(ttensors.S1, V);
-    lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, N, V.data(), N, eps.data());
-  }
-
-#endif
+  tamm::eigensolve(ec, ttensors.S1, V, eps, ec.exhw());
 
   typename std::vector<T>::iterator first_above_thresh;
   if(world_rank == 0) {
@@ -197,30 +114,24 @@ std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv(
   ec.pg().barrier();
 
 #if defined(USE_SCALAPACK)
-  if(scalapack_info.pg.is_valid()) {
-    const tamm::Tile _mb = (scalapack_info.blockcyclic_dist.get())->mb();
-    scf_data.tNortho_bc  = TiledIndexSpace{IndexSpace{range(sys_data.nbf)}, _mb};
-    ttensors.X_alpha     = {scf_data.tN_bc, scf_data.tNortho_bc};
-    ttensors.X_alpha.set_block_cyclic({scalapack_info.npr, scalapack_info.npc});
-    Tensor<T>::allocate(&scalapack_info.ec, ttensors.X_alpha);
-  }
+  scf_data.tNortho_bc = grid.index_space(sys_data.nbf);
+  ttensors.X_alpha    = grid.allocate<T>(scf_data.tN_bc, scf_data.tNortho_bc);
 #else
   ttensors.X_alpha = {scf_data.tAO, scf_data.tAO_ortho};
   sch.allocate(ttensors.X_alpha).execute();
 #endif
 
 #if defined(USE_SCALAPACK)
-  if(scalapack_info.pg.is_valid()) {
-    Tensor<T> V_t = from_block_cyclic_tensor(V_sca);
-    Tensor<T> X_t = tensor_block(V_t, {n_illcond, 0}, {N, N}, {1, 0});
+  if(grid.participates()) {
+    Tensor<T> X_t = tensor_block(V, {n_illcond, 0}, {N, N}, {1, 0});
     tamm::from_dense_tensor(X_t, X_tmp);
-    Tensor<T>::deallocate(V_sca, V_t, X_t);
+    Tensor<T>::deallocate(V, X_t);
   }
 #else
   if(world_rank == 0) {
-    // auto* V_cond = Vbuf + n_illcond * N;
-    Matrix V_cond = V.block(n_illcond, 0, N - n_illcond, N);
-    V.resize(0, 0);
+    Matrix Vm     = tamm_to_eigen_matrix(V);
+    Matrix V_cond = Vm.block(n_illcond, 0, N - n_illcond, N);
+    Vm.resize(0, 0);
     X.resize(N, n_cond);
     X = V_cond.transpose();
     V_cond.resize(0, 0);
@@ -228,6 +139,7 @@ std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv(
     X.resize(0, 0);
   }
   ec.pg().barrier();
+  sch.deallocate(V).execute();
 #endif
 
   Tensor<T> X_comp{scf_data.tAO, scf_data.tAO_ortho};
@@ -243,7 +155,7 @@ std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv(
   sch(X_comp(mu, mu_o) = X_tmp(mu, mu_o) * eps_tamm(mu_o)).deallocate(X_tmp, eps_tamm).execute();
 
 #if defined(USE_SCALAPACK)
-  if(scalapack_info.pg.is_valid()) { tamm::to_block_cyclic_tensor(X_comp, ttensors.X_alpha); }
+  grid.to_block_cyclic(X_comp, ttensors.X_alpha);
 #endif
 
   if(sys_data.is_cuscf) {
@@ -261,11 +173,9 @@ std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv(
   return std::make_tuple(size_t(n_cond), condition_number, result_condition_number);
 }
 template<typename T>
-std::tuple<Matrix, size_t, double, double>
-exachem::scf::SCFUtil::gensqrtinv_atscf(ExecutionContext& ec, const ChemEnv& chem_env,
-                                        const SCFData& scf_data, ScalapackInfo& scalapack_info,
-                                        Tensor<T> S1, TiledIndexSpace& tao_atom, bool symmetric,
-                                        double threshold) {
+std::tuple<Matrix, size_t, double, double> exachem::scf::SCFUtil::gensqrtinv_atscf(
+  ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data, Tensor<T> S1,
+  TiledIndexSpace& tao_atom, bool symmetric, double threshold) {
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
   Scheduler sch{ec};
@@ -285,7 +195,7 @@ exachem::scf::SCFUtil::gensqrtinv_atscf(ExecutionContext& ec, const ChemEnv& che
     // Eigen decompose S -> VsV**T
     V.resize(N, N);
     tamm_to_eigen_tensor(S1, V);
-    lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, N, V.data(), N, eps.data());
+    tamm::eigensolve(N, V.data(), eps);
   }
 
   typename std::vector<T>::iterator first_above_thresh;
@@ -418,9 +328,9 @@ exachem::scf::SCFUtil::gather_task_vectors<double>(ExecutionContext&       ec,
 template std::vector<size_t>
 exachem::scf::SCFUtil::sort_indexes<double>(const std::vector<double>& v, bool reverse);
 template std::tuple<Matrix, size_t, double, double> exachem::scf::SCFUtil::gensqrtinv_atscf<double>(
-  ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data,
-  ScalapackInfo& scalapack_info, Tensor<double> S1, TiledIndexSpace& tao_atom, bool symmetric,
-  double threshold);
-template std::tuple<size_t, double, double> exachem::scf::SCFUtil::gensqrtinv<double>(
-  ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data, ScalapackInfo& scalapack_info,
-  TAMMTensors<double>& ttensors, bool symmetric, double threshold);
+  ExecutionContext& ec, const ChemEnv& chem_env, const SCFData& scf_data, Tensor<double> S1,
+  TiledIndexSpace& tao_atom, bool symmetric, double threshold);
+template std::tuple<size_t, double, double>
+exachem::scf::SCFUtil::gensqrtinv<double>(ExecutionContext& ec, ChemEnv& chem_env,
+                                          SCFData& scf_data, TAMMTensors<double>& ttensors,
+                                          bool symmetric, double threshold);

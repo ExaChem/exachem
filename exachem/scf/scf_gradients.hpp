@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -33,8 +33,7 @@ public:
   SCFGradients& operator=(SCFGradients&&) noexcept = default;
 
   virtual void scf_gradients(ExecutionContext& exc, ChemEnv& chem_env, Matrix& SchwarzK,
-                             SCFData& scf_data, ScalapackInfo& scalapack_info,
-                             GauXC::XCIntegrator<Matrix>& xc_integrator);
+                             SCFData& scf_data, GauXC::XCIntegrator<Matrix>& xc_integrator);
 
 protected:
   SCFIter<TensorType>  scf_iter;

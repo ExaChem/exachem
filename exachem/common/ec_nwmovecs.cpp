@@ -167,25 +167,25 @@ void ECNWChem::reorder_nwchem_orbitals(const bool is_spherical, const libint2::B
                                        Matrix& nw_mat, Matrix& ec_mat) {
   auto   shell2bf = shells.shell2bf();
   size_t nsh      = shells.size();
-  size_t k        = 0;
+  // size_t k        = 0;
   for(size_t ish = 0; ish < nsh; ish++) {
     int l   = shells[ish].contr[0].l;
     int ibf = shell2bf[ish];
     if(l == 0) {
       ec_mat.row(ibf) = nw_mat.row(ibf);
-      k++;
+      // k++;
     }
     else if(l == 1) {
       ec_mat.row(ibf)     = nw_mat.row(ibf + 1);
       ec_mat.row(ibf + 1) = nw_mat.row(ibf + 2);
       ec_mat.row(ibf + 2) = nw_mat.row(ibf);
-      k += 3;
+      // k += 3;
     }
     else {
       for(int m = -l, i = 0; m <= l; m++, i++) {
         double phase        = m % 2 > 0 ? -1.0 : 1.0;
         ec_mat.row(ibf + i) = phase * nw_mat.row(ibf + i);
-        k++;
+        // k++;
       }
     }
   }
@@ -195,25 +195,25 @@ void ECNWChem::reorder_ec_orbitals(const bool is_spherical, const libint2::Basis
                                    Matrix& nw_mat, Matrix& ec_mat) {
   auto   shell2bf = shells.shell2bf();
   size_t nsh      = shells.size();
-  size_t k        = 0;
+  // size_t k        = 0;
   for(size_t ish = 0; ish < nsh; ish++) {
     int l   = shells[ish].contr[0].l;
     int ibf = shell2bf[ish];
     if(l == 0) {
       nw_mat.row(ibf) = nw_mat.row(ibf);
-      k++;
+      // k++;
     }
     else if(l == 1) {
       nw_mat.row(ibf)     = ec_mat.row(ibf + 2);
       nw_mat.row(ibf + 1) = ec_mat.row(ibf);
       nw_mat.row(ibf + 2) = ec_mat.row(ibf + 1);
-      k += 3;
+      // k += 3;
     }
     else {
       for(int m = -l, i = 0; m <= l; m++, i++) {
         double phase        = m % 2 > 0 ? -1.0 : 1.0;
         nw_mat.row(ibf + i) = phase * ec_mat.row(ibf + i);
-        k++;
+        // k++;
       }
     }
   }

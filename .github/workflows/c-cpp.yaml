@@ -16,7 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 1000
     strategy:
-      max-parallel: 5
+      max-parallel: 3
       matrix:
         os: 
           - [self-hosted, rocky10]
@@ -35,6 +35,8 @@ jobs:
           - no-cuda          
         use_scalapack:
           - no-scalapack         
+        use_elpa:
+          - no-elpa
         include:
           - os: [self-hosted, rocky10]
             mpi_impl: mpich
@@ -44,6 +46,7 @@ jobs:
             backend: ga
             use_cuda: no-cuda
             use_scalapack: no-scalapack
+            use_elpa: no-elpa
           - os: [self-hosted, rocky10]
             mpi_impl: mpich
             cxx: g++
@@ -52,6 +55,16 @@ jobs:
             backend: ga
             use_cuda: cuda
             use_scalapack: no-scalapack
+            use_elpa: no-elpa
+          - os: [self-hosted, rocky10]
+            mpi_impl: mpich
+            cxx: g++
+            cc: gcc
+            fc: gfortran
+            backend: ga
+            use_cuda: cuda
+            use_scalapack: scalapack
+            use_elpa: elpa
           - os: [self-hosted, rocky10]
             mpi_impl: mpich
             cxx: g++
@@ -60,6 +73,7 @@ jobs:
             backend: ga
             use_cuda: no-cuda
             use_scalapack: scalapack
+            use_elpa: no-elpa
           - os: [self-hosted, macos]
             mpi_impl: mpich
             cxx: g++
@@ -68,23 +82,7 @@ jobs:
             backend: ga
             use_cuda: no-cuda
             use_scalapack: no-scalapack
-        exclude:
-          - os: [self-hosted, macos]
-            mpi_impl: mpich
-            cxx: g++
-            cc: gcc
-            fc: gfortran
-            backend: upcxx
-            use_cuda: no-cuda
-            use_scalapack: no-scalapack
-          - os: [self-hosted, rocky10]
-            mpi_impl: mpich
-            cxx: g++
-            cc: gcc
-            fc: gfortran
-            backend: upcxx
-            use_cuda: cuda
-            use_scalapack: no-scalapack
+            use_elpa: no-elpa
       fail-fast: true
 
     env:
@@ -108,6 +106,7 @@ jobs:
         echo "INSTALL_PATH=$GITHUB_WORKSPACE/install" >> $GITHUB_ENV
         echo "USE_CUDA=OFF" >> $GITHUB_ENV
         echo "USE_SCALAPACK=OFF" >> $GITHUB_ENV
+        echo "USE_ELPA=OFF" >> $GITHUB_ENV
         echo "EC_NPROC=8" >> $GITHUB_ENV
         echo "LA_VENDOR=OpenBLAS" >> $GITHUB_ENV
       shell: bash
@@ -123,6 +122,12 @@ jobs:
       shell: bash
       run: |
         echo "USE_SCALAPACK=ON" >> $GITHUB_ENV
+
+    - name: Set elpa build options
+      if: ${{ matrix.use_elpa == 'elpa' }}
+      shell: bash
+      run: |
+        echo "USE_ELPA=ON" >> $GITHUB_ENV
 
     - name: load llvm
       if: ${{ matrix.cc == 'clang' && matrix.cxx == 'clang++' && matrix.fc == 'gfortran' && matrix.os[1] == 'rocky10' }}
@@ -148,9 +153,9 @@ jobs:
       with:
         path: |
           ${{ github.workspace }}/install
-        key: ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-ga-${{ matrix.use_cuda }}-${{ matrix.use_scalapack }}-${{ github.run_id }}
+        key: ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-ga-${{ matrix.use_cuda }}-${{ matrix.use_scalapack }}-${{ matrix.use_elpa }}-${{ github.run_id }}
         restore-keys: |
-          ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-ga-${{ matrix.use_cuda }}-${{ matrix.use_scalapack }}-
+          ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-ga-${{ matrix.use_cuda }}-${{ matrix.use_scalapack }}-${{ matrix.use_elpa }}-
 
     - name: Cache install steps (backend = upcxx)
       if: ${{ matrix.backend == 'upcxx' }}
@@ -205,14 +210,14 @@ jobs:
         if [[ "${{ env.LA_VENDOR }}" == "IntelMKL" ]]; then
           LINALG_PREFIX_FLAG="-DLINALG_PREFIX=$MKLROOT"
         fi
-        cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DLINALG_VENDOR=${{ env.LA_VENDOR }} $LINALG_PREFIX_FLAG -DGPU_ARCH=70 -DMODULES="CC" -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DUSE_SCALAPACK=${{ env.USE_SCALAPACK }}
+        cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DLINALG_VENDOR=${{ env.LA_VENDOR }} $LINALG_PREFIX_FLAG -DGPU_ARCH=70 -DMODULES="CC" -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DUSE_SCALAPACK=${{ env.USE_SCALAPACK }} -DTAMM_ENABLE_ELPA=${{ env.USE_ELPA }}
         cd build
         make -j${{ env.EC_NPROC }}
         make install
 
         # ExaChem build
         cd $GITHUB_WORKSPACE
-        cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES="CC" -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }}
+        cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES="CC" -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DTAMM_ENABLE_ELPA=${{ env.USE_ELPA }} -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }}
         cd build
         make -j${{ env.EC_NPROC }}
         make install

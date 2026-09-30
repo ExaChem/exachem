@@ -66,9 +66,6 @@ $MPIEXEC $EXE_PATH $CHEM_INP/h2o_ducc.json
 #RT-EOM-CCSD
 $MPIEXEC $EXE_PATH $CHEM_INP/ozone.json
 
-#DFT
-$MPIEXEC $EXE_PATH $CHEM_INP/cr2.json
-
 #CUSCF
 $MPIEXEC $EXE_PATH $CHEM_INP/no.json
 
@@ -82,7 +79,7 @@ $MPIEXEC $EXE_PATH $CHEM_INP/n2_gw.json
 #Point charges
 $MPIEXEC $EXE_PATH $CHEM_INP/h2o_pcharges.json
 
-#Gradient
+# DFT+Gradient
 $MPIEXEC $EXE_PATH $CHEM_INP/cr2_gradient.json
 
 #PDOS

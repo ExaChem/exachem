@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -86,8 +86,7 @@ void exachem::scf::SCFIO<T>::write_scf_mat(const Matrix& C, const std::string& m
 template<typename T>
 void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_env,
                                             TAMMTensors<T>& ttensors, EigenTensors& etensors,
-                                            const SCFData& scf_data,
-                                            ScalapackInfo& scalapack_info) const {
+                                            const SCFData& scf_data) const {
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
@@ -141,11 +140,7 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
 
 #if defined(USE_SCALAPACK)
       Tensor<T>::allocate(&ec, X_a);
-      if(scalapack_info.pg.is_valid()) {
-        Tensor<T> X_dense = from_block_cyclic_tensor(ttensors.X_alpha);
-        tamm::from_dense_tensor(X_dense, X_a);
-        Tensor<T>::deallocate(X_dense);
-      }
+      tamm::find_scalapack_grid(ec).from_block_cyclic(ttensors.X_alpha, X_a);
       ec.pg().barrier();
 #else
       X_a = ttensors.X_alpha;
@@ -304,11 +299,7 @@ void exachem::scf::SCFIO<T>::print_energies(ExecutionContext& ec, ChemEnv& chem_
 
 #if defined(USE_SCALAPACK)
       Tensor<T>::allocate(&ec, X_a);
-      if(scalapack_info.pg.is_valid()) {
-        Tensor<T> X_dense = from_block_cyclic_tensor(ttensors.X_alpha);
-        tamm::from_dense_tensor(X_dense, X_a);
-        Tensor<T>::deallocate(X_dense);
-      }
+      tamm::find_scalapack_grid(ec).from_block_cyclic(ttensors.X_alpha, X_a);
       ec.pg().barrier();
 #else
       X_a = ttensors.X_alpha;
@@ -783,9 +774,8 @@ void exachem::scf::SCFIO<T>::rw_mat_disk(Tensor<T> tensor, const std::string& tf
 
 template<typename T>
 void exachem::scf::SCFIO<T>::rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env,
-                                        ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors,
-                                        EigenTensors& etensors, const std::string& files_prefix,
-                                        bool read) const {
+                                        TAMMTensors<T>& ttensors, EigenTensors& etensors,
+                                        const std::string& files_prefix, bool read) const {
   const auto rank    = ec.pg().rank();
   const bool is_uhf  = chem_env.sys_data.is_unrestricted;
   const auto profile = chem_env.ioptions.scf_options.profile;
@@ -797,10 +787,10 @@ void exachem::scf::SCFIO<T>::rw_md_disk(ExecutionContext& ec, const ChemEnv& che
 
   if(!read) {
 #if defined(USE_SCALAPACK)
-    if(scalapack_info.pg.is_valid()) {
-      tamm::from_block_cyclic_tensor(ttensors.C_alpha_BC, ttensors.C_alpha);
-      if(is_uhf) tamm::from_block_cyclic_tensor(ttensors.C_beta_BC, ttensors.C_beta);
-    }
+    // Find-only: e.g. embedding writes orbitals after the SCF grid has been released.
+    const tamm::ScalapackGrid& grid = tamm::find_scalapack_grid(ec);
+    grid.from_block_cyclic(ttensors.C_alpha_BC, ttensors.C_alpha);
+    if(is_uhf) grid.from_block_cyclic(ttensors.C_beta_BC, ttensors.C_beta);
 #else
     if(rank == 0) {
       eigen_to_tamm_tensor(ttensors.C_alpha, etensors.C_alpha);

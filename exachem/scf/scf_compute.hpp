@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -40,7 +40,6 @@ public:
                                   const libint2::BasisSet& bs2       = libint2::BasisSet(),
                                   double                   threshold = 1e-16) const;
   virtual void compute_orthogonalizer(ExecutionContext& ec, ChemEnv& chem_env, SCFData& scf_data,
-                                      ScalapackInfo&  scalapack_info,
                                       TAMMTensors<T>& ttensors) const;
 
   virtual std::tuple<std::vector<size_t>, std::vector<Tile>, std::vector<Tile>>
@@ -61,8 +60,8 @@ public:
                                    EigenTensors& etensors) const;
 
   virtual void compute_density(ExecutionContext& ec, const ChemEnv& chem_env,
-                               const SCFData& scf_data, ScalapackInfo& scalapack_info,
-                               TAMMTensors<T>& ttensors, EigenTensors& etensors) const;
+                               const SCFData& scf_data, TAMMTensors<T>& ttensors,
+                               EigenTensors& etensors) const;
 
   virtual std::vector<double> compute_multipoles(ExecutionContext& ec, const ChemEnv& chem_env,
                                                  const SCFData&        scf_data,

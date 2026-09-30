@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -612,294 +612,60 @@ void exachem::scf::SCFGuess<T>::compute_pchg_ints(
 }
 
 template<typename T>
-void exachem::scf::SCFGuess<T>::scf_diagonalize(Scheduler& sch, const ChemEnv& chem_env,
-                                                SCFData& scf_data, ScalapackInfo& scalapack_info,
-                                                TAMMTensors<T>& ttensors, EigenTensors& etensors) {
-  auto              rank     = sch.ec().pg().rank();
-  const SystemData& sys_data = chem_env.sys_data;
-  // SCFOptions& scf_options = chem_env.ioptions.scf_options;
-  // const bool debug      = scf_options.debug && rank==0;
-
+T exachem::scf::SCFGuess<T>::diagonalize_spin(ExecutionContext& ec, const SystemData& sys_data,
+                                              TAMMTensors<T>& ttensors, EigenTensors& etensors,
+                                              bool is_beta) {
   // solve F C = e S C by (conditioned) transformation to F' C' = e C',
   // where
   // F' = X.transpose() . F . X; the original C is obtained as C = X . C'
 
-  // Eigen::SelfAdjointEigenSolver<Matrix> eig_solver_alpha(X_a.transpose() * F_alpha * X_a);
-  // C_alpha = X_a * eig_solver_alpha.eigenvectors();
-  // Eigen::SelfAdjointEigenSolver<Matrix> eig_solver_beta( X_b.transpose() * F_beta  * X_b);
-  // C_beta  = X_b * eig_solver_beta.eigenvectors();
-
-  const int64_t N      = sys_data.nbf_orig;
-  const bool    is_uhf = sys_data.is_unrestricted;
-  // const bool is_rhf = sys_data.is_restricted;
-  const int nelectrons_alpha = sys_data.nelectrons_alpha;
-  const int nelectrons_beta  = sys_data.nelectrons_beta;
-  double    hl_gap           = 0;
+  [[maybe_unused]] const int64_t N      = sys_data.nbf_orig;
+  const int64_t                  Northo = sys_data.nbf;
+  Tensor<T>&                     F      = is_beta ? ttensors.F_beta : ttensors.F_alpha;
+  std::vector<T>&                eps    = is_beta ? etensors.eps_b : etensors.eps_a;
+  const int nelec = is_beta ? sys_data.nelectrons_beta : sys_data.nelectrons_alpha;
+  T         gap   = std::numeric_limits<T>::max(); // gap undefined unless computed below
 
 #if defined(USE_SCALAPACK)
-  if(scalapack_info.pg.is_valid()) {
-    blacspp::Grid*                  blacs_grid       = scalapack_info.blacs_grid.get();
-    scalapackpp::BlockCyclicDist2D* blockcyclic_dist = scalapack_info.blockcyclic_dist.get();
-
-    auto desc_lambda = [&](const int64_t M, const int64_t N) {
-      auto [M_loc, N_loc] = (*blockcyclic_dist).get_local_dims(M, N);
-      return (*blockcyclic_dist).descinit_noerror(M, N, M_loc);
-    };
-
-    const auto& grid   = *blacs_grid;
-    const auto  mb     = blockcyclic_dist->mb();
-    const auto  Northo = sys_data.nbf;
-
-    if(grid.ipr() >= 0 and grid.ipc() >= 0) {
-      // TODO: Optimize intermediates here
-      scalapackpp::BlockCyclicMatrix<double>
-        // Fa_sca  ( grid, N,      N,      mb, mb ),
-        // Xa_sca  ( grid, Northo, N,      mb, mb ), // Xa is row-major
-        Fp_sca(grid, Northo, Northo, mb, mb), Ca_sca(grid, Northo, Northo, mb, mb),
-        TMP1_sca(grid, N, Northo, mb, mb);
-
-      auto desc_Fa = desc_lambda(N, N);
-      auto desc_Xa = desc_lambda(Northo, N);
-
-      tamm::to_block_cyclic_tensor(ttensors.F_alpha, ttensors.F_BC);
-      scalapack_info.pg.barrier();
-
-      auto Fa_tamm_lptr = ttensors.F_BC.access_local_buf();
-      auto Xa_tamm_lptr = ttensors.X_alpha.access_local_buf();
-      auto Ca_tamm_lptr = ttensors.C_alpha_BC.access_local_buf();
-
-      // Compute TMP = F * X -> F * X**T (b/c row-major)
-      // scalapackpp::pgemm( scalapackpp::Op::NoTrans, scalapackpp::Op::Trans,
-      // 1., Fa_sca, Xa_sca, 0., TMP1_sca );
-
-      scalapackpp::pgemm(scalapackpp::Op::NoTrans, scalapackpp::Op::Trans, TMP1_sca.m(),
-                         TMP1_sca.n(), desc_Fa[3], 1., Fa_tamm_lptr, 1, 1, desc_Fa, Xa_tamm_lptr, 1,
-                         1, desc_Xa, 0., TMP1_sca.data(), 1, 1, TMP1_sca.desc());
-
-      // Compute Fp = X**T * TMP -> X * TMP (b/c row-major)
-      // scalapackpp::pgemm( scalapackpp::Op::NoTrans, scalapackpp::Op::NoTrans,
-      // 1., Xa_sca, TMP1_sca, 0., Fp_sca );
-
-      scalapackpp::pgemm(scalapackpp::Op::NoTrans, scalapackpp::Op::NoTrans, Fp_sca.m(), Fp_sca.n(),
-                         desc_Xa[3], 1., Xa_tamm_lptr, 1, 1, desc_Xa, TMP1_sca.data(), 1, 1,
-                         TMP1_sca.desc(), 0., Fp_sca.data(), 1, 1, Fp_sca.desc());
-      // Solve EVP
-      etensors.eps_a.resize(Northo, 0.0);
-      // scalapackpp::hereigd( scalapackpp::Job::Vec, scalapackpp::Uplo::Lower,
-      //                       Fp_sca, etensors.eps_a.data(), Ca_sca );
-
-#if defined(TAMM_USE_ELPA)
-      elpa_t handle;
-      int    error;
-
-      // Initialize ELPA
-      if(elpa_init(20221109) != ELPA_OK) tamm_terminate("ELPA API not supported");
-
-      // Get and ELPA handle
-      handle = elpa_allocate(&error);
-      if(error != ELPA_OK) tamm_terminate("Could not create ELPA handle");
-
-      auto [na_rows, na_cols] = (*blockcyclic_dist).get_local_dims(Northo, Northo);
-
-      // Set parameters
-      elpa_set(handle, "na", Northo, &error);
-      elpa_set(handle, "nev", Northo, &error);
-      elpa_set(handle, "local_nrows", static_cast<int>(na_rows), &error);
-      elpa_set(handle, "local_ncols", static_cast<int>(na_cols), &error);
-      elpa_set(handle, "nblk", static_cast<int>(mb), &error);
-      elpa_set(handle, "mpi_comm_parent", scalapack_info.pg.comm_c2f(), &error);
-      elpa_set(handle, "process_row", static_cast<int>(grid.ipr()), &error);
-      elpa_set(handle, "process_col", static_cast<int>(grid.ipc()), &error);
-#if defined(USE_CUDA)
-      elpa_set(handle, "nvidia-gpu", static_cast<int>(1), &error);
-      // elpa_set(handle, "use_gpu_id", 1, &error);
-#endif
-      error = elpa_setup(handle);
-      if(error != ELPA_OK) tamm_terminate(" ERROR: Could not setup ELPA");
-
-      elpa_set(handle, "solver", ELPA_SOLVER_2STAGE, &error);
-
-#if defined(USE_CUDA)
-      elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_NVIDIA_GPU, &error);
+  // F and the orthogonalizer X, C on the ScaLAPACK grid
+  if(!tamm::find_scalapack_grid(ec).participates()) return gap;
+  Tensor<T>& C_BC = is_beta ? ttensors.C_beta_BC : ttensors.C_alpha_BC;
+  tamm::generalized_eigensolve(ec, F, ttensors.X_alpha, C_BC, eps, ec.exhw());
 #else
-      elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_AVX2_BLOCK2, &error);
+  // F, X and C on rank 0
+  if(ec.pg().rank() != 0) return gap;
+  Matrix& C  = is_beta ? etensors.C_beta : etensors.C_alpha;
+  Matrix  Fp = tamm_to_eigen_matrix(F);
+  // TODO: avoid eigen Fp, X
+  Matrix X = tamm_to_eigen_matrix(ttensors.X_alpha);
+  C.resize(N, Northo);
+  tamm::generalized_eigensolve(N, Northo, Fp.data(), X.data(), C.data(), eps, ec.exhw());
 #endif
 
-      // elpa_set(handle, "debug", 1, &error);
-      // if (rank == 0 ) std::cout << " Calling ELPA " << std::endl;
-      elpa_eigenvectors(handle, Fp_sca.data(), etensors.eps_a.data(), Ca_sca.data(), &error);
-      if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA Eigendecompoistion failed");
+  if(nelec > 0 && nelec < Northo) gap = eps[nelec] - eps[nelec - 1];
+  return gap;
+}
 
-      // Clean-up
-      elpa_deallocate(handle, &error);
-      elpa_uninit(&error);
-      if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA deallocation failed");
+template<typename T>
+void exachem::scf::SCFGuess<T>::scf_diagonalize(Scheduler& sch, const ChemEnv& chem_env,
+                                                SCFData& scf_data, TAMMTensors<T>& ttensors,
+                                                EigenTensors& etensors) {
+  auto              rank     = sch.ec().pg().rank();
+  const SystemData& sys_data = chem_env.sys_data;
 
-#else
-      /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, Fp_sca.m(),
-                                   Fp_sca.data(), 1, 1, Fp_sca.desc(), etensors.eps_a.data(),
-                                   Ca_sca.data(), 1, 1, Ca_sca.desc());
-#endif
+  const bool is_uhf           = sys_data.is_unrestricted;
+  const int  nelectrons_alpha = sys_data.nelectrons_alpha;
+  const int  nelectrons_beta  = sys_data.nelectrons_beta;
+  double     hl_gap           = 0;
 
-      // Backtransform TMP = X * Ca -> TMP**T = Ca**T * X
-      // scalapackpp::pgemm( scalapackpp::Op::Trans, scalapackpp::Op::NoTrans,
-      //                     1., Ca_sca, Xa_sca, 0., TMP2_sca );
-      scalapackpp::pgemm(scalapackpp::Op::Trans, scalapackpp::Op::NoTrans, desc_Xa[2], desc_Xa[3],
-                         Ca_sca.m(), 1., Ca_sca.data(), 1, 1, Ca_sca.desc(), Xa_tamm_lptr, 1, 1,
-                         desc_Xa, 0., Ca_tamm_lptr, 1, 1, desc_Xa);
-
-      if(!scf_data.lshift_reset)
-        hl_gap = etensors.eps_a[nelectrons_alpha] - etensors.eps_a[nelectrons_alpha - 1];
-
-      // Gather results
-      // if(scalapack_info.pg.rank() == 0) C_alpha.resize(N, Northo);
-      // TMP2_sca.gather_from(Northo, N, C_alpha.data(), Northo, 0, 0);
-
-      if(is_uhf) {
-        tamm::to_block_cyclic_tensor(ttensors.F_beta, ttensors.F_BC);
-        scalapack_info.pg.barrier();
-        Fa_tamm_lptr = ttensors.F_BC.access_local_buf();
-        Xa_tamm_lptr = ttensors.X_alpha.access_local_buf();
-        Ca_tamm_lptr = ttensors.C_beta_BC.access_local_buf();
-
-        // Compute TMP = F * X -> F * X**T (b/c row-major)
-        // scalapackpp::pgemm( scalapackpp::Op::NoTrans, scalapackpp::Op::Trans,
-        //                     1., Fa_sca, Xa_sca, 0., TMP1_sca );
-        scalapackpp::pgemm(scalapackpp::Op::NoTrans, scalapackpp::Op::Trans, TMP1_sca.m(),
-                           TMP1_sca.n(), desc_Fa[3], 1., Fa_tamm_lptr, 1, 1, desc_Fa, Xa_tamm_lptr,
-                           1, 1, desc_Xa, 0., TMP1_sca.data(), 1, 1, TMP1_sca.desc());
-
-        // Compute Fp = X**T * TMP -> X * TMP (b/c row-major)
-        // scalapackpp::pgemm( scalapackpp::Op::NoTrans, scalapackpp::Op::NoTrans,
-        //                     1., Xa_sca, TMP1_sca, 0., Fp_sca );
-        scalapackpp::pgemm(scalapackpp::Op::NoTrans, scalapackpp::Op::NoTrans, Fp_sca.m(),
-                           Fp_sca.n(), desc_Xa[3], 1., Xa_tamm_lptr, 1, 1, desc_Xa, TMP1_sca.data(),
-                           1, 1, TMP1_sca.desc(), 0., Fp_sca.data(), 1, 1, Fp_sca.desc());
-
-        // Solve EVP
-        etensors.eps_b.resize(Northo, 0.0);
-        // scalapackpp::hereigd( scalapackpp::Job::Vec, scalapackpp::Uplo::Lower,
-        //                       Fp_sca, etensors.eps_b.data(), Ca_sca );
-#if defined(TAMM_USE_ELPA)
-        elpa_t handle;
-        int    error;
-
-        // Initialize ELPA
-        if(elpa_init(20221109) != ELPA_OK) tamm_terminate("ELPA API not supported");
-
-        // Get and ELPA handle
-        handle = elpa_allocate(&error);
-        if(error != ELPA_OK) tamm_terminate("Could not create ELPA handle");
-
-        auto [na_rows, na_cols] = (*blockcyclic_dist).get_local_dims(Northo, Northo);
-
-        // Set parameters
-        elpa_set(handle, "na", Northo, &error);
-        elpa_set(handle, "nev", Northo, &error);
-        elpa_set(handle, "local_nrows", static_cast<int>(na_rows), &error);
-        elpa_set(handle, "local_ncols", static_cast<int>(na_cols), &error);
-        elpa_set(handle, "nblk", static_cast<int>(mb), &error);
-        elpa_set(handle, "mpi_comm_parent", scalapack_info.pg.comm_c2f(), &error);
-        elpa_set(handle, "process_row", static_cast<int>(grid.ipr()), &error);
-        elpa_set(handle, "process_col", static_cast<int>(grid.ipc()), &error);
-#if defined(USE_CUDA)
-        elpa_set(handle, "nvidia-gpu", static_cast<int>(1), &error);
-        // elpa_set(handle, "use_gpu_id", 1, &error);
-#endif
-        error = elpa_setup(handle);
-        if(error != ELPA_OK) tamm_terminate(" ERROR: Could not setup ELPA");
-
-        elpa_set(handle, "solver", ELPA_SOLVER_2STAGE, &error);
-#if defined(USE_CUDA)
-        elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_NVIDIA_GPU, &error);
-#else
-        elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_AVX2_BLOCK2, &error);
-#endif
-        // elpa_set(handle, "debug", 1, &error);
-        // if (rank == 0 ) std::cout << " Calling ELPA " << std::endl;
-        elpa_eigenvectors(handle, Fp_sca.data(), etensors.eps_b.data(), Ca_sca.data(), &error);
-        if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA Eigendecompoistion failed");
-
-        // Clean-up
-        elpa_deallocate(handle, &error);
-        elpa_uninit(&error);
-        if(error != ELPA_OK) tamm_terminate(" ERROR: ELPA deallocation failed");
-
-#else
-        /*info=*/scalapackpp::hereig(scalapackpp::Job::Vec, scalapackpp::Uplo::Lower, Fp_sca.m(),
-                                     Fp_sca.data(), 1, 1, Fp_sca.desc(), etensors.eps_b.data(),
-                                     Ca_sca.data(), 1, 1, Ca_sca.desc());
-#endif
-        // Backtransform TMP = X * Cb -> TMP**T = Cb**T * X
-        // scalapackpp::pgemm( scalapackpp::Op::Trans, scalapackpp::Op::NoTrans,
-        //                     1., Ca_sca, Xa_sca, 0., TMP2_sca );
-        scalapackpp::pgemm(scalapackpp::Op::Trans, scalapackpp::Op::NoTrans, desc_Xa[2], desc_Xa[3],
-                           Ca_sca.m(), 1., Ca_sca.data(), 1, 1, Ca_sca.desc(), Xa_tamm_lptr, 1, 1,
-                           desc_Xa, 0., Ca_tamm_lptr, 1, 1, desc_Xa);
-
-        // Gather results
-        // if(scalapack_info.pg.rank() == 0) C_beta.resize(N, Northo);
-        // TMP2_sca.gather_from(Northo, N, C_beta.data(), Northo, 0, 0);
-
-        if(!scf_data.lshift_reset)
-          hl_gap =
-            std::min(hl_gap, etensors.eps_b[nelectrons_beta] - etensors.eps_b[nelectrons_beta - 1]);
-      }
-    } // rank participates in ScaLAPACK call
-  }
-  sch.ec().pg().barrier();
-
-#else
-
-  Matrix& C_alpha = etensors.C_alpha;
-  Matrix& C_beta  = etensors.C_beta;
-
-  const int64_t Northo_a = sys_data.nbf; // X_a.cols();
-  // TODO: avoid eigen Fp
-  Matrix X_a;
-  if(rank == 0) {
-    // alpha
-    Matrix Fp = tamm_to_eigen_matrix(ttensors.F_alpha);
-    X_a       = tamm_to_eigen_matrix(ttensors.X_alpha);
-    C_alpha.resize(N, Northo_a);
-    etensors.eps_a.resize(Northo_a, 0.0);
-
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans, N, Northo_a, N, 1.,
-               Fp.data(), N, X_a.data(), Northo_a, 0., C_alpha.data(), N);
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, Northo_a, Northo_a, N,
-               1., X_a.data(), Northo_a, C_alpha.data(), N, 0., Fp.data(), Northo_a);
-    lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, Northo_a, Fp.data(), Northo_a,
-                  etensors.eps_a.data());
-    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, Northo_a, N, Northo_a,
-               1., Fp.data(), Northo_a, X_a.data(), Northo_a, 0., C_alpha.data(), Northo_a);
-    if(!scf_data.lshift_reset)
-      hl_gap = etensors.eps_a[nelectrons_alpha] - etensors.eps_a[nelectrons_alpha - 1];
-  }
+  const T gap_a = diagonalize_spin(sch.ec(), sys_data, ttensors, etensors, false);
+  if(!scf_data.lshift_reset) hl_gap = gap_a;
 
   if(is_uhf) {
-    const int64_t Northo_b = sys_data.nbf; // X_b.cols();
-    if(rank == 0) {
-      // beta
-      Matrix Fp = tamm_to_eigen_matrix(ttensors.F_beta);
-      C_beta.resize(N, Northo_b);
-      etensors.eps_b.resize(Northo_b, 0.0);
-      Matrix& X_b = X_a;
-
-      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans, N, Northo_b, N, 1.,
-                 Fp.data(), N, X_b.data(), Northo_b, 0., C_beta.data(), N);
-      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, Northo_b, Northo_b,
-                 N, 1., X_b.data(), Northo_b, C_beta.data(), N, 0., Fp.data(), Northo_b);
-      lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, Northo_b, Fp.data(), Northo_b,
-                    etensors.eps_b.data());
-      blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, Northo_b, N, Northo_b,
-                 1., Fp.data(), Northo_b, X_b.data(), Northo_b, 0., C_beta.data(), Northo_b);
-
-      if(!scf_data.lshift_reset)
-        hl_gap =
-          std::min(hl_gap, etensors.eps_b[nelectrons_beta] - etensors.eps_b[nelectrons_beta - 1]);
-    }
+    const T gap_b = diagonalize_spin(sch.ec(), sys_data, ttensors, etensors, true);
+    if(!scf_data.lshift_reset) hl_gap = std::min(hl_gap, gap_b);
   }
-#endif
+  sch.ec().pg().barrier();
 
   // Remove the level-shift
   if(rank == 0 && scf_data.lshift != 0.0) {
@@ -922,8 +688,7 @@ void exachem::scf::SCFGuess<T>::scf_diagonalize(Scheduler& sch, const ChemEnv& c
 
 template<typename T>
 void exachem::scf::SCFGuess<T>::compute_sad_guess(ExecutionContext& ec, ChemEnv& chem_env,
-                                                  SCFData& scf_data, ScalapackInfo& scalapack_info,
-                                                  EigenTensors&   etensors,
+                                                  SCFData& scf_data, EigenTensors& etensors,
                                                   TAMMTensors<T>& ttensors) {
   auto ig1 = std::chrono::high_resolution_clock::now();
 
@@ -1246,8 +1011,8 @@ void exachem::scf::SCFGuess<T>::compute_sad_guess(ExecutionContext& ec, ChemEnv&
 
     Matrix X_atom;
     std::tie(X_atom, obs_rank, S_condition_number, XtX_condition_number) =
-      exachem::scf::SCFUtil::gensqrtinv_atscf<T>(ec, chem_env, scf_data, scalapack_info, S_atom,
-                                                 tAO_atom, false, S_condition_number_threshold);
+      exachem::scf::SCFUtil::gensqrtinv_atscf<T>(ec, chem_env, scf_data, S_atom, tAO_atom, false,
+                                                 S_condition_number_threshold);
 
     // if(rank == 0) cout << std::setprecision(6) << "X_atom: " << endl << X_atom << endl;
 

@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2026 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -10,7 +10,6 @@
 
 void exachem::scf::SCFGradients::scf_gradients(ExecutionContext& ec, ChemEnv& chem_env,
                                                Matrix& SchwarzK, SCFData& scf_data,
-                                               ScalapackInfo&               scalapack_info,
                                                GauXC::XCIntegrator<Matrix>& xc_integrator) {
   using T = double;
 
@@ -193,8 +192,8 @@ void exachem::scf::SCFGradients::scf_gradients(ExecutionContext& ec, ChemEnv& ch
 
   do_t1 = std::chrono::high_resolution_clock::now();
 
-  scf_iter.compute_2bf_deriv(ec, chem_env, scalapack_info, scf_data, do_schwarz_screen, shell2bf,
-                             SchwarzK, max_nprim4, scf_data.ttensors, scf_data.etensors,
+  scf_iter.compute_2bf_deriv(ec, chem_env, scf_data, do_schwarz_screen, shell2bf, SchwarzK,
+                             max_nprim4, scf_data.ttensors, scf_data.etensors,
                              /*scf_state.is_3c_init*/ false, scf_data.do_dens_fit, scf_data.xHF);
 
   do_t2   = std::chrono::high_resolution_clock::now();

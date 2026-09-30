@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -35,8 +35,7 @@ public:
   virtual void   write_scf_mat(const Matrix& C, const std::string& matfile) const;
 
   // SCF I/O routines
-  virtual void rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env,
-                          ScalapackInfo& scalapack_info, TAMMTensors<T>& ttensors,
+  virtual void rw_md_disk(ExecutionContext& ec, const ChemEnv& chem_env, TAMMTensors<T>& ttensors,
                           EigenTensors& etensors, const std::string& files_prefix,
                           bool read = false) const;
 
@@ -45,8 +44,7 @@ public:
   virtual void print_mulliken(ChemEnv& chem_env, const Matrix& D, const Matrix& D_beta,
                               const Matrix& S) const;
   virtual void print_energies(ExecutionContext& ec, ChemEnv& chem_env, TAMMTensors<T>& ttensors,
-                              EigenTensors& etensors, const SCFData& scf_data,
-                              ScalapackInfo& scalapack_info) const;
+                              EigenTensors& etensors, const SCFData& scf_data) const;
   virtual void print_multipoles(ChemEnv& chem_env, const std::vector<double>& multipoles) const;
 };
 

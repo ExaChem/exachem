@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -78,8 +78,6 @@ public:
     bool       is_conv    = true;
     bool       is_3c_init = false; // whether 3-center integrals are initialized
   };
-
-  ScalapackInfo scalapack_info;
 
 #if defined(USE_GAUXC)
   SCFGauxc<TensorType>                         scf_gauxc;

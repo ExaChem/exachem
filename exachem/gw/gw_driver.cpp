@@ -160,15 +160,19 @@ void gw_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   SCFCompute<T> scf_compute;
   SCFIter<T>    scf_iter;
-  ScalapackInfo scalapack_info;
   SCFData       gw_scf_data;
-#if defined(USE_SCALAPACK)
-  // In a ScaLAPACK build compute_Vm12 diagonalizes the CD-basis metric only on a valid
-  // ScaLAPACK subgroup (there is no rank-0 LAPACK fallback), so set one up as SCF does.
-  ProcGroupData pgdata =
-    get_spg_data(ec, chem_env.shells.nbf(), -1, 50, chem_env.ioptions.scf_options.nnodes);
-  setup_scalapack_info(ec, chem_env, scalapack_info, pgdata);
-#endif
+  // compute_Vm12 diagonalizes the CD-basis metric on the ScaLAPACK grid in ScaLAPACK builds;
+  // size it as SCF does (a no-op in builds without ScaLAPACK). Released after init_ri.
+  {
+    const ProcGroupData pgdata =
+      get_spg_data(ec, chem_env.shells.nbf(), -1, 50, chem_env.ioptions.scf_options.nnodes);
+    const SCFOptions& scf_opts = chem_env.ioptions.scf_options;
+    tamm::scalapack_grid(ec, {.N          = chem_env.sys_data.nbf_orig,
+                              .npr        = scf_opts.scalapack_np_row,
+                              .npc        = scf_opts.scalapack_np_col,
+                              .nb         = scf_opts.scalapack_nb,
+                              .max_nranks = pgdata.spg_nranks});
+  }
 
   gw_scf_data.tAO = tAO;
   std::tie(gw_scf_data.shell_tile_map, gw_scf_data.AO_tiles, gw_scf_data.AO_opttiles) =
@@ -196,14 +200,9 @@ void gw_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   if(mrank) std::cout << "\t Three-center integrals in AO basis ... ";
   // computes V^{-1/2} (Vm1), the 3c integrals (xyZ) and xyK = xyZ * Vm1
-  scf_iter.init_ri(ec, chem_env, scalapack_info, gw_scf_data, gw_scf_data.etensors, tt);
+  scf_iter.init_ri(ec, chem_env, gw_scf_data, gw_scf_data.etensors, tt);
   Tensor<T>::deallocate(tt.Vm1);
-#if defined(USE_SCALAPACK)
-  if(scalapack_info.pg.is_valid()) {
-    scalapack_info.ec.flush_and_sync();
-    scalapack_info.ec.pg().destroy_coll();
-  }
-#endif
+  tamm::release_scalapack_grid(ec);
   Tensor<T>& xyK = tt.xyK;
   if(mrank)
     std::cout << gw_strfmt("\t %8.2f seconds",
@@ -421,7 +420,7 @@ void gw_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           for(int c = 0; c < n_ov; c++) RPA[static_cast<size_t>(r) * n_ov + c] *= AmB[r] * AmB[c];
 
         std::vector<double> lam(n_ov);
-        lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, n_ov, RPA.data(), n_ov, lam.data());
+        tamm::eigensolve(n_ov, RPA.data(), lam, ex_hw);
         // RPA now holds the eigenvectors U(r,s) = RPA[s*n_ov + r] (column-major)
 
         for(int t = 0; t < n_ov; t++) {

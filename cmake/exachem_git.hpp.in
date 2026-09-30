@@ -43,3 +43,11 @@ inline std::string exachem_git_info() {
     gitinfo += "}\n";
     return gitinfo;
 }
+
+// The git state above as a JSON object (text): branch, commit, describe, commit_date and dirty,
+// or {"available": false} when it could not be retrieved.
+inline std::string exachem_git_json() {
+    if(!@GIT_RETRIEVED_STATE@) return R"({"available": false})";
+    return R"({"branch": "@GIT_BRANCH@", "commit": "@GIT_HEAD_SHA1@", "describe": "@GIT_DESCRIBE@", )"
+           R"("commit_date": "@GIT_COMMIT_DATE_ISO8601@", "dirty": @GIT_IS_DIRTY@})";
+}

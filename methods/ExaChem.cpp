@@ -1,13 +1,14 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
 
 #include <exachem/exachem_git.hpp>
 #include <exachem/task/ec_task.hpp>
+#include <tamm/tamm_config.hpp>
 #include <tamm/tamm_git.hpp>
 
 int main(int argc, char* argv[]) {
@@ -26,23 +27,11 @@ int main(int argc, char* argv[]) {
 
   auto ec_t1 = std::chrono::high_resolution_clock::now();
 
-  std::ostringstream cur_date;
   if(rank == 0) {
-    auto current_time   = std::chrono::system_clock::now();
-    auto current_time_t = std::chrono::system_clock::to_time_t(current_time);
-    auto cur_local_time = localtime(&current_time_t);
-    cur_date << std::put_time(cur_local_time, "%c");
-    cout << endl << "date: " << cur_date.str() << endl;
-    cout << "program: " << fs::canonical(argv[0]) << endl;
-    std::cout << "nnodes: " << ec.nnodes() << ", ";
-    std::cout << "nproc_per_node: " << ec.ppn() << ", ";
-    std::cout << "nproc_total: " << ec.nnodes() * ec.ppn() << ", ";
-    if(ec.has_gpu()) {
-      std::cout << "ngpus_per_node: " << ec.gpn() << ", ";
-      std::cout << "ngpus_total: " << ec.nnodes() * ec.gpn() << endl;
-    }
+    cout << endl << "program: " << fs::canonical(argv[0]) << endl;
     std::cout << std::endl;
-    ec.print_mem_info();
+    ec.print_execution_environment();
+    std::cout << std::endl << tamm_build_config() << std::endl;
   }
 
   auto                     input_fpath = std::string(argv[1]);
@@ -108,25 +97,16 @@ int main(int argc, char* argv[]) {
            << "Output folder & files prefix: " << chem_env.sys_data.output_file_prefix << endl
            << endl;
 
-      // Store machine info in results
-      auto& machine_info = chem_env.sys_data.results["output"]["machine_info"];
-      auto  meminfo      = ec.mem_info();
+      // Store the execution environment and build configuration in results, as printed above
+      auto& output = chem_env.sys_data.results["output"];
 
-      machine_info["date"]                           = cur_date.str();
-      machine_info["nnodes"]                         = ec.nnodes();
-      machine_info["nproc_per_node"]                 = ec.ppn();
-      machine_info["nproc_total"]                    = ec.nnodes() * ec.ppn();
-      machine_info["cpu"]["name"]                    = meminfo.cpu_name;
-      machine_info["cpu"]["cpu_memory_per_node_gib"] = meminfo.cpu_mem_per_node;
-      machine_info["cpu"]["total_cpu_memory_gib"]    = meminfo.total_cpu_mem;
-      if(ec.has_gpu()) {
-        machine_info["ngpus_per_node"]                 = ec.gpn();
-        machine_info["ngpus_total"]                    = ec.nnodes() * ec.gpn();
-        machine_info["gpu"]["name"]                    = meminfo.gpu_name;
-        machine_info["gpu"]["memory_per_gpu_gib"]      = meminfo.gpu_mem_per_device;
-        machine_info["gpu"]["gpu_memory_per_node_gib"] = meminfo.gpu_mem_per_node;
-        machine_info["gpu"]["total_gpu_memory_gib"]    = meminfo.total_gpu_mem;
-      }
+      output["execution_environment"] = json::parse(ec.execution_environment_json());
+
+      json build_configuration;
+      build_configuration["git"]["exachem"] = json::parse(exachem_git_json());
+      build_configuration["git"]["tamm"]    = json::parse(tamm_git_json());
+      build_configuration.update(json::parse(tamm_build_config_json()));
+      output["build_configuration"] = build_configuration;
     }
 
     const auto task = ioptions.task_options;

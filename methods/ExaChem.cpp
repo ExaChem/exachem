@@ -27,8 +27,22 @@ int main(int argc, char* argv[]) {
 
   auto ec_t1 = std::chrono::high_resolution_clock::now();
 
+  // Executable path and its last-modified time (local time with UTC offset)
+  std::string exe_path, exe_build_date;
   if(rank == 0) {
-    cout << endl << "program: " << fs::canonical(argv[0]) << endl;
+    exe_path             = fs::canonical(argv[0]);
+    const auto exe_ftime = fs::last_write_time(exe_path);
+    const auto exe_mtime = std::chrono::system_clock::to_time_t(
+      std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+        exe_ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now()));
+    std::tm exe_tm{};
+    localtime_r(&exe_mtime, &exe_tm);
+    std::ostringstream exe_mtime_ss;
+    exe_mtime_ss << std::put_time(&exe_tm, "%FT%T%z");
+    exe_build_date = exe_mtime_ss.str();
+    cout << endl
+         << "program: " << exe_path << " (built " << std::put_time(&exe_tm, "%F %T %z") << ")"
+         << endl;
     std::cout << std::endl;
     ec.print_execution_environment();
     std::cout << std::endl << tamm_build_config() << std::endl;
@@ -98,6 +112,9 @@ int main(int argc, char* argv[]) {
            << endl;
 
       // Store the execution environment and build configuration in results, as printed above
+      chem_env.sys_data.results["program"]["executable"] = exe_path;
+      chem_env.sys_data.results["program"]["build_date"] = exe_build_date;
+
       auto& output = chem_env.sys_data.results["output"];
 
       output["execution_environment"] = json::parse(ec.execution_environment_json());

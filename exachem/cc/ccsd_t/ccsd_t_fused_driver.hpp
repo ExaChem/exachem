@@ -645,8 +645,8 @@ void CCSD_T_Fused_Driver<T>::calculate_performance_ops(ChemEnv& chem_env, Execut
           }
         }
       }
-    }    // nested for loops
-  }      // parallel h3b loop
+    } // nested for loops
+  } // parallel h3b loop
   else { // seq h3b loop
     for(size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
       for(size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
@@ -677,7 +677,7 @@ void CCSD_T_Fused_Driver<T>::calculate_performance_ops(ChemEnv& chem_env, Execut
         }
       }
     } // nested for loops
-  }   // end seq h3b
+  } // end seq h3b
 
   total_num_ops = (long double) ccsd_t_fully_fused_performance(
     is_restricted, list_tasks, rank, 1, noab, nvab, k_spin, k_range, k_offset, k_evl_sorted);

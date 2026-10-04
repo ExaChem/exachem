@@ -251,8 +251,8 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
                 << omega_space_ea << std::endl;
   }
 
-  //#define MOR 1
-  //#if MOR
+  // #define MOR 1
+  // #if MOR
 
   auto   restart_time_end   = std::chrono::high_resolution_clock::now();
   double total_restart_time = std::chrono::duration_cast<std::chrono::duration<double>>(
@@ -1375,7 +1375,7 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
             write_to_disk(q1_tamm_a, q1_a_file);
             write_to_disk(q2_tamm_aaa, q2_aaa_file);
             write_to_disk(q2_tamm_bab, q2_bab_file);
-          }      // end of !gs-restart
+          } // end of !gs-restart
           else { // restart GS
             read_from_disk(q1_tamm_a, q1_a_file);
             read_from_disk(q2_tamm_aaa, q2_aaa_file);
@@ -1654,7 +1654,7 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
               }
               else { omega_extra.push_back(Win); }
             } // end oe add
-          }   // end oe finished
+          } // end oe finished
         }
         if(rank == 0) {
           std::cout << "new freq's:" << std::fixed << std::setprecision(2) << omega_extra
@@ -3785,7 +3785,7 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     sch.deallocate(cholVpr, d_f1, d_t1, d_t2).execute();
 
     /////////////////Free tensors////////////////////////////
-    //#endif
+    // #endif
 
     free_tensors(d_t1_a, d_t1_b, d_t2_aaaa, d_t2_bbbb, d_t2_abab, v2ijab_aaaa, v2ijab_abab,
                  v2ijab_bbbb, v2ijab, v2ijka, v2iajb, cholOO_a, cholOO_b, cholOV_a, cholOV_b,

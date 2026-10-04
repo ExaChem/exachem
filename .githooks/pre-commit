@@ -10,8 +10,8 @@ else
   STYLEARG=""
 fi
 
-if ! "${CF_EXE}" --version | grep 'clang-format version 14\.0' >/dev/null 2>/dev/null; then
-    echo "clang-format version 14.0 is required (exactly)"
+if ! "${CF_EXE}" --version | grep 'clang-format version 18\.1\.8' >/dev/null 2>/dev/null; then
+    echo "clang-format version 18.1.8 is required (exactly)"
     exit 1
 fi
 

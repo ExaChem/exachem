@@ -257,7 +257,7 @@ public:
             CTiled = lcao_new;
 
           } // uhf
-        }   // pcore
+        } // pcore
 
         eigen_to_tamm_tensor(F_MO, F);
         eigen_to_tamm_tensor(lcao, CTiled);

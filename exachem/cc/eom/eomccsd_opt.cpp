@@ -342,9 +342,9 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
   constexpr double au2ev    = 27.2113961;
   const bool       mrank    = (ec.pg().rank() == 0);
 
-  //################################################################################
-  //  CALL THE EOM_GUESS ROUTINE (EXTERNAL ROUTINE)
-  //################################################################################
+  // ################################################################################
+  //   CALL THE EOM_GUESS ROUTINE (EXTERNAL ROUTINE)
+  // ################################################################################
   auto cc_t1 = std::chrono::high_resolution_clock::now();
 
   eom_guess_opt(ec, MO, hbar_tis, nroots, n_occ_alpha, n_occ_beta, p_evl_sorted, x1);
@@ -364,9 +364,9 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
 
   ExecutionHW exhw = ec.exhw();
 
-  //#################################################
-  //  Compute intermediates independent of X1/X2
-  //#################################################
+  // #################################################
+  //   Compute intermediates independent of X1/X2
+  // #################################################
 
   cc_t1 = std::chrono::high_resolution_clock::now();
 
@@ -482,9 +482,9 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
               << "Time taken for computing intermediates: " << std::fixed << std::setprecision(2)
               << time << " secs" << std::endl;
 
-  //################################################################################
-  //  PRINT THE HEADER FOR THE EOM ITERATIONS
-  //################################################################################
+  // ################################################################################
+  //   PRINT THE HEADER FOR THE EOM ITERATIONS
+  // ################################################################################
 
   if(mrank) {
     std::cout << std::endl << std::endl;
@@ -496,9 +496,9 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
     std::cout << std::string(75, '-') << std::endl;
   }
 
-  //################################################################################
-  //  MAIN ITERATION LOOP
-  //################################################################################
+  // ################################################################################
+  //   MAIN ITERATION LOOP
+  // ################################################################################
 
   for(int iter = 0; iter < maxeomiter;) {
     int nxtrials    = 0;
@@ -531,9 +531,9 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
                   << std::setprecision(2) << time << " secs" << std::endl;
       }
 
-      //################################################################################
-      //  UPDATE HBAR: ELEMENTS FOR THE NEWEST X AND XP VECTORS ARE COMPUTED
-      //################################################################################
+      // ################################################################################
+      //   UPDATE HBAR: ELEMENTS FOR THE NEWEST X AND XP VECTORS ARE COMPUTED
+      // ################################################################################
 
       if(mrank && profile) cc_t1 = std::chrono::high_resolution_clock::now();
       if(micro == 0) {
@@ -582,9 +582,9 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
                   << std::setprecision(2) << time << " secs" << std::endl;
       }
 
-      //################################################################################
-      //  DIAGONALIZE HBAR
-      //################################################################################
+      // ################################################################################
+      //   DIAGONALIZE HBAR
+      // ################################################################################
 
       if(mrank && profile) cc_t1 = std::chrono::high_resolution_clock::now();
       Eigen::EigenSolver<Matrix> hbardiag(hbar.block(0, 0, newnxtrials, newnxtrials));
@@ -594,9 +594,9 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
       std::vector<T> omegar(nev);
       for(auto x = 0; x < nev; x++) omegar[x] = real(omegar1(x));
 
-      //################################################################################
-      //  SORT THE EIGENVECTORS AND CORRESPONDING EIGENVALUES
-      //################################################################################
+      // ################################################################################
+      //   SORT THE EIGENVECTORS AND CORRESPONDING EIGENVALUES
+      // ################################################################################
 
       std::vector<size_t> omegar_sorted_order = SCFUtil::sort_indexes(omegar);
       std::sort(omegar.begin(), omegar.end());
@@ -621,9 +621,9 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
 
       for(auto root = 0; root < nroots; root++) {
         if(mrank && profile && root == 0) cc_t1 = std::chrono::high_resolution_clock::now();
-        //################################################################################
-        //  FORM RESIDUAL VECTORS
-        //################################################################################
+        // ################################################################################
+        //   FORM RESIDUAL VECTORS
+        // ################################################################################
 
         sch(r1.at(root)() = 0)(r2.at(root)() = 0).execute();
 
@@ -651,9 +651,9 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
                     << std::setprecision(2) << time << " secs" << std::endl;
         }
 
-        //################################################################################
-        //  EXPAND ITERATIVE SPACE WITH NEW ORTHONORMAL VECTORS
-        //################################################################################
+        // ################################################################################
+        //   EXPAND ITERATIVE SPACE WITH NEW ORTHONORMAL VECTORS
+        // ################################################################################
         if(mrank && profile && root == 0) cc_t1 = std::chrono::high_resolution_clock::now();
         if(xresidual > eomthresh) {
           int ivec = newnxtrials;
@@ -723,9 +723,9 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
         chem_env.write_json_data();
       }
 
-      //################################################################################
-      //  CHECK CONVERGENCE
-      //################################################################################
+      // ################################################################################
+      //   CHECK CONVERGENCE
+      // ################################################################################
       if(nxtrials == newnxtrials) {
         if(mrank) {
           std::cout << std::string(62, '-') << std::endl;
@@ -739,9 +739,9 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
 
     if(convflag) break;
 
-    //################################################################################
-    //  FORM INITAL VECTORS FOR NEWEST MICRO INTERATIONS
-    //################################################################################
+    // ################################################################################
+    //   FORM INITAL VECTORS FOR NEWEST MICRO INTERATIONS
+    // ################################################################################
     if(mrank) {
       std::cout << " END OF MICROITERATIONS: COLLAPSING WITH NEW INITAL VECTORS" << std::endl;
     }

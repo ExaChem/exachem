@@ -77,13 +77,13 @@ public:
     const size_t max_dimb = bbuf_size1 / max_d1_kernels_pertask;
 
     for(Index h7b = 0; h7b < noab; h7b++) {
-      df_simple_d1_size[0 + (h7b) *7] = (int) k_range[t_h1b];
-      df_simple_d1_size[1 + (h7b) *7] = (int) k_range[t_h2b];
-      df_simple_d1_size[2 + (h7b) *7] = (int) k_range[t_h3b];
-      df_simple_d1_size[3 + (h7b) *7] = (int) k_range[h7b];
-      df_simple_d1_size[4 + (h7b) *7] = (int) k_range[t_p4b];
-      df_simple_d1_size[5 + (h7b) *7] = (int) k_range[t_p5b];
-      df_simple_d1_size[6 + (h7b) *7] = (int) k_range[t_p6b];
+      df_simple_d1_size[0 + (h7b) * 7] = (int) k_range[t_h1b];
+      df_simple_d1_size[1 + (h7b) * 7] = (int) k_range[t_h2b];
+      df_simple_d1_size[2 + (h7b) * 7] = (int) k_range[t_h3b];
+      df_simple_d1_size[3 + (h7b) * 7] = (int) k_range[h7b];
+      df_simple_d1_size[4 + (h7b) * 7] = (int) k_range[t_p4b];
+      df_simple_d1_size[5 + (h7b) * 7] = (int) k_range[t_p5b];
+      df_simple_d1_size[6 + (h7b) * 7] = (int) k_range[t_p6b];
 
       host_d1_size_h7b[h7b] = (int) k_range[h7b];
     }
@@ -185,7 +185,7 @@ public:
         //
         idx_offset++;
       } // h7b
-    }   // end ia6
+    } // end ia6
 
     // ia6 -- get for t2
     //  d1b = 0;
@@ -257,7 +257,7 @@ public:
 
         idx_offset++;
       } // h7b
-    }   // end ia6
+    } // end ia6
 
     idx_offset = 0;
     for(auto ia6 = 0; ia6 < 9; ia6++) {
@@ -304,7 +304,7 @@ public:
 
         idx_offset++;
       } // h7b
-    }   // end ia6
+    } // end ia6
 
     *df_num_d1_enabled = idx_offset;
   } // ccsd_t_data_d1_new
@@ -336,13 +336,13 @@ public:
     }
 
     for(Index h7b = 0; h7b < noab; h7b++) {
-      df_simple_d1_size[0 + (h7b) *7] = (int) k_range[t_h1b];
-      df_simple_d1_size[1 + (h7b) *7] = (int) k_range[t_h2b];
-      df_simple_d1_size[2 + (h7b) *7] = (int) k_range[t_h3b];
-      df_simple_d1_size[3 + (h7b) *7] = (int) k_range[h7b];
-      df_simple_d1_size[4 + (h7b) *7] = (int) k_range[t_p4b];
-      df_simple_d1_size[5 + (h7b) *7] = (int) k_range[t_p5b];
-      df_simple_d1_size[6 + (h7b) *7] = (int) k_range[t_p6b];
+      df_simple_d1_size[0 + (h7b) * 7] = (int) k_range[t_h1b];
+      df_simple_d1_size[1 + (h7b) * 7] = (int) k_range[t_h2b];
+      df_simple_d1_size[2 + (h7b) * 7] = (int) k_range[t_h3b];
+      df_simple_d1_size[3 + (h7b) * 7] = (int) k_range[h7b];
+      df_simple_d1_size[4 + (h7b) * 7] = (int) k_range[t_p4b];
+      df_simple_d1_size[5 + (h7b) * 7] = (int) k_range[t_p5b];
+      df_simple_d1_size[6 + (h7b) * 7] = (int) k_range[t_p6b];
     }
 
     std::vector<bool> ia6_enabled(9 * noab, false);
@@ -484,8 +484,8 @@ public:
         // detailed_stats[h7b][3], detailed_stats[h7b][4], detailed_stats[h7b][5],
         // detailed_stats[h7b][6], detailed_stats[h7b][7], detailed_stats[h7b][8]);
       } // h7b
-    }   // end ia6
-  }     // ccsd_t_data_d1_info_only
+    } // end ia6
+  } // ccsd_t_data_d1_info_only
 
 }; // class CCSD_T_Fused_Doubles1
 

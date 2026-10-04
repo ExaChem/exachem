@@ -14,9 +14,6 @@
 #include "exachem/common/system_data.hpp"
 #include "exachem/scf/scf_compute.hpp"
 #include "tamm/eigen_utils.hpp"
-#if defined(USE_UPCXX)
-#include "tamm/ga_over_upcxx.hpp"
-#endif
 
 using namespace tamm;
 

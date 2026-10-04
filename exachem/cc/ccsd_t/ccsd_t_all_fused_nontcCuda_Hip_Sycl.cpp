@@ -42,7 +42,7 @@ inline constexpr short FUSION_SIZE_TB_2_Y{FUSION_SIZE_SLICE_2_P4 * FUSION_SIZE_S
 inline constexpr short FUSION_SIZE_REG_2_X{FUSION_SIZE_SLICE_2_P5};
 inline constexpr short FUSION_SIZE_REG_2_Y{FUSION_SIZE_SLICE_2_P6};
 
-#define CEIL(a, b) (((a) + (b) -1) / (b))
+#define CEIL(a, b) (((a) + (b) - 1) / (b))
 
 inline constexpr short NUM_D1_EQUATIONS{9};
 inline constexpr short NUM_D2_EQUATIONS{9};
@@ -2060,7 +2060,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           tmp_dev_s1_t1_1[str_blk_idx_p4 + idx_h3 + (str_blk_idx_h1 + idx_h2) * base_size_p4b];
 
       if(idx_h3 < rng_h3 && idx_h2 < rng_h2 && idx_p6 < rng_p6 && idx_h1 < rng_p5)
-        sm_b[idx_h1][idx_h3 + (idx_h2 + (idx_p6) *4) * 4] =
+        sm_b[idx_h1][idx_h3 + (idx_h2 + (idx_p6) * 4) * 4] =
           tmp_dev_s1_v2_1[blk_idx_h3b * 4 + idx_h3 +
                           (blk_idx_h2b * 4 + idx_h2 +
                            (blk_idx_p6b * 4 + idx_p6 + (blk_idx_p5b * 4 + idx_h1) * base_size_p6b) *
@@ -2073,13 +2073,13 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #endif
 
       //  "p4"
-      temp_av = sm_a[0][0 + (idx_h1) *4];
+      temp_av = sm_a[0][0 + (idx_h1) * 4];
 
       //  "p5"
-      temp_bv[0] = sm_b[0][idx_h3 + (idx_h2 + (idx_p6) *4) * 4];
-      temp_bv[1] = sm_b[1][idx_h3 + (idx_h2 + (idx_p6) *4) * 4];
-      temp_bv[2] = sm_b[2][idx_h3 + (idx_h2 + (idx_p6) *4) * 4];
-      temp_bv[3] = sm_b[3][idx_h3 + (idx_h2 + (idx_p6) *4) * 4];
+      temp_bv[0] = sm_b[0][idx_h3 + (idx_h2 + (idx_p6) * 4) * 4];
+      temp_bv[1] = sm_b[1][idx_h3 + (idx_h2 + (idx_p6) * 4) * 4];
+      temp_bv[2] = sm_b[2][idx_h3 + (idx_h2 + (idx_p6) * 4) * 4];
+      temp_bv[3] = sm_b[3][idx_h3 + (idx_h2 + (idx_p6) * 4) * 4];
 
       //  "p4 x p5"
       reg_singles[0][0] += temp_av * temp_bv[0];
@@ -2087,21 +2087,21 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
       reg_singles[0][2] += temp_av * temp_bv[2];
       reg_singles[0][3] += temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][1 + (idx_h1) *4];
+      temp_av = sm_a[0][1 + (idx_h1) * 4];
 
       reg_singles[1][0] += temp_av * temp_bv[0];
       reg_singles[1][1] += temp_av * temp_bv[1];
       reg_singles[1][2] += temp_av * temp_bv[2];
       reg_singles[1][3] += temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][2 + (idx_h1) *4];
+      temp_av = sm_a[0][2 + (idx_h1) * 4];
 
       reg_singles[2][0] += temp_av * temp_bv[0];
       reg_singles[2][1] += temp_av * temp_bv[1];
       reg_singles[2][2] += temp_av * temp_bv[2];
       reg_singles[2][3] += temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][3 + (idx_h1) *4];
+      temp_av = sm_a[0][3 + (idx_h1) * 4];
 
       reg_singles[3][0] += temp_av * temp_bv[0];
       reg_singles[3][1] += temp_av * temp_bv[1];
@@ -2142,13 +2142,13 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #endif
 
       //  "p4"
-      temp_av = sm_a[0][0 + (idx_h2) *4];
+      temp_av = sm_a[0][0 + (idx_h2) * 4];
 
       //  "p5"
-      temp_bv[0] = sm_b[0][idx_h3 + (idx_h1 + (idx_p6) *4) * 4];
-      temp_bv[1] = sm_b[1][idx_h3 + (idx_h1 + (idx_p6) *4) * 4];
-      temp_bv[2] = sm_b[2][idx_h3 + (idx_h1 + (idx_p6) *4) * 4];
-      temp_bv[3] = sm_b[3][idx_h3 + (idx_h1 + (idx_p6) *4) * 4];
+      temp_bv[0] = sm_b[0][idx_h3 + (idx_h1 + (idx_p6) * 4) * 4];
+      temp_bv[1] = sm_b[1][idx_h3 + (idx_h1 + (idx_p6) * 4) * 4];
+      temp_bv[2] = sm_b[2][idx_h3 + (idx_h1 + (idx_p6) * 4) * 4];
+      temp_bv[3] = sm_b[3][idx_h3 + (idx_h1 + (idx_p6) * 4) * 4];
 
       //  "p4 x p5"
       reg_singles[0][0] -= temp_av * temp_bv[0];
@@ -2156,21 +2156,21 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
       reg_singles[0][2] -= temp_av * temp_bv[2];
       reg_singles[0][3] -= temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][1 + (idx_h2) *4];
+      temp_av = sm_a[0][1 + (idx_h2) * 4];
 
       reg_singles[1][0] -= temp_av * temp_bv[0];
       reg_singles[1][1] -= temp_av * temp_bv[1];
       reg_singles[1][2] -= temp_av * temp_bv[2];
       reg_singles[1][3] -= temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][2 + (idx_h2) *4];
+      temp_av = sm_a[0][2 + (idx_h2) * 4];
 
       reg_singles[2][0] -= temp_av * temp_bv[0];
       reg_singles[2][1] -= temp_av * temp_bv[1];
       reg_singles[2][2] -= temp_av * temp_bv[2];
       reg_singles[2][3] -= temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][3 + (idx_h2) *4];
+      temp_av = sm_a[0][3 + (idx_h2) * 4];
 
       reg_singles[3][0] -= temp_av * temp_bv[0];
       reg_singles[3][1] -= temp_av * temp_bv[1];
@@ -2198,7 +2198,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           tmp_dev_s1_t1_3[str_blk_idx_p4 + idx_h3 + (str_blk_idx_h3 + idx_h2) * base_size_p4b];
 
       if(idx_h3 < rng_h2 && idx_h2 < rng_h1 && idx_p6 < rng_p6 && idx_h1 < rng_p5)
-        sm_b[idx_h1][idx_h3 + (idx_h2 + (idx_p6) *4) * 4] =
+        sm_b[idx_h1][idx_h3 + (idx_h2 + (idx_p6) * 4) * 4] =
           tmp_dev_s1_v2_3[blk_idx_h2b * 4 + idx_h3 +
                           (blk_idx_h1b * 4 + idx_h2 +
                            (blk_idx_p6b * 4 + idx_p6 + (blk_idx_p5b * 4 + idx_h1) * base_size_p6b) *
@@ -2211,13 +2211,13 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #endif
 
       //  "p4"
-      temp_av = sm_a[0][0 + (idx_h3) *4];
+      temp_av = sm_a[0][0 + (idx_h3) * 4];
 
       //  "p5"
-      temp_bv[0] = sm_b[0][idx_h2 + (idx_h1 + (idx_p6) *4) * 4];
-      temp_bv[1] = sm_b[1][idx_h2 + (idx_h1 + (idx_p6) *4) * 4];
-      temp_bv[2] = sm_b[2][idx_h2 + (idx_h1 + (idx_p6) *4) * 4];
-      temp_bv[3] = sm_b[3][idx_h2 + (idx_h1 + (idx_p6) *4) * 4];
+      temp_bv[0] = sm_b[0][idx_h2 + (idx_h1 + (idx_p6) * 4) * 4];
+      temp_bv[1] = sm_b[1][idx_h2 + (idx_h1 + (idx_p6) * 4) * 4];
+      temp_bv[2] = sm_b[2][idx_h2 + (idx_h1 + (idx_p6) * 4) * 4];
+      temp_bv[3] = sm_b[3][idx_h2 + (idx_h1 + (idx_p6) * 4) * 4];
 
       //  "p4 x p5"
       reg_singles[0][0] += temp_av * temp_bv[0];
@@ -2225,21 +2225,21 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
       reg_singles[0][2] += temp_av * temp_bv[2];
       reg_singles[0][3] += temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][1 + (idx_h3) *4];
+      temp_av = sm_a[0][1 + (idx_h3) * 4];
 
       reg_singles[1][0] += temp_av * temp_bv[0];
       reg_singles[1][1] += temp_av * temp_bv[1];
       reg_singles[1][2] += temp_av * temp_bv[2];
       reg_singles[1][3] += temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][2 + (idx_h3) *4];
+      temp_av = sm_a[0][2 + (idx_h3) * 4];
 
       reg_singles[2][0] += temp_av * temp_bv[0];
       reg_singles[2][1] += temp_av * temp_bv[1];
       reg_singles[2][2] += temp_av * temp_bv[2];
       reg_singles[2][3] += temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][3 + (idx_h3) *4];
+      temp_av = sm_a[0][3 + (idx_h3) * 4];
 
       reg_singles[3][0] += temp_av * temp_bv[0];
       reg_singles[3][1] += temp_av * temp_bv[1];
@@ -2265,7 +2265,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
           tmp_dev_s1_t1_4[str_blk_idx_p5 + idx_h3 + (str_blk_idx_h1 + idx_h2) * base_size_p5b];
 
       if(idx_h3 < rng_h3 && idx_h2 < rng_h2 && idx_p6 < rng_p6 && idx_h1 < rng_p4)
-        sm_b[idx_h1][idx_h3 + (idx_h2 + (idx_p6) *4) * 4] =
+        sm_b[idx_h1][idx_h3 + (idx_h2 + (idx_p6) * 4) * 4] =
           tmp_dev_s1_v2_4[str_blk_idx_h3 + idx_h3 +
                           (str_blk_idx_h2 + idx_h2 +
                            (str_blk_idx_p6 + idx_p6 + (str_blk_idx_p4 + idx_h1) * base_size_p6b) *
@@ -2278,13 +2278,13 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #endif
 
       //  "p5"
-      temp_av = sm_a[0][0 + (idx_h1) *4];
+      temp_av = sm_a[0][0 + (idx_h1) * 4];
 
       //  "p4"
-      temp_bv[0] = sm_b[0][idx_h3 + (idx_h2 + (idx_p6) *4) * 4];
-      temp_bv[1] = sm_b[1][idx_h3 + (idx_h2 + (idx_p6) *4) * 4];
-      temp_bv[2] = sm_b[2][idx_h3 + (idx_h2 + (idx_p6) *4) * 4];
-      temp_bv[3] = sm_b[3][idx_h3 + (idx_h2 + (idx_p6) *4) * 4];
+      temp_bv[0] = sm_b[0][idx_h3 + (idx_h2 + (idx_p6) * 4) * 4];
+      temp_bv[1] = sm_b[1][idx_h3 + (idx_h2 + (idx_p6) * 4) * 4];
+      temp_bv[2] = sm_b[2][idx_h3 + (idx_h2 + (idx_p6) * 4) * 4];
+      temp_bv[3] = sm_b[3][idx_h3 + (idx_h2 + (idx_p6) * 4) * 4];
 
       //  "p4 x p5"
       reg_singles[0][0] -= temp_av * temp_bv[0];
@@ -2292,21 +2292,21 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
       reg_singles[2][0] -= temp_av * temp_bv[2];
       reg_singles[3][0] -= temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][1 + (idx_h1) *4];
+      temp_av = sm_a[0][1 + (idx_h1) * 4];
 
       reg_singles[0][1] -= temp_av * temp_bv[0];
       reg_singles[1][1] -= temp_av * temp_bv[1];
       reg_singles[2][1] -= temp_av * temp_bv[2];
       reg_singles[3][1] -= temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][2 + (idx_h1) *4];
+      temp_av = sm_a[0][2 + (idx_h1) * 4];
 
       reg_singles[0][2] -= temp_av * temp_bv[0];
       reg_singles[1][2] -= temp_av * temp_bv[1];
       reg_singles[2][2] -= temp_av * temp_bv[2];
       reg_singles[3][2] -= temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][3 + (idx_h1) *4];
+      temp_av = sm_a[0][3 + (idx_h1) * 4];
 
       reg_singles[0][3] -= temp_av * temp_bv[0];
       reg_singles[1][3] -= temp_av * temp_bv[1];
@@ -2347,13 +2347,13 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
 #endif
 
       //  "p5"
-      temp_av = sm_a[0][0 + (idx_h2) *4];
+      temp_av = sm_a[0][0 + (idx_h2) * 4];
 
       //  "p4"
-      temp_bv[0] = sm_b[0][idx_h3 + (idx_h1 + (idx_p6) *4) * 4];
-      temp_bv[1] = sm_b[1][idx_h3 + (idx_h1 + (idx_p6) *4) * 4];
-      temp_bv[2] = sm_b[2][idx_h3 + (idx_h1 + (idx_p6) *4) * 4];
-      temp_bv[3] = sm_b[3][idx_h3 + (idx_h1 + (idx_p6) *4) * 4];
+      temp_bv[0] = sm_b[0][idx_h3 + (idx_h1 + (idx_p6) * 4) * 4];
+      temp_bv[1] = sm_b[1][idx_h3 + (idx_h1 + (idx_p6) * 4) * 4];
+      temp_bv[2] = sm_b[2][idx_h3 + (idx_h1 + (idx_p6) * 4) * 4];
+      temp_bv[3] = sm_b[3][idx_h3 + (idx_h1 + (idx_p6) * 4) * 4];
 
       //  "p4 x p5"
       reg_singles[0][0] += temp_av * temp_bv[0];
@@ -2361,21 +2361,21 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
       reg_singles[2][0] += temp_av * temp_bv[2];
       reg_singles[3][0] += temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][1 + (idx_h2) *4];
+      temp_av = sm_a[0][1 + (idx_h2) * 4];
 
       reg_singles[0][1] += temp_av * temp_bv[0];
       reg_singles[1][1] += temp_av * temp_bv[1];
       reg_singles[2][1] += temp_av * temp_bv[2];
       reg_singles[3][1] += temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][2 + (idx_h2) *4];
+      temp_av = sm_a[0][2 + (idx_h2) * 4];
 
       reg_singles[0][2] += temp_av * temp_bv[0];
       reg_singles[1][2] += temp_av * temp_bv[1];
       reg_singles[2][2] += temp_av * temp_bv[2];
       reg_singles[3][2] += temp_av * temp_bv[3];
 
-      temp_av = sm_a[0][3 + (idx_h2) *4];
+      temp_av = sm_a[0][3 + (idx_h2) * 4];
 
       reg_singles[0][3] += temp_av * temp_bv[0];
       reg_singles[1][3] += temp_av * temp_bv[1];
@@ -2419,10 +2419,10 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
       temp_av = sm_a[0][0 + (idx_h3) *FUSION_SIZE_SLICE_1_P5];
 
       //  "p4"
-      temp_bv[0] = sm_b[0][idx_h2 + (idx_h1 + (idx_p6) *4) * 4];
-      temp_bv[1] = sm_b[1][idx_h2 + (idx_h1 + (idx_p6) *4) * 4];
-      temp_bv[2] = sm_b[2][idx_h2 + (idx_h1 + (idx_p6) *4) * 4];
-      temp_bv[3] = sm_b[3][idx_h2 + (idx_h1 + (idx_p6) *4) * 4];
+      temp_bv[0] = sm_b[0][idx_h2 + (idx_h1 + (idx_p6) * 4) * 4];
+      temp_bv[1] = sm_b[1][idx_h2 + (idx_h1 + (idx_p6) * 4) * 4];
+      temp_bv[2] = sm_b[2][idx_h2 + (idx_h1 + (idx_p6) * 4) * 4];
+      temp_bv[3] = sm_b[3][idx_h2 + (idx_h1 + (idx_p6) * 4) * 4];
 
       //  "p4 x p5"
       reg_singles[0][0] -= temp_av * temp_bv[0];

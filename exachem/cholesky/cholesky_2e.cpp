@@ -15,9 +15,7 @@ bool cd_debug = false;
 
 template<typename T>
 auto cd_tensor_zero(Tensor<T>& tens) {
-#if !defined(USE_UPCXX)
   NGA_Zero(tens.ga_handle());
-#endif
 }
 
 namespace exachem::cholesky_2e {
@@ -538,7 +536,6 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
 
     Tensor<TensorType>::allocate(&ec_dense, g_d_tamm, g_r_tamm, g_chol_tamm);
 
-#if !defined(USE_UPCXX)
     // cd_tensor_zero(g_d_tamm);
     // cd_tensor_zero(g_r_tamm);
     cd_tensor_zero(g_chol_tamm);
@@ -578,7 +575,6 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
     bool has_gc_data = (lo_b[0] >= 0 && hi_b[0] >= 0);
     bool has_gd_data = (lo_d[0] >= 0 && hi_d[0] >= 0);
     bool has_gr_data = (lo_r[0] >= 0 && hi_r[0] >= 0);
-#endif
 #endif
 
     ec_dense.pg().barrier();
@@ -670,7 +666,6 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
                 << cd_time << " secs" << endl;
     }
 
-#if !defined(USE_UPCXX)
     if(cd_restart) {
       cd_t1 = std::chrono::high_resolution_clock::now();
 
@@ -689,7 +684,6 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
                   << std::fixed << std::setprecision(2) << cd_time << " secs" << endl;
       }
     }
-#endif
 
     auto cd_t3 = std::chrono::high_resolution_clock::now();
 
@@ -716,9 +710,7 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
       auto ind12      = f1 * n2 + f2;
       auto schwarz_12 = SchwarzK(s1, s2);
 
-#if !defined(USE_UPCXX)
       cd_tensor_zero(g_r_tamm);
-#endif
 
 #if !defined(CD_USE_PGAS_API)
       auto n1          = shells[s1].size();
@@ -809,23 +801,14 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
     for(size_t s3 = 0; s3 != shells.size(); ++s3) {
       auto bf3_first = shell2bf[s3]; // first basis function in this shell
       auto n3        = shells[s3].size();
-#if !defined(USE_UPCXX)
       if(!(lo_r[0] <= cd_ncast<size_t>(bf3_first) && cd_ncast<size_t>(bf3_first) <= hi_r[0]))
         continue;
       for(size_t s4 = 0; s4 != shells.size(); ++s4) {
-#else
-      for(size_t s4 = 0; s4 != shells.size(); ++s4) {
-#endif
         auto bf4_first = shell2bf[s4];
         auto n4        = shells[s4].size();
         if(schwarz_12 * SchwarzK(s3, s4) < schwarz_tol) continue;
 
-#if defined(USE_UPCXX)
-        if(g_r_tamm.is_local_element(0, 0, bf3_first, bf4_first)) {
-          double factor = 1.0;
-#else
         if(lo_r[1] <= cd_ncast<size_t>(bf4_first) && cd_ncast<size_t>(bf4_first) <= hi_r[1]) {
-#endif
           // Switching shell order allows unit-stride access
           engine.compute(shells[s1], shells[s2], shells[s3], shells[s4]);
           const auto* buf_3412 = buf[0];
@@ -838,19 +821,14 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
           int64_t ibfhi[4] = {0, 0, cd_ncast<size_t>(bf3_first + n3 - 1),
                               cd_ncast<size_t>(bf4_first + n4 - 1)};
 
-#ifdef USE_UPCXX
-          g_r_tamm.put_raw(ibflo, ibfhi, k_eri.data());
-#else
           int64_t ld[1] = {cd_ncast<size_t>(n4)};
           NGA_Put64(g_r, &ibflo[2], &ibfhi[2], k_eri.data(), ld);
-#endif
         }
       }
     }
     ec_dense.pg().barrier();
 #endif
 
-#ifndef USE_UPCXX
       lo_x[0] = indx_d0[0];
       lo_x[1] = indx_d0[1];
       lo_x[2] = 0;
@@ -861,16 +839,6 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
       hi_x[3] = 0;
       ld_x[0] = 1;
       ld_x[1] = hi_x[2] + 1;
-#else
-    lo_x[0] = 0;
-    lo_x[1] = indx_d0[0];
-    lo_x[2] = indx_d0[1];
-    lo_x[3] = 0;
-    hi_x[0] = 0;
-    hi_x[1] = indx_d0[0];
-    hi_x[2] = indx_d0[1];
-    hi_x[3] = count;
-#endif
 
 #if !defined(CD_USE_PGAS_API)
       auto update_diagonals = [&](const IndexVector& blockid) {
@@ -950,30 +918,6 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
 
 #else
 
-#if defined(USE_UPCXX)
-    g_chol_tamm.get_raw_contig(lo_x.data(), hi_x.data(), k_row.data());
-
-    auto left  = g_r_tamm.access_local_buf();
-    auto right = g_chol_tamm.access_local_buf();
-    auto n     = g_r_tamm.local_buf_size();
-    for(size_t icount = 0; icount < count; icount++)
-      for(size_t i = 0, k = icount; i < n; i++, k += max_cvecs)
-        *(left + i) -= *(right + k) * k_row[icount];
-
-    for(size_t i = 0, k = count; i < n; i++, k += max_cvecs) {
-      auto tmp     = *(left + i) / sqrt(val_d0);
-      *(right + k) = tmp;
-    }
-
-    left = g_d_tamm.access_local_buf();
-    n    = g_d_tamm.local_buf_size();
-    for(size_t i = 0, k = count; i < n; i++, k += max_cvecs) {
-      auto tmp = *(right + k);
-      *(left + i) -= tmp * tmp;
-    }
-
-    count++;
-#else
     TensorType *indx_b, *indx_d, *indx_r;
 
     {
@@ -988,7 +932,7 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
         // Implemented as a safeguard and for performance?
         if(nj != ld_r[0] || count < 50) {
           for(int64_t i = 0; i <= hi_r[0] - lo_r[0]; i++) {
-            int64_t ild = i * ld_r[0];
+            int64_t ild   = i * ld_r[0];
             int64_t ildld = i * ld_b[1] * ld_b[0];
             for(int64_t j = 0; j <= hi_r[1] - lo_r[1]; j++) {
               int64_t nij = ild + j;
@@ -1006,8 +950,8 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
       }
 
       if(has_gc_data) {
-        double value = 1.0 / sqrt(val_d0);
-        int64_t nij = ld_r[0] * (hi_r[0] - lo_r[0] + 1);
+        double  value = 1.0 / sqrt(val_d0);
+        int64_t nij   = ld_r[0] * (hi_r[0] - lo_r[0] + 1);
         blas::scal(nij, value, indx_r, 1);
         blas::copy(nij, indx_r, 1, indx_b + count, ld_b[1]);
         for(auto ij = 0; ij < nij; ij++) { indx_d[ij] -= indx_r[ij] * indx_r[ij]; }
@@ -1019,26 +963,21 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
     }
     count++;
 #endif
-#endif
 
       std::tie(val_d0, blkid, eoff) = tamm::max_element(g_d_tamm);
       blkoff                        = g_d_tamm.block_offsets(blkid);
       indx_d0[0]                    = (int64_t) blkoff[0] + (int64_t) eoff[0];
       indx_d0[1]                    = (int64_t) blkoff[1] + (int64_t) eoff[1];
 
-#if !defined(USE_UPCXX)
       // Restart
       if(write_cv.first && count % write_cv.second == 0 && nbf > 1000) { write_chol_vectors(); }
-#endif
 
     } // while
 
     if(rank == 0)
       std::cout << endl << "- Total number of cholesky vectors = " << count << std::endl;
 
-#if !defined(USE_UPCXX)
     if(write_cv.first && nbf > 1000) write_chol_vectors();
-#endif
 
     Tensor<TensorType>::deallocate(g_d_tamm, g_r_tamm);
 
@@ -1098,13 +1037,9 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
                      cd_ncast<size_t>(block_offset[2] + block_dims[2] - 1)};
 
     std::vector<TensorType> sbuf(dsize);
-#ifdef USE_UPCXX
-    g_chol_tamm_global.get_raw(lo, hi, sbuf.data());
-#else
     int64_t   ld[2]  = {cd_ncast<size_t>(block_dims[1]), cd_ncast<size_t>(block_dims[2])};
     const int g_chol = g_chol_tamm_global.ga_handle();
     NGA_Get64(g_chol, &lo[1], &hi[1], sbuf.data(), ld);
-#endif
 
     g_chol_ao_tamm.put(blockid, sbuf);
   };

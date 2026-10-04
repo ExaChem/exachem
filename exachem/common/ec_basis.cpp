@@ -105,8 +105,7 @@ void ECBasis::parse_ecp_basis_file(ExecutionContext& exc, std::string ca_symbol,
       if(atom_has_ecp) oss << line << std::endl;
     }
   }
-  while(std::getline(is, line))
-    ;
+  while(std::getline(is, line));
   if(exc.print())
     std::cout << std::endl << "ECP" << std::endl << oss.str() << "END" << std::endl << std::endl;
 }
@@ -309,7 +308,7 @@ void BasisSetMap::construct(std::vector<libint2::Atom>& atoms, libint2::BasisSet
   for(size_t s1 = 0; s1 != nshells; ++s1) first_bf_shell[s1] = shells[s1].size();
 
   std::map<int, std::string>              gaus_comp_map{{0, "s"}, {1, "p"}, {2, "d"}, {3, "f"},
-                                           {4, "g"}, {5, "h"}, {6, "i"}};
+                                                        {4, "g"}, {5, "h"}, {6, "i"}};
   std::map<int, std::vector<std::string>> cart_comp_map{
     {1, {"x", "y", "z"}},
     {2, {"xx", "xy", "xz", "yy", "yz", "zz"}},

@@ -59,11 +59,11 @@ void CCSD_Natural_Orbitals<T>::ccsd_natural_orbitals(ChemEnv& chem_env, std::vec
 
   if(rank == 0) std::cout << "\nComputing CCSD Natural Orbitals" << std::endl << std::endl;
 
-  //################################################################################
-  // ADD THE HARTREE-FOCK CONTRIBUTION TO THE CC 1-RMD MATRIX
-  //################################################################################
-  // gamma1 is the CC 1-RDM matrix and does not contain the HF contribution
-  // when computed using compute_1rdm.
+  // ################################################################################
+  //  ADD THE HARTREE-FOCK CONTRIBUTION TO THE CC 1-RMD MATRIX
+  // ################################################################################
+  //  gamma1 is the CC 1-RDM matrix and does not contain the HF contribution
+  //  when computed using compute_1rdm.
 
   Tensor<T> deltaoo{{j, i}};
   sch.allocate(deltaoo).execute();
@@ -74,14 +74,14 @@ void CCSD_Natural_Orbitals<T>::ccsd_natural_orbitals(ChemEnv& chem_env, std::vec
   sch(gamma1(i, j) += 1.0 * deltaoo(i, j)).execute();
 
   sch.deallocate(deltaoo).execute();
-  //################################################################################
-  // SPIN-ORBITAL TO ORBITAL 1-RDM
-  //################################################################################
-  // Since TAMM uses the oa|ob|va|vb tiling, using the full spin-orbital representation is not
-  // straight forward. For example, how do you identify the ordering of eigenvalues/vectors for
-  // degenerate orbitals and for both alpha and beta spin (remembering that ordering of
-  // eigenvalues/vectors is not for all spin orbitals but has to be seperated for alpha and beta
-  // spins).
+  // ################################################################################
+  //  SPIN-ORBITAL TO ORBITAL 1-RDM
+  // ################################################################################
+  //  Since TAMM uses the oa|ob|va|vb tiling, using the full spin-orbital representation is not
+  //  straight forward. For example, how do you identify the ordering of eigenvalues/vectors for
+  //  degenerate orbitals and for both alpha and beta spin (remembering that ordering of
+  //  eigenvalues/vectors is not for all spin orbitals but has to be seperated for alpha and beta
+  //  spins).
 
   // So the alpha and beta parts should be seperated. For RHF, these are the same and so
   // the alpha contribution is doubled in order to get the 'orbital' occupation numbers while
@@ -99,9 +99,9 @@ void CCSD_Natural_Orbitals<T>::ccsd_natural_orbitals(ChemEnv& chem_env, std::vec
 
   sch.deallocate(gamma1).execute();
 
-  //################################################################################
-  // SOLVE EIGENVALUES AND EIGENVECTORS
-  //################################################################################
+  // ################################################################################
+  //  SOLVE EIGENVALUES AND EIGENVECTORS
+  // ################################################################################
 
   Eigen::EigenSolver<Matrix> gamma1mat(gamma1a_eig);
   auto                       noocc_vals = gamma1mat.eigenvalues();
@@ -136,9 +136,9 @@ void CCSD_Natural_Orbitals<T>::ccsd_natural_orbitals(ChemEnv& chem_env, std::vec
   sch.allocate(natorbs_TAMM).execute();
   eigen_to_tamm_tensor(natorbs_TAMM, natorbs);
 
-  //################################################################################
-  // TRANSFORM C AND FORM DENSITY FOR NATURAL ORBITAL BASIS
-  //################################################################################
+  // ################################################################################
+  //  TRANSFORM C AND FORM DENSITY FOR NATURAL ORBITAL BASIS
+  // ################################################################################
   Tensor<T> C_alpha_AO2{mu, chem_env.is_context.AO_ortho};
   Tensor<T> C_alpha_AOMO{mu, pa};
   Tensor<T> C_alpha_NO_AOMO{mu, pa};

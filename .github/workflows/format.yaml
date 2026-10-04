@@ -18,17 +18,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - uses: DoozyX/clang-format-lint-action@v0.14
+    - uses: DoozyX/clang-format-lint-action@v0.18
       with:
         source: 'exachem methods'
         exclude: 'exachem/util'
         extensions: 'hpp,cpp,h,c,cu,cuh,cc'
-        clangFormatVersion: 14
+        clangFormatVersion: 18
         inplace: True
     - uses: EndBug/add-and-commit@v4
       with:
-        author_name: ExaChem developers
-        author_email: exachem23@gmail.com
         message: 'Committing clang-format changes'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

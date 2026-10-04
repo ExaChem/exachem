@@ -17,7 +17,62 @@
 #include <omp.h>
 #endif
 
-#define CEIL(a, b) (((a) + (b) -1) / (b))
+#define CEIL(a, b) (((a) + (b) - 1) / (b))
+
+// t3 index slots, in t3[h3,h2,h1,p6,p5,p4] order
+enum { S_H3 = 0, S_H2, S_H1, S_P6, S_P5, S_P4 };
+
+// One d1/d2 term:  t3[h3,h2,h1,p6,p5,p4] += alpha * sum_k t2[..] * v2[..]
+// computed as a GEMM into scratch C[v2 free idx, t2 free idx] (column-major), followed by a
+// permuted accumulate into t3. t2 is always stored with the contracted index k first;
+// v2 has it last for d1 (op_v2 = NoTrans) and first for d2 (op_v2 = Trans).
+// t2_slots/v2_slots list the t3 slots of the free indices of t2/v2 in their storage order.
+template<typename T>
+inline void ccsd_t_cpu_gemm_acc(T alpha, int size_k, const T* t2, const int (&t2_slots)[3],
+                                const T* v2, const int (&v2_slots)[3], blas::Op op_v2,
+                                const int (&dims)[6], std::vector<T>& scratch, T* t3) {
+  const int64_t m = (int64_t) dims[v2_slots[0]] * dims[v2_slots[1]] * dims[v2_slots[2]];
+  const int64_t n = (int64_t) dims[t2_slots[0]] * dims[t2_slots[1]] * dims[t2_slots[2]];
+  if(scratch.size() < (size_t) (m * n)) scratch.resize(m * n);
+  T* C = scratch.data();
+
+  const int64_t lda = (op_v2 == blas::Op::NoTrans) ? m : size_k;
+  blas::gemm(blas::Layout::ColMajor, op_v2, blas::Op::NoTrans, m, n, size_k, alpha, v2, lda, t2,
+             size_k, T{0}, C, m);
+
+  // stride of each t3 slot within C
+  const int c_order[6] = {v2_slots[0], v2_slots[1], v2_slots[2],
+                          t2_slots[0], t2_slots[1], t2_slots[2]};
+  int64_t   s[6];
+  int64_t   stride = 1;
+  for(int i = 0; i < 6; i++) {
+    s[c_order[i]] = stride;
+    stride *= dims[c_order[i]];
+  }
+
+  const int size_h3 = dims[S_H3], size_h2 = dims[S_H2], size_h1 = dims[S_H1];
+  const int size_p6 = dims[S_P6], size_p5 = dims[S_P5], size_p4 = dims[S_P4];
+
+  // h3 innermost: t3 is stride-1 in h3
+#ifdef _OPENMP
+#pragma omp parallel for collapse(6)
+#endif
+  for(int t3_p4 = 0; t3_p4 < size_p4; t3_p4++)
+    for(int t3_p5 = 0; t3_p5 < size_p5; t3_p5++)
+      for(int t3_p6 = 0; t3_p6 < size_p6; t3_p6++)
+        for(int t3_h1 = 0; t3_h1 < size_h1; t3_h1++)
+          for(int t3_h2 = 0; t3_h2 < size_h2; t3_h2++)
+            for(int t3_h3 = 0; t3_h3 < size_h3; t3_h3++) {
+              const int64_t t3_idx =
+                t3_h3 + (t3_h2 + (t3_h1 + (t3_p6 + (t3_p5 + (int64_t) t3_p4 * size_p5) * size_p6) *
+                                            size_h1) *
+                                   size_h2) *
+                          size_h3;
+              const int64_t c_idx = t3_h3 * s[S_H3] + t3_h2 * s[S_H2] + t3_h1 * s[S_H1] +
+                                    t3_p6 * s[S_P6] + t3_p5 * s[S_P5] + t3_p4 * s[S_P4];
+              t3[t3_idx] += C[c_idx];
+            }
+}
 
 template<typename T>
 void total_fused_ccsd_t_cpu(
@@ -113,320 +168,69 @@ void total_fused_ccsd_t_cpu(
 
   //
   // for (size_t idx_ia6 = 0; idx_ia6 < 9; idx_ia6++){
-  // d1
+  // d1:  t3[h3,h2,h1,p6,p5,p4] +/-= sum_h7 t2[h7,..] * v2[..,h7]
+  // each term = GEMM into scratch + permuted accumulate (see ccsd_t_cpu_gemm_acc)
+  std::vector<double> host_scratch_v(size_tensor_t3);
+
+  // {sign, t2 free slots, v2 free slots} for sd1_1 .. sd1_9
+  struct GemmTerm {
+    double sign;
+    int    t2_slots[3];
+    int    v2_slots[3];
+  };
+  static constexpr GemmTerm d1_terms[9] = {
+    {-1.0, {S_P4, S_P5, S_H1}, {S_H3, S_H2, S_P6}}, // sd1_1: t2[h7,p4,p5,h1] * v2[h3,h2,p6,h7]
+    {+1.0, {S_P4, S_P5, S_H2}, {S_H3, S_H1, S_P6}}, // sd1_2: t2[h7,p4,p5,h2] * v2[h3,h1,p6,h7]
+    {-1.0, {S_P4, S_P5, S_H3}, {S_H2, S_H1, S_P6}}, // sd1_3: t2[h7,p4,p5,h3] * v2[h2,h1,p6,h7]
+    {-1.0, {S_P5, S_P6, S_H1}, {S_H3, S_H2, S_P4}}, // sd1_4: t2[h7,p5,p6,h1] * v2[h3,h2,p4,h7]
+    {+1.0, {S_P5, S_P6, S_H2}, {S_H3, S_H1, S_P4}}, // sd1_5: t2[h7,p5,p6,h2] * v2[h3,h1,p4,h7]
+    {-1.0, {S_P5, S_P6, S_H3}, {S_H2, S_H1, S_P4}}, // sd1_6: t2[h7,p5,p6,h3] * v2[h2,h1,p4,h7]
+    {+1.0, {S_P4, S_P6, S_H1}, {S_H3, S_H2, S_P5}}, // sd1_7: t2[h7,p4,p6,h1] * v2[h3,h2,p5,h7]
+    {-1.0, {S_P4, S_P6, S_H2}, {S_H3, S_H1, S_P5}}, // sd1_8: t2[h7,p4,p6,h2] * v2[h3,h1,p5,h7]
+    {+1.0, {S_P4, S_P6, S_H3}, {S_H2, S_H1, S_P5}}, // sd1_9: t2[h7,p4,p6,h3] * v2[h2,h1,p5,h7]
+  };
+
   for(size_t idx_noab = 0; idx_noab < noab; idx_noab++) {
-    int flag_d1_1 = (int) df_simple_d1_exec[0 + (idx_noab) *9];
-    int flag_d1_2 = (int) df_simple_d1_exec[1 + (idx_noab) *9];
-    int flag_d1_3 = (int) df_simple_d1_exec[2 + (idx_noab) *9];
-    int flag_d1_4 = (int) df_simple_d1_exec[3 + (idx_noab) *9];
-    int flag_d1_5 = (int) df_simple_d1_exec[4 + (idx_noab) *9];
-    int flag_d1_6 = (int) df_simple_d1_exec[5 + (idx_noab) *9];
-    int flag_d1_7 = (int) df_simple_d1_exec[6 + (idx_noab) *9];
-    int flag_d1_8 = (int) df_simple_d1_exec[7 + (idx_noab) *9];
-    int flag_d1_9 = (int) df_simple_d1_exec[8 + (idx_noab) *9];
+    const int* d1_size = df_simple_d1_size + idx_noab * 7; // h1,h2,h3,h7,p4,p5,p6
+    const int  dims[6] = {d1_size[2], d1_size[1], d1_size[0], d1_size[6], d1_size[5], d1_size[4]};
+    const int  d1_base_size_h7b = d1_size[3];
 
-    int d1_base_size_h1b = (int) df_simple_d1_size[0 + (idx_noab) *7];
-    int d1_base_size_h2b = (int) df_simple_d1_size[1 + (idx_noab) *7];
-    int d1_base_size_h3b = (int) df_simple_d1_size[2 + (idx_noab) *7];
-    int d1_base_size_h7b = (int) df_simple_d1_size[3 + (idx_noab) *7];
-    int d1_base_size_p4b = (int) df_simple_d1_size[4 + (idx_noab) *7];
-    int d1_base_size_p5b = (int) df_simple_d1_size[5 + (idx_noab) *7];
-    int d1_base_size_p6b = (int) df_simple_d1_size[6 + (idx_noab) *7];
-
-    double* host_d1_t2_1 = df_host_pinned_d1_t2 + max_dim_d1_t2 * flag_d1_1;
-    double* host_d1_v2_1 = df_host_pinned_d1_v2 + max_dim_d1_v2 * flag_d1_1;
-    double* host_d1_t2_2 = df_host_pinned_d1_t2 + max_dim_d1_t2 * flag_d1_2;
-    double* host_d1_v2_2 = df_host_pinned_d1_v2 + max_dim_d1_v2 * flag_d1_2;
-    double* host_d1_t2_3 = df_host_pinned_d1_t2 + max_dim_d1_t2 * flag_d1_3;
-    double* host_d1_v2_3 = df_host_pinned_d1_v2 + max_dim_d1_v2 * flag_d1_3;
-    double* host_d1_t2_4 = df_host_pinned_d1_t2 + max_dim_d1_t2 * flag_d1_4;
-    double* host_d1_v2_4 = df_host_pinned_d1_v2 + max_dim_d1_v2 * flag_d1_4;
-    double* host_d1_t2_5 = df_host_pinned_d1_t2 + max_dim_d1_t2 * flag_d1_5;
-    double* host_d1_v2_5 = df_host_pinned_d1_v2 + max_dim_d1_v2 * flag_d1_5;
-    double* host_d1_t2_6 = df_host_pinned_d1_t2 + max_dim_d1_t2 * flag_d1_6;
-    double* host_d1_v2_6 = df_host_pinned_d1_v2 + max_dim_d1_v2 * flag_d1_6;
-    double* host_d1_t2_7 = df_host_pinned_d1_t2 + max_dim_d1_t2 * flag_d1_7;
-    double* host_d1_v2_7 = df_host_pinned_d1_v2 + max_dim_d1_v2 * flag_d1_7;
-    double* host_d1_t2_8 = df_host_pinned_d1_t2 + max_dim_d1_t2 * flag_d1_8;
-    double* host_d1_v2_8 = df_host_pinned_d1_v2 + max_dim_d1_v2 * flag_d1_8;
-    double* host_d1_t2_9 = df_host_pinned_d1_t2 + max_dim_d1_t2 * flag_d1_9;
-    double* host_d1_v2_9 = df_host_pinned_d1_v2 + max_dim_d1_v2 * flag_d1_9;
-
-#ifdef _OPENMP
-#pragma omp parallel for collapse(6)
-#endif
-    for(int t3_h3 = 0; t3_h3 < d1_base_size_h3b; t3_h3++)
-      for(int t3_h2 = 0; t3_h2 < d1_base_size_h2b; t3_h2++)
-        for(int t3_h1 = 0; t3_h1 < d1_base_size_h1b; t3_h1++)
-          for(int t3_p6 = 0; t3_p6 < d1_base_size_p6b; t3_p6++)
-            for(int t3_p5 = 0; t3_p5 < d1_base_size_p5b; t3_p5++)
-              for(int t3_p4 = 0; t3_p4 < d1_base_size_p4b; t3_p4++) {
-                int t3_idx =
-                  t3_h3 + (t3_h2 + (t3_h1 + (t3_p6 + (t3_p5 + (t3_p4) *d1_base_size_p5b) *
-                                                       d1_base_size_p6b) *
-                                              d1_base_size_h1b) *
-                                     d1_base_size_h2b) *
-                            d1_base_size_h3b;
-
-                for(int t3_h7 = 0; t3_h7 < d1_base_size_h7b; t3_h7++) {
-                  // sd1_1:  t3[h3,h2,h1,p6,p5,p4] -= t2[h7,p4,p5,h1] * v2[h3,h2,p6,h7]
-                  if(flag_d1_1 >= 0) {
-                    host_t3_d[t3_idx] -=
-                      host_d1_t2_1[t3_h7 + (t3_p4 + (t3_p5 + (t3_h1) *d1_base_size_p5b) *
-                                                      d1_base_size_p4b) *
-                                             d1_base_size_h7b] *
-                      host_d1_v2_1[t3_h3 + (t3_h2 + (t3_p6 + (t3_h7) *d1_base_size_p6b) *
-                                                      d1_base_size_h2b) *
-                                             d1_base_size_h3b];
-                  }
-
-                  // sd1_2:  t3[h3,h2,h1,p6,p5,p4] += t2[h7,p4,p5,h2] * v2[h3,h1,p6,h7]
-                  if(flag_d1_2 >= 0) {
-                    host_t3_d[t3_idx] +=
-                      host_d1_t2_2[t3_h7 + (t3_p4 + (t3_p5 + (t3_h2) *d1_base_size_p5b) *
-                                                      d1_base_size_p4b) *
-                                             d1_base_size_h7b] *
-                      host_d1_v2_2[t3_h3 + (t3_h1 + (t3_p6 + (t3_h7) *d1_base_size_p6b) *
-                                                      d1_base_size_h1b) *
-                                             d1_base_size_h3b];
-                  }
-
-                  // sd1_3:  t3[h3,h2,h1,p6,p5,p4] -= t2[h7,p4,p5,h3] * v2[h2,h1,p6,h7]
-                  if(flag_d1_3 >= 0) {
-                    host_t3_d[t3_idx] -=
-                      host_d1_t2_3[t3_h7 + (t3_p4 + (t3_p5 + (t3_h3) *d1_base_size_p5b) *
-                                                      d1_base_size_p4b) *
-                                             d1_base_size_h7b] *
-                      host_d1_v2_3[t3_h2 + (t3_h1 + (t3_p6 + (t3_h7) *d1_base_size_p6b) *
-                                                      d1_base_size_h1b) *
-                                             d1_base_size_h2b];
-                  }
-
-                  // sd1_4:  t3[h3,h2,h1,p6,p5,p4] -= t2[h7,p5,p6,h1] * v2[h3,h2,p4,h7]
-                  if(flag_d1_4 >= 0) {
-                    host_t3_d[t3_idx] -=
-                      host_d1_t2_4[t3_h7 + (t3_p5 + (t3_p6 + (t3_h1) *d1_base_size_p6b) *
-                                                      d1_base_size_p5b) *
-                                             d1_base_size_h7b] *
-                      host_d1_v2_4[t3_h3 + (t3_h2 + (t3_p4 + (t3_h7) *d1_base_size_p4b) *
-                                                      d1_base_size_h2b) *
-                                             d1_base_size_h3b];
-                  }
-
-                  // sd1_5:  t3[h3,h2,h1,p6,p5,p4] += t2[h7,p5,p6,h2] * v2[h3,h1,p4,h7]
-                  if(flag_d1_5 >= 0) {
-                    host_t3_d[t3_idx] +=
-                      host_d1_t2_5[t3_h7 + (t3_p5 + (t3_p6 + (t3_h2) *d1_base_size_p6b) *
-                                                      d1_base_size_p5b) *
-                                             d1_base_size_h7b] *
-                      host_d1_v2_5[t3_h3 + (t3_h1 + (t3_p4 + (t3_h7) *d1_base_size_p4b) *
-                                                      d1_base_size_h1b) *
-                                             d1_base_size_h3b];
-                  }
-
-                  // sd1_6:  t3[h3,h2,h1,p6,p5,p4] -= t2[h7,p5,p6,h3] * v2[h2,h1,p4,h7]
-                  if(flag_d1_6 >= 0) {
-                    host_t3_d[t3_idx] -=
-                      host_d1_t2_6[t3_h7 + (t3_p5 + (t3_p6 + (t3_h3) *d1_base_size_p6b) *
-                                                      d1_base_size_p5b) *
-                                             d1_base_size_h7b] *
-                      host_d1_v2_6[t3_h2 + (t3_h1 + (t3_p4 + (t3_h7) *d1_base_size_p4b) *
-                                                      d1_base_size_h1b) *
-                                             d1_base_size_h2b];
-                  }
-
-                  // sd1_7:  t3[h3,h2,h1,p6,p5,p4] += t2[h7,p4,p6,h1] * v2[h3,h2,p5,h7]
-                  if(flag_d1_7 >= 0) {
-                    host_t3_d[t3_idx] +=
-                      host_d1_t2_7[t3_h7 + (t3_p4 + (t3_p6 + (t3_h1) *d1_base_size_p6b) *
-                                                      d1_base_size_p4b) *
-                                             d1_base_size_h7b] *
-                      host_d1_v2_7[t3_h3 + (t3_h2 + (t3_p5 + (t3_h7) *d1_base_size_p5b) *
-                                                      d1_base_size_h2b) *
-                                             d1_base_size_h3b];
-                  }
-
-                  // sd1_8:  t3[h3,h2,h1,p6,p5,p4] -= t2[h7,p4,p6,h2] * v2[h3,h1,p5,h7]
-                  if(flag_d1_8 >= 0) {
-                    host_t3_d[t3_idx] -=
-                      host_d1_t2_8[t3_h7 + (t3_p4 + (t3_p6 + (t3_h2) *d1_base_size_p6b) *
-                                                      d1_base_size_p4b) *
-                                             d1_base_size_h7b] *
-                      host_d1_v2_8[t3_h3 + (t3_h1 + (t3_p5 + (t3_h7) *d1_base_size_p5b) *
-                                                      d1_base_size_h1b) *
-                                             d1_base_size_h3b];
-                  }
-
-                  // sd1_9:  t3[h3,h2,h1,p6,p5,p4] += t2[h7,p4,p6,h3] * v2[h2,h1,p5,h7]
-                  if(flag_d1_9 >= 0) {
-                    host_t3_d[t3_idx] +=
-                      host_d1_t2_9[t3_h7 + (t3_p4 + (t3_p6 + (t3_h3) *d1_base_size_p6b) *
-                                                      d1_base_size_p4b) *
-                                             d1_base_size_h7b] *
-                      host_d1_v2_9[t3_h2 + (t3_h1 + (t3_p5 + (t3_h7) *d1_base_size_p5b) *
-                                                      d1_base_size_h1b) *
-                                             d1_base_size_h2b];
-                  }
-                }
-              }
+    for(int k = 0; k < 9; k++) {
+      int flag = df_simple_d1_exec[k + idx_noab * 9];
+      if(flag < 0) continue;
+      ccsd_t_cpu_gemm_acc<double>(d1_terms[k].sign, d1_base_size_h7b,
+                                  df_host_pinned_d1_t2 + max_dim_d1_t2 * flag, d1_terms[k].t2_slots,
+                                  df_host_pinned_d1_v2 + max_dim_d1_v2 * flag, d1_terms[k].v2_slots,
+                                  blas::Op::NoTrans, dims, host_scratch_v, host_t3_d);
+    }
   }
 
-  // d2
+  // d2:  t3[h3,h2,h1,p6,p5,p4] +/-= sum_p7 t2[p7,..] * v2[p7,..]
+  static constexpr GemmTerm d2_terms[9] = {
+    {-1.0, {S_P4, S_H1, S_H2}, {S_H3, S_P6, S_P5}}, // sd2_1: t2[p7,p4,h1,h2] * v2[p7,h3,p6,p5]
+    {-1.0, {S_P4, S_H2, S_H3}, {S_H1, S_P6, S_P5}}, // sd2_2: t2[p7,p4,h2,h3] * v2[p7,h1,p6,p5]
+    {+1.0, {S_P4, S_H1, S_H3}, {S_H2, S_P6, S_P5}}, // sd2_3: t2[p7,p4,h1,h3] * v2[p7,h2,p6,p5]
+    {+1.0, {S_P5, S_H1, S_H2}, {S_H3, S_P6, S_P4}}, // sd2_4: t2[p7,p5,h1,h2] * v2[p7,h3,p6,p4]
+    {+1.0, {S_P5, S_H2, S_H3}, {S_H1, S_P6, S_P4}}, // sd2_5: t2[p7,p5,h2,h3] * v2[p7,h1,p6,p4]
+    {-1.0, {S_P5, S_H1, S_H3}, {S_H2, S_P6, S_P4}}, // sd2_6: t2[p7,p5,h1,h3] * v2[p7,h2,p6,p4]
+    {-1.0, {S_P6, S_H1, S_H2}, {S_H3, S_P5, S_P4}}, // sd2_7: t2[p7,p6,h1,h2] * v2[p7,h3,p5,p4]
+    {-1.0, {S_P6, S_H2, S_H3}, {S_H1, S_P5, S_P4}}, // sd2_8: t2[p7,p6,h2,h3] * v2[p7,h1,p5,p4]
+    {+1.0, {S_P6, S_H1, S_H3}, {S_H2, S_P5, S_P4}}, // sd2_9: t2[p7,p6,h1,h3] * v2[p7,h2,p5,p4]
+  };
+
   for(size_t idx_nvab = 0; idx_nvab < nvab; idx_nvab++) {
-    int flag_d2_1 = (int) df_simple_d2_exec[0 + (idx_nvab) *9];
-    int flag_d2_2 = (int) df_simple_d2_exec[1 + (idx_nvab) *9];
-    int flag_d2_3 = (int) df_simple_d2_exec[2 + (idx_nvab) *9];
-    int flag_d2_4 = (int) df_simple_d2_exec[3 + (idx_nvab) *9];
-    int flag_d2_5 = (int) df_simple_d2_exec[4 + (idx_nvab) *9];
-    int flag_d2_6 = (int) df_simple_d2_exec[5 + (idx_nvab) *9];
-    int flag_d2_7 = (int) df_simple_d2_exec[6 + (idx_nvab) *9];
-    int flag_d2_8 = (int) df_simple_d2_exec[7 + (idx_nvab) *9];
-    int flag_d2_9 = (int) df_simple_d2_exec[8 + (idx_nvab) *9];
+    const int* d2_size = df_simple_d2_size + idx_nvab * 7; // h1,h2,h3,p4,p5,p6,p7
+    const int  dims[6] = {d2_size[2], d2_size[1], d2_size[0], d2_size[5], d2_size[4], d2_size[3]};
+    const int  d2_base_size_p7b = d2_size[6];
 
-    int d2_base_size_h1b = (int) df_simple_d2_size[0 + (idx_nvab) *7];
-    int d2_base_size_h2b = (int) df_simple_d2_size[1 + (idx_nvab) *7];
-    int d2_base_size_h3b = (int) df_simple_d2_size[2 + (idx_nvab) *7];
-    int d2_base_size_p4b = (int) df_simple_d2_size[3 + (idx_nvab) *7];
-    int d2_base_size_p5b = (int) df_simple_d2_size[4 + (idx_nvab) *7];
-    int d2_base_size_p6b = (int) df_simple_d2_size[5 + (idx_nvab) *7];
-    int d2_base_size_p7b = (int) df_simple_d2_size[6 + (idx_nvab) *7];
-
-    double* host_d2_t2_1 = df_host_pinned_d2_t2 + max_dim_d2_t2 * flag_d2_1;
-    double* host_d2_v2_1 = df_host_pinned_d2_v2 + max_dim_d2_v2 * flag_d2_1;
-    double* host_d2_t2_2 = df_host_pinned_d2_t2 + max_dim_d2_t2 * flag_d2_2;
-    double* host_d2_v2_2 = df_host_pinned_d2_v2 + max_dim_d2_v2 * flag_d2_2;
-    double* host_d2_t2_3 = df_host_pinned_d2_t2 + max_dim_d2_t2 * flag_d2_3;
-    double* host_d2_v2_3 = df_host_pinned_d2_v2 + max_dim_d2_v2 * flag_d2_3;
-    double* host_d2_t2_4 = df_host_pinned_d2_t2 + max_dim_d2_t2 * flag_d2_4;
-    double* host_d2_v2_4 = df_host_pinned_d2_v2 + max_dim_d2_v2 * flag_d2_4;
-    double* host_d2_t2_5 = df_host_pinned_d2_t2 + max_dim_d2_t2 * flag_d2_5;
-    double* host_d2_v2_5 = df_host_pinned_d2_v2 + max_dim_d2_v2 * flag_d2_5;
-    double* host_d2_t2_6 = df_host_pinned_d2_t2 + max_dim_d2_t2 * flag_d2_6;
-    double* host_d2_v2_6 = df_host_pinned_d2_v2 + max_dim_d2_v2 * flag_d2_6;
-    double* host_d2_t2_7 = df_host_pinned_d2_t2 + max_dim_d2_t2 * flag_d2_7;
-    double* host_d2_v2_7 = df_host_pinned_d2_v2 + max_dim_d2_v2 * flag_d2_7;
-    double* host_d2_t2_8 = df_host_pinned_d2_t2 + max_dim_d2_t2 * flag_d2_8;
-    double* host_d2_v2_8 = df_host_pinned_d2_v2 + max_dim_d2_v2 * flag_d2_8;
-    double* host_d2_t2_9 = df_host_pinned_d2_t2 + max_dim_d2_t2 * flag_d2_9;
-    double* host_d2_v2_9 = df_host_pinned_d2_v2 + max_dim_d2_v2 * flag_d2_9;
-
-#ifdef _OPENMP
-#pragma omp parallel for collapse(6)
-#endif
-    for(int t3_h3 = 0; t3_h3 < d2_base_size_h3b; t3_h3++)
-      for(int t3_h2 = 0; t3_h2 < d2_base_size_h2b; t3_h2++)
-        for(int t3_h1 = 0; t3_h1 < d2_base_size_h1b; t3_h1++)
-          for(int t3_p6 = 0; t3_p6 < d2_base_size_p6b; t3_p6++)
-            for(int t3_p5 = 0; t3_p5 < d2_base_size_p5b; t3_p5++)
-              for(int t3_p4 = 0; t3_p4 < d2_base_size_p4b; t3_p4++) {
-                int t3_idx =
-                  t3_h3 + (t3_h2 + (t3_h1 + (t3_p6 + (t3_p5 + (t3_p4) *d2_base_size_p5b) *
-                                                       d2_base_size_p6b) *
-                                              d2_base_size_h1b) *
-                                     d2_base_size_h2b) *
-                            d2_base_size_h3b;
-
-                for(int t3_p7 = 0; t3_p7 < d2_base_size_p7b; t3_p7++) {
-                  // sd2_1:  t3[h3,h2,h1,p6,p5,p4] −= t2[p7,p4,h1,h2] * v2[p7,h3,p6,p5]
-                  if(flag_d2_1 >= 0) {
-                    host_t3_d[t3_idx] -=
-                      host_d2_t2_1[t3_p7 + (t3_p4 + (t3_h1 + (t3_h2) *d2_base_size_h1b) *
-                                                      d2_base_size_p4b) *
-                                             d2_base_size_p7b] *
-                      host_d2_v2_1[t3_p7 + (t3_h3 + (t3_p6 + (t3_p5) *d2_base_size_p6b) *
-                                                      d2_base_size_h3b) *
-                                             d2_base_size_p7b];
-                  }
-
-                  // sd2_2:  t3[h3,h2,h1,p6,p5,p4] −= t2[p7,p4,h2,h3] * v2[p7,h1,p6,p5]
-                  if(flag_d2_2 >= 0) {
-                    host_t3_d[t3_idx] -=
-                      host_d2_t2_2[t3_p7 + (t3_p4 + (t3_h2 + (t3_h3) *d2_base_size_h2b) *
-                                                      d2_base_size_p4b) *
-                                             d2_base_size_p7b] *
-                      host_d2_v2_2[t3_p7 + (t3_h1 + (t3_p6 + (t3_p5) *d2_base_size_p6b) *
-                                                      d2_base_size_h1b) *
-                                             d2_base_size_p7b];
-                  }
-
-                  // sd2_3:  t3[h3,h2,h1,p6,p5,p4] += t2[p7,p4,h1,h3] * v2[p7,h2,p6,p5]
-                  if(flag_d2_3 >= 0) {
-                    host_t3_d[t3_idx] +=
-                      host_d2_t2_3[t3_p7 + (t3_p4 + (t3_h1 + (t3_h3) *d2_base_size_h1b) *
-                                                      d2_base_size_p4b) *
-                                             d2_base_size_p7b] *
-                      host_d2_v2_3[t3_p7 + (t3_h2 + (t3_p6 + (t3_p5) *d2_base_size_p6b) *
-                                                      d2_base_size_h2b) *
-                                             d2_base_size_p7b];
-                  }
-
-                  // sd2_4:  t3[h3,h2,h1,p6,p5,p4] += t2[p7,p5,h1,h2] * v2[p7,h3,p6,p4]
-                  if(flag_d2_4 >= 0) {
-                    host_t3_d[t3_idx] +=
-                      host_d2_t2_4[t3_p7 + (t3_p5 + (t3_h1 + (t3_h2) *d2_base_size_h1b) *
-                                                      d2_base_size_p5b) *
-                                             d2_base_size_p7b] *
-                      host_d2_v2_4[t3_p7 + (t3_h3 + (t3_p6 + (t3_p4) *d2_base_size_p6b) *
-                                                      d2_base_size_h3b) *
-                                             d2_base_size_p7b];
-                  }
-
-                  // sd2_5:  t3[h3,h2,h1,p6,p5,p4] += t2[p7,p5,h2,h3] * v2[p7,h1,p6,p4]
-                  if(flag_d2_5 >= 0) {
-                    host_t3_d[t3_idx] +=
-                      host_d2_t2_5[t3_p7 + (t3_p5 + (t3_h2 + (t3_h3) *d2_base_size_h2b) *
-                                                      d2_base_size_p5b) *
-                                             d2_base_size_p7b] *
-                      host_d2_v2_5[t3_p7 + (t3_h1 + (t3_p6 + (t3_p4) *d2_base_size_p6b) *
-                                                      d2_base_size_h1b) *
-                                             d2_base_size_p7b];
-                  }
-
-                  // sd2_6:  t3[h3,h2,h1,p6,p5,p4] −= t2[p7,p5,h1,h3] * v2[p7,h2,p6,p4]
-                  if(flag_d2_6 >= 0) {
-                    host_t3_d[t3_idx] -=
-                      host_d2_t2_6[t3_p7 + (t3_p5 + (t3_h1 + (t3_h3) *d2_base_size_h1b) *
-                                                      d2_base_size_p5b) *
-                                             d2_base_size_p7b] *
-                      host_d2_v2_6[t3_p7 + (t3_h2 + (t3_p6 + (t3_p4) *d2_base_size_p6b) *
-                                                      d2_base_size_h2b) *
-                                             d2_base_size_p7b];
-                  }
-
-                  // sd2_7:  t3[h3,h2,h1,p6,p5,p4] −= t2[p7,p6,h1,h2] * v2[p7,h3,p5,p4]
-                  if(flag_d2_7 >= 0) {
-                    host_t3_d[t3_idx] -=
-                      host_d2_t2_7[t3_p7 + (t3_p6 + (t3_h1 + (t3_h2) *d2_base_size_h1b) *
-                                                      d2_base_size_p6b) *
-                                             d2_base_size_p7b] *
-                      host_d2_v2_7[t3_p7 + (t3_h3 + (t3_p5 + (t3_p4) *d2_base_size_p5b) *
-                                                      d2_base_size_h3b) *
-                                             d2_base_size_p7b];
-                  }
-
-                  // sd2_8:  t3[h3,h2,h1,p6,p5,p4] −= t2[p7,p6,h2,h3] * v2[p7,h1,p5,p4]
-                  if(flag_d2_8 >= 0) {
-                    host_t3_d[t3_idx] -=
-                      host_d2_t2_8[t3_p7 + (t3_p6 + (t3_h2 + (t3_h3) *d2_base_size_h2b) *
-                                                      d2_base_size_p6b) *
-                                             d2_base_size_p7b] *
-                      host_d2_v2_8[t3_p7 + (t3_h1 + (t3_p5 + (t3_p4) *d2_base_size_p5b) *
-                                                      d2_base_size_h1b) *
-                                             d2_base_size_p7b];
-                  }
-
-                  // sd2_9:  t3[h3,h2,h1,p6,p5,p4] += t2[p7,p6,h1,h3] * v2[p7,h2,p5,p4]
-                  if(flag_d2_9 >= 0) {
-                    host_t3_d[t3_idx] +=
-                      host_d2_t2_9[t3_p7 + (t3_p6 + (t3_h1 + (t3_h3) *d2_base_size_h1b) *
-                                                      d2_base_size_p6b) *
-                                             d2_base_size_p7b] *
-                      host_d2_v2_9[t3_p7 + (t3_h2 + (t3_p5 + (t3_p4) *d2_base_size_p5b) *
-                                                      d2_base_size_h2b) *
-                                             d2_base_size_p7b];
-                  }
-                }
-              }
+    for(int k = 0; k < 9; k++) {
+      int flag = df_simple_d2_exec[k + idx_nvab * 9];
+      if(flag < 0) continue;
+      ccsd_t_cpu_gemm_acc<double>(d2_terms[k].sign, d2_base_size_p7b,
+                                  df_host_pinned_d2_t2 + max_dim_d2_t2 * flag, d2_terms[k].t2_slots,
+                                  df_host_pinned_d2_v2 + max_dim_d2_v2 * flag, d2_terms[k].v2_slots,
+                                  blas::Op::Trans, dims, host_scratch_v, host_t3_d);
+    }
   }
 
   // s1
@@ -449,131 +253,121 @@ void total_fused_ccsd_t_cpu(
     int s1_base_size_p5b = (int) df_simple_s1_size[4];
     int s1_base_size_p6b = (int) df_simple_s1_size[5];
 
-    double* host_s1_t2;
-    double* host_s1_v2;
+    double* host_s1_t1_1 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_1;
+    double* host_s1_v2_1 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_1;
+    double* host_s1_t1_2 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_2;
+    double* host_s1_v2_2 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_2;
+    double* host_s1_t1_3 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_3;
+    double* host_s1_v2_3 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_3;
+    double* host_s1_t1_4 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_4;
+    double* host_s1_v2_4 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_4;
+    double* host_s1_t1_5 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_5;
+    double* host_s1_v2_5 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_5;
+    double* host_s1_t1_6 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_6;
+    double* host_s1_v2_6 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_6;
+    double* host_s1_t1_7 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_7;
+    double* host_s1_v2_7 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_7;
+    double* host_s1_t1_8 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_8;
+    double* host_s1_v2_8 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_8;
+    double* host_s1_t1_9 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_9;
+    double* host_s1_v2_9 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_9;
 
+    // h3 innermost: t3 is stride-1 in h3
 #ifdef _OPENMP
 #pragma omp parallel for collapse(6)
 #endif
-    for(int t3_h3 = 0; t3_h3 < s1_base_size_h3b; t3_h3++)
-      for(int t3_h2 = 0; t3_h2 < s1_base_size_h2b; t3_h2++)
-        for(int t3_h1 = 0; t3_h1 < s1_base_size_h1b; t3_h1++)
-          for(int t3_p6 = 0; t3_p6 < s1_base_size_p6b; t3_p6++)
-            for(int t3_p5 = 0; t3_p5 < s1_base_size_p5b; t3_p5++)
-              for(int t3_p4 = 0; t3_p4 < s1_base_size_p4b; t3_p4++) {
-                int t3_idx =
-                  t3_h3 + (t3_h2 + (t3_h1 + (t3_p6 + (t3_p5 + (t3_p4) *s1_base_size_p5b) *
+    for(int t3_p4 = 0; t3_p4 < s1_base_size_p4b; t3_p4++)
+      for(int t3_p5 = 0; t3_p5 < s1_base_size_p5b; t3_p5++)
+        for(int t3_p6 = 0; t3_p6 < s1_base_size_p6b; t3_p6++)
+          for(int t3_h1 = 0; t3_h1 < s1_base_size_h1b; t3_h1++)
+            for(int t3_h2 = 0; t3_h2 < s1_base_size_h2b; t3_h2++)
+              for(int t3_h3 = 0; t3_h3 < s1_base_size_h3b; t3_h3++) {
+                int64_t t3_idx =
+                  t3_h3 + (t3_h2 + (t3_h1 + (t3_p6 + (t3_p5 + (int64_t) t3_p4 * s1_base_size_p5b) *
                                                        s1_base_size_p6b) *
                                               s1_base_size_h1b) *
                                      s1_base_size_h2b) *
                             s1_base_size_h3b;
 
                 //  s1_1: t3[h3,h2,h1,p6,p5,p4] += t1[p4,h1] * v2[h3,h2,p6,p5]
-                host_s1_t2 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_1;
-                host_s1_v2 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_1;
-
                 if(flag_s1_1 >= 0) {
                   host_t3_s[t3_idx] +=
-                    host_s1_t2[t3_p4 + (t3_h1) *s1_base_size_p4b] *
-                    host_s1_v2[t3_h3 +
-                               (t3_h2 + (t3_p6 + (t3_p5) *s1_base_size_p6b) * s1_base_size_h2b) *
-                                 s1_base_size_h3b];
+                    host_s1_t1_1[t3_p4 + (t3_h1) *s1_base_size_p4b] *
+                    host_s1_v2_1[t3_h3 +
+                                 (t3_h2 + (t3_p6 + (t3_p5) *s1_base_size_p6b) * s1_base_size_h2b) *
+                                   s1_base_size_h3b];
                 }
 
                 // s1_2: t3[h3,h2,h1,p6,p5,p4] -= t1[p4,h2] * v2[h3,h1,p6,p5]
-                host_s1_t2 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_2;
-                host_s1_v2 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_2;
-
                 if(flag_s1_2 >= 0) {
                   host_t3_s[t3_idx] -=
-                    host_s1_t2[t3_p4 + (t3_h2) *s1_base_size_p4b] *
-                    host_s1_v2[t3_h3 +
-                               (t3_h1 + (t3_p6 + (t3_p5) *s1_base_size_p6b) * s1_base_size_h1b) *
-                                 s1_base_size_h3b];
+                    host_s1_t1_2[t3_p4 + (t3_h2) *s1_base_size_p4b] *
+                    host_s1_v2_2[t3_h3 +
+                                 (t3_h1 + (t3_p6 + (t3_p5) *s1_base_size_p6b) * s1_base_size_h1b) *
+                                   s1_base_size_h3b];
                 }
 
                 // s1_3: t3[h3,h2,h1,p6,p5,p4] += t1[p4,h3] * v2[h2,h1,p6,p5]
-                host_s1_t2 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_3;
-                host_s1_v2 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_3;
-
                 if(flag_s1_3 >= 0) {
                   host_t3_s[t3_idx] +=
-                    host_s1_t2[t3_p4 + (t3_h3) *s1_base_size_p4b] *
-                    host_s1_v2[t3_h2 +
-                               (t3_h1 + (t3_p6 + (t3_p5) *s1_base_size_p6b) * s1_base_size_h1b) *
-                                 s1_base_size_h2b];
+                    host_s1_t1_3[t3_p4 + (t3_h3) *s1_base_size_p4b] *
+                    host_s1_v2_3[t3_h2 +
+                                 (t3_h1 + (t3_p6 + (t3_p5) *s1_base_size_p6b) * s1_base_size_h1b) *
+                                   s1_base_size_h2b];
                 }
 
                 // s1_4:   t3[h3,h2,h1,p6,p5,p4] -= t1[p5,h1] * v2[h3,h2,p6,p4]
-                host_s1_t2 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_4;
-                host_s1_v2 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_4;
-
                 if(flag_s1_4 >= 0) {
                   host_t3_s[t3_idx] -=
-                    host_s1_t2[t3_p5 + (t3_h1) *s1_base_size_p5b] *
-                    host_s1_v2[t3_h3 +
-                               (t3_h2 + (t3_p6 + (t3_p4) *s1_base_size_p6b) * s1_base_size_h2b) *
-                                 s1_base_size_h3b];
+                    host_s1_t1_4[t3_p5 + (t3_h1) *s1_base_size_p5b] *
+                    host_s1_v2_4[t3_h3 +
+                                 (t3_h2 + (t3_p6 + (t3_p4) *s1_base_size_p6b) * s1_base_size_h2b) *
+                                   s1_base_size_h3b];
                 }
 
                 // s1_5:   t3[h3,h2,h1,p6,p5,p4] += t1[p5,h2] * v2[h3,h1,p6,p4]
-                host_s1_t2 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_5;
-                host_s1_v2 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_5;
-
                 if(flag_s1_5 >= 0) {
                   host_t3_s[t3_idx] +=
-                    host_s1_t2[t3_p5 + (t3_h2) *s1_base_size_p5b] *
-                    host_s1_v2[t3_h3 +
-                               (t3_h1 + (t3_p6 + (t3_p4) *s1_base_size_p6b) * s1_base_size_h1b) *
-                                 s1_base_size_h3b];
+                    host_s1_t1_5[t3_p5 + (t3_h2) *s1_base_size_p5b] *
+                    host_s1_v2_5[t3_h3 +
+                                 (t3_h1 + (t3_p6 + (t3_p4) *s1_base_size_p6b) * s1_base_size_h1b) *
+                                   s1_base_size_h3b];
                 }
 
                 // s1_6:   t3[h3,h2,h1,p6,p5,p4] -= t1[p5,h3] * v2[h2,h1,p6,p4]
-                host_s1_t2 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_6;
-                host_s1_v2 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_6;
-
                 if(flag_s1_6 >= 0) {
                   host_t3_s[t3_idx] -=
-                    host_s1_t2[t3_p5 + (t3_h3) *s1_base_size_p5b] *
-                    host_s1_v2[t3_h2 +
-                               (t3_h1 + (t3_p6 + (t3_p4) *s1_base_size_p6b) * s1_base_size_h1b) *
-                                 s1_base_size_h2b];
+                    host_s1_t1_6[t3_p5 + (t3_h3) *s1_base_size_p5b] *
+                    host_s1_v2_6[t3_h2 +
+                                 (t3_h1 + (t3_p6 + (t3_p4) *s1_base_size_p6b) * s1_base_size_h1b) *
+                                   s1_base_size_h2b];
                 }
 
-                // s1_7:   t3[h3,h2,h1,p6,p5,p4] -= t1[p6,h1] * v2[h3,h2,p5,p4]
-                host_s1_t2 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_7;
-                host_s1_v2 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_7;
-
+                // s1_7:   t3[h3,h2,h1,p6,p5,p4] += t1[p6,h1] * v2[h3,h2,p5,p4]
                 if(flag_s1_7 >= 0) {
                   host_t3_s[t3_idx] +=
-                    host_s1_t2[t3_p6 + (t3_h1) *s1_base_size_p6b] *
-                    host_s1_v2[t3_h3 +
-                               (t3_h2 + (t3_p5 + (t3_p4) *s1_base_size_p5b) * s1_base_size_h2b) *
-                                 s1_base_size_h3b];
+                    host_s1_t1_7[t3_p6 + (t3_h1) *s1_base_size_p6b] *
+                    host_s1_v2_7[t3_h3 +
+                                 (t3_h2 + (t3_p5 + (t3_p4) *s1_base_size_p5b) * s1_base_size_h2b) *
+                                   s1_base_size_h3b];
                 }
 
                 // s1_8:   t3[h3,h2,h1,p6,p5,p4] -= t1[p6,h2] * v2[h3,h1,p5,p4]
-                host_s1_t2 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_8;
-                host_s1_v2 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_8;
-
                 if(flag_s1_8 >= 0) {
                   host_t3_s[t3_idx] -=
-                    host_s1_t2[t3_p6 + (t3_h2) *s1_base_size_p6b] *
-                    host_s1_v2[t3_h3 +
-                               (t3_h1 + (t3_p5 + (t3_p4) *s1_base_size_p5b) * s1_base_size_h1b) *
-                                 s1_base_size_h3b];
+                    host_s1_t1_8[t3_p6 + (t3_h2) *s1_base_size_p6b] *
+                    host_s1_v2_8[t3_h3 +
+                                 (t3_h1 + (t3_p5 + (t3_p4) *s1_base_size_p5b) * s1_base_size_h1b) *
+                                   s1_base_size_h3b];
                 }
 
-                // s1_9:   t3[h3,h2,h1,p6,p5,p4] -= t1[p6,h3] * v2[h2,h1,p5,p4]
-                host_s1_t2 = df_host_pinned_s1_t1 + max_dim_s1_t1 * flag_s1_9;
-                host_s1_v2 = df_host_pinned_s1_v2 + max_dim_s1_v2 * flag_s1_9;
-
+                // s1_9:   t3[h3,h2,h1,p6,p5,p4] += t1[p6,h3] * v2[h2,h1,p5,p4]
                 if(flag_s1_9 >= 0) {
                   host_t3_s[t3_idx] +=
-                    host_s1_t2[t3_p6 + (t3_h3) *s1_base_size_p6b] *
-                    host_s1_v2[t3_h2 +
-                               (t3_h1 + (t3_p5 + (t3_p4) *s1_base_size_p5b) * s1_base_size_h1b) *
-                                 s1_base_size_h2b];
+                    host_s1_t1_9[t3_p6 + (t3_h3) *s1_base_size_p6b] *
+                    host_s1_v2_9[t3_h2 +
+                                 (t3_h1 + (t3_p5 + (t3_p4) *s1_base_size_p5b) * s1_base_size_h1b) *
+                                   s1_base_size_h2b];
                 }
               }
   }
@@ -600,12 +394,12 @@ void total_fused_ccsd_t_cpu(
           for(int idx_h2 = 0; idx_h2 < size_idx_h2; idx_h2++)
             for(int idx_h3 = 0; idx_h3 < size_idx_h3; idx_h3++) {
               //
-              int idx_t3 =
-                idx_h3 +
-                (idx_h2 + (idx_h1 + (idx_p6 + (idx_p5 + (idx_p4) *size_idx_p5) * size_idx_p6) *
-                                      size_idx_h1) *
-                            size_idx_h2) *
-                  size_idx_h3;
+              int64_t idx_t3 =
+                idx_h3 + (idx_h2 + (idx_h1 + (idx_p6 + (idx_p5 + (int64_t) idx_p4 * size_idx_p5) *
+                                                         size_idx_p6) *
+                                               size_idx_h1) *
+                                     size_idx_h2) *
+                           size_idx_h3;
 
               //
               double inner_factor = (host_evl_sorted_h3b[idx_h3] + host_evl_sorted_h2b[idx_h2] +

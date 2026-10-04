@@ -294,10 +294,10 @@ void SCFGauxc<T>::compute_exx(ExecutionContext& ec, const ChemEnv& chem_env,
   scf_compute.compute_sdens_to_cdens(shells, etensors.D_alpha, D_alpha, etensors);
   if(is_uhf) scf_compute.compute_sdens_to_cdens(shells, etensors.D_beta, D_beta, etensors);
 #else
-  Matrix& D_alpha   = etensors.D_alpha;
-  Matrix& K_alpha   = etensors.G_alpha;
-  Matrix& D_beta    = etensors.D_beta;
-  Matrix& K_beta    = etensors.G_beta;
+  Matrix& D_alpha = etensors.D_alpha;
+  Matrix& K_alpha = etensors.G_alpha;
+  Matrix& D_beta  = etensors.D_beta;
+  Matrix& K_beta  = etensors.G_beta;
 #endif
 
   K_alpha = xc_integrator.eval_exx(factor * D_alpha, sn_link_settings);
@@ -414,8 +414,8 @@ std::vector<T> SCFGauxc<T>::compute_exc_grad(ExecutionContext& ec, const ChemEnv
   scf_compute.compute_sdens_to_cdens(shells, etensors.D_alpha, D_alpha, etensors);
   if(is_uhf) scf_compute.compute_sdens_to_cdens(shells, etensors.D_beta, D_beta, etensors);
 #else
-  Matrix& D_alpha   = etensors.D_alpha;
-  Matrix& D_beta    = etensors.D_beta;
+  Matrix& D_alpha = etensors.D_alpha;
+  Matrix& D_beta  = etensors.D_beta;
 #endif
 
   if(is_rhf) {

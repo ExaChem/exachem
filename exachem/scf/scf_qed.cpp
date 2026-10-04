@@ -342,7 +342,7 @@ void exachem::scf::SCFQed<T>::compute_qed_emult_ints(ExecutionContext& ec, const
           }
         }
       } // s2
-    }   // s1
+    } // s1
 
     ttensors.QED_Dx.put(blockid, dbufx);
     ttensors.QED_Dy.put(blockid, dbufy);
@@ -467,7 +467,7 @@ void exachem::scf::SCFQed<T>::compute_qed_emult_ints_deriv(
           }
         }
       } // s2
-    }   // s1
+    } // s1
     for(unsigned int i = 0; i < 3 * natoms; ++i) {
       D_deriv[i].put(blockid, dbuf[i]);
       Q_deriv[i].put(blockid, dbuf[i + 3 * natoms]);

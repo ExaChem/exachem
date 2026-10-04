@@ -188,7 +188,7 @@ public:
         //
         idx_offset++;
       } // p7b
-    }   // end ia6
+    } // end ia6
 
     idx_offset = 0;
     for(auto ia6 = 0; ia6 < 9; ia6++) {
@@ -309,7 +309,7 @@ public:
         //
         idx_offset++;
       } // p7b
-    }   // end ia6
+    } // end ia6
 
     idx_offset = 0;
     for(auto ia6 = 0; ia6 < 9; ia6++) {
@@ -356,7 +356,7 @@ public:
 
         idx_offset++;
       } // p7b
-    }   // end ia6
+    } // end ia6
 
     //
     *df_num_d2_enabled = idx_offset;
@@ -540,8 +540,8 @@ public:
         // detailed_stats[p7b
         // - noab][7], detailed_stats[p7b - noab][8]);
       } // p7b
-    }   // end ia6
-  }     // ccsd_t_data_d2_info_only
+    } // end ia6
+  } // ccsd_t_data_d2_info_only
 
 }; // class CCSD_T_Fused_Doubles2
 

@@ -57,7 +57,7 @@ using namespace std;
 #define SIZE_UNIT_INT SIZE_TILE_P7
 
 #define NUM_INDEX 6
-#define CEIL(a, b) (((a) + (b) -1) / (b))
+#define CEIL(a, b) (((a) + (b) - 1) / (b))
 
 #define PAD 3
 #define STAGE_ALIGN 32
@@ -106,8 +106,8 @@ __device__ inline void rt_store_fixed(double* smem, const int idx_x_1, const int
   for(int i = 0; i < 4; i++) {
 #pragma unroll 4
     for(int j = 0; j < 4; j++) {
-      smem[idx_x_1 + (idx_x_2 + (j) *4) * 4 + (idx_y_1 + (idx_y_2 + (i) *4) * 4) * 65] =
-        op_c.reg[j + (i) *4];
+      smem[idx_x_1 + (idx_x_2 + (j) * 4) * 4 + (idx_y_1 + (idx_y_2 + (i) * 4) * 4) * 65] =
+        op_c.reg[j + (i) * 4];
     }
   }
 }
@@ -119,8 +119,8 @@ __device__ inline void rt_load_fixed(double* smem, const int idx_x_1, const int 
   for(int i = 0; i < 4; i++) {
 #pragma unroll 4
     for(int j = 0; j < 4; j++) {
-      op_c.reg[j + (i) *4] =
-        smem[idx_x_1 + (idx_x_2 + (j) *4) * 4 + (idx_y_1 + (idx_y_2 + (i) *4) * 4) * 65];
+      op_c.reg[j + (i) * 4] =
+        smem[idx_x_1 + (idx_x_2 + (j) * 4) * 4 + (idx_y_1 + (idx_y_2 + (i) * 4) * 4) * 65];
     }
   }
 }
@@ -234,7 +234,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   // REG_X,Y(p5,p4)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
     int size_p7   = const_d2_p7b[iter_nvab];
-    int flag_d2_1 = const_d2_exec[0 + (iter_nvab) *9];
+    int flag_d2_1 = const_d2_exec[0 + (iter_nvab) * 9];
 
     const size_t num_batches      = (size_p7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_p7 + 3) / 4) * 4;
@@ -310,7 +310,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   for(int iter_noab = 0; iter_noab < size_noab; iter_noab++) {
     //
     int size_h7   = const_d1_h7b[iter_noab];
-    int flag_d1_6 = const_d1_exec[5 + (iter_noab) *9];
+    int flag_d1_6 = const_d1_exec[5 + (iter_noab) * 9];
 
     const size_t num_batches      = (size_h7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_h7 + 3) / 4) * 4;
@@ -395,7 +395,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   // t2[p7,ry,h2,h3] * v2[p7,h1,p6,rx] -> TB_X(p6,h3), TB_Y(h2,h1), REG_X,Y(p5,p4)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
     int size_p7   = const_d2_p7b[iter_nvab];
-    int flag_d2_2 = const_d2_exec[1 + (iter_nvab) *9];
+    int flag_d2_2 = const_d2_exec[1 + (iter_nvab) * 9];
 
     const size_t num_batches      = (size_p7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_p7 + 3) / 4) * 4;
@@ -472,7 +472,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   for(int iter_noab = 0; iter_noab < size_noab; iter_noab++) {
     //
     int size_h7   = const_d1_h7b[iter_noab];
-    int flag_d1_4 = const_d1_exec[3 + (iter_noab) *9];
+    int flag_d1_4 = const_d1_exec[3 + (iter_noab) * 9];
 
     const size_t num_batches      = (size_h7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_h7 + 3) / 4) * 4;
@@ -559,7 +559,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   // t2[p7,ry,h1,h3] * v2[p7,h2,p6,rx] -> TB_X(p6,h3), TB_Y(h1,h2)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
     int size_p7   = const_d2_p7b[iter_nvab];
-    int flag_d2_3 = const_d2_exec[2 + (iter_nvab) *9];
+    int flag_d2_3 = const_d2_exec[2 + (iter_nvab) * 9];
 
     const size_t num_batches      = (size_p7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_p7 + 3) / 4) * 4;
@@ -636,7 +636,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   for(int iter_noab = 0; iter_noab < size_noab; iter_noab++) {
     //
     int size_h7   = const_d1_h7b[iter_noab];
-    int flag_d1_5 = const_d1_exec[4 + (iter_noab) *9];
+    int flag_d1_5 = const_d1_exec[4 + (iter_noab) * 9];
 
     const size_t num_batches      = (size_h7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_h7 + 3) / 4) * 4;
@@ -718,8 +718,8 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   for(int i = 0; i < 4; i++) { // p5
 #pragma unroll 4
     for(int j = 0; j < 4; j++) { // p4
-      op_c.reg[j + (i) *4] =
-        sm_block[idx_p6 + (idx_h3 + (i) *4) * 4 + (idx_h1 + (idx_h2 + (j) *4) * 4) * 65];
+      op_c.reg[j + (i) * 4] =
+        sm_block[idx_p6 + (idx_h3 + (i) * 4) * 4 + (idx_h1 + (idx_h2 + (j) * 4) * 4) * 65];
     }
   }
   block.sync();
@@ -731,7 +731,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   // REG_X,Y(p4,p5)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
     int size_p7   = const_d2_p7b[iter_nvab];
-    int flag_d2_4 = const_d2_exec[3 + (iter_nvab) *9];
+    int flag_d2_4 = const_d2_exec[3 + (iter_nvab) * 9];
 
     const size_t num_batches      = (size_p7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_p7 + 3) / 4) * 4;
@@ -807,7 +807,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   for(int iter_noab = 0; iter_noab < size_noab; iter_noab++) {
     //
     int size_h7   = const_d1_h7b[iter_noab];
-    int flag_d1_9 = const_d1_exec[8 + (iter_noab) *9];
+    int flag_d1_9 = const_d1_exec[8 + (iter_noab) * 9];
 
     const size_t num_batches      = (size_h7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_h7 + 3) / 4) * 4;
@@ -893,7 +893,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   // [2] t2[p7,ry,h2,h3] * v2[p7,h1,rx,p4] -> TB_X(p6,h3), TB_Y(h2,h1), REG_X,Y(p4,p5)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
     int size_p7   = const_d2_p7b[iter_nvab];
-    int flag_d2_5 = const_d2_exec[4 + (iter_nvab) *9];
+    int flag_d2_5 = const_d2_exec[4 + (iter_nvab) * 9];
 
     const size_t num_batches      = (size_p7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_p7 + 3) / 4) * 4;
@@ -969,7 +969,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   for(int iter_noab = 0; iter_noab < size_noab; iter_noab++) {
     //
     int size_h7   = const_d1_h7b[iter_noab];
-    int flag_d1_7 = const_d1_exec[6 + (iter_noab) *9];
+    int flag_d1_7 = const_d1_exec[6 + (iter_noab) * 9];
 
     const size_t num_batches      = (size_h7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_h7 + 3) / 4) * 4;
@@ -1055,7 +1055,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   // [2] t2[p7,ry,h1,h3] * v2[p7,h2,rx,p4] -> TB_X(p6,h3), TB_Y(h1,h2) <----
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
     int size_p7   = const_d2_p7b[iter_nvab];
-    int flag_d2_6 = const_d2_exec[5 + (iter_nvab) *9];
+    int flag_d2_6 = const_d2_exec[5 + (iter_nvab) * 9];
 
     const size_t num_batches      = (size_p7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_p7 + 3) / 4) * 4;
@@ -1131,7 +1131,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   for(int iter_noab = 0; iter_noab < size_noab; iter_noab++) {
     //
     int size_h7   = const_d1_h7b[iter_noab];
-    int flag_d1_8 = const_d1_exec[7 + (iter_noab) *9];
+    int flag_d1_8 = const_d1_exec[7 + (iter_noab) * 9];
 
     const size_t num_batches      = (size_h7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_h7 + 3) / 4) * 4;
@@ -1212,8 +1212,8 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   for(int i = 0; i < 4; i++) { // p6
 #pragma unroll 4
     for(int j = 0; j < 4; j++) { // p5
-      op_c.reg[j + (i) *4] =
-        sm_block[i + (idx_h3 + (idx_p6) *4) * 4 + (idx_h1 + (idx_h2 + (j) *4) * 4) * 65];
+      op_c.reg[j + (i) * 4] =
+        sm_block[i + (idx_h3 + (idx_p6) * 4) * 4 + (idx_h1 + (idx_h2 + (j) * 4) * 4) * 65];
     }
   }
   block.sync();
@@ -1230,7 +1230,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   // TB_Y(h1,h3)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
     int size_p7   = const_d2_p7b[iter_nvab];
-    int flag_d2_7 = const_d2_exec[6 + (iter_nvab) *9];
+    int flag_d2_7 = const_d2_exec[6 + (iter_nvab) * 9];
 
     const size_t num_batches      = (size_p7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_p7 + 3) / 4) * 4;
@@ -1307,7 +1307,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   for(int iter_noab = 0; iter_noab < size_noab; iter_noab++) {
     //
     int size_h7   = const_d1_h7b[iter_noab];
-    int flag_d1_3 = const_d1_exec[2 + (iter_noab) *9];
+    int flag_d1_3 = const_d1_exec[2 + (iter_noab) * 9];
 
     const size_t num_batches      = (size_h7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_h7 + 3) / 4) * 4;
@@ -1392,7 +1392,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   // t2[p7,ry,h2,h3] * v2[p7,h1,rx,p4] -> TB_X(p4,h3), TB_Y(h2,h1)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
     int size_p7   = const_d2_p7b[iter_nvab];
-    int flag_d2_8 = const_d2_exec[7 + (iter_nvab) *9];
+    int flag_d2_8 = const_d2_exec[7 + (iter_nvab) * 9];
 
     const size_t num_batches      = (size_p7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_p7 + 3) / 4) * 4;
@@ -1469,7 +1469,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   for(int iter_noab = 0; iter_noab < size_noab; iter_noab++) {
     //
     int size_h7   = const_d1_h7b[iter_noab];
-    int flag_d1_1 = const_d1_exec[0 + (iter_noab) *9];
+    int flag_d1_1 = const_d1_exec[0 + (iter_noab) * 9];
 
     const size_t num_batches      = (size_h7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_h7 + 3) / 4) * 4;
@@ -1554,7 +1554,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   // TB_X(p4,h3), TB_Y(h1,h2), REG_X,Y(p5,p6)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
     int size_p7   = const_d2_p7b[iter_nvab];
-    int flag_d2_9 = const_d2_exec[8 + (iter_nvab) *9];
+    int flag_d2_9 = const_d2_exec[8 + (iter_nvab) * 9];
 
     const size_t num_batches      = (size_p7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_p7 + 3) / 4) * 4;
@@ -1630,7 +1630,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   for(int iter_noab = 0; iter_noab < size_noab; iter_noab++) {
     //
     int size_h7   = const_d1_h7b[iter_noab];
-    int flag_d1_2 = const_d1_exec[1 + (iter_noab) *9];
+    int flag_d1_2 = const_d1_exec[1 + (iter_noab) * 9];
 
     const size_t num_batches      = (size_h7 + SIZE_UNIT_INT - 1) / SIZE_UNIT_INT;
     const size_t size_internal_up = ((size_h7 + 3) / 4) * 4;
@@ -1978,8 +1978,8 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   for(int i = 0; i < 4; i++) { // p6
 #pragma unroll 4
     for(int j = 0; j < 4; j++) { // p5
-      op_c_s.reg[j + (i) *4] =
-        sm_block[i + (idx_h2 + (j) *4) * 4 + (idx_h1 + (idx_h3 + (idx_p6) *4) * 4) * 65];
+      op_c_s.reg[j + (i) * 4] =
+        sm_block[i + (idx_h2 + (j) * 4) * 4 + (idx_h1 + (idx_h3 + (idx_p6) * 4) * 4) * 65];
     }
   }
   block.sync();
@@ -2557,7 +2557,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
     atomicAdd(&dev_energy[0], final_energy_1);
     atomicAdd(&dev_energy[1], final_energy_2);
 #else
-    dev_energy[blockIdx.x] = final_energy_1;
+    dev_energy[blockIdx.x]             = final_energy_1;
     dev_energy[blockIdx.x + gridDim.x] = final_energy_2;
 #endif
   }

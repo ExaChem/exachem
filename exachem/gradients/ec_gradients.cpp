@@ -94,7 +94,7 @@ Matrix ECGradients::compute_numerical_gradients(ExecutionContext& ec, ChemEnv& c
       }
 
     } // xyz
-  }   // natoms
+  } // natoms
 
   // Reset chemenv atoms
   chem_env.atoms    = atoms;

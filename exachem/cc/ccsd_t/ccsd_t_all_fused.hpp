@@ -16,7 +16,7 @@
 void dev_mem_s(size_t, size_t, size_t, size_t, size_t, size_t);
 void dev_mem_d(size_t, size_t, size_t, size_t, size_t, size_t);
 
-#define CEIL(a, b) (((a) + (b) -1) / (b))
+#define CEIL(a, b) (((a) + (b) - 1) / (b))
 
 inline void hostEnergyReduce(void* data) {
   hostEnergyReduceData_t* data_t        = (hostEnergyReduceData_t*) data;

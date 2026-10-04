@@ -157,18 +157,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-ga-${{ matrix.use_cuda }}-${{ matrix.use_scalapack }}-${{ matrix.use_elpa }}-
 
-    - name: Cache install steps (backend = upcxx)
-      if: ${{ matrix.backend == 'upcxx' }}
-      id: exachem-upcxx-cache-install
-      uses: actions/cache@v4
-      with:
-        path: |
-          ${{ github.workspace }}/install
-        key: ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-upcxx-${{ github.run_id }}
-        restore-keys: |
-          ${{ runner.os }}-${{ matrix.mpi_impl }}-${{ matrix.cc }}-${{ matrix.cxx }}-simd${{ env.simd }}-exachem-upcxx-
-
-
     - name: show-mpi
       run: |
         mpicc   -show
@@ -183,19 +171,6 @@ jobs:
         $FC     --version
         python3 --version
       shell: bash
-
-    - name: build upcxx
-      if: ${{ matrix.backend == 'upcxx' && steps.exachem-upcxx-cache-install.outputs.cache-hit != 'true' }}
-      shell: bash
-      run: |
-        mkdir -p $GITHUB_WORKSPACE/../external_deps
-        cd $GITHUB_WORKSPACE/../external_deps
-        wget https://bitbucket.org/berkeleylab/upcxx/downloads/upcxx-2023.9.0.tar.gz
-        tar xf upcxx-2023.9.0.tar.gz
-        cd upcxx-2023.9.0
-        ./configure --prefix=${{ env.INSTALL_PATH }} --with-cxx=mpicxx --with-cc=mpicc --with-default-network=smp
-        make -j${{ env.EC_NPROC }} all
-        make install
 
     - name: build exachem (backend = ga)
       if: ${{ matrix.backend == 'ga' }}
@@ -222,31 +197,6 @@ jobs:
         make -j${{ env.EC_NPROC }}
         make install
 
-    - name: build exachem (backend = upcxx)
-      if: ${{ matrix.backend == 'upcxx' }}
-      id: build_exachem_upcxx
-      run: |
-        export PATH=$PATH:$GITHUB_WORKSPACE/install/bin
-        echo "UPCXX_SHARED_HEAP_SIZE=MAX" >> $GITHUB_ENV
-        echo "CI_MPIEXEC=upcxx-run" >> $GITHUB_ENV
-        echo "CI_NRANKS=2" >> $GITHUB_ENV
-        echo "UPCXX_MISSING_TESTS=1" >> $GITHUB_ENV
-
-        # TAMM build
-        git clone https://github.com/NWChemEx/TAMM $GITHUB_WORKSPACE/TAMM
-        cd $GITHUB_WORKSPACE/TAMM
-        UPCXX_CODEMODE=O3 CXX=upcxx cmake -H. -Bbuild -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DGPU_ARCH=70 -DMODULES=CC -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DUSE_UPCXX=ON -DMPIRUN_EXECUTABLE=${{ env.CI_MPIEXEC }}
-        cd build
-        UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make -j${{ env.EC_NPROC }}
-        UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make install
-
-        # ExaChem build
-        cd $GITHUB_WORKSPACE
-        UPCXX_CODEMODE=O3 CXX=upcxx cmake -H. -Bbuild -DGPU_ARCH=70 -DMODULES=CC -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_PATH }} -DTAMM_ENABLE_CUDA=${{ env.USE_CUDA }} -DUSE_UPCXX=ON -DMPIRUN_EXECUTABLE=${{ env.CI_MPIEXEC }}
-        cd build
-        UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make -j${{ env.EC_NPROC }}
-        UPCXX_NETWORK=smp UPCXX_CODEMODE=O3 make install
-
     - name: ctest
       run: |
         cd $GITHUB_WORKSPACE/build
@@ -254,7 +204,7 @@ jobs:
         echo "OMP_NUM_THREADS=1" >> $GITHUB_ENV
         # ctest -VV
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CUDA_HOME/lib64 || true
-        $GITHUB_WORKSPACE/ci/scripts/run_ci $GITHUB_WORKSPACE $GITHUB_WORKSPACE/build/methods_stage/${{ env.INSTALL_PATH }}/methods/ExaChem ${{ env.CI_NRANKS }} ${{ env.CI_MPIEXEC }} ${{ env.UPCXX_MISSING_TESTS }}
+        $GITHUB_WORKSPACE/ci/scripts/run_ci $GITHUB_WORKSPACE $GITHUB_WORKSPACE/build/methods_stage/${{ env.INSTALL_PATH }}/methods/ExaChem ${{ env.CI_NRANKS }} ${{ env.CI_MPIEXEC }}
 
     # - name: gcovr
     #   run: |

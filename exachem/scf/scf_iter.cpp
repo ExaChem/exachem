@@ -165,7 +165,7 @@ exachem::scf::SCFIter<T>::scf_iter_body(ExecutionContext& ec, const ChemEnv& che
   Tensor<T>::allocate(&ec, X_tmp);
   tamm::find_scalapack_grid(ec).from_block_cyclic(X_alpha, X_tmp);
 #else
-  X_tmp             = X_alpha;
+  X_tmp = X_alpha;
 #endif
 
   // clang-format off
@@ -2229,8 +2229,8 @@ void exachem::scf::SCFIter<T>::compute_2bf_deriv(
           }
 
         } // idx=1..12
-      }   // s4
-    }     // s3
+      } // s4
+    } // s3
 
     // Add contributions to (s1,s2) block
     for(auto d = 0; d != nderiv; ++d) {

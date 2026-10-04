@@ -214,7 +214,7 @@ void exachem::scf::SCFGuess<T>::compute_dipole_ints(ExecutionContext& ec, const 
           }
         }
       } // s2
-    }   // s1
+    } // s1
 
     tensorX.put(blockid, dbufX);
     tensorY.put(blockid, dbufY);
@@ -1572,11 +1572,11 @@ void exachem::scf::SCFGuess<T>::compute_1body_ints_deriv(ExecutionContext&      
               // }
               // tensor1e.put({s2,s1}, ttbuf);
             } // op
-          }   // xyz
-        }     // c
+          } // xyz
+        } // c
 
       } // s2
-    }   // s1
+    } // s1
 
     for(unsigned int i = 0; i < nresults; ++i) {
       Tensor<T>& tens = d1b_tensors[i];

@@ -17,9 +17,6 @@ ref_res_path = os.path.abspath(str(sys.argv[1]))
 cur_res_path = os.path.abspath(str(sys.argv[2]))
 file_compare = False
 
-upcxx = False
-if len(sys.argv) == 4: upcxx = True
-
 #check if above paths exist
 if not os.path.exists(ref_res_path): 
     print("ERROR: " + ref_res_path + " does not exist!")
@@ -366,12 +363,6 @@ for ref_file in ref_files:
           sys.exit(1)
     
     print(" ... OK")
-
-upcxx_skip_tests=["ozone.sto-3g.rt-eomccsd.json","co.cc-pvdz.gfccsd.json","cr2.def2-svp.scf.json"]
-if upcxx:
-    print(" **** upcxx: skipping rt-eomccsd and gfccsd tests ****")
-    for rf in upcxx_skip_tests:
-        missing_tests.remove(rf)
 
 if not missing_tests:
     print(" **** ALL TESTS PASS ****")

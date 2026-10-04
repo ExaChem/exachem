@@ -180,13 +180,13 @@ public:
     //
     {
       for(Index idx_noab = 0; idx_noab < noab; idx_noab++) {
-        long double base_num_ops_d1_per_eq = ((long double) df_simple_d1_size[0 + (idx_noab) *7]) *
-                                             ((long double) df_simple_d1_size[1 + (idx_noab) *7]) *
-                                             ((long double) df_simple_d1_size[2 + (idx_noab) *7]) *
-                                             ((long double) df_simple_d1_size[3 + (idx_noab) *7]) *
-                                             ((long double) df_simple_d1_size[4 + (idx_noab) *7]) *
-                                             ((long double) df_simple_d1_size[5 + (idx_noab) *7]) *
-                                             ((long double) df_simple_d1_size[6 + (idx_noab) *7]) *
+        long double base_num_ops_d1_per_eq = ((long double) df_simple_d1_size[0 + (idx_noab) * 7]) *
+                                             ((long double) df_simple_d1_size[1 + (idx_noab) * 7]) *
+                                             ((long double) df_simple_d1_size[2 + (idx_noab) * 7]) *
+                                             ((long double) df_simple_d1_size[3 + (idx_noab) * 7]) *
+                                             ((long double) df_simple_d1_size[4 + (idx_noab) * 7]) *
+                                             ((long double) df_simple_d1_size[5 + (idx_noab) * 7]) *
+                                             ((long double) df_simple_d1_size[6 + (idx_noab) * 7]) *
                                              2;
 
 #if 0
@@ -201,15 +201,15 @@ public:
       printf ("[%s] d1 with noab: %d >> %lu\n", __func__, idx_noab, base_num_ops_d1_per_eq);
 #endif
 
-        if(df_simple_d1_exec[0 + (idx_noab) *9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
-        if(df_simple_d1_exec[1 + (idx_noab) *9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
-        if(df_simple_d1_exec[2 + (idx_noab) *9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
-        if(df_simple_d1_exec[3 + (idx_noab) *9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
-        if(df_simple_d1_exec[4 + (idx_noab) *9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
-        if(df_simple_d1_exec[5 + (idx_noab) *9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
-        if(df_simple_d1_exec[6 + (idx_noab) *9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
-        if(df_simple_d1_exec[7 + (idx_noab) *9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
-        if(df_simple_d1_exec[8 + (idx_noab) *9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
+        if(df_simple_d1_exec[0 + (idx_noab) * 9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
+        if(df_simple_d1_exec[1 + (idx_noab) * 9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
+        if(df_simple_d1_exec[2 + (idx_noab) * 9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
+        if(df_simple_d1_exec[3 + (idx_noab) * 9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
+        if(df_simple_d1_exec[4 + (idx_noab) * 9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
+        if(df_simple_d1_exec[5 + (idx_noab) * 9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
+        if(df_simple_d1_exec[6 + (idx_noab) * 9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
+        if(df_simple_d1_exec[7 + (idx_noab) * 9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
+        if(df_simple_d1_exec[8 + (idx_noab) * 9] >= 0) num_ops_d1 += base_num_ops_d1_per_eq;
       }
     }
 
@@ -218,13 +218,13 @@ public:
     //
     {
       for(Index idx_nvab = 0; idx_nvab < nvab; idx_nvab++) {
-        long double base_num_ops_d2_per_eq = ((long double) df_simple_d2_size[0 + (idx_nvab) *7]) *
-                                             ((long double) df_simple_d2_size[1 + (idx_nvab) *7]) *
-                                             ((long double) df_simple_d2_size[2 + (idx_nvab) *7]) *
-                                             ((long double) df_simple_d2_size[3 + (idx_nvab) *7]) *
-                                             ((long double) df_simple_d2_size[4 + (idx_nvab) *7]) *
-                                             ((long double) df_simple_d2_size[5 + (idx_nvab) *7]) *
-                                             ((long double) df_simple_d2_size[6 + (idx_nvab) *7]) *
+        long double base_num_ops_d2_per_eq = ((long double) df_simple_d2_size[0 + (idx_nvab) * 7]) *
+                                             ((long double) df_simple_d2_size[1 + (idx_nvab) * 7]) *
+                                             ((long double) df_simple_d2_size[2 + (idx_nvab) * 7]) *
+                                             ((long double) df_simple_d2_size[3 + (idx_nvab) * 7]) *
+                                             ((long double) df_simple_d2_size[4 + (idx_nvab) * 7]) *
+                                             ((long double) df_simple_d2_size[5 + (idx_nvab) * 7]) *
+                                             ((long double) df_simple_d2_size[6 + (idx_nvab) * 7]) *
                                              2;
 
 #if 0
@@ -240,15 +240,15 @@ public:
     printf ("[%s] d2 with noab: %d >> %lu\n", __func__, idx_nvab, base_num_ops_d2_per_eq);
 #endif
 
-        if(df_simple_d2_exec[0 + (idx_nvab) *9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
-        if(df_simple_d2_exec[1 + (idx_nvab) *9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
-        if(df_simple_d2_exec[2 + (idx_nvab) *9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
-        if(df_simple_d2_exec[3 + (idx_nvab) *9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
-        if(df_simple_d2_exec[4 + (idx_nvab) *9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
-        if(df_simple_d2_exec[5 + (idx_nvab) *9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
-        if(df_simple_d2_exec[6 + (idx_nvab) *9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
-        if(df_simple_d2_exec[7 + (idx_nvab) *9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
-        if(df_simple_d2_exec[8 + (idx_nvab) *9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
+        if(df_simple_d2_exec[0 + (idx_nvab) * 9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
+        if(df_simple_d2_exec[1 + (idx_nvab) * 9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
+        if(df_simple_d2_exec[2 + (idx_nvab) * 9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
+        if(df_simple_d2_exec[3 + (idx_nvab) * 9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
+        if(df_simple_d2_exec[4 + (idx_nvab) * 9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
+        if(df_simple_d2_exec[5 + (idx_nvab) * 9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
+        if(df_simple_d2_exec[6 + (idx_nvab) * 9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
+        if(df_simple_d2_exec[7 + (idx_nvab) * 9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
+        if(df_simple_d2_exec[8 + (idx_nvab) * 9] >= 0) num_ops_d2 += base_num_ops_d2_per_eq;
       }
     }
 

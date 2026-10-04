@@ -1574,7 +1574,7 @@ void DUCC_T_QFLOW_Driver(Scheduler& sch, ChemEnv& chem_env, const TiledIndexSpac
               << std::endl;
       }
     } // vqe_converged
-  }   // rank==0
+  } // rank==0
 }
 
 using T = double;

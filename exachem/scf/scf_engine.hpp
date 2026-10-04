@@ -110,7 +110,7 @@ public:
   virtual bool   check_convergence(ExecutionContext& exc, const ChemEnv& chem_env,
                                    SCFIterationState& scf_state);
   inline void    set_basis_purity(const ChemEnv& chem_env, libint2::BasisSet& basis) const {
-       basis.set_pure(chem_env.ioptions.scf_options.gaussian_type == "spherical");
+    basis.set_pure(chem_env.ioptions.scf_options.gaussian_type == "spherical");
   }
   virtual void compute_fock_matrix(ExecutionContext& ec, const ChemEnv& chem_env, bool is_uhf,
                                    const bool do_schwarz_screen, Matrix& SchwarzK,

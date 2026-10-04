@@ -1,19 +1,18 @@
 #!/bin/bash
 
-#run_ci <$CHEM_SRC> <exe-path> [num-procs]
+#run_ci <$CHEM_SRC> <exe-path> [num-procs] [mpi-cmd]
 
 CHEM_SRC=$1
 EXE_PATH=$2
 NPROC=${3:-3}
 MPICMD=${4:-mpirun}
-UPCXX=$5
 MPIEXEC="$MPICMD -n ${NPROC}"
 
 CHEM_INP="$CHEM_SRC/inputs/ci"
 
 if [ $# -le 1 ]
   then
-    { echo "Insufficient arguments supplied. Run as: ./run_ci <\$CHEM_SRC> <path-to-exe> [nproc] [is_upcxx]"; exit 1; }
+    { echo "Insufficient arguments supplied. Run as: ./run_ci <\$CHEM_SRC> <path-to-exe> [nproc] [mpicmd]"; exit 1; }
 fi
 
 echo "----------------------------------------------------------"
@@ -25,7 +24,7 @@ echo "----------------------------------------------------------"
 
 echo ""
 
-[ ! -f "$EXE_PATH" ] && { echo "ERROR: Folder $EXE_PATH does not exist." ; exit 1; }
+[ ! -f "$EXE_PATH" ] && { echo "ERROR: File $EXE_PATH does not exist." ; exit 1; }
 [ ! -d "$CHEM_INP" ] && { echo "ERROR: Folder $CHEM_INP does not exist." ; exit 1; }
 
 echo ""
@@ -51,7 +50,7 @@ $MPIEXEC $EXE_PATH  $CHEM_INP/butanol2_pt.json
 $MPIEXEC $EXE_PATH  $CHEM_INP/seh2.json
 
 #cp *_files/restricted/json/*.json .
-#python3 $CHEM_SRC/ci/scripts/compare_results.py $CHEM_SRC/ci/reference_output/ . 1
+#python3 $CHEM_SRC/ci/scripts/compare_results.py $CHEM_SRC/ci/reference_output/ .
 [ -d butanol2.sto-3g_files ] && { rm butanol2.sto-3g_files/restricted/*; }
 
 #EOMCCSD
@@ -92,4 +91,4 @@ cp *_files/restricted/json/*.json .
 cp *_files/unrestricted/json/*.json .
 cp *_files/unrestricted/scf/*.pdos .
 
-python3 $CHEM_SRC/ci/scripts/compare_results.py $CHEM_SRC/ci/reference_output/ . $UPCXX
+python3 $CHEM_SRC/ci/scripts/compare_results.py $CHEM_SRC/ci/reference_output/ .

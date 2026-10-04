@@ -240,7 +240,7 @@ void exachem::cc::ccsd_t::CCSD_T_Driver<T>::ccsd_t_driver(ExecutionContext& ec, 
   LRUCache<Index, std::vector<T>> cache_d2t{cache_size * nvab};
   LRUCache<Index, std::vector<T>> cache_d2v{cache_size * nvab};
 
-  if(rank == 0 && seq_h3b) cout << "running seq h3b loop variant..." << endl;
+  // if(rank == 0 && seq_h3b) cout << "running seq h3b loop variant..." << endl;
 
   std::vector<int> k_spin;
   for(tamm::Index x = 0; x < noab / 2; x++) k_spin.push_back(1);

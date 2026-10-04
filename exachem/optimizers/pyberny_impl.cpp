@@ -243,12 +243,12 @@ torsion_eval(Eigen::MatrixXd coords, int i, int j, int k, int l) {
     double A = v1.dot(ew) / w.norm();
     double B = v2.dot(ew) / w.norm();
     grad     = std::make_tuple(
-          1 / tan(phi) * a1 / a1.norm() * a1.norm() - a2 / (a1.norm() * a2.norm() * sin(phi)),
-          ((1 - A) * a2 - B * a1) / (a1.norm() * a2.norm() * sin(phi)) -
-            1 / tan(phi) * ((1 - A) * a1 / a1.norm() * a1.norm() - B * a2 / a2.norm() * a2.norm()),
-          ((1 + B) * a1 + A * a2) / (a1.norm() * a2.norm() * sin(phi)) -
-            1 / tan(phi) * ((1 + B) * a2 / pow(a2.norm(), 2) + A * a1 / pow(a1.norm(), 2)),
-          1 / tan(phi) * a2 / pow(a2.norm(), 2) - a1 / (a1.norm() * a2.norm() * sin(phi)));
+      1 / tan(phi) * a1 / a1.norm() * a1.norm() - a2 / (a1.norm() * a2.norm() * sin(phi)),
+      ((1 - A) * a2 - B * a1) / (a1.norm() * a2.norm() * sin(phi)) -
+        1 / tan(phi) * ((1 - A) * a1 / a1.norm() * a1.norm() - B * a2 / a2.norm() * a2.norm()),
+      ((1 + B) * a1 + A * a2) / (a1.norm() * a2.norm() * sin(phi)) -
+        1 / tan(phi) * ((1 + B) * a2 / pow(a2.norm(), 2) + A * a1 / pow(a1.norm(), 2)),
+      1 / tan(phi) * a2 / pow(a2.norm(), 2) - a1 / (a1.norm() * a2.norm() * sin(phi)));
   }
 
   return std::tuple<double,

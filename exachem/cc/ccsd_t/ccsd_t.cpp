@@ -2,7 +2,7 @@
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
  * Copyright 2023 NWChemEx-Project.
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -13,6 +13,34 @@
 #include "exachem/cholesky/cholesky_2e_driver.hpp"
 #include "exachem/cc/ccsd_t/ccsd_t.hpp"
 // clang-format on
+
+#include <cmath>
+#include <string>
+
+#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
+// returns an error message if the (T) buffers for tilesize cc_t_ts do not fit in GPU memory
+static std::string check_memory_req(const int cc_t_ts, const int nbf) {
+  size_t      total_gpu_mem{0};
+  std::string errmsg = "";
+
+  size_t free_gpu_mem{0};
+  tamm::gpuMemGetInfo(&free_gpu_mem, &total_gpu_mem);
+
+  const size_t gpu_mem_req =
+    (9.0 * (std::pow(cc_t_ts, 2) + std::pow(cc_t_ts, 4) + 2 * 2 * nbf * std::pow(cc_t_ts, 3)) * 8);
+  int gpu_mem_check = 0;
+  if(gpu_mem_req >= total_gpu_mem) gpu_mem_check = 1;
+  if(gpu_mem_check) {
+    const double gib = 1024 * 1024 * 1024.0;
+    errmsg = "ERROR: GPU memory not sufficient for (T) calculation, available memory per gpu: " +
+             std::to_string(total_gpu_mem / gib) +
+             " GiB, required: " + std::to_string(gpu_mem_req / gib) +
+             " GiB. Please set a smaller tilesize and retry";
+  }
+
+  return errmsg;
+}
+#endif
 
 template<typename T>
 void exachem::cc::ccsd_t::CCSD_T_Driver<T>::ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env) {

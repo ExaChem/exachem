@@ -2,7 +2,7 @@
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
  * Copyright 2023 NWChemEx-Project.
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -16,14 +16,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
-
-#define NUM_IA6_LOOPS 9
-#define NUM_D1_EQUATIONS 9
-#define NUM_D2_EQUATIONS 9
-#define NUM_S1_EQUATIONS 9
-#define NUM_D1_INDEX 7
-#define NUM_D2_INDEX 7
-#define NUM_S1_INDEX 6
 
 // (2) 3rd. Generation Tensor Cores (FP64)
 #if defined(USE_NV_TC)
@@ -56,9 +48,6 @@ using namespace std;
 
 #define SIZE_UNIT_INT SIZE_TILE_P7
 
-#define NUM_INDEX 6
-#define CEIL(a, b) (((a) + (b) - 1) / (b))
-
 #define PAD 3
 #define STAGE_ALIGN 32
 #define SINGLE_STAGE_SIZE (64 * (PAD + 16))
@@ -66,7 +55,7 @@ using namespace std;
 
 #define NUM_STAGE 2
 
-#define NUM_ENERGY 2
+// #define NUM_ENERGY 2
 #define FULL_MASK 0xffffffff
 
 #define TEST_ENABLE_RT
@@ -74,9 +63,6 @@ using namespace std;
 //
 //      helpers
 //
-#define MAX_NOAB 50
-#define MAX_NVAB 140
-
 // 9 * (1 + MAX_NOAB + MAX_NVAB) + (MAX_NOAB + MAX_NVAB) * sizeof(int) <= 64KB
 __constant__ int const_s1_exec[9];
 __constant__ int const_d1_exec[9 * MAX_NOAB];
@@ -228,8 +214,7 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
                            dev_evl_sorted_h1b[blk_idx_h1 * SIZE_TILE_H1 + idx_h1] -
                            dev_evl_sorted_p4b[blk_idx_p4 * SIZE_TILE_P4 + idx_p6];
 
-    //
-#if 1
+  //
   // sd2_1: t3[h3,h2,h1,p6,p5,p4] −= t2[p7,p4,h1,h2] * v2[p7,h3,p6,p5] --> TB_X(p6,h2), TB_Y(h1,h3),
   // REG_X,Y(p5,p4)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
@@ -378,7 +363,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
       block.sync();
     }
   }
-#endif
 
   // rt #1
   // from TB_X(p6,h2), TB_Y(h1,h3), REG_X,Y(p5,p4) // d2_1
@@ -390,7 +374,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   block.sync();
 #endif
 
-#if 1
   // sd2_2: t3[h3,h2,h1,p6,p5,p4] -= t2[p7,p4,h2,h3] * v2[p7,h1,p6,p5]
   // t2[p7,ry,h2,h3] * v2[p7,h1,p6,rx] -> TB_X(p6,h3), TB_Y(h2,h1), REG_X,Y(p5,p4)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
@@ -541,7 +524,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
       block.sync();
     }
   }
-#endif
 
   // rt         TB_X(p6,h2), TB_Y(h1,h3) #2
   // from TB_X(p6,h3), TB_Y(h2,h1), REG_X,Y(p5,p4) // d2_2
@@ -554,7 +536,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   block.sync();
 #endif
 
-#if 1
   // sd2_3: t3[h3,h2,h1,p6,p5,p4] += t2[p7,p4,h1,h3] * v2[p7,h2,p6,p5]
   // t2[p7,ry,h1,h3] * v2[p7,h2,p6,rx] -> TB_X(p6,h3), TB_Y(h1,h2)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
@@ -705,7 +686,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
       block.sync();
     }
   }
-#endif
 
   // rt         TB_X(p6,h2), TB_Y(h1,h3) #3
   // from TB_X(p6,h3), TB_Y(h1,h2), REG_X,Y(p5,p4) // d2_3
@@ -725,7 +705,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   block.sync();
 #endif
 
-#if 1
   //
   // sd2_4: t3[h3,h2,h1,p6,p5,p4] += t2[p7,p5,h1,h2] * v2[p7,h3,p6,p4] -> TB_X(p6,h2), TB_Y(h1,h3),
   // REG_X,Y(p4,p5)
@@ -875,7 +854,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
       block.sync();
     }
   }
-#endif
 
   // rt         TB_X(p6,h2), TB_Y(h1,h3) #4
   // from TB_X(p6,h2), TB_Y(h1,h3), REG_X,Y(p4,p5) // sd2_4
@@ -887,7 +865,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   block.sync();
 #endif
 
-#if 1
   // sd2_5: t3[h3,h2,h1,p6,p5,p4] += t2[p7,p5,h2,h3] * v2[p7,h1,p6,p4] (pending)
   // [1] t2[p7,rx,h2,h3] * v2[p7,h1,ry,p4] -> TB_X(h3,p4), TB_Y(h1,h2)
   // [2] t2[p7,ry,h2,h3] * v2[p7,h1,rx,p4] -> TB_X(p6,h3), TB_Y(h2,h1), REG_X,Y(p4,p5)
@@ -1037,7 +1014,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
       block.sync();
     }
   }
-#endif
 
   // rt         TB_X(p6,h2), TB_Y(h1,h3) #5
   // from TB_X(p6,h3), TB_Y(h2,h1), REG_X,Y(p4,p5) // sd2_5
@@ -1049,7 +1025,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   block.sync();
 #endif
 
-#if 1
   // sd2_6: t3[h3,h2,h1,p6,p5,p4] −= t2[p7,p5,h1,h3] * v2[p7,h2,p6,p4]
   // [1] t2[p7,rx,h1,h3] * v2[p7,h2,ry,p4] -> TB_X(h3,p4), TB_Y(h2,h3)
   // [2] t2[p7,ry,h1,h3] * v2[p7,h2,rx,p4] -> TB_X(p6,h3), TB_Y(h1,h2) <----
@@ -1199,7 +1174,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
       block.sync();
     }
   }
-#endif
 
   // rt         TB_X(p6,h2), TB_Y(h1,h3) #6
   // from TB_X(p6,h3), TB_Y(h1,h2), REG_X,Y(p4,p5)
@@ -1225,7 +1199,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   // sd2_8 && sd1_1
   // sd2_9 && sd1_2
   //----------------------------------------------------------------------------
-#if 1
   // sd2_7:     t3[h3,h2,h1,p6,p5,p4] −= t2[p7,p6,h1,h2] * v2[p7,h3,p5,p4] --> TB_X(p4,h2),
   // TB_Y(h1,h3)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
@@ -1375,7 +1348,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
       block.sync();
     }
   }
-#endif
 
   // rt         TB_X(p6,h2), TB_Y(h1,h3) #7
   // from TB_X(p4,h2), TB_Y(h1,h3)
@@ -1387,7 +1359,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   block.sync();
 #endif
 
-#if 1
   // sd2_8: t3[h3,h2,h1,p6,p5,p4] −= t2[p7,p6,h2,h3] * v2[p7,h1,p5,p4]
   // t2[p7,ry,h2,h3] * v2[p7,h1,rx,p4] -> TB_X(p4,h3), TB_Y(h2,h1)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
@@ -1537,7 +1508,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
       block.sync();
     }
   }
-#endif
 
   // rt         TB_X(p6,h2), TB_Y(h1,h3) #8
   // from TB_X(p4,h3), TB_Y(h2,h1)
@@ -1549,7 +1519,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
   block.sync();
 #endif
 
-#if 1
   // sd2_9: t3[h3,h2,h1,p6,p5,p4] += t2[p7,p6,h1,h3] * v2[p7,h2,p5,p4]
   // TB_X(p4,h3), TB_Y(h1,h2), REG_X,Y(p5,p6)
   for(int iter_nvab = 0; iter_nvab < size_nvab; iter_nvab++) {
@@ -1698,7 +1667,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
       block.sync();
     }
   }
-#endif
 
   //----------------------------------------------------------------------------
   //
@@ -2478,7 +2446,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
     block.sync();
   }
 
-#if 1
   block.sync();
 
   if(threadIdx.y == 0) {
@@ -2488,7 +2455,6 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
     }
   }
   block.sync();
-#endif
   //
   //    kernel x(idx_p6,idx_h2), y(idx_h1,idx_h3)
   //
@@ -2501,13 +2467,12 @@ __global__ __launch_bounds__(256, 3) void fully_fused_kernel_ccsd_t_nvidia_tc_fp
       for(int idx_reg_x = 0; idx_reg_x < 4; idx_reg_x++) {
         //
         if(idx_reg_y < rng_p6 && idx_reg_x < rng_p5) {
-#if 1
           T inner_factor = (partial_inner_factor - sm_a[idx_reg_y * 4 + idx_reg_x]);
           T temp         = op_c.reg[idx_reg_y * 4 + idx_reg_x] / inner_factor;
           energy_1 += temp * op_c.reg[idx_reg_y * 4 + idx_reg_x];
           energy_2 +=
             temp * (op_c.reg[idx_reg_y * 4 + idx_reg_x] + op_c_s.reg[idx_reg_y * 4 + idx_reg_x]);
-#else
+#if 0
           T inner_factor = partial_inner_factor -
                            dev_evl_sorted_p5b[blk_idx_p5 * SIZE_TILE_P5 + idx_reg_x] -
                            dev_evl_sorted_p6b[blk_idx_p6 * SIZE_TILE_P6 + idx_reg_y];

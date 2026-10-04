@@ -2,7 +2,7 @@
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
  * Copyright 2023 NWChemEx-Project.
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -28,7 +28,7 @@ inline constexpr short FUSION_SIZE_SLICE_2_H1{4};
 inline constexpr short FUSION_SIZE_SLICE_2_P6{4};
 inline constexpr short FUSION_SIZE_SLICE_2_P5{4};
 inline constexpr short FUSION_SIZE_SLICE_2_P4{4};
-inline constexpr short FUSION_SIZE_SLICE_2_H7{16};
+// inline constexpr short FUSION_SIZE_SLICE_2_H7{16};
 
 inline constexpr short FUSION_SIZE_INT_UNIT{FUSION_SIZE_SLICE_1_H7};
 
@@ -42,19 +42,11 @@ inline constexpr short FUSION_SIZE_TB_2_Y{FUSION_SIZE_SLICE_2_P4 * FUSION_SIZE_S
 inline constexpr short FUSION_SIZE_REG_2_X{FUSION_SIZE_SLICE_2_P5};
 inline constexpr short FUSION_SIZE_REG_2_Y{FUSION_SIZE_SLICE_2_P6};
 
-#define CEIL(a, b) (((a) + (b) - 1) / (b))
-
 inline constexpr short NUM_D1_EQUATIONS{9};
 inline constexpr short NUM_D2_EQUATIONS{9};
-inline constexpr short NUM_S1_EQUATIONS{9};
 inline constexpr short NUM_D1_INDEX{7};
 inline constexpr short NUM_D2_INDEX{7};
-inline constexpr short NUM_S1_INDEX{6};
-inline constexpr short NUM_ENERGIES{2};
 #define FULL_MASK 0xffffffff
-
-inline constexpr short MAX_NOAB{50};
-inline constexpr short MAX_NVAB{140};
 
 #ifdef USE_DPCPP
 class ccsd_t_sycl_kernel;
@@ -110,7 +102,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
   T* reduced_energy,
   //  common
   int num_blks_h3b, int num_blks_h2b, int num_blks_h1b, int num_blks_p6b, int num_blks_p5b,
-  int num_blks_p4b,
+  // int num_blks_p4b, // unused: p4 is the outermost block index, its count is never needed
   //
   int base_size_h1b, int base_size_h2b, int base_size_h3b, int base_size_p4b, int base_size_p5b,
   int base_size_p6b
@@ -231,7 +223,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
     num_blks_h1b = CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1);
     num_blks_h2b = CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2);
     num_blks_h3b = CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3);
-    num_blks_p4b = CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4);
+    // num_blks_p4b = CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4);
     num_blks_p5b = CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5);
     num_blks_p6b = CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6);
 
@@ -506,7 +498,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
     num_blks_h1b = CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1);
     num_blks_h2b = CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2);
     num_blks_h3b = CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3);
-    num_blks_p4b = CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4);
+    // num_blks_p4b = CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4);
     num_blks_p5b = CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5);
     num_blks_p6b = CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6);
 
@@ -1017,7 +1009,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
     num_blks_h1b = CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1);
     num_blks_h2b = CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2);
     num_blks_h3b = CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3);
-    num_blks_p4b = CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4);
+    // num_blks_p4b = CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4);
     num_blks_p5b = CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5);
     num_blks_p6b = CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6);
 
@@ -1504,7 +1496,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
     num_blks_h1b = CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1);
     num_blks_h2b = CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2);
     num_blks_h3b = CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3);
-    num_blks_p4b = CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4);
+    // num_blks_p4b = CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4);
     num_blks_p5b = CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5);
     num_blks_p6b = CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6);
 
@@ -1989,7 +1981,7 @@ __global__ void revised_jk_ccsd_t_fully_fused_kernel(
     num_blks_h1b = CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1);
     num_blks_h2b = CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2);
     num_blks_h3b = CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3);
-    num_blks_p4b = CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4);
+    // num_blks_p4b = CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4);
     num_blks_p5b = CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5);
     num_blks_p6b = CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6);
 
@@ -2847,7 +2839,7 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
     partial_energies, CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3),
     CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2), CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1),
     CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6), CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5),
-    CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4), (int) base_size_h1b, (int) base_size_h2b,
+    /* CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4), */ (int) base_size_h1b, (int) base_size_h2b,
     (int) base_size_h3b, (int) base_size_p4b, (int) base_size_p5b, (int) base_size_p6b);
 
 #elif defined(USE_HIP)
@@ -2885,7 +2877,7 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
     dev_evl_sorted_p6b, partial_energies, CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3),
     CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2), CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1),
     CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6), CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5),
-    CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4), (int) base_size_h1b, (int) base_size_h2b,
+    /* CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4), */ (int) base_size_h1b, (int) base_size_h2b,
     (int) base_size_h3b, (int) base_size_p4b, (int) base_size_p5b, (int) base_size_p6b);
 
 #elif defined(USE_DPCPP)
@@ -2911,7 +2903,8 @@ void fully_fused_ccsd_t_gpu(gpuStream_t& stream, size_t num_blocks, size_t base_
         dev_evl_sorted_p5b, dev_evl_sorted_p6b, partial_energies,
         CEIL(base_size_h3b, FUSION_SIZE_SLICE_1_H3), CEIL(base_size_h2b, FUSION_SIZE_SLICE_1_H2),
         CEIL(base_size_h1b, FUSION_SIZE_SLICE_1_H1), CEIL(base_size_p6b, FUSION_SIZE_SLICE_1_P6),
-        CEIL(base_size_p5b, FUSION_SIZE_SLICE_1_P5), CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4),
+        CEIL(base_size_p5b,
+             FUSION_SIZE_SLICE_1_P5), /* CEIL(base_size_p4b, FUSION_SIZE_SLICE_1_P4), */
         base_size_h1b, base_size_h2b, base_size_h3b, base_size_p4b, base_size_p5b, base_size_p6b,
         item);
     });

@@ -20,24 +20,23 @@ else()
 endif()
 
 set(CCSD_T_COMMON_SRCS
-    ${CCSD_T_SRCDIR}/ccsd_t.cpp    
-    ${CCSD_T_SRCDIR}/hybrid.cpp
+    ${CCSD_T_SRCDIR}/ccsd_t.cpp
     )
 
 if(EXACHEM_HAS_CUDA)
     set(CCSD_T_SRCS ${CCSD_T_COMMON_SRCS}
-            ${CCSD_T_SRCDIR}/ccsd_t_all_fused_gpu.cu
-            ${CCSD_T_SRCDIR}/ccsd_t_all_fused_nontcCuda_Hip_Sycl.cpp)
+            ${CCSD_T_SRCDIR}/ccsd_t_all_fused_cuda_tc.cu
+            ${CCSD_T_SRCDIR}/ccsd_t_all_fused_gpu.cpp)
 
-    set_source_files_properties(${CCSD_T_SRCDIR}/ccsd_t_all_fused_nontcCuda_Hip_Sycl.cpp PROPERTIES LANGUAGE CUDA)
+    set_source_files_properties(${CCSD_T_SRCDIR}/ccsd_t_all_fused_gpu.cpp PROPERTIES LANGUAGE CUDA)
 elseif(EXACHEM_HAS_HIP)
     set(CCSD_T_SRCS ${CCSD_T_COMMON_SRCS}
-            ${CCSD_T_SRCDIR}/ccsd_t_all_fused_nontcCuda_Hip_Sycl.cpp)
+            ${CCSD_T_SRCDIR}/ccsd_t_all_fused_gpu.cpp)
 
-    set_source_files_properties(${CCSD_T_SRCDIR}/ccsd_t_all_fused_nontcCuda_Hip_Sycl.cpp PROPERTIES LANGUAGE HIP)
+    set_source_files_properties(${CCSD_T_SRCDIR}/ccsd_t_all_fused_gpu.cpp PROPERTIES LANGUAGE HIP)
 elseif(EXACHEM_HAS_DPCPP)
     set(CCSD_T_SRCS ${CCSD_T_COMMON_SRCS}
-            ${CCSD_T_SRCDIR}/ccsd_t_all_fused_nontcCuda_Hip_Sycl.cpp)
+            ${CCSD_T_SRCDIR}/ccsd_t_all_fused_gpu.cpp)
 else()
     set(CCSD_T_SRCS ${CCSD_T_COMMON_SRCS})
 endif()

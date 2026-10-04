@@ -2,7 +2,7 @@
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
  * Copyright 2023 NWChemEx-Project.
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -12,11 +12,6 @@
 #include "exachem/cc/ccsd_t/fused_common.hpp"
 
 #include <span>
-
-void dev_mem_s(size_t, size_t, size_t, size_t, size_t, size_t);
-void dev_mem_d(size_t, size_t, size_t, size_t, size_t, size_t);
-
-#define CEIL(a, b) (((a) + (b) - 1) / (b))
 
 inline void hostEnergyReduce(void* data) {
   hostEnergyReduceData_t* data_t        = (hostEnergyReduceData_t*) data;

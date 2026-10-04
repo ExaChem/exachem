@@ -2,7 +2,7 @@
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
  * Copyright 2023 NWChemEx-Project.
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -16,8 +16,6 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
-
-#define CEIL(a, b) (((a) + (b) - 1) / (b))
 
 // t3 index slots, in t3[h3,h2,h1,p6,p5,p4] order
 enum { S_H3 = 0, S_H2, S_H1, S_P6, S_P5, S_P4 };

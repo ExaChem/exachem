@@ -2,7 +2,7 @@
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
  * Copyright 2023 NWChemEx-Project.
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -28,7 +28,7 @@ void ccsd_t_driver(ExecutionContext& ec, ChemEnv& chem_env);
 /**
  *  to check if target NVIDIA GPUs can support the fully-fused kernel
  *  based on 3rd gen. tensor cores or not.
- *  - requirements: (1) arch >= 80 and (2) driver >= 11.2?
+ *  - requirements: (1) arch >= 80 and (2) CUDA >= 12.0
  **/
 #if defined(USE_CUDA)
 inline int checkCudaKernelCompatible(bool r0) {
@@ -57,7 +57,7 @@ inline int checkCudaKernelCompatible(bool r0) {
     printf("Given info.: Compatibility = %d.%d, CUDA Version = %d.%d\n", dP.major, dP.minor,
            driver_major, driver_minor);
 
-  if(dP.major >= 8 && driver_major >= 11 && driver_minor >= 1) { return 1; }
+  if(dP.major >= 8 && driver_major >= 12) { return 1; }
   else { return -1; }
 }
 #endif
@@ -106,10 +106,7 @@ std::tuple<T, T, double, double> CCSD_T_Fused_Driver<T>::execute(
 #if defined(USE_CUDA)
 // int opt_CUDA_TC = checkCudaKernelCompatible(nodezero);
 #if defined(USE_NV_TC)
-  if(nodezero)
-    cout << "Enabled the fully-fused kernel based on FP64 TC (Third Gen. Tensor Cores)" << endl;
-#else
-  if(nodezero) cout << "Enabled the fully-fused kernel based on FP64" << endl;
+  if(nodezero) cout << "Using FP64 Tensor Cores" << endl;
 #endif
 #endif
 
@@ -245,6 +242,13 @@ std::tuple<T, T, double, double> CCSD_T_Fused_Driver<T>::execute(
   };
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
+  // the fused GPU kernels keep per-task tables for at most MAX_NOAB / MAX_NVAB tiles
+  if(noab > MAX_NOAB || nvab > MAX_NVAB)
+    tamm::tamm_terminate("[CCSD(T)] noab = " + std::to_string(noab) +
+                         ", nvab = " + std::to_string(nvab) +
+                         " exceed the GPU kernel limits (MAX_NOAB = " + std::to_string(MAX_NOAB) +
+                         ", MAX_NVAB = " + std::to_string(MAX_NVAB) + ");");
+
   // Spans own these pool blocks; .data() feeds the kernel APIs below. The span carries its
   // length, so each deallocate matches its allocation by construction.
   auto&        memDevPool        = RMMMemoryManager::getInstance().getDeviceMemoryPool();

@@ -2,7 +2,7 @@
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
  * Copyright 2023 NWChemEx-Project.
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -10,10 +10,19 @@
 #pragma once
 
 #include <cassert>
+#include <cstddef>
 #include <cstdio>
 #include <memory>
 #include <new>
 #include <string>
+
+// Max number of occupied (noab) / virtual (nvab) tiles supported by the fused GPU kernels;
+// sizes their per-task constant-memory tables.
+inline constexpr std::size_t MAX_NOAB{50};
+inline constexpr std::size_t MAX_NVAB{140};
+
+// integer ceiling division; a macro so it works in host and CUDA/HIP/SYCL device code
+#define CEIL(a, b) (((a) + (b) - 1) / (b))
 
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
 #include "tamm/gpu_streams.hpp"
@@ -39,14 +48,6 @@ using event_ptr_t = std::shared_ptr<tamm::gpuEvent_t>;
     exit(100);                                                                             \
   }
 #endif // USE_HIP
-
-using Integer = long;
-// static int notset;
-
-#define DIV_UB(x, y) ((x) / (y) + ((x) % (y) ? 1 : 0))
-#define TG_MIN(x, y) ((x) < (y) ? (x) : (y))
-
-std::string check_memory_req(const int cc_t_ts, const int nbf);
 
 struct hostEnergyReduceData_t {
   double* result_energy;

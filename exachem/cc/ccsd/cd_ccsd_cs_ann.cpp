@@ -8,15 +8,10 @@
  */
 
 #include "exachem/cc/ccsd/cd_ccsd_cs_ann.hpp"
+#include "exachem/cc/ccsd/canonical/canonical_ccsd_preconditioner.hpp"
+#include "exachem/cc/ccsd/cd_ccsd_preconditioner.hpp"
+#include "exachem/cc/krylov_solvers.hpp"
 #include <span>
-
-#include "exachem/cc/ccsd/cd_ccsd_preconditioner.hpp"
-#include "exachem/cc/krylov_solvers.hpp"
-
-using namespace exachem::cc::solvers;
-
-#include "exachem/cc/ccsd/cd_ccsd_preconditioner.hpp"
-#include "exachem/cc/krylov_solvers.hpp"
 
 using namespace exachem::cc::solvers;
 
@@ -797,8 +792,23 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
     auto precond_action = [&](const std::vector<Tensor<T>>& pv) -> std::vector<Tensor<T>> {
       return preconditioner_action_cs(sch, MO, f1_oo, f1_vv, pv, exhw);
     };
-    auto preconditioner_inverse_application =
+    const size_t           n_occ_total = static_cast<size_t>(2 * n_occ_alpha);
+    std::vector<T>         eps_occ(p_evl_sorted.begin(), p_evl_sorted.begin() + n_occ_total);
+    std::vector<T>         eps_virt(p_evl_sorted.begin() + n_occ_total, p_evl_sorted.end());
+    std::vector<Tensor<T>> inverse_denominators;
+    if(nk.preconditioner == "diagonal") {
+      inverse_denominators = exachem::cc::ccsd_os::initialize_diagonal_preconditioner<T>(
+        ec, d_t, eps_occ, eps_virt, T(0));
+    }
+    const auto preconditioner_type = nk.preconditioner == "gmres"
+                                       ? exachem::cc::ccsd_os::PreconditionerType::GMRES
+                                       : exachem::cc::ccsd_os::PreconditionerType::Diagonal;
+    auto       preconditioner_inverse_application =
       [&](const std::vector<Tensor<T>>& v) -> std::vector<Tensor<T>> {
+      if(preconditioner_type == exachem::cc::ccsd_os::PreconditionerType::Diagonal) {
+        return exachem::cc::ccsd_os::diagonal_preconditioner_inverse_application<T>(
+          ec, v, inverse_denominators);
+      }
       return gmres_solver(ec, chem_env, d_e, precond_action, v, nk.krylov_dims_precond,
                           nk.gmres_tol);
     };

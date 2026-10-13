@@ -704,9 +704,8 @@ std::pair<double, double> newton_krylov_solver(ExecutionContext& ec, ChemEnv& ch
     if(iter == 0) { current_eta = eta; }
     else {
       double ratio = res_fun_norm / (previous_residual_function_norm);
-      current_eta  = std::min(0.8, gamma * std::pow(ratio, alpha));
-      // if(current_eta < 1e-3) current_eta = 1e-3;
-      current_eta = std::max(current_eta, 1e-8);
+      current_eta  = std::min(0.9, gamma * std::pow(ratio, alpha));
+      current_eta  = std::max(current_eta, 1e-8);
     }
 
     previous_residual_function_norm = res_fun_norm;
@@ -839,15 +838,15 @@ std::pair<double, double> preconditioned_newton_krylov_solver(
   ExecutionContext& ec, ChemEnv& chem_env, ResidualFun&& residual_fun,
   PreconditionedInverseApplication&& preconditioner_inverse_application, Tensor<T>& d_e,
   std::vector<Tensor<T>>& initial_guess) {
-  const auto&  nk               = chem_env.ioptions.ccsd_options.solvers.newton_krylov;
-  const int    maxiter          = chem_env.ioptions.ccsd_options.ccsd_maxiter;
-  const int    krylov_dims      = nk.krylov_dims;
-  const double newton_tol       = nk.newton_tol;
-  const double gmres_tol        = nk.gmres_tol;
-  const double eta              = nk.eta;
-  const double gamma            = nk.gamma;
-  const double alpha            = nk.alpha;
-  const bool   adaptive_forcing = nk.adaptive_forcing;
+  const auto&                   nk          = chem_env.ioptions.ccsd_options.solvers.newton_krylov;
+  const int                     maxiter     = chem_env.ioptions.ccsd_options.ccsd_maxiter;
+  const int                     krylov_dims = nk.krylov_dims;
+  const double                  newton_tol  = nk.newton_tol;
+  const double                  gmres_tol   = nk.gmres_tol;
+  [[maybe_unused]] const double eta         = nk.eta;
+  const double                  gamma       = nk.gamma;
+  const double                  alpha       = nk.alpha;
+  const bool                    adaptive_forcing = nk.adaptive_forcing;
 
   auto  sch                = Scheduler{ec};
   auto& iterative_solution = initial_guess;
@@ -856,15 +855,23 @@ std::pair<double, double> preconditioned_newton_krylov_solver(
   double residual               = 0.0;
   double energy                 = 0.0;
 
+  double precond_time  = 0.0;
+  long   precond_calls = 0;
+  auto   timed_precond = [&](const std::vector<Tensor<T>>& v) {
+    const auto t0     = std::chrono::high_resolution_clock::now();
+    auto       result = preconditioner_inverse_application(v);
+    const auto t1     = std::chrono::high_resolution_clock::now();
+    precond_time += std::chrono::duration_cast<std::chrono::duration<double>>(t1 - t0).count();
+    ++precond_calls;
+    return result;
+  };
+
   for(int iter = 0; iter < maxiter; ++iter) {
     const auto step_start   = std::chrono::high_resolution_clock::now();
     auto       res_fun      = tensor_copy(ec, residual_fun(iterative_solution));
     double     res_fun_norm = compute_norm(res_fun);
 
-    auto M_inv_res_fun_temp = preconditioner_inverse_application(res_fun);
-    auto M_inv_res_fun      = tensor_copy(ec, M_inv_res_fun_temp);
-
-    for(auto& t: M_inv_res_fun_temp) { sch.deallocate(t).execute(); }
+    auto M_inv_res_fun = timed_precond(res_fun);
 
     const auto   step_end = std::chrono::high_resolution_clock::now();
     const double step_time =
@@ -894,8 +901,8 @@ std::pair<double, double> preconditioned_newton_krylov_solver(
       break;
     }
 
-    // Eisenstat-Walker forcing term evalutation.
-    double current_eta;
+    // Eisenstat-Walker forcing term evaluation.
+    double current_eta = eta;
     if(iter == 0) { current_eta = eta; }
     else {
       double ratio = res_fun_norm / previous_residual_norm;
@@ -923,15 +930,12 @@ std::pair<double, double> preconditioned_newton_krylov_solver(
     };
 
     auto M_inv_jvp = [&](const std::vector<Tensor<T>>& vector) {
-      auto jv = jvp(vector);
-
-      auto result      = preconditioner_inverse_application(jv);
-      auto result_copy = tensor_copy(ec, result);
+      auto jv     = jvp(vector);
+      auto result = timed_precond(jv); // owned by us, returned directly (no copy)
 
       for(auto& t: jv) sch.deallocate(t);
-      for(auto& t: result) sch.deallocate(t);
       sch.execute();
-      return result_copy;
+      return result;
     };
 
     auto neg_M_inv_res_fun = tensor_copy(ec, M_inv_res_fun);
@@ -947,6 +951,11 @@ std::pair<double, double> preconditioned_newton_krylov_solver(
     for(auto& t: M_inv_res_fun) sch.deallocate(t);
     for(auto& t: delta_x) sch.deallocate(t);
     sch.execute();
+  }
+
+  if(ec.pg().rank() == 0) {
+    std::cout << "Preconditioner applications: " << precond_calls
+              << ", total preconditioner time (s): " << precond_time << std::endl;
   }
 
   return {residual, energy};

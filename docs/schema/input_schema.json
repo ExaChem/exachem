@@ -59,6 +59,13 @@
         "comments": {
           "type": "object",
           "properties": {
+            "preconditioner": {
+              "type": "string",
+              "enum": [
+                "diagonal",
+                "gmres"
+              ]
+            },
             "comment1": {
               "type": "string"
             }

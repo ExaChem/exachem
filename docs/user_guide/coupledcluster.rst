@@ -48,9 +48,10 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
       "solver_type": "diis",
       "newton_krylov": {
          "variant": "preconditioned",
+         "preconditioner": "diagonal",
          "krylov_dims": 5,
          "krylov_dims_precond": 10,
-         "eta": 0.5,
+         "eta": 0.1,
          "gamma": 0.9,
          "alpha": 1.5,
          "adaptive_forcing": true,
@@ -112,9 +113,14 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
      * :strong:`preconditioned`: Newton-Krylov with the diagonal (Fock) preconditioner applied to the inner GMRES solve.
      * :strong:`inexact`: Inexact Newton-Krylov, which solves :math:`M\,\delta x = -F(x)` directly with the preconditioner action as the linear operator (the GMRES analog of fixed-point/energy-denominator updates).
 
+   * :strong:`preconditioner`: ``[default=diagonal]`` Selects the preconditioner used by the ``preconditioned`` and ``inexact`` variants. One of:
+
+     * :strong:`diagonal`: Applies the inverse orbital-energy denominators directly (the diagonal Fock preconditioner).
+     * :strong:`gmres`: Uses an inner GMRES solve with the Fock preconditioner action.
+
    * :strong:`krylov_dims`: ``[default=5]`` The Krylov subspace dimension (maximum number of Arnoldi steps) for the inner GMRES solve of the linearized system :math:`J\,\delta x = -F(x)` at each Newton iteration.
-   * :strong:`krylov_dims_precond`: ``[default=10]`` The Krylov subspace dimension for the preconditioner's GMRES solve (applying :math:`M^{-1}`). Generally set larger than ``krylov_dims``.
-   * :strong:`eta`: ``[default=0.5]`` The initial Eisenstat-Walker forcing term, which controls how tightly the inner GMRES solve is converged in the early Newton iterations to avoid over-solving.
+   * :strong:`krylov_dims_precond`: ``[default=10]`` The Krylov subspace dimension for the ``gmres`` preconditioner's inner solve (applying :math:`M^{-1}`). This option is not used with the ``diagonal`` preconditioner and is generally set larger than ``krylov_dims`` when ``gmres`` is selected.
+   * :strong:`eta`: ``[default=0.1]`` The initial Eisenstat-Walker forcing term, which controls how tightly the inner GMRES solve is converged in the early Newton iterations to avoid over-solving.
    * :strong:`gamma`: ``[default=0.9]`` Coefficient of the Eisenstat-Walker forcing term update :math:`\eta = \gamma\,(\lVert F_k\rVert / \lVert F_{k-1}\rVert)^{\alpha}`.
    * :strong:`alpha`: ``[default=1.5]`` Exponent of the Eisenstat-Walker forcing term update (see ``gamma``).
    * :strong:`adaptive_forcing`: ``[default=true]`` When enabled, uses the Eisenstat-Walker adaptive forcing term to stop the inner GMRES solve early (when the residual falls below ``eta`` times the right-hand-side norm), avoiding over-solving the linearized system in the early Newton iterations.
@@ -277,4 +283,3 @@ The input file for an *RT-EOMCCSD* calculation describes the closed-shell **refe
 .. note::
 
    The same options described here can be used to run an RT-EOM-CC2 calculation using task ``rteom_cc2`` in the input file.
-

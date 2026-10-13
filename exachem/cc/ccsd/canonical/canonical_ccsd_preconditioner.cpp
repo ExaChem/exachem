@@ -17,10 +17,11 @@ using namespace exachem::cc::solvers;
 /**
  * @brief Preconditioning a linear system. (Note: This is system dependent)
  *
- * This involves 2 steps:
- *  1. Function to compute the preconditioner action on a vector.
- *  2. Use the preconditioner action function in GMRES to solve the linear system and return
- * precondtioned solution.
+ * Two implementations of M^{-1} are provided so they can be compared:
+ *
+ * (1) GMRES: general. Solve M*y = v iteratively with preconditioner_action.
+ * (2) Diagonal: for canonical MOs M is diagonal, so M^{-1} is an element-wise division by the
+ *     orbital energy denominators. No GMRES, no contractions.
  *
  * Note: When we solve A*x = b via GMRES, the convergence rate of depends on the condition number of
  * A.
@@ -49,7 +50,16 @@ using namespace exachem::cc::solvers;
  *    b) M*y_2 = residual function (GMRES: MVPFun = M*y_2, rhs = residual function)
  *
  * Note: The idea of using GMRES is to avoid explicit inversion of the preconditioner.
+ *
+ * Diagonal case (canonical orbitals: f_oo = diag(e_i), f_vv = diag(e_a), f_ov = 0):
+ *    a) M_1*y(a,i)     = (e_a - e_i) * y(a,i)
+ *    b) M_2*y(a,b,i,j) = (e_a + e_b - e_i - e_j) * y(a,b,i,j)
+ *  so M^{-1} is a pointwise division by the same denominators.
  */
+
+// ---------------------------------------------------------------------------------------------
+// (1) GMRES-based preconditioner
+// ---------------------------------------------------------------------------------------------
 
 template<typename T>
 std::vector<Tensor<T>> preconditioner_action(Scheduler& sch, const TiledIndexSpace& MO,
@@ -126,9 +136,7 @@ std::vector<Tensor<T>> preconditioner_action(Scheduler& sch, const TiledIndexSpa
   // (M_2_y_2(aa, ba, ia, ja) += 0.5 * eri.at("aaaa_oooo")(la, ka, ia, ja) * y_2(aa, ba, la, ka))
   // (M_2_y_2(ab, bb, ib, jb) += 0.5 * eri.at("bbbb_oooo")(lb, kb, ib, jb) * y_2(ab, bb, lb, kb))
   // (M_2_y_2(aa, bb, ia, jb) += 0.5 * eri.at("abab_oooo")(la, kb, ia, jb) * y_2(aa, bb, la, kb))
-  
-  
-  
+
   .deallocate(f_full)
   .execute(sch.ec().exhw());
   // clang-format on
@@ -156,6 +164,125 @@ preconditioner_inverse_application(ExecutionContext& ec, ChemEnv& chem_env, Tens
                       krylov_dims_precond, gmres_tol);
 }
 
+// ---------------------------------------------------------------------------------------------
+// (2) Diagonal (orbital energy denominator) preconditioner
+// ---------------------------------------------------------------------------------------------
+
+namespace {
+
+template<typename T>
+std::vector<Tensor<T>> allocate_like(ExecutionContext&             ec,
+                                     const std::vector<Tensor<T>>& reference) {
+  std::vector<Tensor<T>> result;
+  result.reserve(reference.size());
+  for(const auto& tensor: reference) {
+    Tensor<T> allocated{tensor.tiled_index_spaces()};
+    Tensor<T>::allocate(&ec, allocated);
+    result.push_back(allocated);
+  }
+  return result;
+}
+
+// Builds the inverse orbital-energy denominator for each tensor block.
+//  rank 2: (V,O)     -> e_a - e_i
+//  rank 4: (V,V,O,O) -> e_a + e_b - e_i - e_j
+template<typename T>
+void fill_inverse_denominator(ExecutionContext& ec, Tensor<T>& result,
+                              const std::vector<T>& eps_occ, const std::vector<T>& eps_virt,
+                              T shift) {
+  constexpr T tiny = static_cast<T>(1e-10);
+  auto        safe = [&](T d) {
+    d += shift;
+    return (std::abs(d) < tiny) ? (d < 0 ? -tiny : tiny) : d;
+  };
+
+  block_for(ec, result(), [&](IndexVector blockid) {
+    const auto     size = result.block_size(blockid);
+    std::vector<T> buf(size);
+
+    const auto dims = result.block_dims(blockid);
+    const auto off  = result.block_offsets(blockid);
+
+    size_t c = 0;
+    if(dims.size() == 2) {
+      for(size_t a = 0; a < dims[0]; ++a)
+        for(size_t i = 0; i < dims[1]; ++i, ++c)
+          buf[c] = T(1) / safe(eps_virt[off[0] + a] - eps_occ[off[1] + i]);
+    }
+    else if(dims.size() == 4) {
+      for(size_t a = 0; a < dims[0]; ++a)
+        for(size_t b = 0; b < dims[1]; ++b)
+          for(size_t i = 0; i < dims[2]; ++i)
+            for(size_t j = 0; j < dims[3]; ++j, ++c)
+              buf[c] = T(1) / safe(eps_virt[off[0] + a] + eps_virt[off[1] + b] -
+                                   eps_occ[off[2] + i] - eps_occ[off[3] + j]);
+    }
+    result.put(blockid, buf);
+  });
+}
+
+} // namespace
+
+template<typename T>
+std::vector<Tensor<T>> initialize_diagonal_preconditioner(
+  ExecutionContext& ec, const std::vector<Tensor<T>>& vector_template,
+  const std::vector<T>& eps_occ, const std::vector<T>& eps_virt, T shift) {
+  auto inverse_denominators = allocate_like(ec, vector_template);
+  for(auto& denominator: inverse_denominators)
+    fill_inverse_denominator(ec, denominator, eps_occ, eps_virt, shift);
+  return inverse_denominators;
+}
+
+template<typename T>
+std::vector<Tensor<T>> diagonal_preconditioner_inverse_application(
+  ExecutionContext& ec, const std::vector<Tensor<T>>& vector_to_be_preconditioned,
+  const std::vector<Tensor<T>>& inverse_denominators) {
+  auto result = allocate_like(ec, vector_to_be_preconditioned);
+  auto sch    = Scheduler{ec};
+  for(size_t i = 0; i < result.size(); ++i) {
+    const auto tis = result[i].tiled_index_spaces();
+    if(result[i].num_modes() == 2) {
+      auto [a]    = tis[0].template labels<1>("all");
+      auto [iocc] = tis[1].template labels<1>("all");
+      sch(result[i](a, iocc) =
+            vector_to_be_preconditioned[i](a, iocc) * inverse_denominators[i](a, iocc));
+    }
+    else {
+      auto [a]    = tis[0].template labels<1>("all");
+      auto [b]    = tis[1].template labels<1>("all");
+      auto [iocc] = tis[2].template labels<1>("all");
+      auto [jocc] = tis[3].template labels<1>("all");
+      sch(result[i](a, b, iocc, jocc) = vector_to_be_preconditioned[i](a, b, iocc, jocc) *
+                                        inverse_denominators[i](a, b, iocc, jocc));
+    }
+  }
+  sch.execute();
+  return result;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Dispatcher
+// ---------------------------------------------------------------------------------------------
+
+template<typename T>
+std::vector<Tensor<T>> apply_preconditioner_inverse(
+  PreconditionerType type, ExecutionContext& ec, ChemEnv& chem_env, Tensor<T>& d_e, Scheduler& sch,
+  const TiledIndexSpace& MO, const TensorMap<T>& f, const TensorMap<T>& eri,
+  const std::vector<Tensor<T>>& vector_to_be_preconditioned, int krylov_dims_precond,
+  double gmres_tol, const std::vector<Tensor<T>>& inverse_denominators) {
+  if(type == PreconditionerType::Diagonal) {
+    return diagonal_preconditioner_inverse_application<T>(ec, vector_to_be_preconditioned,
+                                                          inverse_denominators);
+  }
+  return preconditioner_inverse_application<T>(ec, chem_env, d_e, sch, MO, f, eri,
+                                               vector_to_be_preconditioned, krylov_dims_precond,
+                                               gmres_tol);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Explicit instantiations
+// ---------------------------------------------------------------------------------------------
+
 template std::vector<Tensor<double>>
 preconditioner_action<double>(Scheduler&, const TiledIndexSpace&, const TensorMap<double>&,
                               const TensorMap<double>&, const std::vector<Tensor<double>>&);
@@ -165,5 +292,18 @@ preconditioner_inverse_application<double>(ExecutionContext&, ChemEnv&, Tensor<d
                                            const TiledIndexSpace&, const TensorMap<double>&,
                                            const TensorMap<double>&,
                                            const std::vector<Tensor<double>>&, int, double);
+
+template std::vector<Tensor<double>>
+initialize_diagonal_preconditioner<double>(ExecutionContext&, const std::vector<Tensor<double>>&,
+                                           const std::vector<double>&, const std::vector<double>&,
+                                           double);
+
+template std::vector<Tensor<double>> diagonal_preconditioner_inverse_application<double>(
+  ExecutionContext&, const std::vector<Tensor<double>>&, const std::vector<Tensor<double>>&);
+
+template std::vector<Tensor<double>> apply_preconditioner_inverse<double>(
+  PreconditionerType, ExecutionContext&, ChemEnv&, Tensor<double>&, Scheduler&,
+  const TiledIndexSpace&, const TensorMap<double>&, const TensorMap<double>&,
+  const std::vector<Tensor<double>>&, int, double, const std::vector<Tensor<double>>&);
 
 } // namespace exachem::cc::ccsd_os

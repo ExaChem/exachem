@@ -10,7 +10,6 @@
 
 #include "exachem/common/constants.hpp"
 #include "exachem/common/ecatom.hpp"
-// #include "exachem/common/txt_utils.hpp"
 #include <iostream>
 #include <limits>
 #include <map>
@@ -192,7 +191,8 @@ public:
 
 // Options for the Jacobian-free Newton-Krylov CC solver (CC.solvers.newton_krylov).
 struct NewtonKrylovOptions {
-  std::string variant{"preconditioned"}; // one of: general, preconditioned, inexact
+  std::string variant{"preconditioned"};  // one of: general, preconditioned, inexact
+  std::string preconditioner{"diagonal"}; // one of: diagonal, gmres
   int         krylov_dims{5};
   int         krylov_dims_precond{10};
   double      eta{0.5};

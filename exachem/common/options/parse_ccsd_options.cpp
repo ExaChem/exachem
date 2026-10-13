@@ -87,6 +87,7 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
   json                 jnk = jsolvers["newton_krylov"];
   NewtonKrylovOptions& nk  = sv.newton_krylov;
   parse_option<string>(nk.variant, jnk, "variant");
+  parse_option<string>(nk.preconditioner, jnk, "preconditioner");
   parse_option<int>(nk.krylov_dims, jnk, "krylov_dims");
   parse_option<int>(nk.krylov_dims_precond, jnk, "krylov_dims_precond");
   parse_option<double>(nk.eta, jnk, "eta");
@@ -95,12 +96,19 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(nk.adaptive_forcing, jnk, "adaptive_forcing");
   parse_option<double>(nk.newton_tol, jnk, "newton_tol");
   parse_option<double>(nk.gmres_tol, jnk, "gmres_tol");
+  std::transform(
+    nk.preconditioner.begin(), nk.preconditioner.end(), nk.preconditioner.begin(),
+    [](unsigned char character) { return static_cast<char>(std::tolower(character)); });
   // Resolve the tolerance options: an unspecified tol follows the CC threshold.
   if(nk.newton_tol < 0) nk.newton_tol = cc_options.threshold;
   if(nk.gmres_tol < 0) nk.gmres_tol = cc_options.threshold;
   if(nk.variant != "general" && nk.variant != "preconditioned" && nk.variant != "inexact") {
     tamm_terminate("[INPUT FILE ERROR]: CC.solvers.newton_krylov.variant must be one of: "
                    "general, preconditioned, inexact");
+  }
+  if(nk.preconditioner != "diagonal" && nk.preconditioner != "gmres") {
+    tamm_terminate("[INPUT FILE ERROR]: CC.solvers.newton_krylov.preconditioner must be one of: "
+                   "diagonal, gmres");
   }
 
   // The Newton-Krylov solver writes restart amplitudes every writet_iter Newton steps; default
@@ -156,7 +164,6 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(cc_options.gf_cs      , jgfcc, "gf_cs");
   parse_option<bool>(cc_options.gf_restart , jgfcc, "gf_restart");
   parse_option<bool>(cc_options.gf_itriples, jgfcc, "gf_itriples");
-
   parse_option<int>   (cc_options.gf_ndiis            , jgfcc, "gf_ndiis");
   parse_option<int>   (cc_options.gf_ngmres           , jgfcc, "gf_ngmres");
   parse_option<int>   (cc_options.gf_maxiter          , jgfcc, "gf_maxiter");

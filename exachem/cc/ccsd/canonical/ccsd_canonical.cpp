@@ -449,11 +449,25 @@ ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& M
     // Newton-Krylov solver. Thin binding lambdas forwarding to the CCSD preconditioner routines
     // defined in ccsd_preconditioner.hpp. Kept as lambdas so the solver callable interface is
     // unchanged.
+
+    const size_t           n_occ_total = static_cast<size_t>(n_occ_alpha + n_occ_beta);
+    std::vector<T>         eps_occ(p_evl_sorted.begin(), p_evl_sorted.begin() + n_occ_total);
+    std::vector<T>         eps_virt(p_evl_sorted.begin() + n_occ_total, p_evl_sorted.end());
+    std::vector<Tensor<T>> inverse_denominators;
+    if(nk.preconditioner == "diagonal") {
+      inverse_denominators = exachem::cc::ccsd_os::initialize_diagonal_preconditioner<T>(
+        ec, d_t, eps_occ, eps_virt, T(0));
+    }
+
+    const auto preconditioner_type = nk.preconditioner == "gmres"
+                                       ? exachem::cc::ccsd_os::PreconditionerType::GMRES
+                                       : exachem::cc::ccsd_os::PreconditionerType::Diagonal;
+
     auto preconditioner_inverse_application =
       [&](const std::vector<Tensor<T>>& vector_to_be_preconditioned) -> std::vector<Tensor<T>> {
-      return exachem::cc::ccsd_os::preconditioner_inverse_application<T>(
-        ec, chem_env, d_e, sch, MO, f, eri, vector_to_be_preconditioned, nk.krylov_dims_precond,
-        nk.gmres_tol);
+      return exachem::cc::ccsd_os::apply_preconditioner_inverse<T>(
+        preconditioner_type, ec, chem_env, d_e, sch, MO, f, eri, vector_to_be_preconditioned,
+        nk.krylov_dims_precond, nk.gmres_tol, inverse_denominators);
     };
 
     auto precond_action =

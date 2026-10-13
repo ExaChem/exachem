@@ -170,9 +170,10 @@
           "solver_type": "diis",
           "newton_krylov": {
             "variant": "preconditioned",
+            "preconditioner": "diagonal",
             "krylov_dims": 5,
             "krylov_dims_precond": 10,
-            "eta": 0.5,
+            "eta": 0.1,
             "gamma": 0.9,
             "alpha": 1.5,
             "adaptive_forcing": true,

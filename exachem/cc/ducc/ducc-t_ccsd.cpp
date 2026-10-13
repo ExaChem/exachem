@@ -153,12 +153,53 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
     // clang-format on
   }
 
+  // Print norms of original T1/T2 operators
+  const auto t1_full_norm = tamm::norm(t1);
+  const auto t2_full_norm = tamm::norm(t2);
+
   // Zero T_int components
   // This means that T1 and T2 are no longer the full T1 and T2.
   // clang-format off
   sch(t1(p1i, h1i) = 0)
      (t2(p1i, p2i, h1i, h2i) = 0).execute();
-  // clang-format off
+  // clang-format on
+
+  const auto t1_ext_norm = tamm::norm(t1);
+  const auto t2_ext_norm = tamm::norm(t2);
+
+  auto [maxt1ext, maxblockid1, maxcoord1] = tamm::max_element(t1);
+  auto [mint1ext, minblockid1, mincoord1] = tamm::min_element(t1);
+  const auto maxabst1ext                  = std::max(std::abs(maxt1ext), std::abs(mint1ext));
+  auto [maxt2ext, maxblockid2, maxcoord2] =
+    tamm::max_element(t2); // T2 is antisymmetric so max and min are the same.
+
+  const bool is_qflow = chem_env.ioptions.task_options.ducc.second == "qflow";
+
+  if(is_qflow && ducc_lvl == 0) {
+    qfstr << "Norm of T1 (Full): " << t1_full_norm << std::endl;
+    qfstr << "Norm of T2 (Full): " << t2_full_norm << std::endl;
+    qfstr << "Norm of T1 (Ext): " << t1_ext_norm << std::endl;
+    qfstr << "Norm of T2 (Ext): " << t2_ext_norm << std::endl;
+    qfstr << "Max abs of T1 (Ext): " << maxabst1ext << std::endl;
+    qfstr << "Max abs of T2 (Ext): " << maxt2ext << std::endl;
+    qfstr << "Norm of T1 (Int): " << sqrt(t1_full_norm * t1_full_norm - t1_ext_norm * t1_ext_norm)
+          << std::endl;
+    qfstr << "Norm of T2 (Int): " << sqrt(t2_full_norm * t2_full_norm - t2_ext_norm * t2_ext_norm)
+          << std::endl;
+  }
+
+  if(ducc_print) {
+    std::cout << "Norm of T1 (Full): " << t1_full_norm << std::endl;
+    std::cout << "Norm of T2 (Full): " << t2_full_norm << std::endl;
+    std::cout << "Norm of T1 (Ext): " << t1_ext_norm << std::endl;
+    std::cout << "Norm of T2 (Ext): " << t2_ext_norm << std::endl;
+    std::cout << "Max abs of T1 (Ext): " << maxabst1ext << std::endl;
+    std::cout << "Max abs of T2 (Ext): " << maxt2ext << std::endl;
+    std::cout << "Norm of T1 (Int): "
+              << sqrt(t1_full_norm * t1_full_norm - t1_ext_norm * t1_ext_norm) << std::endl;
+    std::cout << "Norm of T2 (Int): "
+              << sqrt(t2_full_norm * t2_full_norm - t2_ext_norm * t2_ext_norm) << std::endl;
+  }
 
   // Tensors to read/write from/to disk
   std::vector<Tensor<T>>   ducc_tensors = {ftij,   ftia,   ftab,   vtijkl, vtijka,
@@ -167,8 +208,8 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
                                            vtijkl_file, vtijka_file, vtaijb_file,
                                            vtijab_file, vtiabc_file, vtabcd_file};
 
-  bool      drestart       = chem_env.ioptions.ccsd_options.writet;
-  bool      dtensors_exist = ducc_tensors_exist(ducc_tensors, dt_files, drestart);
+  bool drestart       = chem_env.ioptions.ccsd_options.writet;
+  bool dtensors_exist = ducc_tensors_exist(ducc_tensors, dt_files, drestart);
 
   // TODO: Extend this logic to new active space variables
   if(drestart && dtensors_exist) {
@@ -195,7 +236,8 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
     }
   }
   else {
-    H_0(sch, chem_env, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd, f1, v2tensors, ex_hw);
+    H_0(sch, chem_env, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd, f1,
+        v2tensors, ex_hw);
     ducc_tensors_io(ec, chem_env, ducc_tensors, dt_files, 0, drestart);
     chem_env.run_context["ducc"]["level0"]      = true;
     chem_env.run_context["ducc"]["level1"]      = false;
@@ -400,175 +442,11 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
   }
 
   // PRINT STATEMENTS
-  // TODO: Everything is assuming closed shell. For open shell calculations,
-  //       formats starting from the tensor contractions to printing must be reconsidered.
   // X1-X9 below are only used for the default (non-QFlow) DUCC task
   if(chem_env.ioptions.task_options.ducc.second != "qflow") {
     cc_t1 = std::chrono::high_resolution_clock::now();
-    ExecutionContext ec_dense{ec.pg(), DistributionKind::dense,
-                              MemoryManagerKind::ga}; // create ec_dense once
-    // const auto       nelectrons       = sys_data.nelectrons;
-    auto print_blockstr = [](std::string filename, std::string val, bool append = false) {
-      if(!filename.empty()) {
-        std::ofstream tos;
-        if(append) tos.open(filename + ".txt", std::ios::app);
-        else tos.open(filename + ".txt", std::ios::out);
-        if(!tos) std::cerr << "Error opening file " << filename << std::endl;
-        tos << val << std::endl;
-        tos.close();
-      }
-    };
-    const std::string results_file = files_prefix + ".ducc.results";
-
-    if(ducc_print) {
-      print_blockstr(results_file, "Begin IJ Block");
-      // std::cout << "Begin IJ Block" << std::endl;
-    }
-
-    Tensor<T>                                X1       = to_dense_tensor(ec_dense, ftij);
-    std::function<bool(std::vector<size_t>)> dp_cond1 = [&](std::vector<size_t> cond) {
-      if(cond[0] < nactoa && cond[1] < nactoa && cond[0] <= cond[1]) return true;
-      // if(cond[0] < nelectrons_alpha && cond[1] < nelectrons_alpha && cond[0] <= cond[1]) return
-      // true;
-      return false;
-    };
-    print_dense_tensor(X1, dp_cond1, results_file, true);
-    if(ducc_print) {
-      print_blockstr(results_file, "End IJ Block", true);
-      T first_val                                         = tamm::get_tensor_element(X1, {0, 0});
-      sys_data.results["output"]["DUCC"]["results"]["X1"] = first_val;
-    }
-    Tensor<T>::deallocate(X1);
-
-    if(nactva > 0) {
-      if(ducc_print) print_blockstr(results_file, "Begin IA Block", true);
-      Tensor<T>                                X2       = to_dense_tensor(ec_dense, ftia);
-      std::function<bool(std::vector<size_t>)> dp_cond2 = [&](std::vector<size_t> cond) {
-        if(cond[0] < nactoa && cond[1] < nactva) return true;
-        return false;
-      };
-      print_dense_tensor(X2, dp_cond2, results_file, true);
-      if(ducc_print) {
-        print_blockstr(results_file, "End IA Block", true);
-        T first_val                                         = tamm::get_tensor_element(X2, {0, 0});
-        sys_data.results["output"]["DUCC"]["results"]["X2"] = first_val;
-      }
-      Tensor<T>::deallocate(X2);
-
-      if(ducc_print) print_blockstr(results_file, "Begin AB Block", true);
-      Tensor<T>                                X3       = to_dense_tensor(ec_dense, ftab);
-      std::function<bool(std::vector<size_t>)> dp_cond3 = [&](std::vector<size_t> cond) {
-        if(cond[0] < nactva && cond[1] < nactva && cond[0] <= cond[1]) return true;
-        return false;
-      };
-      print_dense_tensor(X3, dp_cond3, results_file, true);
-      if(ducc_print) {
-        print_blockstr(results_file, "End AB Block", true);
-        T first_val                                         = tamm::get_tensor_element(X3, {0, 0});
-        sys_data.results["output"]["DUCC"]["results"]["X3"] = first_val;
-      }
-      Tensor<T>::deallocate(X3);
-    }
-
-    if(ducc_print) print_blockstr(results_file, "Begin IJKL Block", true);
-    Tensor<T>                                X4       = to_dense_tensor(ec_dense, vtijkl);
-    std::function<bool(std::vector<size_t>)> dp_cond4 = [&](std::vector<size_t> cond) {
-      if(cond[0] < nactoa && cond[2] < nactoa && nactoa <= cond[1] && nactoa <= cond[3])
-        return true;
-      return false;
-    };
-    print_dense_tensor(X4, dp_cond4, results_file, true);
-    if(ducc_print) {
-      print_blockstr(results_file, "End IJKL Block", true);
-      T first_val = tamm::get_tensor_element(X4, {0, 0, 0, 0});
-      sys_data.results["output"]["DUCC"]["results"]["X4"] = first_val;
-    }
-    Tensor<T>::deallocate(X4);
-
-    if(nactva > 0) {
-      if(ducc_print) print_blockstr(results_file, "Begin IJAB Block", true);
-      Tensor<T>                                X5       = to_dense_tensor(ec_dense, vtijab);
-      std::function<bool(std::vector<size_t>)> dp_cond5 = [&](std::vector<size_t> cond) {
-        if(cond[0] < nactoa && nactoa <= cond[1] && cond[2] < nactva && nactva <= cond[3])
-          return true;
-        return false;
-      };
-      print_dense_tensor(X5, dp_cond5, results_file, true);
-      if(ducc_print) {
-        print_blockstr(results_file, "End IJAB Block", true);
-        T first_val = tamm::get_tensor_element(X5, {0, 0, 0, 0});
-        sys_data.results["output"]["DUCC"]["results"]["X5"] = first_val;
-      }
-      Tensor<T>::deallocate(X5);
-
-      if(ducc_print) print_blockstr(results_file, "Begin ABCD Block", true);
-      Tensor<T>                                X6       = to_dense_tensor(ec_dense, vtabcd);
-      std::function<bool(std::vector<size_t>)> dp_cond6 = [&](std::vector<size_t> cond) {
-        if(cond[0] < nactva && cond[2] < nactva && nactva <= cond[1] && nactva <= cond[3])
-          return true;
-        return false;
-      };
-      print_dense_tensor(X6, dp_cond6, results_file, true);
-      if(ducc_print) {
-        print_blockstr(results_file, "End ABCD Block", true);
-        T first_val = tamm::get_tensor_element(X6, {0, 0, 0, 0});
-        sys_data.results["output"]["DUCC"]["results"]["X6"] = first_val;
-      }
-      Tensor<T>::deallocate(X6);
-
-      if(ducc_print) print_blockstr(results_file, "Begin AIJB Block", true);
-      Tensor<T>                                X7         = to_dense_tensor(ec_dense, vtaijb);
-      std::function<bool(std::vector<size_t>)> dp_cond7_1 = [&](std::vector<size_t> cond) {
-        if(cond[0] < nactva && cond[2] < nactoa && nactoa <= cond[1] && nactva <= cond[3])
-          return true;
-        return false;
-      };
-      print_dense_tensor(X7, dp_cond7_1, results_file, true);
-
-      std::function<bool(std::vector<size_t>)> dp_cond7_2 = [&](std::vector<size_t> cond) {
-        if(cond[0] < nactva && nactoa <= cond[1] && nactoa <= cond[2] && cond[3] < nactva)
-          return true;
-        return false;
-      };
-      print_dense_tensor(X7, dp_cond7_2, results_file, true);
-      if(ducc_print) print_blockstr(results_file, "End AIJB Block", true);
-      if(ducc_print) {
-        T first_val = tamm::get_tensor_element(X7, {0, 0, 0, 0});
-        sys_data.results["output"]["DUCC"]["results"]["X7"] = first_val;
-      }
-      Tensor<T>::deallocate(X7);
-
-      if(ducc_print) print_blockstr(results_file, "Begin IJKA Block", true);
-      Tensor<T>                                X8       = to_dense_tensor(ec_dense, vtijka);
-      std::function<bool(std::vector<size_t>)> dp_cond8 = [&](std::vector<size_t> cond) {
-        if(cond[0] < nactoa && cond[2] < nactoa && nactoa <= cond[1] && nactva <= cond[3])
-          return true;
-        return false;
-      };
-      print_dense_tensor(X8, dp_cond8, results_file, true);
-      if(ducc_print) {
-        print_blockstr(results_file, "End IJKA Block", true);
-        T first_val = tamm::get_tensor_element(X8, {0, 0, 0, 0});
-        sys_data.results["output"]["DUCC"]["results"]["X8"] = first_val;
-      }
-      Tensor<T>::deallocate(X8);
-
-      if(ducc_print) print_blockstr(results_file, "Begin IABC Block", true);
-      Tensor<T>                                X9       = to_dense_tensor(ec_dense, vtiabc);
-      std::function<bool(std::vector<size_t>)> dp_cond9 = [&](std::vector<size_t> cond) {
-        if(cond[0] < nactoa && cond[2] < nactva && nactva <= cond[1] && nactva <= cond[3])
-          return true;
-        return false;
-      };
-      print_dense_tensor(X9, dp_cond9, results_file, true);
-      if(ducc_print) {
-        print_blockstr(results_file, "End IABC Block", true);
-        T first_val = tamm::get_tensor_element(X9, {0, 0, 0, 0});
-        sys_data.results["output"]["DUCC"]["results"]["X9"] = first_val;
-      }
-      Tensor<T>::deallocate(X9);
-    }
-
+    print_ducc_results(chem_env, ec, files_prefix, ducc_print, nactoa, nactva, ftij, ftia, ftab,
+                       vtijkl, vtijka, vtaijb, vtijab, vtiabc, vtabcd);
     cc_t2     = std::chrono::high_resolution_clock::now();
     ducc_time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
     if(ducc_print)
@@ -578,7 +456,7 @@ void DUCCInternal<T>::DUCC_T_CCSD_Driver(ChemEnv& chem_env, ExecutionContext& ec
 
 // qflow
 #if defined(USE_NWQSIM)
-  if(chem_env.ioptions.task_options.ducc.second == "qflow")
+  if(chem_env.ioptions.task_options.ducc.second == "qflow" && ducc_lvl != 0)
     DUCC_T_QFLOW_Driver(sch, chem_env, MO, ftij, ftia, ftab, vtijkl, vtijka, vtaijb, vtijab, vtiabc,
                         vtabcd, ex_hw, shift, occ_int_vec, virt_int_vec, pos, qfstr, qflow_timers);
 #endif

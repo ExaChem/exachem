@@ -11,4 +11,6 @@ if(USE_NWQSIM)
     list(APPEND DUCC_SRCS ${DUCC_SRCDIR}/qflow-t_ccsd.cpp)
 endif()
 
-set(DUCC_INCLUDES ${DUCC_SRCDIR}/ducc-t_ccsd.hpp)
+set(DUCC_INCLUDES
+    ${DUCC_SRCDIR}/ducc-t_ccsd.hpp
+    ${DUCC_SRCDIR}/ducc_print.hpp)

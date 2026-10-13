@@ -12,6 +12,8 @@
 #include "exachem/cholesky/v2tensors.hpp"
 #include <tamm/op_executor.hpp>
 
+#include "exachem/cc/ducc/ducc_print.hpp"
+
 using namespace tamm;
 using namespace tamm::new_ops;
 
@@ -159,8 +161,8 @@ op_exec.execute(ftij, true, ex_hw);
 //PP
 
 auto op2 = (
-          -1.0 * (LTOp)f1(m, b) * (LTOp)t1(a, m) +    // PT ORDER = 2, Zero because of T_int
-          -1.0 * (LTOp)t1(b, m) * (LTOp)f1(a, m)      // PT ORDER = 2, Zero because of T_int
+          -1.0 * (LTOp)f1(m, b) * (LTOp)t1(a, m) +    // PT ORDER = 2
+          -1.0 * (LTOp)t1(b, m) * (LTOp)f1(a, m)      // PT ORDER = 2
            );
 
 ftab(a, b).update(op2);
@@ -171,7 +173,7 @@ op_exec.execute(ftab, true, ex_hw);
 
 auto op3 = (
            1.0 * (LTOp)f1(m, e) * (LTOp)t2(a, e, i, m) +    // PT ORDER = 1
-          -1.0 * (LTOp)f1(m, i) * (LTOp)t1(a, m) +    // PT ORDER = 2, Zero because of T_int
+          -1.0 * (LTOp)f1(m, i) * (LTOp)t1(a, m) +    // PT ORDER = 2
            1.0 * (LTOp)f1(a, e) * (LTOp)t1(e, i)      // PT ORDER = 2
            );
 
@@ -200,7 +202,7 @@ op_exec.execute(vtijka, true, ex_hw);
 //PPPH/PHPP
 
 auto op7 = (
-           1.0 * (LTOp)f1(m, a) * (LTOp)t2(c, b, i, m)      // PT ORDER = 1, Zero because of T_int
+           1.0 * (LTOp)f1(m, a) * (LTOp)t2(c, b, i, m)      // PT ORDER = 1
            );
 
 vtiabc(i, a, b, c).update(op7);
@@ -211,8 +213,8 @@ op_exec.execute(vtiabc, true, ex_hw);
 
 auto op8 = (
            1.0 * (LTOp)f1(b, e) * (LTOp)t2(a, e, i, j) +    // PT ORDER = 1
-          -1.0 * (LTOp)f1(m, j) * (LTOp)t2(a, b, i, m) +    // PT ORDER = 1, Zero because of T_int
-           1.0 * (LTOp)f1(m, i) * (LTOp)t2(a, b, j, m) +    // PT ORDER = 1, Zero because of T_int
+          -1.0 * (LTOp)f1(m, j) * (LTOp)t2(a, b, i, m) +    // PT ORDER = 1
+           1.0 * (LTOp)f1(m, i) * (LTOp)t2(a, b, j, m) +    // PT ORDER = 1
           -1.0 * (LTOp)f1(a, e) * (LTOp)t2(b, e, i, j)      // PT ORDER = 1
            );
 
@@ -314,12 +316,12 @@ op_exec.execute(vtijkl, true, ex_hw);
 //PPPP
 
 auto op5 = (
-          -(1.0/2.0) * (LTOp)v2tensors.v2ijab(m, n, d, c) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 2, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2ijab(m, n, a, b) +    // PT ORDER = 2, Zero because of T_int
-           1.0 * (LTOp)t1(d, m) * (LTOp)v2tensors.v2iabc(m, c, a, b) +    // PT ORDER = 3, Zero because of T_int
-          -1.0 * (LTOp)t1(c, m) * (LTOp)v2tensors.v2iabc(m, d, a, b) +    // PT ORDER = 3, Zero because of T_int
-          -1.0 * (LTOp)v2tensors.v2iabc(m, b, c, d) * (LTOp)t1(a, m) +    // PT ORDER = 3, Zero because of T_int
-           1.0 * (LTOp)v2tensors.v2iabc(m, a, c, d) * (LTOp)t1(b, m)      // PT ORDER = 3, Zero because of T_int
+          -(1.0/2.0) * (LTOp)v2tensors.v2ijab(m, n, d, c) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 2
+          -(1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2ijab(m, n, a, b) +    // PT ORDER = 2
+           1.0 * (LTOp)t1(d, m) * (LTOp)v2tensors.v2iabc(m, c, a, b) +    // PT ORDER = 3
+          -1.0 * (LTOp)t1(c, m) * (LTOp)v2tensors.v2iabc(m, d, a, b) +    // PT ORDER = 3
+          -1.0 * (LTOp)v2tensors.v2iabc(m, b, c, d) * (LTOp)t1(a, m) +    // PT ORDER = 3
+           1.0 * (LTOp)v2tensors.v2iabc(m, a, c, d) * (LTOp)t1(b, m)      // PT ORDER = 3
            );
 
 vtabcd(a, b, c, d).update(op5);
@@ -332,7 +334,7 @@ auto op6 = (
            1.0 * (LTOp)v2tensors.v2ijka(m, k, j, e) * (LTOp)t2(a, e, i, m) +    // PT ORDER = 2
           -1.0 * (LTOp)v2tensors.v2ijka(m, k, i, e) * (LTOp)t2(a, e, j, m) +    // PT ORDER = 2
           -(1.0/2.0) * (LTOp)v2tensors.v2iabc(k, a, f, e) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 2
-           1.0 * (LTOp)v2tensors.v2ijkl(m, k, i, j) * (LTOp)t1(a, m) +    // PT ORDER = 3, Zero because of T_int
+           1.0 * (LTOp)v2tensors.v2ijkl(m, k, i, j) * (LTOp)t1(a, m) +    // PT ORDER = 3
           -1.0 * (LTOp)t1(e, k) * (LTOp)v2tensors.v2ijab(i, j, a, e) +    // PT ORDER = 3
           -1.0 * (LTOp)v2tensors.v2iajb(k, a, j, e) * (LTOp)t1(e, i) +    // PT ORDER = 3
            1.0 * (LTOp)v2tensors.v2iajb(k, a, i, e) * (LTOp)t1(e, j)      // PT ORDER = 3
@@ -347,11 +349,11 @@ op_exec.execute(vtijka, true, ex_hw);
 auto op7 = (
            1.0 * (LTOp)v2tensors.v2iabc(m, b, a, e) * (LTOp)t2(c, e, i, m) +    // PT ORDER = 2
           -1.0 * (LTOp)v2tensors.v2iabc(m, c, a, e) * (LTOp)t2(b, e, i, m) +    // PT ORDER = 2
-          -(1.0/2.0) * (LTOp)v2tensors.v2ijka(m, n, i, a) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 2, Zero because of T_int
-           1.0 * (LTOp)t1(a, m) * (LTOp)v2tensors.v2ijab(i, m, c, b) +    // PT ORDER = 3, Zero because of T_int
+          -(1.0/2.0) * (LTOp)v2tensors.v2ijka(m, n, i, a) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 2
+           1.0 * (LTOp)t1(a, m) * (LTOp)v2tensors.v2ijab(i, m, c, b) +    // PT ORDER = 3
           -1.0 * (LTOp)v2tensors.v2abcd(c, b, e, a) * (LTOp)t1(e, i) +    // PT ORDER = 3
-          -1.0 * (LTOp)v2tensors.v2iajb(m, c, i, a) * (LTOp)t1(b, m) +    // PT ORDER = 3, Zero because of T_int
-           1.0 * (LTOp)v2tensors.v2iajb(m, b, i, a) * (LTOp)t1(c, m)      // PT ORDER = 3, Zero because of T_int
+          -1.0 * (LTOp)v2tensors.v2iajb(m, c, i, a) * (LTOp)t1(b, m) +    // PT ORDER = 3
+           1.0 * (LTOp)v2tensors.v2iajb(m, b, i, a) * (LTOp)t1(c, m)      // PT ORDER = 3
            );
 
 vtiabc(i, a, b, c).update(op7);
@@ -362,14 +364,14 @@ op_exec.execute(vtiabc, true, ex_hw);
 
 auto op8 = (
            1.0 * (LTOp)v2tensors.v2iajb(m, a, j, e) * (LTOp)t2(b, e, i, m) +    // PT ORDER = 2
-           (1.0/2.0) * (LTOp)v2tensors.v2ijkl(m, n, i, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 2, Zero because of T_int
+           (1.0/2.0) * (LTOp)v2tensors.v2ijkl(m, n, i, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 2
            1.0 * (LTOp)v2tensors.v2iajb(m, b, i, e) * (LTOp)t2(a, e, j, m) +    // PT ORDER = 2
           -1.0 * (LTOp)v2tensors.v2iajb(m, a, i, e) * (LTOp)t2(b, e, j, m) +    // PT ORDER = 2
           -1.0 * (LTOp)v2tensors.v2iajb(m, b, j, e) * (LTOp)t2(a, e, i, m) +    // PT ORDER = 2
            (1.0/2.0) * (LTOp)v2tensors.v2abcd(a, b, e, f) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 2
            1.0 * (LTOp)v2tensors.v2iabc(i, e, a, b) * (LTOp)t1(e, j) +    // PT ORDER = 3
-          -1.0 * (LTOp)v2tensors.v2ijka(j, i, m, a) * (LTOp)t1(b, m) +    // PT ORDER = 3, Zero because of T_int
-           1.0 * (LTOp)v2tensors.v2ijka(j, i, m, b) * (LTOp)t1(a, m) +    // PT ORDER = 3, Zero because of T_int
+          -1.0 * (LTOp)v2tensors.v2ijka(j, i, m, a) * (LTOp)t1(b, m) +    // PT ORDER = 3
+           1.0 * (LTOp)v2tensors.v2ijka(j, i, m, b) * (LTOp)t1(a, m) +    // PT ORDER = 3
           -1.0 * (LTOp)v2tensors.v2iabc(j, e, a, b) * (LTOp)t1(e, i)      // PT ORDER = 3
            );
 
@@ -382,9 +384,9 @@ op_exec.execute(vtijab, true, ex_hw);
 auto op9 = (
            1.0 * (LTOp)v2tensors.v2ijab(m, i, e, b) * (LTOp)t2(a, e, j, m) +    // PT ORDER = 2
            1.0 * (LTOp)t2(e, b, m, i) * (LTOp)v2tensors.v2ijab(j, m, a, e) +    // PT ORDER = 2
-          -1.0 * (LTOp)v2tensors.v2ijka(m, i, j, b) * (LTOp)t1(a, m) +    // PT ORDER = 3, Zero because of T_int
+          -1.0 * (LTOp)v2tensors.v2ijka(m, i, j, b) * (LTOp)t1(a, m) +    // PT ORDER = 3
            1.0 * (LTOp)v2tensors.v2iabc(i, a, b, e) * (LTOp)t1(e, j) +    // PT ORDER = 3
-          -1.0 * (LTOp)t1(b, m) * (LTOp)v2tensors.v2ijka(m, j, i, a) +    // PT ORDER = 3, Zero because of T_int
+          -1.0 * (LTOp)t1(b, m) * (LTOp)v2tensors.v2ijka(m, j, i, a) +    // PT ORDER = 3
            1.0 * (LTOp)t1(e, i) * (LTOp)v2tensors.v2iabc(j, b, a, e)      // PT ORDER = 3
            );
 
@@ -465,12 +467,12 @@ auto op2 = (
           -(1.0/4.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(a, f) * (LTOp)t2(e, f, m, n) +    // PT ORDER = 2
           -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, b) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 2
            (1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 3
-          -(1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(e, m) * (LTOp)t1(a, n) +    // PT ORDER = 3, Zero because of T_int
+          -(1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(e, m) * (LTOp)t1(a, n) +    // PT ORDER = 3
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, b) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 3
-          -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)f1(n, e) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 3, Zero because of T_int
-           1.0 * (LTOp)t1(b, m) * (LTOp)f1(n, m) * (LTOp)t1(a, n) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)f1(a, e) * (LTOp)t1(e, m) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, b) * (LTOp)t1(a, m)      // PT ORDER = 4, Zero because of T_int
+          -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)f1(n, e) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 3
+           1.0 * (LTOp)t1(b, m) * (LTOp)f1(n, m) * (LTOp)t1(a, n) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)f1(a, e) * (LTOp)t1(e, m) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, b) * (LTOp)t1(a, m)      // PT ORDER = 4
            );
 
 ftab(a, b).update(op2);
@@ -488,8 +490,8 @@ auto op3 = (
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, i) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 3
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(a, f) * (LTOp)t2(e, f, i, m) +    // PT ORDER = 3
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(a, m) * (LTOp)t1(e, i) +    // PT ORDER = 4
-          -1.0 * (LTOp)f1(m, e) * (LTOp)t1(e, i) * (LTOp)t1(a, m) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, i) * (LTOp)t1(a, m)      // PT ORDER = 4, Zero because of T_int
+          -1.0 * (LTOp)f1(m, e) * (LTOp)t1(e, i) * (LTOp)t1(a, m) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, i) * (LTOp)t1(a, m)      // PT ORDER = 4
            );
 
 ftia(i, a).update(op3);
@@ -519,15 +521,15 @@ op_exec.execute(vtijkl, true, ex_hw);
 //PPPP
 
 auto op5 = (
-          -1.0 * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 2, Zero because of T_int
-           (1.0/4.0) * (LTOp)t2(e, d, m, n) * (LTOp)f1(e, c) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 2, Zero because of T_int
-          -(1.0/4.0) * (LTOp)t2(e, c, m, n) * (LTOp)f1(e, d) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 2, Zero because of T_int
-           (1.0/4.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(a, e) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 2, Zero because of T_int
-          -(1.0/4.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(b, e) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 2, Zero because of T_int
-           (1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(b, m) * (LTOp)t1(a, n) +    // PT ORDER = 3, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(d, m) * (LTOp)f1(n, c) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(c, m) * (LTOp)f1(n, d) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(a, m) * (LTOp)t1(b, n)      // PT ORDER = 3, Zero because of T_int
+          -1.0 * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 2
+           (1.0/4.0) * (LTOp)t2(e, d, m, n) * (LTOp)f1(e, c) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 2
+          -(1.0/4.0) * (LTOp)t2(e, c, m, n) * (LTOp)f1(e, d) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 2
+           (1.0/4.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(a, e) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 2
+          -(1.0/4.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(b, e) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 2
+           (1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(b, m) * (LTOp)t1(a, n) +    // PT ORDER = 3
+          -(1.0/2.0) * (LTOp)t1(d, m) * (LTOp)f1(n, c) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3
+           (1.0/2.0) * (LTOp)t1(c, m) * (LTOp)f1(n, d) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3
+          -(1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(a, m) * (LTOp)t1(b, n)      // PT ORDER = 3
            );
 
 vtabcd(a, b, c, d).update(op5);
@@ -556,14 +558,14 @@ op_exec.execute(vtijka, true, ex_hw);
 
 auto op7 = (
            (1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(e, m) * (LTOp)t2(c, b, i, n) +    // PT ORDER = 2
-          -(1.0/4.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(e, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 2, Zero because of T_int
+          -(1.0/4.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(e, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 2
           -(1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(b, m) * (LTOp)t2(c, e, i, n) +    // PT ORDER = 2
            (1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(c, m) * (LTOp)t2(b, e, i, n) +      // PT ORDER = 2
-           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(n, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 3, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(b, e) * (LTOp)t2(c, e, i, m) +    // PT ORDER = 3, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(c, e) * (LTOp)t2(b, e, i, m) +    // PT ORDER = 3, Zero because of T_int
-          -1.0 * (LTOp)t1(a, m) * (LTOp)f1(n, m) * (LTOp)t2(c, b, i, n) +    // PT ORDER = 3, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, a) * (LTOp)t2(c, b, i, m)      // PT ORDER = 3, Zero because of T_int
+           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(n, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 3
+           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(b, e) * (LTOp)t2(c, e, i, m) +    // PT ORDER = 3
+          -(1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(c, e) * (LTOp)t2(b, e, i, m) +    // PT ORDER = 3
+          -1.0 * (LTOp)t1(a, m) * (LTOp)f1(n, m) * (LTOp)t2(c, b, i, n) +    // PT ORDER = 3
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, a) * (LTOp)t2(c, b, i, m)      // PT ORDER = 3
            );
 
 vtiabc(i, a, b, c).update(op7);
@@ -574,13 +576,13 @@ op_exec.execute(vtiabc, true, ex_hw);
 
 auto op8 = (
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(b, m) * (LTOp)t2(a, e, i, j) +    // PT ORDER = 3
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, i) * (LTOp)t2(a, b, j, m) +    // PT ORDER = 3, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, j) * (LTOp)t2(a, b, i, m) +    // PT ORDER = 3, Zero because of T_int
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, i) * (LTOp)t2(a, b, j, m) +    // PT ORDER = 3
+          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, j) * (LTOp)t2(a, b, i, m) +    // PT ORDER = 3
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(a, m) * (LTOp)t2(b, e, i, j) +    // PT ORDER = 3
-          -1.0 * (LTOp)f1(m, e) * (LTOp)t1(e, j) * (LTOp)t2(a, b, i, m) +    // PT ORDER = 3, Zero because of T_int
-           1.0 * (LTOp)f1(m, e) * (LTOp)t1(a, m) * (LTOp)t2(b, e, i, j) +    // PT ORDER = 3, Zero because of T_int
-          -1.0 * (LTOp)f1(m, e) * (LTOp)t1(b, m) * (LTOp)t2(a, e, i, j) +    // PT ORDER = 3, Zero because of T_int
-           1.0 * (LTOp)f1(m, e) * (LTOp)t1(e, i) * (LTOp)t2(a, b, j, m)      // PT ORDER = 3, Zero because of T_int
+          -1.0 * (LTOp)f1(m, e) * (LTOp)t1(e, j) * (LTOp)t2(a, b, i, m) +    // PT ORDER = 3
+           1.0 * (LTOp)f1(m, e) * (LTOp)t1(a, m) * (LTOp)t2(b, e, i, j) +    // PT ORDER = 3
+          -1.0 * (LTOp)f1(m, e) * (LTOp)t1(b, m) * (LTOp)t2(a, e, i, j) +    // PT ORDER = 3
+           1.0 * (LTOp)f1(m, e) * (LTOp)t1(e, i) * (LTOp)t2(a, b, j, m)      // PT ORDER = 3
            );
 
 vtijab(i, j, a, b).update(op8);
@@ -596,10 +598,10 @@ auto op9 = (
            (1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(i, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 2
           -(1.0/2.0) * (LTOp)t2(e, f, m, i) * (LTOp)f1(e, b) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 2
           -(1.0/2.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(a, f) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 2
-          -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)f1(i, e) * (LTOp)t2(a, e, j, m) +    // PT ORDER = 3, Zero because of T_int
+          -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)f1(i, e) * (LTOp)t2(a, e, j, m) +    // PT ORDER = 3
           -(1.0/2.0) * (LTOp)t1(e, i) * (LTOp)f1(m, b) * (LTOp)t2(a, e, j, m) +    // PT ORDER = 3
           -(1.0/2.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(a, m) * (LTOp)t1(e, j) +    // PT ORDER = 3
-          -(1.0/2.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(e, j) * (LTOp)t1(a, m)      // PT ORDER = 3, Zero because of T_int
+          -(1.0/2.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(e, j) * (LTOp)t1(a, m)      // PT ORDER = 3
            );
 
 vtaijb(a, i, j, b).update(op9);
@@ -700,22 +702,22 @@ auto op2 = (
            (1.0/4.0) * (LTOp)t2(e, b, m, n) * (LTOp)v2tensors.v2abcd(a, e, f, g) * (LTOp)t2(f, g, m, n) +    // PT ORDER = 3
            (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2abcd(e, f, g, b) * (LTOp)t2(a, g, m, n) +    // PT ORDER = 3
            (1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2iajb(o, a, m, b) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 3
-           (1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)v2tensors.v2ijka(n, m, o, e) * (LTOp)t1(a, o) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)v2tensors.v2ijka(n, m, o, e) * (LTOp)t1(a, o) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(n, a, b, f) * (LTOp)t2(e, f, m, n) +    // PT ORDER = 4
            1.0 * (LTOp)t2(e, b, m, n) * (LTOp)v2tensors.v2iabc(m, f, a, e) * (LTOp)t1(f, n) +    // PT ORDER = 4
-          -(1.0/4.0) * (LTOp)t1(b, m) * (LTOp)v2tensors.v2iabc(n, a, f, e) * (LTOp)t2(e, f, m, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/4.0) * (LTOp)t1(b, m) * (LTOp)v2tensors.v2iabc(n, a, f, e) * (LTOp)t2(e, f, m, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2iabc(m, b, a, e) * (LTOp)t1(f, n) +    // PT ORDER = 4
            1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(n, e, b, f) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)v2tensors.v2ijka(n, m, o, a) * (LTOp)t1(e, o) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(n, o, m, b) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 4
-           (1.0/2.0) * (LTOp)t1(b, m) * (LTOp)v2tensors.v2ijka(n, o, m, e) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2iabc(m, b, e, f) * (LTOp)t1(a, n) +    // PT ORDER = 4, Zero because of T_int
-           1.0 * (LTOp)t1(e, m) * (LTOp)t1(b, n) * (LTOp)v2tensors.v2ijab(m, n, a, e) +    // PT ORDER = 5, Zero because of T_int
+           (1.0/2.0) * (LTOp)t1(b, m) * (LTOp)v2tensors.v2ijka(n, o, m, e) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 4
+          -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2iabc(m, b, e, f) * (LTOp)t1(a, n) +    // PT ORDER = 4
+           1.0 * (LTOp)t1(e, m) * (LTOp)t1(b, n) * (LTOp)v2tensors.v2ijab(m, n, a, e) +    // PT ORDER = 5
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2abcd(a, e, f, b) * (LTOp)t1(f, m) +    // PT ORDER = 5
-           1.0 * (LTOp)v2tensors.v2ijab(m, n, e, b) * (LTOp)t1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 5, Zero because of T_int
-           1.0 * (LTOp)t1(b, m) * (LTOp)v2tensors.v2iajb(n, a, m, e) * (LTOp)t1(e, n) +    // PT ORDER = 5, Zero because of T_int
+           1.0 * (LTOp)v2tensors.v2ijab(m, n, e, b) * (LTOp)t1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 5
+           1.0 * (LTOp)t1(b, m) * (LTOp)v2tensors.v2iajb(n, a, m, e) * (LTOp)t1(e, n) +    // PT ORDER = 5
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(n, a, m, b) * (LTOp)t1(e, n) +    // PT ORDER = 5
-           1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(n, e, m, b) * (LTOp)t1(a, n)      // PT ORDER = 5, Zero because of T_int
+           1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(n, e, m, b) * (LTOp)t1(a, n)      // PT ORDER = 5
            );
 
 ftab(a, b).update(op2);
@@ -741,15 +743,15 @@ auto op3 = (
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2abcd(a, e, f, g) * (LTOp)t2(f, g, i, m) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(i, m, a, e) * (LTOp)t1(f, n) +    // PT ORDER = 4
            1.0 * (LTOp)v2tensors.v2ijab(m, n, e, f) * (LTOp)t1(e, m) * (LTOp)t2(a, f, i, n) +    // PT ORDER = 4
-           (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(i, m, e, f) * (LTOp)t1(a, n) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(i, m, e, f) * (LTOp)t1(a, n) +    // PT ORDER = 4
            (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(m, n, a, e) * (LTOp)t1(f, i) +    // PT ORDER = 4
-          -(1.0/2.0) * (LTOp)v2tensors.v2ijab(m, n, e, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/2.0) * (LTOp)v2tensors.v2ijab(m, n, e, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)v2tensors.v2ijab(m, n, e, f) * (LTOp)t1(e, i) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(m, i, n, a) * (LTOp)t1(e, n) +    // PT ORDER = 5
            1.0 * (LTOp)v2tensors.v2iabc(m, a, f, e) * (LTOp)t1(e, i) * (LTOp)t1(f, m) +    // PT ORDER = 5
-          -1.0 * (LTOp)v2tensors.v2ijka(m, n, i, e) * (LTOp)t1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 5, Zero because of T_int
+          -1.0 * (LTOp)v2tensors.v2ijka(m, n, i, e) * (LTOp)t1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 5
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(m, f, a, e) * (LTOp)t1(f, i) +    // PT ORDER = 5
-           1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(m, i, n, e) * (LTOp)t1(a, n) +    // PT ORDER = 5, Zero because of T_int
+           1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(m, i, n, e) * (LTOp)t1(a, n) +    // PT ORDER = 5
            1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(i, f, a, e) * (LTOp)t1(f, m)      // PT ORDER = 5
            );
 
@@ -819,16 +821,16 @@ op_exec.execute(vtijkl, true, ex_hw);
 
 auto op5 = (
           -(1.0/4.0) * (LTOp)t2(e, c, m, n) * (LTOp)v2tensors.v2abcd(a, b, f, d) * (LTOp)t2(e, f, m, n) +    // PT ORDER = 3
-          -(1.0/4.0) * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2ijkl(o, p, m, n) * (LTOp)t2(a, b, o, p) +    // PT ORDER = 3, Zero because of T_int
-          -(1.0/8.0) * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2abcd(a, b, e, f) * (LTOp)t2(e, f, m, n) +    // PT ORDER = 3, Zero because of T_int
+          -(1.0/4.0) * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2ijkl(o, p, m, n) * (LTOp)t2(a, b, o, p) +    // PT ORDER = 3
+          -(1.0/8.0) * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2abcd(a, b, e, f) * (LTOp)t2(e, f, m, n) +    // PT ORDER = 3
           -1.0 * (LTOp)t2(e, c, m, n) * (LTOp)v2tensors.v2iajb(o, e, m, d) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 3
-          -(1.0/8.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2abcd(e, f, d, c) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3, Zero because of T_int
+          -(1.0/8.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2abcd(e, f, d, c) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3
            1.0 * (LTOp)t2(e, d, m, n) * (LTOp)v2tensors.v2iajb(o, e, m, c) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 3
            (1.0/4.0) * (LTOp)t2(e, d, m, n) * (LTOp)v2tensors.v2abcd(a, b, f, c) * (LTOp)t2(e, f, m, n) +    // PT ORDER = 3
           -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2abcd(b, e, d, c) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 3
-           1.0 * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2iajb(o, a, m, e) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 3, Zero because of T_int
+           1.0 * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2iajb(o, a, m, e) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 3
            (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2abcd(a, e, d, c) * (LTOp)t2(b, f, m, n) +    // PT ORDER = 3
-          -1.0 * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2iajb(o, b, m, e) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 3, Zero because of T_int
+          -1.0 * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2iajb(o, b, m, e) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 3
            1.0 * (LTOp)t2(e, c, m, n) * (LTOp)v2tensors.v2iajb(o, b, m, d) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 3
           -(1.0/2.0) * (LTOp)t2(e, d, m, n) * (LTOp)v2tensors.v2abcd(a, e, f, c) * (LTOp)t2(b, f, m, n) +    // PT ORDER = 3
            (1.0/2.0) * (LTOp)t2(e, c, m, n) * (LTOp)v2tensors.v2abcd(a, e, f, d) * (LTOp)t2(b, f, m, n) +    // PT ORDER = 3
@@ -837,34 +839,34 @@ auto op5 = (
            (1.0/2.0) * (LTOp)t2(e, d, m, n) * (LTOp)v2tensors.v2abcd(b, e, f, c) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 3
           -1.0 * (LTOp)t2(e, c, m, n) * (LTOp)v2tensors.v2iajb(o, a, m, d) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 3
            1.0 * (LTOp)t2(e, d, m, n) * (LTOp)v2tensors.v2iajb(o, a, m, c) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 3
-           (1.0/2.0) * (LTOp)t1(c, m) * (LTOp)v2tensors.v2iabc(n, b, d, e) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4, Zero because of T_int
-          -1.0 * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2iabc(m, e, a, b) * (LTOp)t1(e, n) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/2.0) * (LTOp)t1(c, m) * (LTOp)v2tensors.v2iabc(n, b, d, e) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4
+          -1.0 * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2iabc(m, e, a, b) * (LTOp)t1(e, n) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t2(e, c, m, n) * (LTOp)v2tensors.v2iabc(m, d, a, b) * (LTOp)t1(e, n) +    // PT ORDER = 4
-          -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(n, e, c, d) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t2(e, d, m, n) * (LTOp)v2tensors.v2iabc(m, c, b, e) * (LTOp)t1(a, n) +    // PT ORDER = 4, Zero because of T_int
+          -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(n, e, c, d) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t2(e, d, m, n) * (LTOp)v2tensors.v2iabc(m, c, b, e) * (LTOp)t1(a, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t2(e, d, m, n) * (LTOp)v2tensors.v2iabc(m, c, a, b) * (LTOp)t1(e, n) +    // PT ORDER = 4
-           (1.0/2.0) * (LTOp)t1(d, m) * (LTOp)v2tensors.v2ijka(n, o, m, c) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(c, m) * (LTOp)v2tensors.v2ijka(n, o, m, d) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(c, m) * (LTOp)v2tensors.v2iabc(n, a, d, e) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/2.0) * (LTOp)t2(e, c, m, n) * (LTOp)v2tensors.v2iabc(m, d, b, e) * (LTOp)t1(a, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/2.0) * (LTOp)t2(e, d, m, n) * (LTOp)v2tensors.v2iabc(m, c, a, e) * (LTOp)t1(b, n) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t2(e, c, m, n) * (LTOp)v2tensors.v2iabc(m, d, a, e) * (LTOp)t1(b, n) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/2.0) * (LTOp)t1(d, m) * (LTOp)v2tensors.v2ijka(n, o, m, c) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t1(c, m) * (LTOp)v2tensors.v2ijka(n, o, m, d) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t1(c, m) * (LTOp)v2tensors.v2iabc(n, a, d, e) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 4
+           (1.0/2.0) * (LTOp)t2(e, c, m, n) * (LTOp)v2tensors.v2iabc(m, d, b, e) * (LTOp)t1(a, n) +    // PT ORDER = 4
+           (1.0/2.0) * (LTOp)t2(e, d, m, n) * (LTOp)v2tensors.v2iabc(m, c, a, e) * (LTOp)t1(b, n) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t2(e, c, m, n) * (LTOp)v2tensors.v2iabc(m, d, a, e) * (LTOp)t1(b, n) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(n, b, c, d) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(n, a, c, d) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 4
-          -(1.0/2.0) * (LTOp)t1(d, m) * (LTOp)v2tensors.v2iabc(n, b, c, e) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(d, m) * (LTOp)v2tensors.v2iabc(n, a, c, e) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2ijka(n, m, o, a) * (LTOp)t1(b, o) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2ijka(n, m, o, b) * (LTOp)t1(a, o) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(c, m) * (LTOp)v2tensors.v2abcd(a, b, e, d) * (LTOp)t1(e, m) +    // PT ORDER = 5, Zero because of T_int
-          -1.0 * (LTOp)v2tensors.v2ijab(m, n, d, c) * (LTOp)t1(a, m) * (LTOp)t1(b, n) +    // PT ORDER = 5, Zero because of T_int
-          -1.0 * (LTOp)t1(d, m) * (LTOp)t1(c, n) * (LTOp)v2tensors.v2ijab(m, n, a, b) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(d, m) * (LTOp)v2tensors.v2abcd(a, b, e, c) * (LTOp)t1(e, m) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2abcd(a, e, d, c) * (LTOp)t1(b, m) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2abcd(b, e, d, c) * (LTOp)t1(a, m) +    // PT ORDER = 5, Zero because of T_int
-           1.0 * (LTOp)t1(c, m) * (LTOp)v2tensors.v2iajb(n, b, m, d) * (LTOp)t1(a, n) +    // PT ORDER = 5, Zero because of T_int
-          -1.0 * (LTOp)t1(c, m) * (LTOp)v2tensors.v2iajb(n, a, m, d) * (LTOp)t1(b, n) +    // PT ORDER = 5, Zero because of T_int
-          -1.0 * (LTOp)t1(d, m) * (LTOp)v2tensors.v2iajb(n, b, m, c) * (LTOp)t1(a, n) +    // PT ORDER = 5, Zero because of T_int
-           1.0 * (LTOp)t1(d, m) * (LTOp)v2tensors.v2iajb(n, a, m, c) * (LTOp)t1(b, n)      // PT ORDER = 5, Zero because of T_int
+          -(1.0/2.0) * (LTOp)t1(d, m) * (LTOp)v2tensors.v2iabc(n, b, c, e) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4
+           (1.0/2.0) * (LTOp)t1(d, m) * (LTOp)v2tensors.v2iabc(n, a, c, e) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 4
+           (1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2ijka(n, m, o, a) * (LTOp)t1(b, o) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)v2tensors.v2ijka(n, m, o, b) * (LTOp)t1(a, o) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t1(c, m) * (LTOp)v2tensors.v2abcd(a, b, e, d) * (LTOp)t1(e, m) +    // PT ORDER = 5
+          -1.0 * (LTOp)v2tensors.v2ijab(m, n, d, c) * (LTOp)t1(a, m) * (LTOp)t1(b, n) +    // PT ORDER = 5
+          -1.0 * (LTOp)t1(d, m) * (LTOp)t1(c, n) * (LTOp)v2tensors.v2ijab(m, n, a, b) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(d, m) * (LTOp)v2tensors.v2abcd(a, b, e, c) * (LTOp)t1(e, m) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2abcd(a, e, d, c) * (LTOp)t1(b, m) +    // PT ORDER = 5
+          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2abcd(b, e, d, c) * (LTOp)t1(a, m) +    // PT ORDER = 5
+           1.0 * (LTOp)t1(c, m) * (LTOp)v2tensors.v2iajb(n, b, m, d) * (LTOp)t1(a, n) +    // PT ORDER = 5
+          -1.0 * (LTOp)t1(c, m) * (LTOp)v2tensors.v2iajb(n, a, m, d) * (LTOp)t1(b, n) +    // PT ORDER = 5
+          -1.0 * (LTOp)t1(d, m) * (LTOp)v2tensors.v2iajb(n, b, m, c) * (LTOp)t1(a, n) +    // PT ORDER = 5
+           1.0 * (LTOp)t1(d, m) * (LTOp)v2tensors.v2iajb(n, a, m, c) * (LTOp)t1(b, n)      // PT ORDER = 5
            );
 
 vtabcd(a, b, c, d).update(op5);
@@ -896,10 +898,10 @@ auto op6 = (
           -1.0 * (LTOp)v2tensors.v2ijab(m, k, e, f) * (LTOp)t1(e, m) * (LTOp)t2(a, f, i, j) +    // PT ORDER = 4
            1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijkl(n, k, i, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t2(e, f, m, k) * (LTOp)v2tensors.v2ijab(i, j, a, e) * (LTOp)t1(f, m) +    // PT ORDER = 4
-           (1.0/2.0) * (LTOp)v2tensors.v2ijab(m, k, e, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/2.0) * (LTOp)v2tensors.v2ijab(m, k, e, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(k, a, m, f) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(k, a, j, f) * (LTOp)t2(e, f, i, m) +    // PT ORDER = 4
-           (1.0/4.0) * (LTOp)t2(e, f, m, k) * (LTOp)v2tensors.v2ijab(i, j, e, f) * (LTOp)t1(a, m) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/4.0) * (LTOp)t2(e, f, m, k) * (LTOp)v2tensors.v2ijab(i, j, e, f) * (LTOp)t1(a, m) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(k, e, j, f) * (LTOp)t2(a, f, i, m) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijkl(n, k, j, m) * (LTOp)t2(a, e, i, n) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, k) * (LTOp)v2tensors.v2iajb(m, e, i, f) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 4
@@ -917,12 +919,12 @@ auto op6 = (
           -1.0 * (LTOp)v2tensors.v2ijab(m, k, e, f) * (LTOp)t1(e, i) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 4
            1.0 * (LTOp)v2tensors.v2ijab(m, k, e, f) * (LTOp)t1(e, j) * (LTOp)t2(a, f, i, m) +    // PT ORDER = 4
           -1.0 * (LTOp)v2tensors.v2iabc(k, a, f, e) * (LTOp)t1(e, i) * (LTOp)t1(f, j) +    // PT ORDER = 5
-          -1.0 * (LTOp)v2tensors.v2ijka(m, k, j, e) * (LTOp)t1(e, i) * (LTOp)t1(a, m) +    // PT ORDER = 5, Zero because of T_int
-           1.0 * (LTOp)v2tensors.v2ijka(m, k, i, e) * (LTOp)t1(a, m) * (LTOp)t1(e, j) +    // PT ORDER = 5, Zero because of T_int
+          -1.0 * (LTOp)v2tensors.v2ijka(m, k, j, e) * (LTOp)t1(e, i) * (LTOp)t1(a, m) +    // PT ORDER = 5
+           1.0 * (LTOp)v2tensors.v2ijka(m, k, i, e) * (LTOp)t1(a, m) * (LTOp)t1(e, j) +    // PT ORDER = 5
            (1.0/2.0) * (LTOp)t1(e, k) * (LTOp)v2tensors.v2ijka(j, i, m, a) * (LTOp)t1(e, m) +    // PT ORDER = 5
           -1.0 * (LTOp)t1(e, k) * (LTOp)v2tensors.v2iabc(i, f, a, e) * (LTOp)t1(f, j) +    // PT ORDER = 5
-          -1.0 * (LTOp)t1(e, k) * (LTOp)v2tensors.v2ijka(j, i, m, e) * (LTOp)t1(a, m) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(j, i, k, e) * (LTOp)t1(a, m) +    // PT ORDER = 5, Zero because of T_int
+          -1.0 * (LTOp)t1(e, k) * (LTOp)v2tensors.v2ijka(j, i, m, e) * (LTOp)t1(a, m) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(j, i, k, e) * (LTOp)t1(a, m) +    // PT ORDER = 5
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(m, j, k, a) * (LTOp)t1(e, i) +    // PT ORDER = 5
            1.0 * (LTOp)t1(e, k) * (LTOp)v2tensors.v2iabc(j, f, a, e) * (LTOp)t1(f, i) +    // PT ORDER = 5
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(m, i, k, a) * (LTOp)t1(e, j)      // PT ORDER = 5
@@ -953,40 +955,40 @@ auto op7 = (
           -(1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)v2tensors.v2iabc(i, f, c, e) * (LTOp)t2(b, f, m, n) +    // PT ORDER = 3
            (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2iabc(m, a, e, f) * (LTOp)t2(c, b, i, n) +    // PT ORDER = 3
           -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2iabc(i, a, b, e) * (LTOp)t2(c, f, m, n) +    // PT ORDER = 3
-          -(1.0/8.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2iabc(i, a, e, f) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 3, Zero because of T_int
+          -(1.0/8.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2iabc(i, a, e, f) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 3
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2abcd(c, b, f, a) * (LTOp)t2(e, f, i, m) +    // PT ORDER = 4
            1.0 * (LTOp)v2tensors.v2ijab(m, n, e, a) * (LTOp)t1(e, m) * (LTOp)t2(c, b, i, n) +    // PT ORDER = 4
           -(1.0/4.0) * (LTOp)t2(e, a, m, n) * (LTOp)v2tensors.v2ijab(m, n, c, b) * (LTOp)t1(e, i) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)v2tensors.v2ijab(i, m, c, b) * (LTOp)t1(e, n) +    // PT ORDER = 4
-           (1.0/4.0) * (LTOp)t1(a, m) * (LTOp)v2tensors.v2abcd(c, b, e, f) * (LTOp)t2(e, f, i, m) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)v2tensors.v2ijab(m, n, e, a) * (LTOp)t1(e, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 4, Zero because of T_int
-           1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(n, e, i, a) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)v2tensors.v2iajb(n, b, i, e) * (LTOp)t2(c, e, m, n) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(a, m) * (LTOp)v2tensors.v2iajb(n, c, i, e) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/4.0) * (LTOp)t1(a, m) * (LTOp)v2tensors.v2abcd(c, b, e, f) * (LTOp)t2(e, f, i, m) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)v2tensors.v2ijab(m, n, e, a) * (LTOp)t1(e, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 4
+           1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(n, e, i, a) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 4
+           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)v2tensors.v2iajb(n, b, i, e) * (LTOp)t2(c, e, m, n) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t1(a, m) * (LTOp)v2tensors.v2iajb(n, c, i, e) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 4
            1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2abcd(b, e, f, a) * (LTOp)t2(c, f, i, m) +    // PT ORDER = 4
-           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)v2tensors.v2ijkl(n, o, i, m) * (LTOp)t2(c, b, n, o) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)v2tensors.v2ijkl(n, o, i, m) * (LTOp)t2(c, b, n, o) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(n, c, m, a) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 4
-           1.0 * (LTOp)t1(a, m) * (LTOp)v2tensors.v2iajb(n, c, m, e) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 4, Zero because of T_int
+           1.0 * (LTOp)t1(a, m) * (LTOp)v2tensors.v2iajb(n, c, m, e) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(n, e, m, a) * (LTOp)t2(c, b, i, n) +    // PT ORDER = 4
-          -1.0 * (LTOp)t1(a, m) * (LTOp)v2tensors.v2iajb(n, b, m, e) * (LTOp)t2(c, e, i, n) +    // PT ORDER = 4, Zero because of T_int
+          -1.0 * (LTOp)t1(a, m) * (LTOp)v2tensors.v2iajb(n, b, m, e) * (LTOp)t2(c, e, i, n) +    // PT ORDER = 4
            1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(n, b, m, a) * (LTOp)t2(c, e, i, n) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2abcd(c, e, f, a) * (LTOp)t2(b, f, i, m) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(n, c, i, a) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(n, b, i, a) * (LTOp)t2(c, e, m, n) +    // PT ORDER = 4
-           1.0 * (LTOp)v2tensors.v2ijab(m, n, e, a) * (LTOp)t1(c, m) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 4, Zero because of T_int
-          -1.0 * (LTOp)v2tensors.v2ijab(m, n, e, a) * (LTOp)t1(b, m) * (LTOp)t2(c, e, i, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)v2tensors.v2ijab(i, m, c, e) * (LTOp)t1(b, n) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)v2tensors.v2ijab(i, m, b, e) * (LTOp)t1(c, n) +    // PT ORDER = 4, Zero because of T_int
-          -1.0 * (LTOp)v2tensors.v2ijka(m, n, i, a) * (LTOp)t1(c, m) * (LTOp)t1(b, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(i, a, b, e) * (LTOp)t1(c, m) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(i, a, c, e) * (LTOp)t1(b, m) +    // PT ORDER = 5, Zero because of T_int
-          -1.0 * (LTOp)v2tensors.v2iabc(m, b, a, e) * (LTOp)t1(c, m) * (LTOp)t1(e, i) +    // PT ORDER = 5, Zero because of T_int
-           1.0 * (LTOp)v2tensors.v2iabc(m, c, a, e) * (LTOp)t1(e, i) * (LTOp)t1(b, m) +    // PT ORDER = 5, Zero because of T_int
-           1.0 * (LTOp)t1(a, m) * (LTOp)v2tensors.v2ijka(m, i, n, b) * (LTOp)t1(c, n) +    // PT ORDER = 5, Zero because of T_int
-          -1.0 * (LTOp)t1(a, m) * (LTOp)v2tensors.v2ijka(m, i, n, c) * (LTOp)t1(b, n) +    // PT ORDER = 5, Zero because of T_int
+           1.0 * (LTOp)v2tensors.v2ijab(m, n, e, a) * (LTOp)t1(c, m) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 4
+          -1.0 * (LTOp)v2tensors.v2ijab(m, n, e, a) * (LTOp)t1(b, m) * (LTOp)t2(c, e, i, n) +    // PT ORDER = 4
+           (1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)v2tensors.v2ijab(i, m, c, e) * (LTOp)t1(b, n) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)v2tensors.v2ijab(i, m, b, e) * (LTOp)t1(c, n) +    // PT ORDER = 4
+          -1.0 * (LTOp)v2tensors.v2ijka(m, n, i, a) * (LTOp)t1(c, m) * (LTOp)t1(b, n) +    // PT ORDER = 5
+          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(i, a, b, e) * (LTOp)t1(c, m) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(i, a, c, e) * (LTOp)t1(b, m) +    // PT ORDER = 5
+          -1.0 * (LTOp)v2tensors.v2iabc(m, b, a, e) * (LTOp)t1(c, m) * (LTOp)t1(e, i) +    // PT ORDER = 5
+           1.0 * (LTOp)v2tensors.v2iabc(m, c, a, e) * (LTOp)t1(e, i) * (LTOp)t1(b, m) +    // PT ORDER = 5
+           1.0 * (LTOp)t1(a, m) * (LTOp)v2tensors.v2ijka(m, i, n, b) * (LTOp)t1(c, n) +    // PT ORDER = 5
+          -1.0 * (LTOp)t1(a, m) * (LTOp)v2tensors.v2ijka(m, i, n, c) * (LTOp)t1(b, n) +    // PT ORDER = 5
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(m, a, c, b) * (LTOp)t1(e, i) +    // PT ORDER = 5
-          -1.0 * (LTOp)t1(a, m) * (LTOp)v2tensors.v2iabc(m, e, c, b) * (LTOp)t1(e, i) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)v2tensors.v2iabc(i, e, c, b) * (LTOp)t1(e, m)      // PT ORDER = 5, Zero because of T_int
+          -1.0 * (LTOp)t1(a, m) * (LTOp)v2tensors.v2iabc(m, e, c, b) * (LTOp)t1(e, i) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)v2tensors.v2iabc(i, e, c, b) * (LTOp)t1(e, m)      // PT ORDER = 5
            );
 
 vtiabc(i, a, b, c).update(op7);
@@ -999,7 +1001,7 @@ auto op8 = (
           -1.0 * (LTOp)v2tensors.v2ijab(m, n, e, f) * (LTOp)t2(b, e, i, m) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 3
            (1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(i, m, a, e) * (LTOp)t2(b, f, j, n) +    // PT ORDER = 3
            (1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(j, m, b, e) * (LTOp)t2(a, f, i, n) +    // PT ORDER = 3
-          -(1.0/2.0) * (LTOp)v2tensors.v2ijab(m, n, e, f) * (LTOp)t2(a, b, i, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 3, Zero because of T_int
+          -(1.0/2.0) * (LTOp)v2tensors.v2ijab(m, n, e, f) * (LTOp)t2(a, b, i, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 3
           -(1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(i, m, b, e) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 3
           -(1.0/2.0) * (LTOp)v2tensors.v2ijab(m, n, e, f) * (LTOp)t2(e, f, i, m) * (LTOp)t2(a, b, j, n) +    // PT ORDER = 3
           -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(i, m, e, f) * (LTOp)t2(a, b, j, n) +    // PT ORDER = 3
@@ -1014,36 +1016,36 @@ auto op8 = (
            (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(j, m, a, b) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 3
           -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(i, j, a, e) * (LTOp)t2(b, f, m, n) +    // PT ORDER = 3
            (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(i, j, b, e) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 3
-           (1.0/4.0) * (LTOp)v2tensors.v2ijab(m, n, e, f) * (LTOp)t2(e, f, i, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3, Zero because of T_int
+           (1.0/4.0) * (LTOp)v2tensors.v2ijab(m, n, e, f) * (LTOp)t2(e, f, i, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3
            (1.0/8.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(m, n, a, b) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 3
-           (1.0/8.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(i, j, e, f) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3, Zero because of T_int
+           (1.0/8.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2ijab(i, j, e, f) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3
            1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(i, f, a, e) * (LTOp)t2(b, f, j, m) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(i, f, b, e) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 4
           -1.0 * (LTOp)v2tensors.v2ijka(m, n, i, e) * (LTOp)t1(e, m) * (LTOp)t2(a, b, j, n) +    // PT ORDER = 4
            1.0 * (LTOp)v2tensors.v2ijka(m, n, j, e) * (LTOp)t1(e, m) * (LTOp)t2(a, b, i, n) +    // PT ORDER = 4
-           1.0 * (LTOp)v2tensors.v2ijka(m, n, i, e) * (LTOp)t1(b, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 4, Zero because of T_int
+           1.0 * (LTOp)v2tensors.v2ijka(m, n, i, e) * (LTOp)t1(b, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 4
            1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(m, f, a, e) * (LTOp)t2(b, f, i, j) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(j, i, n, a) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 4
            1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(m, j, n, e) * (LTOp)t2(a, b, i, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(j, i, n, b) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4
-          -(1.0/2.0) * (LTOp)v2tensors.v2iabc(m, a, f, e) * (LTOp)t1(b, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4, Zero because of T_int
-          -1.0 * (LTOp)v2tensors.v2ijka(m, n, i, e) * (LTOp)t1(a, m) * (LTOp)t2(b, e, j, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/2.0) * (LTOp)v2tensors.v2iabc(m, a, f, e) * (LTOp)t1(b, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4
+          -1.0 * (LTOp)v2tensors.v2ijka(m, n, i, e) * (LTOp)t1(a, m) * (LTOp)t2(b, e, j, n) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(m, f, b, e) * (LTOp)t2(a, f, i, j) +    // PT ORDER = 4
-          -(1.0/2.0) * (LTOp)v2tensors.v2ijka(m, n, j, e) * (LTOp)t1(e, i) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/2.0) * (LTOp)v2tensors.v2ijka(m, n, j, e) * (LTOp)t1(e, i) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4
           -1.0 * (LTOp)v2tensors.v2iabc(m, b, f, e) * (LTOp)t1(e, i) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 4
-           1.0 * (LTOp)v2tensors.v2ijka(m, n, j, e) * (LTOp)t1(a, m) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 4, Zero because of T_int
+           1.0 * (LTOp)v2tensors.v2ijka(m, n, j, e) * (LTOp)t1(a, m) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(j, f, a, b) * (LTOp)t2(e, f, i, m) +    // PT ORDER = 4
-           1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(j, i, n, e) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4, Zero because of T_int
+           1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(j, i, n, e) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(j, f, a, e) * (LTOp)t2(b, f, i, m) +    // PT ORDER = 4
            1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(m, j, n, a) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(m, f, a, b) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(m, i, n, e) * (LTOp)t2(a, b, j, n) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(m, i, n, a) * (LTOp)t2(b, e, j, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(i, f, a, b) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 4
-           (1.0/2.0) * (LTOp)v2tensors.v2iabc(m, b, f, e) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/2.0) * (LTOp)v2tensors.v2iabc(m, b, f, e) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4
            1.0 * (LTOp)v2tensors.v2iabc(m, a, f, e) * (LTOp)t1(e, m) * (LTOp)t2(b, f, i, j) +    // PT ORDER = 4
-          -1.0 * (LTOp)v2tensors.v2ijka(m, n, j, e) * (LTOp)t1(b, m) * (LTOp)t2(a, e, i, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/2.0) * (LTOp)v2tensors.v2ijka(m, n, i, e) * (LTOp)t1(e, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4, Zero because of T_int
+          -1.0 * (LTOp)v2tensors.v2ijka(m, n, j, e) * (LTOp)t1(b, m) * (LTOp)t2(a, e, i, n) +    // PT ORDER = 4
+           (1.0/2.0) * (LTOp)v2tensors.v2ijka(m, n, i, e) * (LTOp)t1(e, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(m, j, n, b) * (LTOp)t2(a, e, i, n) +    // PT ORDER = 4
            1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(m, i, n, b) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 4
            1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(j, f, b, e) * (LTOp)t2(a, f, i, m) +    // PT ORDER = 4
@@ -1051,16 +1053,16 @@ auto op8 = (
            1.0 * (LTOp)v2tensors.v2iabc(m, b, f, e) * (LTOp)t1(e, j) * (LTOp)t2(a, f, i, m) +    // PT ORDER = 4
           -1.0 * (LTOp)v2tensors.v2iabc(m, b, f, e) * (LTOp)t1(e, m) * (LTOp)t2(a, f, i, j) +    // PT ORDER = 4
           -1.0 * (LTOp)v2tensors.v2iabc(m, a, f, e) * (LTOp)t1(e, j) * (LTOp)t2(b, f, i, m) +    // PT ORDER = 4
-           1.0 * (LTOp)v2tensors.v2ijkl(m, n, i, j) * (LTOp)t1(a, m) * (LTOp)t1(b, n) +    // PT ORDER = 5, Zero because of T_int
+           1.0 * (LTOp)v2tensors.v2ijkl(m, n, i, j) * (LTOp)t1(a, m) * (LTOp)t1(b, n) +    // PT ORDER = 5
            1.0 * (LTOp)v2tensors.v2abcd(a, b, e, f) * (LTOp)t1(e, i) * (LTOp)t1(f, j) +    // PT ORDER = 5
-          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijab(i, j, a, e) * (LTOp)t1(b, m) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijab(i, j, b, e) * (LTOp)t1(a, m) +    // PT ORDER = 5, Zero because of T_int
+          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijab(i, j, a, e) * (LTOp)t1(b, m) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijab(i, j, b, e) * (LTOp)t1(a, m) +    // PT ORDER = 5
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijab(j, m, a, b) * (LTOp)t1(e, i) +    // PT ORDER = 5
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijab(i, m, a, b) * (LTOp)t1(e, j) +    // PT ORDER = 5
-           1.0 * (LTOp)v2tensors.v2iajb(m, a, i, e) * (LTOp)t1(e, j) * (LTOp)t1(b, m) +    // PT ORDER = 5, Zero because of T_int
-           1.0 * (LTOp)v2tensors.v2iajb(m, b, j, e) * (LTOp)t1(e, i) * (LTOp)t1(a, m) +    // PT ORDER = 5, Zero because of T_int
-          -1.0 * (LTOp)v2tensors.v2iajb(m, b, i, e) * (LTOp)t1(a, m) * (LTOp)t1(e, j) +    // PT ORDER = 5, Zero because of T_int
-          -1.0 * (LTOp)v2tensors.v2iajb(m, a, j, e) * (LTOp)t1(e, i) * (LTOp)t1(b, m)      // PT ORDER = 5, Zero because of T_int
+           1.0 * (LTOp)v2tensors.v2iajb(m, a, i, e) * (LTOp)t1(e, j) * (LTOp)t1(b, m) +    // PT ORDER = 5
+           1.0 * (LTOp)v2tensors.v2iajb(m, b, j, e) * (LTOp)t1(e, i) * (LTOp)t1(a, m) +    // PT ORDER = 5
+          -1.0 * (LTOp)v2tensors.v2iajb(m, b, i, e) * (LTOp)t1(a, m) * (LTOp)t1(e, j) +    // PT ORDER = 5
+          -1.0 * (LTOp)v2tensors.v2iajb(m, a, j, e) * (LTOp)t1(e, i) * (LTOp)t1(b, m)      // PT ORDER = 5
            );
 
 vtijab(i, j, a, b).update(op8);
@@ -1093,9 +1095,9 @@ auto op9 = (
            (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)v2tensors.v2iajb(i, a, m, b) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 3
            (1.0/2.0) * (LTOp)t1(e, i) * (LTOp)v2tensors.v2iabc(m, a, b, f) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 4
           -1.0 * (LTOp)t1(e, i) * (LTOp)v2tensors.v2iabc(m, e, b, f) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 4
-          -(1.0/4.0) * (LTOp)t2(e, f, m, i) * (LTOp)v2tensors.v2iabc(j, b, e, f) * (LTOp)t1(a, m) +    // PT ORDER = 4, Zero because of T_int
-           1.0 * (LTOp)t1(b, m) * (LTOp)v2tensors.v2ijka(n, i, m, e) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)v2tensors.v2ijka(n, i, j, e) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/4.0) * (LTOp)t2(e, f, m, i) * (LTOp)v2tensors.v2iabc(j, b, e, f) * (LTOp)t1(a, m) +    // PT ORDER = 4
+           1.0 * (LTOp)t1(b, m) * (LTOp)v2tensors.v2ijka(n, i, m, e) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)v2tensors.v2ijka(n, i, j, e) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4
           -1.0 * (LTOp)t2(e, b, m, i) * (LTOp)v2tensors.v2ijka(m, j, n, a) * (LTOp)t1(e, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t2(e, f, m, i) * (LTOp)v2tensors.v2iabc(j, b, a, e) * (LTOp)t1(f, m) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)v2tensors.v2ijka(m, j, i, a) * (LTOp)t1(e, n) +    // PT ORDER = 4
@@ -1104,23 +1106,23 @@ auto op9 = (
           -1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2ijka(n, i, m, b) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 4
            1.0 * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(i, e, b, f) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 4
           -1.0 * (LTOp)t2(e, b, m, i) * (LTOp)v2tensors.v2iabc(m, f, a, e) * (LTOp)t1(f, j) +    // PT ORDER = 4
-          -(1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)v2tensors.v2ijka(m, j, i, e) * (LTOp)t1(a, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)v2tensors.v2ijka(m, j, i, e) * (LTOp)t1(a, n) +    // PT ORDER = 4
            1.0 * (LTOp)t2(e, b, m, i) * (LTOp)v2tensors.v2iabc(j, f, a, e) * (LTOp)t1(f, m) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iabc(i, a, b, f) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 4
-           1.0 * (LTOp)t2(e, b, m, i) * (LTOp)v2tensors.v2ijka(m, j, n, e) * (LTOp)t1(a, n) +    // PT ORDER = 4, Zero because of T_int
+           1.0 * (LTOp)t2(e, b, m, i) * (LTOp)v2tensors.v2ijka(m, j, n, e) * (LTOp)t1(a, n) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t2(e, f, m, i) * (LTOp)v2tensors.v2iabc(m, b, a, e) * (LTOp)t1(f, j) +    // PT ORDER = 4
            (1.0/4.0) * (LTOp)t1(e, i) * (LTOp)v2tensors.v2ijka(m, n, j, b) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4
-          -(1.0/4.0) * (LTOp)t1(b, m) * (LTOp)v2tensors.v2iabc(i, a, f, e) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 4, Zero because of T_int
-          -1.0 * (LTOp)t1(b, m) * (LTOp)t1(e, i) * (LTOp)v2tensors.v2ijab(j, m, a, e) +    // PT ORDER = 5, Zero because of T_int
-          1.0 * (LTOp)t1(b, m) * (LTOp)v2tensors.v2ijkl(n, i, j, m) * (LTOp)t1(a, n) +    // PT ORDER = 5, Zero because of T_int
+          -(1.0/4.0) * (LTOp)t1(b, m) * (LTOp)v2tensors.v2iabc(i, a, f, e) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 4
+          -1.0 * (LTOp)t1(b, m) * (LTOp)t1(e, i) * (LTOp)v2tensors.v2ijab(j, m, a, e) +    // PT ORDER = 5
+          1.0 * (LTOp)t1(b, m) * (LTOp)v2tensors.v2ijkl(n, i, j, m) * (LTOp)t1(a, n) +    // PT ORDER = 5
            1.0 * (LTOp)t1(e, i) * (LTOp)v2tensors.v2abcd(a, e, f, b) * (LTOp)t1(f, j) +    // PT ORDER = 5
-          -1.0 * (LTOp)v2tensors.v2ijab(m, i, e, b) * (LTOp)t1(e, j) * (LTOp)t1(a, m) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(i, e, j, b) * (LTOp)t1(a, m) +    // PT ORDER = 5, Zero because of T_int
-          -1.0 * (LTOp)t1(e, i) * (LTOp)v2tensors.v2iajb(m, e, j, b) * (LTOp)t1(a, m) +    // PT ORDER = 5, Zero because of T_int
+          -1.0 * (LTOp)v2tensors.v2ijab(m, i, e, b) * (LTOp)t1(e, j) * (LTOp)t1(a, m) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(i, e, j, b) * (LTOp)t1(a, m) +    // PT ORDER = 5
+          -1.0 * (LTOp)t1(e, i) * (LTOp)v2tensors.v2iajb(m, e, j, b) * (LTOp)t1(a, m) +    // PT ORDER = 5
            (1.0/2.0) * (LTOp)t1(e, i) * (LTOp)v2tensors.v2iajb(m, a, j, b) * (LTOp)t1(e, m) +    // PT ORDER = 5
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)v2tensors.v2iajb(i, a, m, b) * (LTOp)t1(e, j) +    // PT ORDER = 5
-           (1.0/2.0) * (LTOp)t1(b, m) * (LTOp)v2tensors.v2iajb(i, a, j, e) * (LTOp)t1(e, m) +    // PT ORDER = 5, Zero because of T_int
-          -1.0 * (LTOp)t1(b, m) * (LTOp)v2tensors.v2iajb(i, a, m, e) * (LTOp)t1(e, j)      // PT ORDER = 5, Zero because of T_int
+           (1.0/2.0) * (LTOp)t1(b, m) * (LTOp)v2tensors.v2iajb(i, a, j, e) * (LTOp)t1(e, m) +    // PT ORDER = 5
+          -1.0 * (LTOp)t1(b, m) * (LTOp)v2tensors.v2iajb(i, a, m, e) * (LTOp)t1(e, j)      // PT ORDER = 5
            );
 
 vtaijb(a, i, j, b).update(op9);
@@ -1224,31 +1226,31 @@ auto op2 = (
           -(1.0/3.0) * (LTOp)t1(e, m) * (LTOp)t2(f, b, n, o) * (LTOp)f1(f, m) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 4
           -(1.0/3.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(o, f) * (LTOp)t1(e, o) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, b) * (LTOp)t1(e, m) * (LTOp)t2(a, f, n, o) +    // PT ORDER = 4
-           (1.0/6.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(o, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/6.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(o, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 4
            (2.0/3.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(o, f) * (LTOp)t1(f, m) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 4
           -(2.0/3.0) * (LTOp)t1(e, m) * (LTOp)t2(f, b, n, o) * (LTOp)f1(e, n) * (LTOp)t2(a, f, m, o) +    // PT ORDER = 4
-          -(1.0/6.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, o) * (LTOp)f1(e, n) * (LTOp)t2(a, f, m, o) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/6.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, o) * (LTOp)f1(e, n) * (LTOp)t2(a, f, m, o) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t2(f, b, n, o) * (LTOp)f1(a, n) * (LTOp)t2(e, f, m, o) +    // PT ORDER = 4
            (1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, b) * (LTOp)t1(e, o) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 4
-          -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, b) * (LTOp)t1(a, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/4.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(o, f) * (LTOp)t1(a, o) * (LTOp)t2(e, f, m, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/4.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, o) * (LTOp)f1(e, m) * (LTOp)t2(a, f, n, o) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, b) * (LTOp)t1(a, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 4
+           (1.0/4.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(o, f) * (LTOp)t1(a, o) * (LTOp)t2(e, f, m, n) +    // PT ORDER = 4
+           (1.0/4.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, o) * (LTOp)f1(e, m) * (LTOp)t2(a, f, n, o) +    // PT ORDER = 4
           -(1.0/12.0) * (LTOp)t1(e, m) * (LTOp)t2(f, b, n, o) * (LTOp)f1(a, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 4
-           (1.0/12.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, o) * (LTOp)f1(a, n) * (LTOp)t2(e, f, m, o) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/12.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, o) * (LTOp)f1(a, n) * (LTOp)t2(e, f, m, o) +    // PT ORDER = 4
           -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(f, n) * (LTOp)f1(e, b) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 5
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)t1(b, n) * (LTOp)f1(e, f) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/3.0) * (LTOp)t1(e, m) * (LTOp)t1(b, n) * (LTOp)f1(a, f) * (LTOp)t2(e, f, m, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(e, f) * (LTOp)t1(a, m) * (LTOp)t1(f, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, b) * (LTOp)t1(a, m) * (LTOp)t1(f, n) +    // PT ORDER = 5, Zero because of T_int
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)t1(b, n) * (LTOp)f1(e, f) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 5
+          -(1.0/3.0) * (LTOp)t1(e, m) * (LTOp)t1(b, n) * (LTOp)f1(a, f) * (LTOp)t2(e, f, m, n) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(e, f) * (LTOp)t1(a, m) * (LTOp)t1(f, n) +    // PT ORDER = 5
+          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, b) * (LTOp)t1(a, m) * (LTOp)t1(f, n) +    // PT ORDER = 5
           -(1.0/6.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(a, f) * (LTOp)t1(e, m) * (LTOp)t1(f, n) +    // PT ORDER = 5
-           (1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(o, m) * (LTOp)t1(a, n) * (LTOp)t1(e, o) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)t1(b, n) * (LTOp)f1(o, m) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(o, m) * (LTOp)t1(a, o) * (LTOp)t1(e, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)t1(e, n) * (LTOp)f1(o, m) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, b) * (LTOp)t1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 6, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(b, m) * (LTOp)f1(n, e) * (LTOp)t1(a, n) * (LTOp)t1(e, m) +    // PT ORDER = 6, Zero because of T_int
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(b, n) * (LTOp)f1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 6, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(b, m) * (LTOp)t1(e, n) * (LTOp)f1(e, m) * (LTOp)t1(a, n)      // PT ORDER = 6, Zero because of T_int
+           (1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(o, m) * (LTOp)t1(a, n) * (LTOp)t1(e, o) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)t1(b, n) * (LTOp)f1(o, m) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 5
+          -(1.0/2.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(o, m) * (LTOp)t1(a, o) * (LTOp)t1(e, n) +    // PT ORDER = 5
+          -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)t1(e, n) * (LTOp)f1(o, m) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 5
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, b) * (LTOp)t1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 6
+           (1.0/2.0) * (LTOp)t1(b, m) * (LTOp)f1(n, e) * (LTOp)t1(a, n) * (LTOp)t1(e, m) +    // PT ORDER = 6
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(b, n) * (LTOp)f1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 6
+           (1.0/2.0) * (LTOp)t1(b, m) * (LTOp)t1(e, n) * (LTOp)f1(e, m) * (LTOp)t1(a, n)      // PT ORDER = 6
            );
 
 ftab(a, b).update(op2);
@@ -1267,17 +1269,17 @@ auto op3 = (
            (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, g) * (LTOp)t2(e, f, i, o) * (LTOp)t2(a, g, m, n) +    // PT ORDER = 3
            (1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, m) * (LTOp)t1(e, n) * (LTOp)t2(a, f, i, o) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t1(f, m) * (LTOp)t2(a, g, i, n) +    // PT ORDER = 4
-          -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, m) * (LTOp)t1(a, n) * (LTOp)t2(e, f, i, o) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, m) * (LTOp)t1(a, n) * (LTOp)t2(e, f, i, o) +    // PT ORDER = 4
            (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t1(f, i) * (LTOp)t2(a, g, m, n) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, i) * (LTOp)t1(e, m) * (LTOp)t2(a, f, n, o) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, m) * (LTOp)t1(e, o) * (LTOp)t2(a, f, i, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, m) * (LTOp)t1(e, i) * (LTOp)t2(a, f, n, o) +    // PT ORDER = 4
           -(1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, g) * (LTOp)t1(e, m) * (LTOp)t2(f, g, i, n) +    // PT ORDER = 4
-           (1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t1(a, m) * (LTOp)t2(f, g, i, n) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t1(a, m) * (LTOp)t2(f, g, i, n) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t1(g, m) * (LTOp)t2(a, f, i, n) +    // PT ORDER = 4
            (1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, i) * (LTOp)t1(e, o) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 4
-          -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, i) * (LTOp)t1(a, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, m) * (LTOp)t1(a, o) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, i) * (LTOp)t1(a, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 4
+           (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, m) * (LTOp)t1(a, o) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 4
            (1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, g) * (LTOp)t1(e, i) * (LTOp)t2(f, g, m, n) +    // PT ORDER = 4
           -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, g) * (LTOp)t1(g, m) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 4
           -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t1(g, i) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 4
@@ -1287,16 +1289,16 @@ auto op3 = (
           -(2.0/3.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t1(e, n) * (LTOp)t2(a, f, i, m) +    // PT ORDER = 5
           -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(f, n) * (LTOp)f1(e, i) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 5
           -(2.0/3.0) * (LTOp)t1(e, m) * (LTOp)t1(f, n) * (LTOp)f1(f, m) * (LTOp)t2(a, e, i, n) +    // PT ORDER = 5
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 5, Zero because of T_int
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 5
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t1(f, i) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 5
-          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, m) * (LTOp)t1(f, i) * (LTOp)t1(a, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t1(a, n) * (LTOp)t2(e, f, i, m) +    // PT ORDER = 5, Zero because of T_int
+          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, m) * (LTOp)t1(f, i) * (LTOp)t1(a, n) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t1(a, n) * (LTOp)t2(e, f, i, m) +    // PT ORDER = 5
           -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, m) * (LTOp)t1(e, i) * (LTOp)t1(f, n) +    // PT ORDER = 5
-          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, i) * (LTOp)t1(a, m) * (LTOp)t1(f, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, m) * (LTOp)t1(e, i) * (LTOp)t1(a, n) +    // PT ORDER = 6, Zero because of T_int
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, i) * (LTOp)t1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 6, Zero because of T_int
+          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, i) * (LTOp)t1(a, m) * (LTOp)t1(f, n) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, m) * (LTOp)t1(e, i) * (LTOp)t1(a, n) +    // PT ORDER = 6
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, i) * (LTOp)t1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 6
           -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(a, f) * (LTOp)t1(e, i) * (LTOp)t1(f, m) +    // PT ORDER = 6
-          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, f) * (LTOp)t1(f, i) * (LTOp)t1(a, m)      // PT ORDER = 6, Zero because of T_int
+          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, f) * (LTOp)t1(f, i) * (LTOp)t1(a, m)      // PT ORDER = 6
            );
 
 ftia(i, a).update(op3);
@@ -1356,43 +1358,43 @@ op_exec.execute(vtijkl, true, ex_hw);
 
 auto op5 = (
           -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t2(d, c, n, o) * (LTOp)f1(b, n) * (LTOp)t2(a, e, m, o) +    // PT ORDER = 4
-           (1.0/6.0) * (LTOp)t1(c, m) * (LTOp)t2(e, d, n, o) * (LTOp)f1(e, n) * (LTOp)t2(a, b, m, o) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/6.0) * (LTOp)t1(c, m) * (LTOp)t2(e, d, n, o) * (LTOp)f1(e, n) * (LTOp)t2(a, b, m, o) +    // PT ORDER = 4
            (2.0/3.0) * (LTOp)t1(e, m) * (LTOp)t2(d, c, n, o) * (LTOp)f1(e, n) * (LTOp)t2(a, b, m, o) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t2(d, c, n, o) * (LTOp)f1(a, n) * (LTOp)t2(b, e, m, o) +    // PT ORDER = 4
           -(1.0/6.0) * (LTOp)t2(e, d, m, n) * (LTOp)f1(o, c) * (LTOp)t1(e, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 4
-          -(1.0/6.0) * (LTOp)t1(d, m) * (LTOp)t2(e, c, n, o) * (LTOp)f1(e, n) * (LTOp)t2(a, b, m, o) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/12.0) * (LTOp)t2(e, c, m, n) * (LTOp)f1(o, d) * (LTOp)t1(e, o) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/4.0) * (LTOp)t1(c, m) * (LTOp)t2(e, d, n, o) * (LTOp)f1(e, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/6.0) * (LTOp)t1(d, m) * (LTOp)t2(e, c, n, o) * (LTOp)f1(e, n) * (LTOp)t2(a, b, m, o) +    // PT ORDER = 4
+           (1.0/12.0) * (LTOp)t2(e, c, m, n) * (LTOp)f1(o, d) * (LTOp)t1(e, o) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4
+          -(1.0/4.0) * (LTOp)t1(c, m) * (LTOp)t2(e, d, n, o) * (LTOp)f1(e, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t2(e, c, m, n) * (LTOp)f1(o, d) * (LTOp)t1(e, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 4
-          -(2.0/3.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, e) * (LTOp)t1(e, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/4.0) * (LTOp)t1(d, m) * (LTOp)t2(e, c, n, o) * (LTOp)f1(e, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 4, Zero because of T_int
+          -(2.0/3.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, e) * (LTOp)t1(e, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 4
+           (1.0/4.0) * (LTOp)t1(d, m) * (LTOp)t2(e, c, n, o) * (LTOp)f1(e, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 4
            (1.0/12.0) * (LTOp)t1(e, m) * (LTOp)t2(d, c, n, o) * (LTOp)f1(b, m) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 4
-          -(1.0/12.0) * (LTOp)t2(e, d, m, n) * (LTOp)f1(o, c) * (LTOp)t1(e, o) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, e) * (LTOp)t1(a, m) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/12.0) * (LTOp)t2(e, d, m, n) * (LTOp)f1(o, c) * (LTOp)t1(e, o) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4
+          -(1.0/6.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, e) * (LTOp)t1(a, m) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 4
           -(1.0/12.0) * (LTOp)t1(e, m) * (LTOp)t2(d, c, n, o) * (LTOp)f1(a, m) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 4
-           (1.0/6.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, e) * (LTOp)t1(b, m) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/4.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, e) * (LTOp)t1(a, o) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/4.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, e) * (LTOp)t1(b, o) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(c, m) * (LTOp)t2(e, d, n, o) * (LTOp)f1(b, n) * (LTOp)t2(a, e, m, o) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/6.0) * (LTOp)t1(c, m) * (LTOp)t2(e, d, n, o) * (LTOp)f1(a, n) * (LTOp)t2(b, e, m, o) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(d, m) * (LTOp)t2(e, c, n, o) * (LTOp)f1(a, n) * (LTOp)t2(b, e, m, o) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/6.0) * (LTOp)t1(d, m) * (LTOp)t2(e, c, n, o) * (LTOp)f1(b, n) * (LTOp)t2(a, e, m, o) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t2(e, c, m, n) * (LTOp)f1(o, d) * (LTOp)t1(b, m) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/6.0) * (LTOp)t2(e, c, m, n) * (LTOp)f1(o, d) * (LTOp)t1(a, m) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/6.0) * (LTOp)t2(e, d, m, n) * (LTOp)f1(o, c) * (LTOp)t1(b, m) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t2(e, d, m, n) * (LTOp)f1(o, c) * (LTOp)t1(a, m) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(d, n) * (LTOp)f1(e, c) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/3.0) * (LTOp)t2(e, d, m, n) * (LTOp)f1(e, c) * (LTOp)t1(a, m) * (LTOp)t1(b, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(d, m) * (LTOp)t1(c, n) * (LTOp)f1(o, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(c, m) * (LTOp)t1(d, n) * (LTOp)f1(o, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/3.0) * (LTOp)t2(e, c, m, n) * (LTOp)f1(e, d) * (LTOp)t1(a, m) * (LTOp)t1(b, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(c, n) * (LTOp)f1(e, d) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/6.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(a, e) * (LTOp)t1(b, m) * (LTOp)t1(e, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(b, e) * (LTOp)t1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, m) * (LTOp)t1(a, n) * (LTOp)t1(b, o) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, m) * (LTOp)t1(a, o) * (LTOp)t1(b, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/3.0) * (LTOp)t1(d, m) * (LTOp)t1(c, n) * (LTOp)f1(a, e) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/3.0) * (LTOp)t1(d, m) * (LTOp)t1(c, n) * (LTOp)f1(b, e) * (LTOp)t2(a, e, m, n)      // PT ORDER = 5, Zero because of T_int
+           (1.0/6.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, e) * (LTOp)t1(b, m) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 4
+          -(1.0/4.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, e) * (LTOp)t1(a, o) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 4
+           (1.0/4.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, e) * (LTOp)t1(b, o) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4
+          -(1.0/6.0) * (LTOp)t1(c, m) * (LTOp)t2(e, d, n, o) * (LTOp)f1(b, n) * (LTOp)t2(a, e, m, o) +    // PT ORDER = 4
+           (1.0/6.0) * (LTOp)t1(c, m) * (LTOp)t2(e, d, n, o) * (LTOp)f1(a, n) * (LTOp)t2(b, e, m, o) +    // PT ORDER = 4
+          -(1.0/6.0) * (LTOp)t1(d, m) * (LTOp)t2(e, c, n, o) * (LTOp)f1(a, n) * (LTOp)t2(b, e, m, o) +    // PT ORDER = 4
+           (1.0/6.0) * (LTOp)t1(d, m) * (LTOp)t2(e, c, n, o) * (LTOp)f1(b, n) * (LTOp)t2(a, e, m, o) +    // PT ORDER = 4
+          -(1.0/6.0) * (LTOp)t2(e, c, m, n) * (LTOp)f1(o, d) * (LTOp)t1(b, m) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 4
+           (1.0/6.0) * (LTOp)t2(e, c, m, n) * (LTOp)f1(o, d) * (LTOp)t1(a, m) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 4
+           (1.0/6.0) * (LTOp)t2(e, d, m, n) * (LTOp)f1(o, c) * (LTOp)t1(b, m) * (LTOp)t2(a, e, n, o) +    // PT ORDER = 4
+          -(1.0/6.0) * (LTOp)t2(e, d, m, n) * (LTOp)f1(o, c) * (LTOp)t1(a, m) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 4
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(d, n) * (LTOp)f1(e, c) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 5
+           (1.0/3.0) * (LTOp)t2(e, d, m, n) * (LTOp)f1(e, c) * (LTOp)t1(a, m) * (LTOp)t1(b, n) +    // PT ORDER = 5
+          -(1.0/2.0) * (LTOp)t1(d, m) * (LTOp)t1(c, n) * (LTOp)f1(o, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(c, m) * (LTOp)t1(d, n) * (LTOp)f1(o, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 5
+          -(1.0/3.0) * (LTOp)t2(e, c, m, n) * (LTOp)f1(e, d) * (LTOp)t1(a, m) * (LTOp)t1(b, n) +    // PT ORDER = 5
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(c, n) * (LTOp)f1(e, d) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 5
+           (1.0/6.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(a, e) * (LTOp)t1(b, m) * (LTOp)t1(e, n) +    // PT ORDER = 5
+          -(1.0/6.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(b, e) * (LTOp)t1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 5
+          -(1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, m) * (LTOp)t1(a, n) * (LTOp)t1(b, o) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t2(d, c, m, n) * (LTOp)f1(o, m) * (LTOp)t1(a, o) * (LTOp)t1(b, n) +    // PT ORDER = 5
+           (1.0/3.0) * (LTOp)t1(d, m) * (LTOp)t1(c, n) * (LTOp)f1(a, e) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 5
+          -(1.0/3.0) * (LTOp)t1(d, m) * (LTOp)t1(c, n) * (LTOp)f1(b, e) * (LTOp)t2(a, e, m, n)      // PT ORDER = 5
            );
 
 vtabcd(a, b, c, d).update(op5);
@@ -1419,19 +1421,19 @@ auto op6 = (
           -(1.0/24.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(k, g) * (LTOp)t2(e, f, i, j) * (LTOp)t2(a, g, m, n) +    // PT ORDER = 3
            (1.0/3.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(n, g) * (LTOp)t2(e, f, i, n) * (LTOp)t2(a, g, j, m) +    // PT ORDER = 3
           -(1.0/3.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(n, g) * (LTOp)t2(a, g, i, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 3
-           (1.0/12.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(n, i) * (LTOp)t1(a, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/12.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(n, i) * (LTOp)t1(a, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 4
           -(1.0/6.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(n, i) * (LTOp)t1(e, m) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(e, g) * (LTOp)t1(f, m) * (LTOp)t2(a, g, i, j) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(a, g) * (LTOp)t1(e, m) * (LTOp)t2(f, g, i, j) +    // PT ORDER = 4
            (1.0/12.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(a, g) * (LTOp)t1(g, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4
-          -(1.0/12.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(n, j) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/12.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(n, j) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(n, j) * (LTOp)t1(e, m) * (LTOp)t2(a, f, i, n) +    // PT ORDER = 4
-          -(1.0/2.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(e, g) * (LTOp)t1(a, m) * (LTOp)t2(f, g, i, j) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/2.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(e, g) * (LTOp)t1(a, m) * (LTOp)t2(f, g, i, j) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(e, g) * (LTOp)t1(g, m) * (LTOp)t2(a, f, i, j) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(n, m) * (LTOp)t1(e, n) * (LTOp)t2(a, f, i, j) +    // PT ORDER = 4
-          -(1.0/4.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(n, m) * (LTOp)t1(a, n) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/4.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(n, m) * (LTOp)t1(a, n) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4
           -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(k, m) * (LTOp)t1(e, n) * (LTOp)t2(a, f, i, j) +    // PT ORDER = 4
-           (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(k, m) * (LTOp)t1(a, n) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(k, m) * (LTOp)t1(a, n) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(n, m) * (LTOp)t1(e, i) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(n, m) * (LTOp)t1(e, j) * (LTOp)t2(a, f, i, n) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(e, g) * (LTOp)t1(f, i) * (LTOp)t2(a, g, j, m) +    // PT ORDER = 4
@@ -1450,14 +1452,14 @@ auto op6 = (
            (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(k, f) * (LTOp)t1(f, m) * (LTOp)t2(a, e, i, j) +    // PT ORDER = 5
           -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(f, k) * (LTOp)f1(e, i) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 5
            (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(k, f) * (LTOp)t1(e, j) * (LTOp)t2(a, f, i, m) +    // PT ORDER = 5
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(k, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(e, k) * (LTOp)f1(m, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 5, Zero because of T_int
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(k, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 5
+          -(1.0/2.0) * (LTOp)t1(e, k) * (LTOp)f1(m, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 5
            (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(f, k) * (LTOp)f1(e, j) * (LTOp)t2(a, f, i, m) +    // PT ORDER = 5
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)t1(f, k) * (LTOp)f1(f, m) * (LTOp)t2(a, e, i, j) +    // PT ORDER = 5
            (1.0/3.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(a, m) * (LTOp)t1(e, i) * (LTOp)t1(f, j) +    // PT ORDER = 5
           -(1.0/2.0) * (LTOp)t1(e, k) * (LTOp)f1(m, f) * (LTOp)t1(f, i) * (LTOp)t2(a, e, j, m) +    // PT ORDER = 5
-          -(1.0/3.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(e, j) * (LTOp)t1(f, i) * (LTOp)t1(a, m) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/3.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(e, i) * (LTOp)t1(a, m) * (LTOp)t1(f, j) +    // PT ORDER = 5, Zero because of T_int
+          -(1.0/3.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(e, j) * (LTOp)t1(f, i) * (LTOp)t1(a, m) +    // PT ORDER = 5
+           (1.0/3.0) * (LTOp)t2(e, f, m, k) * (LTOp)f1(e, i) * (LTOp)t1(a, m) * (LTOp)t1(f, j) +    // PT ORDER = 5
            (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(f, k) * (LTOp)f1(a, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 5
            (1.0/2.0) * (LTOp)t1(e, k) * (LTOp)f1(m, f) * (LTOp)t1(e, m) * (LTOp)t2(a, f, i, j) +    // PT ORDER = 5
            (1.0/2.0) * (LTOp)t1(e, k) * (LTOp)f1(m, f) * (LTOp)t1(f, j) * (LTOp)t2(a, e, i, m)      // PT ORDER = 5
@@ -1475,60 +1477,60 @@ auto op7 = (
            (1.0/3.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, f) * (LTOp)t2(c, e, i, o) * (LTOp)t2(b, f, m, n) +    // PT ORDER = 3
            (1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, f) * (LTOp)t2(c, f, m, o) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 3
           -(2.0/3.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, f) * (LTOp)t2(c, f, i, m) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 3
-          -(1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, f) * (LTOp)t2(c, b, i, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 3, Zero because of T_int
+          -(1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, f) * (LTOp)t2(c, b, i, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 3
            (2.0/3.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, f) * (LTOp)t2(c, b, m, o) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 3
           -(1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, a) * (LTOp)t2(c, e, i, m) * (LTOp)t2(b, f, n, o) +    // PT ORDER = 3
            (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, a) * (LTOp)t2(c, e, m, o) * (LTOp)t2(b, f, i, n) +    // PT ORDER = 3
           -(1.0/4.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, f) * (LTOp)t2(c, b, i, o) * (LTOp)t2(e, f, m, n) +    // PT ORDER = 3
           -(1.0/3.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, f) * (LTOp)t2(c, f, m, n) * (LTOp)t2(b, e, i, o) +    // PT ORDER = 3
-          -(1.0/12.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, f) * (LTOp)t2(c, b, m, n) * (LTOp)t2(e, f, i, o) +    // PT ORDER = 3, Zero because of T_int
+          -(1.0/12.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, f) * (LTOp)t2(c, b, m, n) * (LTOp)t2(e, f, i, o) +    // PT ORDER = 3
           -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, a) * (LTOp)t2(c, e, i, o) * (LTOp)t2(b, f, m, n) +    // PT ORDER = 3
           -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, a) * (LTOp)t2(c, e, m, n) * (LTOp)t2(b, f, i, o) +    // PT ORDER = 3
-           (1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, a) * (LTOp)t2(c, b, i, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 3, Zero because of T_int
+           (1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, a) * (LTOp)t2(c, b, i, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 3
           -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, a) * (LTOp)t2(c, b, m, o) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 3
-           (1.0/24.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, a) * (LTOp)t2(c, b, m, n) * (LTOp)t2(e, f, i, o) +    // PT ORDER = 3, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(e, f) * (LTOp)t1(b, m) * (LTOp)t2(c, f, i, n) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/24.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, a) * (LTOp)t2(c, b, m, n) * (LTOp)t2(e, f, i, o) +    // PT ORDER = 3
+          -(1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(e, f) * (LTOp)t1(b, m) * (LTOp)t2(c, f, i, n) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, i) * (LTOp)t1(e, m) * (LTOp)t2(c, b, n, o) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(e, f) * (LTOp)t1(f, m) * (LTOp)t2(c, b, i, n) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(b, f) * (LTOp)t1(e, m) * (LTOp)t2(c, f, i, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, m) * (LTOp)t1(e, o) * (LTOp)t2(c, b, i, n) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, m) * (LTOp)t1(e, n) * (LTOp)t2(c, b, i, o) +    // PT ORDER = 4
-          -(1.0/4.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(e, f) * (LTOp)t1(f, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/12.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, i) * (LTOp)t1(e, o) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/4.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(e, f) * (LTOp)t1(f, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 4
+           (1.0/12.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, i) * (LTOp)t1(e, o) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, m) * (LTOp)t1(e, i) * (LTOp)t2(c, b, n, o) +    // PT ORDER = 4
           -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, a) * (LTOp)t1(f, m) * (LTOp)t2(c, b, i, n) +    // PT ORDER = 4
           -(1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(c, f) * (LTOp)t1(e, m) * (LTOp)t2(b, f, i, n) +    // PT ORDER = 4
-           (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, a) * (LTOp)t1(f, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, a) * (LTOp)t1(f, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 4
           -(1.0/12.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(b, f) * (LTOp)t1(e, i) * (LTOp)t2(c, f, m, n) +    // PT ORDER = 4
-           (1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(e, f) * (LTOp)t1(c, m) * (LTOp)t2(b, f, i, n) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(e, f) * (LTOp)t1(c, m) * (LTOp)t2(b, f, i, n) +    // PT ORDER = 4
            (1.0/12.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(c, f) * (LTOp)t1(e, i) * (LTOp)t2(b, f, m, n) +    // PT ORDER = 4
-          -(1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, m) * (LTOp)t1(b, n) * (LTOp)t2(c, e, i, o) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, m) * (LTOp)t1(c, n) * (LTOp)t2(b, e, i, o) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, i) * (LTOp)t1(b, m) * (LTOp)t2(c, e, n, o) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, m) * (LTOp)t1(b, o) * (LTOp)t2(c, e, i, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, i) * (LTOp)t1(c, m) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, m) * (LTOp)t1(c, o) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, a) * (LTOp)t1(b, m) * (LTOp)t2(c, f, i, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(c, f) * (LTOp)t1(b, m) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, m) * (LTOp)t1(b, n) * (LTOp)t2(c, e, i, o) +    // PT ORDER = 4
+           (1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, m) * (LTOp)t1(c, n) * (LTOp)t2(b, e, i, o) +    // PT ORDER = 4
+          -(1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, i) * (LTOp)t1(b, m) * (LTOp)t2(c, e, n, o) +    // PT ORDER = 4
+           (1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, m) * (LTOp)t1(b, o) * (LTOp)t2(c, e, i, n) +    // PT ORDER = 4
+           (1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, i) * (LTOp)t1(c, m) * (LTOp)t2(b, e, n, o) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(o, m) * (LTOp)t1(c, o) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 4
+           (1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, a) * (LTOp)t1(b, m) * (LTOp)t2(c, f, i, n) +    // PT ORDER = 4
+           (1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(c, f) * (LTOp)t1(b, m) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 4
           -(1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(b, f) * (LTOp)t1(f, m) * (LTOp)t2(c, e, i, n) +    // PT ORDER = 4
-          -(1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(b, f) * (LTOp)t1(c, m) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(b, f) * (LTOp)t1(c, m) * (LTOp)t2(e, f, i, n) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(c, f) * (LTOp)t1(f, m) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 4
-          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, a) * (LTOp)t1(c, m) * (LTOp)t2(b, f, i, n) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(n, e) * (LTOp)t1(b, n) * (LTOp)t2(c, e, i, m) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(a, n) * (LTOp)f1(e, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(n, e) * (LTOp)t1(c, n) * (LTOp)t2(b, e, i, m) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, a) * (LTOp)t1(e, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/3.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(e, i) * (LTOp)t1(c, m) * (LTOp)t1(b, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(a, n) * (LTOp)f1(b, m) * (LTOp)t2(c, e, i, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/3.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(c, m) * (LTOp)t1(e, i) * (LTOp)t1(b, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, a) * (LTOp)t1(c, m) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(n, e) * (LTOp)t1(e, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/3.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(b, m) * (LTOp)t1(c, n) * (LTOp)t1(e, i) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, a) * (LTOp)t1(b, m) * (LTOp)t2(c, e, i, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(a, n) * (LTOp)f1(c, m) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(n, e) * (LTOp)t1(e, m) * (LTOp)t2(c, b, i, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, a) * (LTOp)t1(e, n) * (LTOp)t2(c, b, i, m) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(a, m) * (LTOp)t1(e, n) * (LTOp)f1(e, m) * (LTOp)t2(c, b, i, n)      // PT ORDER = 5, Zero because of T_int
+          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, a) * (LTOp)t1(c, m) * (LTOp)t2(b, f, i, n) +    // PT ORDER = 4
+          -(1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(n, e) * (LTOp)t1(b, n) * (LTOp)t2(c, e, i, m) +    // PT ORDER = 5
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(a, n) * (LTOp)f1(e, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(n, e) * (LTOp)t1(c, n) * (LTOp)t2(b, e, i, m) +    // PT ORDER = 5
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, a) * (LTOp)t1(e, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 5
+          -(1.0/3.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(e, i) * (LTOp)t1(c, m) * (LTOp)t1(b, n) +    // PT ORDER = 5
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(a, n) * (LTOp)f1(b, m) * (LTOp)t2(c, e, i, n) +    // PT ORDER = 5
+          -(1.0/3.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(c, m) * (LTOp)t1(e, i) * (LTOp)t1(b, n) +    // PT ORDER = 5
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, a) * (LTOp)t1(c, m) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(n, e) * (LTOp)t1(e, i) * (LTOp)t2(c, b, m, n) +    // PT ORDER = 5
+           (1.0/3.0) * (LTOp)t2(e, a, m, n) * (LTOp)f1(b, m) * (LTOp)t1(c, n) * (LTOp)t1(e, i) +    // PT ORDER = 5
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, a) * (LTOp)t1(b, m) * (LTOp)t2(c, e, i, n) +    // PT ORDER = 5
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(a, n) * (LTOp)f1(c, m) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 5
+          -(1.0/2.0) * (LTOp)t1(a, m) * (LTOp)f1(n, e) * (LTOp)t1(e, m) * (LTOp)t2(c, b, i, n) +    // PT ORDER = 5
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, a) * (LTOp)t1(e, n) * (LTOp)t2(c, b, i, m) +    // PT ORDER = 5
+          -(1.0/2.0) * (LTOp)t1(a, m) * (LTOp)t1(e, n) * (LTOp)f1(e, m) * (LTOp)t2(c, b, i, n)      // PT ORDER = 5
            );
 
 vtiabc(i, a, b, c).update(op7);
@@ -1539,7 +1541,7 @@ op_exec.execute(vtiabc, true, ex_hw);
 
 auto op8 = (
           -(1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, m) * (LTOp)t2(a, e, i, j) * (LTOp)t2(b, f, n, o) +    // PT ORDER = 3
-           (1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t2(a, b, i, m) * (LTOp)t2(f, g, j, n) +    // PT ORDER = 3, Zero because of T_int
+           (1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t2(a, b, i, m) * (LTOp)t2(f, g, j, n) +    // PT ORDER = 3
           -(1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t2(a, f, i, m) * (LTOp)t2(b, g, j, n) +    // PT ORDER = 3
            (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, m) * (LTOp)t2(e, f, i, j) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 3
            (1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, m) * (LTOp)t2(b, e, i, j) * (LTOp)t2(a, f, n, o) +    // PT ORDER = 3
@@ -1548,7 +1550,7 @@ auto op8 = (
            (1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t2(f, g, i, m) * (LTOp)t2(a, b, j, n) +    // PT ORDER = 3
           -(1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t2(b, g, i, m) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 3
           -(1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, j) * (LTOp)t2(b, e, i, m) * (LTOp)t2(a, f, n, o) +    // PT ORDER = 3
-          -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t2(f, g, i, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3, Zero because of T_int
+          -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t2(f, g, i, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3
           -(1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(b, g) * (LTOp)t2(a, e, i, m) * (LTOp)t2(f, g, j, n) +    // PT ORDER = 3
            (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(b, g) * (LTOp)t2(e, g, i, m) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 3
            (1.0/2.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, g) * (LTOp)t2(b, f, i, m) * (LTOp)t2(a, g, j, n) +    // PT ORDER = 3
@@ -1570,14 +1572,14 @@ auto op8 = (
            (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, g) * (LTOp)t2(b, e, i, m) * (LTOp)t2(f, g, j, n) +    // PT ORDER = 3
           -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(b, g) * (LTOp)t2(e, g, i, j) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 3
           -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, i) * (LTOp)t2(a, b, m, o) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 3
-          -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, j) * (LTOp)t2(a, b, i, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 3, Zero because of T_int
+          -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, j) * (LTOp)t2(a, b, i, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 3
           -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(b, g) * (LTOp)t2(e, f, i, m) * (LTOp)t2(a, g, j, n) +    // PT ORDER = 3
           -(1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, m) * (LTOp)t2(a, b, i, n) * (LTOp)t2(e, f, j, o) +    // PT ORDER = 3
            (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, m) * (LTOp)t2(a, b, i, o) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 3
           -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, j) * (LTOp)t2(e, f, i, m) * (LTOp)t2(a, b, n, o) +    // PT ORDER = 3
-           (1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, i) * (LTOp)t2(a, b, j, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 3, Zero because of T_int
+           (1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, i) * (LTOp)t2(a, b, j, m) * (LTOp)t2(e, f, n, o) +    // PT ORDER = 3
            (1.0/24.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(b, g) * (LTOp)t2(e, f, i, j) * (LTOp)t2(a, g, m, n) +    // PT ORDER = 3
-           (1.0/24.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, i) * (LTOp)t2(a, b, m, n) * (LTOp)t2(e, f, j, o) +    // PT ORDER = 3, Zero because of T_int
+           (1.0/24.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, i) * (LTOp)t2(a, b, m, n) * (LTOp)t2(e, f, j, o) +    // PT ORDER = 3
           -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, j) * (LTOp)t2(b, e, i, o) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 3
           -(1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, g) * (LTOp)t2(b, e, i, j) * (LTOp)t2(f, g, m, n) +    // PT ORDER = 3
            (1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, g) * (LTOp)t2(e, f, i, m) * (LTOp)t2(b, g, j, n) +    // PT ORDER = 3
@@ -1586,18 +1588,18 @@ auto op8 = (
            (1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, g) * (LTOp)t2(b, g, i, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 3
            (1.0/12.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, g) * (LTOp)t2(e, g, i, j) * (LTOp)t2(b, f, m, n) +    // PT ORDER = 3
            (1.0/4.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, m) * (LTOp)t2(e, f, i, o) * (LTOp)t2(a, b, j, n) +    // PT ORDER = 3
-          -(1.0/24.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, j) * (LTOp)t2(e, f, i, o) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3, Zero because of T_int
+          -(1.0/24.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(o, j) * (LTOp)t2(e, f, i, o) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 3
           -(1.0/24.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, g) * (LTOp)t2(e, f, i, j) * (LTOp)t2(b, g, m, n) +    // PT ORDER = 3
-          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, m) * (LTOp)t1(b, n) * (LTOp)t2(a, f, i, j) +    // PT ORDER = 4, Zero because of T_int
-           (2.0/3.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t2(e, f, i, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, m) * (LTOp)t1(a, n) * (LTOp)t2(b, f, i, j) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, m) * (LTOp)t1(b, n) * (LTOp)t2(a, f, i, j) +    // PT ORDER = 4
+           (2.0/3.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t2(e, f, i, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4
+           (1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, m) * (LTOp)t1(a, n) * (LTOp)t2(b, f, i, j) +    // PT ORDER = 4
            (2.0/3.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t2(b, f, i, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t2(e, f, i, m) * (LTOp)t2(a, b, j, n) +    // PT ORDER = 4
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t2(e, f, i, n) * (LTOp)t2(a, b, j, m) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t2(e, f, i, n) * (LTOp)t2(a, b, j, m) +    // PT ORDER = 4
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t2(b, f, i, j) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4
           -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, m) * (LTOp)t1(f, j) * (LTOp)t2(a, b, i, n) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t2(a, b, i, n) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 4
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t2(a, b, i, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t2(a, b, i, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 4
           -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, m) * (LTOp)t1(e, n) * (LTOp)t2(b, f, i, j) +    // PT ORDER = 4
            (1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, j) * (LTOp)t1(f, m) * (LTOp)t2(a, b, i, n) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t2(a, f, i, j) * (LTOp)t2(b, e, m, n) +    // PT ORDER = 4
@@ -1608,43 +1610,43 @@ auto op8 = (
           -(2.0/3.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t2(a, e, i, n) * (LTOp)t2(b, f, j, m) +    // PT ORDER = 4
            (1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, m) * (LTOp)t1(f, i) * (LTOp)t2(a, b, j, n) +    // PT ORDER = 4
           -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, i) * (LTOp)t1(f, m) * (LTOp)t2(a, b, j, n) +    // PT ORDER = 4
-          -(1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, j) * (LTOp)t1(f, i) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, i) * (LTOp)t1(f, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, j) * (LTOp)t1(f, i) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4
+           (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, i) * (LTOp)t1(f, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 4
            (2.0/3.0) * (LTOp)t1(e, m) * (LTOp)f1(n, f) * (LTOp)t2(b, e, i, n) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 4
-           (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, m) * (LTOp)t1(b, n) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(b, m) * (LTOp)t1(a, n) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, i) * (LTOp)t1(a, m) * (LTOp)t2(b, f, j, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, j) * (LTOp)t1(a, m) * (LTOp)t2(b, f, i, n) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, j) * (LTOp)t1(b, m) * (LTOp)t2(a, f, i, n) +    // PT ORDER = 4, Zero because of T_int
-           (1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, i) * (LTOp)t1(b, m) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, m) * (LTOp)t1(b, n) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4
+          -(1.0/6.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(b, m) * (LTOp)t1(a, n) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 4
+          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, i) * (LTOp)t1(a, m) * (LTOp)t2(b, f, j, n) +    // PT ORDER = 4
+           (1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, j) * (LTOp)t1(a, m) * (LTOp)t2(b, f, i, n) +    // PT ORDER = 4
+          -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, j) * (LTOp)t1(b, m) * (LTOp)t2(a, f, i, n) +    // PT ORDER = 4
+           (1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(e, i) * (LTOp)t1(b, m) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 4
           -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(b, m) * (LTOp)t1(e, j) * (LTOp)t2(a, f, i, n) +    // PT ORDER = 4
            (1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(b, m) * (LTOp)t1(e, i) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 4
            (1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, m) * (LTOp)t1(e, j) * (LTOp)t2(b, f, i, n) +    // PT ORDER = 4
           -(1.0/3.0) * (LTOp)t2(e, f, m, n) * (LTOp)f1(a, m) * (LTOp)t1(e, i) * (LTOp)t2(b, f, j, n) +    // PT ORDER = 4
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, j) * (LTOp)t1(b, m) * (LTOp)t2(a, e, i, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(b, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 5, Zero because of T_int
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, j) * (LTOp)t1(b, m) * (LTOp)t2(a, e, i, n) +    // PT ORDER = 5
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(b, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 5
            (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(a, f) * (LTOp)t1(e, j) * (LTOp)t2(b, f, i, m) +    // PT ORDER = 5
            (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(b, f) * (LTOp)t1(e, i) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 5
           -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(b, f) * (LTOp)t1(e, j) * (LTOp)t2(a, f, i, m) +    // PT ORDER = 5
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, j) * (LTOp)t1(e, i) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, i) * (LTOp)t1(e, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, i) * (LTOp)t1(b, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, i) * (LTOp)t1(e, n) * (LTOp)t2(a, b, j, m) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(a, f) * (LTOp)t1(b, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, j) * (LTOp)t1(e, n) * (LTOp)t2(a, b, i, m) +    // PT ORDER = 5, Zero because of T_int
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, j) * (LTOp)t1(e, i) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 5
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, i) * (LTOp)t1(e, j) * (LTOp)t2(a, b, m, n) +    // PT ORDER = 5
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, i) * (LTOp)t1(b, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 5
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, i) * (LTOp)t1(e, n) * (LTOp)t2(a, b, j, m) +    // PT ORDER = 5
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(a, f) * (LTOp)t1(b, m) * (LTOp)t2(e, f, i, j) +    // PT ORDER = 5
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, j) * (LTOp)t1(e, n) * (LTOp)t2(a, b, i, m) +    // PT ORDER = 5
           -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(b, f) * (LTOp)t1(f, m) * (LTOp)t2(a, e, i, j) +    // PT ORDER = 5
-          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, j) * (LTOp)t1(a, m) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, f) * (LTOp)t1(b, m) * (LTOp)t2(a, f, i, j) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, m) * (LTOp)t1(b, n) * (LTOp)t2(a, e, i, j) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, m) * (LTOp)t1(a, n) * (LTOp)t2(b, e, i, j) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, f) * (LTOp)t1(a, m) * (LTOp)t2(b, f, i, j) +    // PT ORDER = 5, Zero because of T_int
+          -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, j) * (LTOp)t1(a, m) * (LTOp)t2(b, e, i, n) +    // PT ORDER = 5
+          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, f) * (LTOp)t1(b, m) * (LTOp)t2(a, f, i, j) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, m) * (LTOp)t1(b, n) * (LTOp)t2(a, e, i, j) +    // PT ORDER = 5
+          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, m) * (LTOp)t1(a, n) * (LTOp)t2(b, e, i, j) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, f) * (LTOp)t1(a, m) * (LTOp)t2(b, f, i, j) +    // PT ORDER = 5
            (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, m) * (LTOp)t1(e, j) * (LTOp)t2(a, b, i, n) +    // PT ORDER = 5
-          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, f) * (LTOp)t1(f, j) * (LTOp)t2(a, b, i, m) +    // PT ORDER = 5, Zero because of T_int
+          -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, f) * (LTOp)t1(f, j) * (LTOp)t2(a, b, i, m) +    // PT ORDER = 5
            (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(a, f) * (LTOp)t1(f, m) * (LTOp)t2(b, e, i, j) +    // PT ORDER = 5
           -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(a, f) * (LTOp)t1(e, i) * (LTOp)t2(b, f, j, m) +    // PT ORDER = 5
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, i) * (LTOp)t1(a, m) * (LTOp)t2(b, e, j, n) +    // PT ORDER = 5, Zero because of T_int
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)f1(n, i) * (LTOp)t1(a, m) * (LTOp)t2(b, e, j, n) +    // PT ORDER = 5
           -(1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(n, m) * (LTOp)t1(e, i) * (LTOp)t2(a, b, j, n) +    // PT ORDER = 5
-           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, f) * (LTOp)t1(f, i) * (LTOp)t2(a, b, j, m)      // PT ORDER = 5, Zero because of T_int
+           (1.0/2.0) * (LTOp)t1(e, m) * (LTOp)f1(e, f) * (LTOp)t1(f, i) * (LTOp)t2(a, b, j, m)      // PT ORDER = 5
            );
 
 vtijab(i, j, a, b).update(op8);
@@ -1654,46 +1656,46 @@ op_exec.execute(vtijab, true, ex_hw);
 //PHHP
 
 auto op9 = (
-          -(1.0/6.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(n, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/6.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(n, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 4
           -(2.0/3.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(n, f) * (LTOp)t1(f, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 4
           -(1.0/6.0) * (LTOp)t2(e, f, m, i) * (LTOp)f1(n, b) * (LTOp)t1(e, m) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t2(f, b, n, i) * (LTOp)f1(a, n) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 4
           -(2.0/3.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(n, f) * (LTOp)t1(e, n) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 4
-           (1.0/12.0) * (LTOp)t2(e, f, m, i) * (LTOp)f1(n, b) * (LTOp)t1(a, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/12.0) * (LTOp)t2(e, f, m, i) * (LTOp)f1(n, b) * (LTOp)t1(a, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 4
           -(1.0/6.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(i, f) * (LTOp)t1(e, m) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 4
           -(2.0/3.0) * (LTOp)t1(e, m) * (LTOp)t2(f, b, n, i) * (LTOp)f1(e, n) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t2(f, b, n, i) * (LTOp)f1(f, j) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4
           -(1.0/6.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(n, f) * (LTOp)t1(e, j) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 4
            (1.0/12.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(i, f) * (LTOp)t1(e, j) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 4
-          -(1.0/6.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, i) * (LTOp)f1(e, n) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 4, Zero because of T_int
+          -(1.0/6.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, i) * (LTOp)f1(e, n) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 4
           -(1.0/6.0) * (LTOp)t1(e, i) * (LTOp)t2(f, b, m, n) * (LTOp)f1(f, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 4
           -(2.0/3.0) * (LTOp)t1(e, m) * (LTOp)t2(f, b, n, i) * (LTOp)f1(f, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 4
-           (1.0/12.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, i) * (LTOp)f1(a, n) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/12.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, i) * (LTOp)f1(a, n) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 4
            (1.0/12.0) * (LTOp)t1(e, i) * (LTOp)t2(f, b, m, n) * (LTOp)f1(f, j) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4
           -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t2(f, b, n, i) * (LTOp)f1(e, j) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 4
-           (1.0/2.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, i) * (LTOp)f1(e, m) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 4, Zero because of T_int
-          -(1.0/6.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, i) * (LTOp)f1(e, j) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/2.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, i) * (LTOp)f1(e, m) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 4
+          -(1.0/6.0) * (LTOp)t1(b, m) * (LTOp)t2(e, f, n, i) * (LTOp)f1(e, j) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 4
           -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t2(f, b, n, i) * (LTOp)f1(a, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t1(e, i) * (LTOp)t2(f, b, m, n) * (LTOp)f1(e, m) * (LTOp)t2(a, f, j, n) +    // PT ORDER = 4
           -(1.0/6.0) * (LTOp)t1(e, i) * (LTOp)t2(f, b, m, n) * (LTOp)f1(a, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(i, f) * (LTOp)t1(f, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 4
-           (1.0/6.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(i, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/6.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(i, f) * (LTOp)t1(a, m) * (LTOp)t2(e, f, j, n) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t2(e, f, m, i) * (LTOp)f1(n, b) * (LTOp)t1(e, n) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 4
            (1.0/6.0) * (LTOp)t2(e, f, m, i) * (LTOp)f1(n, b) * (LTOp)t1(e, j) * (LTOp)t2(a, f, m, n) +    // PT ORDER = 4
-           (1.0/2.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(n, f) * (LTOp)t1(a, n) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 4, Zero because of T_int
+           (1.0/2.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(n, f) * (LTOp)t1(a, n) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 4
            (1.0/2.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(n, f) * (LTOp)t1(f, j) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 4
-           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(b, n) * (LTOp)f1(i, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)t1(e, i) * (LTOp)f1(e, f) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/3.0) * (LTOp)t1(b, m) * (LTOp)t1(e, i) * (LTOp)f1(a, f) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 5, Zero because of T_int
-          -(1.0/3.0) * (LTOp)t1(b, m) * (LTOp)t1(e, i) * (LTOp)f1(n, j) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t1(b, m) * (LTOp)t1(e, i) * (LTOp)f1(n, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 5, Zero because of T_int
+           (1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(b, n) * (LTOp)f1(i, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 5
+          -(1.0/2.0) * (LTOp)t1(b, m) * (LTOp)t1(e, i) * (LTOp)f1(e, f) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 5
+           (1.0/3.0) * (LTOp)t1(b, m) * (LTOp)t1(e, i) * (LTOp)f1(a, f) * (LTOp)t2(e, f, j, m) +    // PT ORDER = 5
+          -(1.0/3.0) * (LTOp)t1(b, m) * (LTOp)t1(e, i) * (LTOp)f1(n, j) * (LTOp)t2(a, e, m, n) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t1(b, m) * (LTOp)t1(e, i) * (LTOp)f1(n, m) * (LTOp)t2(a, e, j, n) +    // PT ORDER = 5
           -(1.0/6.0) * (LTOp)t1(e, m) * (LTOp)t1(f, i) * (LTOp)f1(e, b) * (LTOp)t2(a, f, j, m) +    // PT ORDER = 5
-          -(1.0/3.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(i, m) * (LTOp)t1(e, j) * (LTOp)t1(a, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/3.0) * (LTOp)t2(e, f, m, i) * (LTOp)f1(e, b) * (LTOp)t1(f, j) * (LTOp)t1(a, m) +    // PT ORDER = 5, Zero because of T_int
+          -(1.0/3.0) * (LTOp)t2(e, b, m, n) * (LTOp)f1(i, m) * (LTOp)t1(e, j) * (LTOp)t1(a, n) +    // PT ORDER = 5
+           (1.0/3.0) * (LTOp)t2(e, f, m, i) * (LTOp)f1(e, b) * (LTOp)t1(f, j) * (LTOp)t1(a, m) +    // PT ORDER = 5
           -(1.0/6.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(a, f) * (LTOp)t1(e, j) * (LTOp)t1(f, m) +    // PT ORDER = 5
-          -(1.0/2.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(e, f) * (LTOp)t1(f, j) * (LTOp)t1(a, m) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/6.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(n, j) * (LTOp)t1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 5, Zero because of T_int
-           (1.0/2.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(n, m) * (LTOp)t1(e, j) * (LTOp)t1(a, n)      // PT ORDER = 5, Zero because of T_int
+          -(1.0/2.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(e, f) * (LTOp)t1(f, j) * (LTOp)t1(a, m) +    // PT ORDER = 5
+           (1.0/6.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(n, j) * (LTOp)t1(a, m) * (LTOp)t1(e, n) +    // PT ORDER = 5
+           (1.0/2.0) * (LTOp)t2(e, b, m, i) * (LTOp)f1(n, m) * (LTOp)t1(e, j) * (LTOp)t1(a, n)      // PT ORDER = 5
            );
 
 vtaijb(a, i, j, b).update(op9);

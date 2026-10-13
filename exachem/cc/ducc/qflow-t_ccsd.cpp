@@ -755,7 +755,7 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   ec.pg().barrier();
 
   // Main loop
-  for(int cycle = cycle_start; cycle < cycles; ++cycle) {
+  for(int cycle = cycle_start; cycle < cycles + 1; ++cycle) {
     auto cycle_t1       = std::chrono::high_resolution_clock::now();
     cc_context.qf_cycle = cycle + 1;
     QflowTimers cycle_timers{};
@@ -827,9 +827,15 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
     const bool qflow_pg_print = root_ppi == 0 && !noprint;
 
+    // Per-group combination counters for this cycle (replicated across every rank in a group,
+    // same as cycle_timers, so they reduce the same way).
+    double combos_processed = 0.0;
+    double combos_skipped   = 0.0;
+
     for(size_t pos = 0; pos < ncombinations; ++pos) {
       if(next == taskcount) {
         std::stringstream qfstr;
+        combos_processed += 1.0;
         // total_pi_pg++;
         // size_t pi = pi_tbp[pos];
         if(qflow_pg_print) {
@@ -900,6 +906,9 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         sub_sch.allocate(d_f1_sub).execute();
         retile_tamm_tensor(d_f1, d_f1_sub);
 
+        // Trick last cycles to give final active-space statisitcs
+        if(cycle == cycles) { chem_env.ioptions.ccsd_options.ducc_lvl = 0; }
+
         // Call DUCC
         DUCCInternal<T> ducc_internal;
         ducc_internal.DUCC_T_CCSD_Driver(chem_env, sub_ec, MO_AS, dt1_sub, dt2_sub, d_f1_sub,
@@ -908,142 +917,149 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
         std::string qflow_tmp_json_file = files_prefix + "_qflow_tmp_" + pos_str + ".json";
 
-        if(root_ppi == 0) {
-          std::ofstream res_file(qflow_tmp_json_file);
-          res_file << std::setw(2) << chem_env.sys_data.results["output"]["QFlow"] << std::endl;
-          // store energy of last combination of each cycle for restart.
-          if(pos + 1 == ncombinations) {
-            std::ofstream res_file(qflow_restart_json_file);
-            res_file << std::setw(2) << chem_env.sys_data.results["output"]["QFlow"] << std::endl;
-            //   chem_env.run_context["QFlow"]["results"]["energy"][cycle] = nwqsim_energy;
-          }
-        }
-        json jres_qflow;
-        sub_ec.pg().barrier();
-        {
-          std::ifstream jread(qflow_tmp_json_file);
-          read_qflow_json(root_ppi == 0, jread, jres_qflow, qflow_tmp_json_file);
-        }
-
-        // Get QFlow results
-        auto& qflow_results = jres_qflow["results"];
-        bool  converged     = qflow_results.value("converged", false);
-        if(!converged) {
-          qfstr << "[NWQSim] VQE did not converge. Skipping this combination." << std::endl;
-          if(root_ppi == 0) { std::cout << qfstr.str() << std::endl; }
-          free_tensors(d_f1_sub, dt1_sub, dt2_sub, v2tensors_sub);
+        // Skip the work for the last cycle, since we don't need to update the amplitudes for the
+        // last cycle.
+        if(cycle < cycles) {
           if(root_ppi == 0) {
-            std::filesystem::remove(qflow_tmp_json_file);
-            next = ac->fetch_add(0, 1);
-          }
-          sub_ec.pg().broadcast(&next, 0);
-          if(root_ppi == 0) taskcount++;
-          sub_ec.pg().broadcast(&taskcount, 0);
-          continue;
-        }
-        // Get XACC ordering
-        std::vector<int> xacc_order;
-        xacc_order = qflow_results["xacc_order"].get<std::vector<int>>();
-        if(qflow_pg_print) {
-          qfstr << "XACC Ordering: ";
-          for(const auto& idx: xacc_order) { qfstr << idx << " "; }
-          qfstr << std::endl;
-        }
-
-        for(const auto& amp: qflow_results["amplitudes"]) {
-          if(amp["indices"].size() == 2) {
-            size_t v      = xacc_order[amp["indices"][1]];
-            size_t o      = xacc_order[amp["indices"][0]];
-            auto   t1_key = std::make_pair(o, v);
-            if(allowed_t1s[pos].find(t1_key) != allowed_t1s[pos].end()) {
-              update_tensor_val(sub_ec, dt1, {v - chem_env.sys_data.nocc, o},
-                                -1.0 * (amp["value"].get<double>()));
-              update_tensor_val(sub_ec, dt1, {v - chem_env.sys_data.nocc + nvirt_orb, o + nocc_orb},
-                                -1.0 * (amp["value"].get<double>()));
+            std::ofstream res_file(qflow_tmp_json_file);
+            res_file << std::setw(2) << chem_env.sys_data.results["output"]["QFlow"] << std::endl;
+            // store energy of last combination of each cycle for restart.
+            if(pos + 1 == ncombinations) {
+              std::ofstream res_file(qflow_restart_json_file);
+              res_file << std::setw(2) << chem_env.sys_data.results["output"]["QFlow"] << std::endl;
+              //   chem_env.run_context["QFlow"]["results"]["energy"][cycle] = nwqsim_energy;
             }
           }
-          else if(amp["indices"].size() == 4) {
-            size_t v1     = xacc_order[amp["indices"][3]];
-            size_t v2     = xacc_order[amp["indices"][2]];
-            size_t o1     = xacc_order[amp["indices"][1]];
-            size_t o2     = xacc_order[amp["indices"][0]];
-            auto   t2_key = std::make_tuple(o1, o2, v1, v2);
-            if(allowed_t2s[pos].find(t2_key) != allowed_t2s[pos].end()) {
-              update_tensor_val(sub_ec, dt2,
-                                {v1 - chem_env.sys_data.nocc, v2 - chem_env.sys_data.nocc, o1, o2},
-                                -1.0 * (amp["value"].get<double>()));
-              update_tensor_val(sub_ec, dt2,
-                                {v2 - chem_env.sys_data.nocc, v1 - chem_env.sys_data.nocc, o1, o2},
-                                1.0 * (amp["value"].get<double>()));
-              update_tensor_val(sub_ec, dt2,
-                                {v1 - chem_env.sys_data.nocc, v2 - chem_env.sys_data.nocc, o2, o1},
-                                1.0 * (amp["value"].get<double>()));
-              update_tensor_val(sub_ec, dt2,
-                                {v2 - chem_env.sys_data.nocc, v1 - chem_env.sys_data.nocc, o2, o1},
-                                -1.0 * (amp["value"].get<double>()));
+          json jres_qflow;
+          sub_ec.pg().barrier();
+          {
+            std::ifstream jread(qflow_tmp_json_file);
+            read_qflow_json(root_ppi == 0, jread, jres_qflow, qflow_tmp_json_file);
+          }
 
-              // if xacc_order[amp["indices"][0]] and xacc_order[amp["indices"][1]] are less than
-              // occ_alpha_int that is the alpha-alpha part. The beta beta also needs to be filled
-              // in.
-              if((xacc_order[amp["indices"][0]] < (int) occ_alpha_int) &&
-                 (xacc_order[amp["indices"][1]] < (int) occ_alpha_int)) {
-                size_t v_1 =
-                  xacc_order[amp["indices"][3].get<int>() + occ_alpha_int + vir_alpha_int];
-                size_t v_2 =
-                  xacc_order[amp["indices"][2].get<int>() + occ_alpha_int + vir_alpha_int];
-                size_t o_1 =
-                  xacc_order[amp["indices"][1].get<int>() + occ_alpha_int + vir_alpha_int];
-                size_t o_2 =
-                  xacc_order[amp["indices"][0].get<int>() + occ_alpha_int + vir_alpha_int];
+          // Get QFlow results
+          auto& qflow_results = jres_qflow["results"];
+          bool  converged     = qflow_results.value("converged", false);
+          if(!converged) {
+            combos_skipped += 1.0;
+            qfstr << "[NWQSim] VQE did not converge. Skipping this combination." << std::endl;
+            if(root_ppi == 0) { std::cout << qfstr.str() << std::endl; }
+            free_tensors(d_f1_sub, dt1_sub, dt2_sub, v2tensors_sub);
+            if(root_ppi == 0) {
+              std::filesystem::remove(qflow_tmp_json_file);
+              next = ac->fetch_add(0, 1);
+            }
+            sub_ec.pg().broadcast(&next, 0);
+            if(root_ppi == 0) taskcount++;
+            sub_ec.pg().broadcast(&taskcount, 0);
+            continue;
+          }
+          // Get XACC ordering
+          std::vector<int> xacc_order;
+          xacc_order = qflow_results["xacc_order"].get<std::vector<int>>();
+          if(qflow_pg_print) {
+            qfstr << "XACC Ordering: ";
+            for(const auto& idx: xacc_order) { qfstr << idx << " "; }
+            qfstr << std::endl;
+          }
 
-                update_tensor_val(
-                  sub_ec, dt2,
-                  {v_1 - chem_env.sys_data.nocc, v_2 - chem_env.sys_data.nocc, o_1, o_2},
-                  -1.0 * (amp["value"].get<double>()));
-                update_tensor_val(
-                  sub_ec, dt2,
-                  {v_2 - chem_env.sys_data.nocc, v_1 - chem_env.sys_data.nocc, o_1, o_2},
-                  1.0 * (amp["value"].get<double>()));
-                update_tensor_val(
-                  sub_ec, dt2,
-                  {v_1 - chem_env.sys_data.nocc, v_2 - chem_env.sys_data.nocc, o_2, o_1},
-                  1.0 * (amp["value"].get<double>()));
-                update_tensor_val(
-                  sub_ec, dt2,
-                  {v_2 - chem_env.sys_data.nocc, v_1 - chem_env.sys_data.nocc, o_2, o_1},
-                  -1.0 * (amp["value"].get<double>()));
+          for(const auto& amp: qflow_results["amplitudes"]) {
+            if(amp["indices"].size() == 2) {
+              size_t v      = xacc_order[amp["indices"][1]];
+              size_t o      = xacc_order[amp["indices"][0]];
+              auto   t1_key = std::make_pair(o, v);
+              if(allowed_t1s[pos].find(t1_key) != allowed_t1s[pos].end()) {
+                update_tensor_val(sub_ec, dt1, {v - chem_env.sys_data.nocc, o},
+                                  -1.0 * (amp["value"].get<double>()));
+                update_tensor_val(sub_ec, dt1,
+                                  {v - chem_env.sys_data.nocc + nvirt_orb, o + nocc_orb},
+                                  -1.0 * (amp["value"].get<double>()));
               }
-              // else fill in the b,a,b,a part.
-              else {
-                size_t v_1 =
-                  xacc_order[amp["indices"][3].get<int>() - occ_alpha_int - vir_alpha_int];
-                size_t v_2 =
-                  xacc_order[amp["indices"][2].get<int>() + occ_alpha_int + vir_alpha_int];
-                size_t o_1 =
-                  xacc_order[amp["indices"][1].get<int>() - occ_alpha_int - vir_alpha_int];
-                size_t o_2 =
-                  xacc_order[amp["indices"][0].get<int>() + occ_alpha_int + vir_alpha_int];
+            }
+            else if(amp["indices"].size() == 4) {
+              size_t v1     = xacc_order[amp["indices"][3]];
+              size_t v2     = xacc_order[amp["indices"][2]];
+              size_t o1     = xacc_order[amp["indices"][1]];
+              size_t o2     = xacc_order[amp["indices"][0]];
+              auto   t2_key = std::make_tuple(o1, o2, v1, v2);
+              if(allowed_t2s[pos].find(t2_key) != allowed_t2s[pos].end()) {
+                update_tensor_val(
+                  sub_ec, dt2, {v1 - chem_env.sys_data.nocc, v2 - chem_env.sys_data.nocc, o1, o2},
+                  -1.0 * (amp["value"].get<double>()));
+                update_tensor_val(
+                  sub_ec, dt2, {v2 - chem_env.sys_data.nocc, v1 - chem_env.sys_data.nocc, o1, o2},
+                  1.0 * (amp["value"].get<double>()));
+                update_tensor_val(
+                  sub_ec, dt2, {v1 - chem_env.sys_data.nocc, v2 - chem_env.sys_data.nocc, o2, o1},
+                  1.0 * (amp["value"].get<double>()));
+                update_tensor_val(
+                  sub_ec, dt2, {v2 - chem_env.sys_data.nocc, v1 - chem_env.sys_data.nocc, o2, o1},
+                  -1.0 * (amp["value"].get<double>()));
 
-                update_tensor_val(
-                  sub_ec, dt2,
-                  {v_1 - chem_env.sys_data.nocc, v_2 - chem_env.sys_data.nocc, o_1, o_2},
-                  -1.0 * (amp["value"].get<double>()));
-                update_tensor_val(
-                  sub_ec, dt2,
-                  {v_2 - chem_env.sys_data.nocc, v_1 - chem_env.sys_data.nocc, o_1, o_2},
-                  1.0 * (amp["value"].get<double>()));
-                update_tensor_val(
-                  sub_ec, dt2,
-                  {v_1 - chem_env.sys_data.nocc, v_2 - chem_env.sys_data.nocc, o_2, o_1},
-                  1.0 * (amp["value"].get<double>()));
-                update_tensor_val(
-                  sub_ec, dt2,
-                  {v_2 - chem_env.sys_data.nocc, v_1 - chem_env.sys_data.nocc, o_2, o_1},
-                  -1.0 * (amp["value"].get<double>()));
+                // if xacc_order[amp["indices"][0]] and xacc_order[amp["indices"][1]] are less than
+                // occ_alpha_int that is the alpha-alpha part. The beta beta also needs to be filled
+                // in.
+                if((xacc_order[amp["indices"][0]] < (int) occ_alpha_int) &&
+                   (xacc_order[amp["indices"][1]] < (int) occ_alpha_int)) {
+                  size_t v_1 =
+                    xacc_order[amp["indices"][3].get<int>() + occ_alpha_int + vir_alpha_int];
+                  size_t v_2 =
+                    xacc_order[amp["indices"][2].get<int>() + occ_alpha_int + vir_alpha_int];
+                  size_t o_1 =
+                    xacc_order[amp["indices"][1].get<int>() + occ_alpha_int + vir_alpha_int];
+                  size_t o_2 =
+                    xacc_order[amp["indices"][0].get<int>() + occ_alpha_int + vir_alpha_int];
+
+                  update_tensor_val(
+                    sub_ec, dt2,
+                    {v_1 - chem_env.sys_data.nocc, v_2 - chem_env.sys_data.nocc, o_1, o_2},
+                    -1.0 * (amp["value"].get<double>()));
+                  update_tensor_val(
+                    sub_ec, dt2,
+                    {v_2 - chem_env.sys_data.nocc, v_1 - chem_env.sys_data.nocc, o_1, o_2},
+                    1.0 * (amp["value"].get<double>()));
+                  update_tensor_val(
+                    sub_ec, dt2,
+                    {v_1 - chem_env.sys_data.nocc, v_2 - chem_env.sys_data.nocc, o_2, o_1},
+                    1.0 * (amp["value"].get<double>()));
+                  update_tensor_val(
+                    sub_ec, dt2,
+                    {v_2 - chem_env.sys_data.nocc, v_1 - chem_env.sys_data.nocc, o_2, o_1},
+                    -1.0 * (amp["value"].get<double>()));
+                }
+                // else fill in the b,a,b,a part.
+                else {
+                  size_t v_1 =
+                    xacc_order[amp["indices"][3].get<int>() - occ_alpha_int - vir_alpha_int];
+                  size_t v_2 =
+                    xacc_order[amp["indices"][2].get<int>() + occ_alpha_int + vir_alpha_int];
+                  size_t o_1 =
+                    xacc_order[amp["indices"][1].get<int>() - occ_alpha_int - vir_alpha_int];
+                  size_t o_2 =
+                    xacc_order[amp["indices"][0].get<int>() + occ_alpha_int + vir_alpha_int];
+
+                  update_tensor_val(
+                    sub_ec, dt2,
+                    {v_1 - chem_env.sys_data.nocc, v_2 - chem_env.sys_data.nocc, o_1, o_2},
+                    -1.0 * (amp["value"].get<double>()));
+                  update_tensor_val(
+                    sub_ec, dt2,
+                    {v_2 - chem_env.sys_data.nocc, v_1 - chem_env.sys_data.nocc, o_1, o_2},
+                    1.0 * (amp["value"].get<double>()));
+                  update_tensor_val(
+                    sub_ec, dt2,
+                    {v_1 - chem_env.sys_data.nocc, v_2 - chem_env.sys_data.nocc, o_2, o_1},
+                    1.0 * (amp["value"].get<double>()));
+                  update_tensor_val(
+                    sub_ec, dt2,
+                    {v_2 - chem_env.sys_data.nocc, v_1 - chem_env.sys_data.nocc, o_2, o_1},
+                    -1.0 * (amp["value"].get<double>()));
+                }
               }
             }
           }
-        }
+
+        } // end if cycle < cycles
 
         if(qflow_pg_print) {
           qfstr << "Process group " << pg_id + 1 << " finished executing combination " << pos + 1
@@ -1067,6 +1083,11 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
     } // end combinations
 
+    // vqe_solve_time is only accumulated on root_ppi == 0 of each group; replicate it to every
+    // rank in the subgroup (as ducc_time already is) so the cross-group min/max/sum reductions
+    // below see one consistent value per group instead of (subranks - 1) zeros per group.
+    sub_ec.pg().broadcast(&cycle_timers.vqe_solve_time, 0);
+
     sub_ec.flush_and_sync();
     // MemoryManagerGA::destroy_coll(mgr);
     sub_pg.destroy_coll();
@@ -1085,18 +1106,39 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       std::chrono::duration_cast<std::chrono::duration<double>>((cycle_t2 - cycle_t1)).count();
 
     double avg_ducc_time      = ec.pg().reduce(&cycle_timers.ducc_time, ReduceOp::sum, 0);
+    double min_ducc_time      = ec.pg().reduce(&cycle_timers.ducc_time, ReduceOp::min, 0);
+    double max_ducc_time      = ec.pg().reduce(&cycle_timers.ducc_time, ReduceOp::max, 0);
     double avg_vqe_solve_time = ec.pg().reduce(&cycle_timers.vqe_solve_time, ReduceOp::sum, 0);
+    double min_vqe_solve_time = ec.pg().reduce(&cycle_timers.vqe_solve_time, ReduceOp::min, 0);
+    double max_vqe_solve_time = ec.pg().reduce(&cycle_timers.vqe_solve_time, ReduceOp::max, 0);
+
+    double avg_combos_pg = ec.pg().reduce(&combos_processed, ReduceOp::sum, 0);
+    double min_combos_pg = ec.pg().reduce(&combos_processed, ReduceOp::min, 0);
+    double max_combos_pg = ec.pg().reduce(&combos_processed, ReduceOp::max, 0);
+
+    // combos_skipped is replicated across every rank in a group (like ducc_time), so undo that
+    // replication (factor of subranks) to get the true cross-group total.
+    int total_combos_skipped = ec.pg().reduce(&combos_skipped, ReduceOp::sum, 0) / subranks;
 
     if(rank == 0) {
       avg_ducc_time /= nranks;
-      avg_vqe_solve_time /= num_pg;
+      avg_vqe_solve_time /= nranks;
+      avg_combos_pg /= nranks;
 
       std::cout << std::fixed << std::setprecision(2);
       std::cout << "Total time for cycle " << cc_context.qf_cycle << ": " << cycletime << " secs"
                 << std::endl;
-      std::cout << " --> Avg DUCC time: " << avg_ducc_time << " secs" << std::endl;
-      std::cout << " --> Avg VQE Solve time: " << avg_vqe_solve_time << " secs" << std::endl
+      std::cout << " --> DUCC time range across groups (min/avg/max): " << min_ducc_time << " / "
+                << avg_ducc_time << " / " << max_ducc_time << " secs" << std::endl;
+      std::cout << " --> VQE time range across groups (min/avg/max): " << min_vqe_solve_time
+                << " / " << avg_vqe_solve_time << " / " << max_vqe_solve_time << " secs"
                 << std::endl;
+      std::cout << " --> Combinations per group (min/avg/max): " << min_combos_pg << " / "
+                << avg_combos_pg << " / " << max_combos_pg << std::endl;
+      std::cout << " --> Combinations skipped (non-converged): " << total_combos_skipped << " / "
+                << ncombinations << std::endl;
+      std::cout << " --> Average per-combination time: DUCC " << (avg_ducc_time / avg_combos_pg)
+                << " secs, VQE " << (avg_vqe_solve_time / avg_combos_pg) << " secs" << std::endl;
     }
 
   } // end cycles

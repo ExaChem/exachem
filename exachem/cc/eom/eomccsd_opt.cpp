@@ -276,6 +276,16 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
   const int  microeomiter = ccsd_options.eom_microiter; // Number of iterations in a microcycle
   const bool profile      = ccsd_options.profile;
 
+  // EOM restart: writet dumps the collapsed right vectors every eom_writex_iter iterations,
+  // readt uses them in place of eom_guess_opt on the next run.
+  const bool        eom_writex      = ccsd_options.writet;
+  const bool        eom_readx       = ccsd_options.readt;
+  const int         eom_writex_iter = ccsd_options.writet_iter;
+  const std::string eom_fp          = chem_env.get_files_prefix() + ".eomccsd";
+
+  auto xc1_file = [&](int root) { return eom_fp + ".xc1.root" + std::to_string(root + 1); };
+  auto xc2_file = [&](int root) { return eom_fp + ".xc2.root" + std::to_string(root + 1); };
+
   const TiledIndexSpace& O = MO("occ");
   const TiledIndexSpace& V = MO("virt");
 
@@ -347,15 +357,34 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
   // ################################################################################
   auto cc_t1 = std::chrono::high_resolution_clock::now();
 
-  eom_guess_opt(ec, MO, hbar_tis, nroots, n_occ_alpha, n_occ_beta, p_evl_sorted, x1);
+  bool eom_restart = false;
+  if(eom_readx) {
+    eom_restart = true;
+    for(int root = 0; root < nroots; root++)
+      if(!fs::exists(xc1_file(root)) || !fs::exists(xc2_file(root))) eom_restart = false;
+
+    if(!eom_restart && mrank)
+      std::cout << std::endl
+                << "EOM restart vectors for " << nroots
+                << " roots not found, falling back to EOM GUESS" << std::endl;
+  }
+
+  if(eom_restart) {
+    for(int root = 0; root < nroots; root++) {
+      read_from_disk(x1.at(root), xc1_file(root));
+      read_from_disk(x2.at(root), xc2_file(root));
+    }
+  }
+  else eom_guess_opt(ec, MO, hbar_tis, nroots, n_occ_alpha, n_occ_beta, p_evl_sorted, x1);
 
   auto cc_t2 = std::chrono::high_resolution_clock::now();
 
   double time = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
   if(mrank)
     std::cout << std::endl
-              << "Time taken for EOM GUESS: " << std::fixed << std::setprecision(2) << time
-              << " secs" << std::endl;
+              << (eom_restart ? "Time taken for reading EOM restart vectors: "
+                              : "Time taken for EOM GUESS: ")
+              << std::fixed << std::setprecision(2) << time << " secs" << std::endl;
 
   EOM_X1Tensors<T> x1tensors;
   EOM_X2Tensors<T> x2tensors;
@@ -721,6 +750,30 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
         sys_data.results["output"]["EOMCCSD"]["iter"][std::to_string(iter + 1)]["performance"]
                         ["total_time"] = iter_time;
         chem_env.write_json_data();
+      }
+
+      // ################################################################################
+      //   WRITE RESTART VECTORS: COLLAPSE THE CURRENT ITERATIVE SPACE INTO NROOTS VECTORS
+      // ################################################################################
+      if(eom_writex && ((iter + 1) % eom_writex_iter == 0)) {
+        for(auto root = 0; root < nroots; root++) {
+          sch(xc1.at(root)() = 0)(xc2.at(root)() = 0).execute();
+
+          for(int i = 0; i < nxtrials; i++) {
+            T hbr_scalar = hbar_right(i, root);
+            // clang-format off
+            sch(xc1.at(root)() += hbr_scalar * x1.at(i)())
+               (xc2.at(root)() += hbr_scalar * x2.at(i)())
+              .execute();
+            // clang-format on
+          }
+
+          write_to_disk(xc1.at(root), xc1_file(root));
+          write_to_disk(xc2.at(root), xc2_file(root));
+        }
+        if(mrank)
+          std::cout << " Restart vectors for " << nroots << " roots written to " << eom_fp
+                    << ".xc{1,2}.root*" << std::endl;
       }
 
       // ################################################################################

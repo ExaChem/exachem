@@ -752,13 +752,14 @@ void exachem::scf::SCFIO<T>::print_mulliken(ChemEnv& chem_env, const Matrix& D,
 }
 
 template<typename T>
-void exachem::scf::SCFIO<T>::rw_mat_disk(Tensor<T> tensor, const std::string& tfilename,
-                                         bool profile, bool read) const {
+void exachem::scf::SCFIO<T>::rw_mat_disk(ExecutionContext& ec, Tensor<T> tensor,
+                                         const std::string& tfilename, bool profile,
+                                         bool read) const {
 #if !defined(USE_SERIAL_IO)
-  if(read) read_from_disk<T>(tensor, tfilename, true, {}, profile);
-  else write_to_disk<T>(tensor, tfilename, true, profile);
+  if(read) read_from_disk<T>(ec, tensor, tfilename, profile);
+  else write_to_disk<T>(ec, tensor, tfilename, profile);
 #else
-  if((tensor.execution_context())->pg().rank() == 0) {
+  if(ec.pg().rank() == 0) {
     if(read) {
       Matrix teig = this->read_scf_mat(tfilename);
       eigen_to_tamm_tensor(tensor, teig);
@@ -768,7 +769,7 @@ void exachem::scf::SCFIO<T>::rw_mat_disk(Tensor<T> tensor, const std::string& tf
       this->write_scf_mat(teig, tfilename);
     }
   }
-  tensor.execution_context()->pg().barrier();
+  ec.pg().barrier();
 #endif
 }
 
@@ -810,28 +811,28 @@ void exachem::scf::SCFIO<T>::rw_md_disk(ExecutionContext& ec, const ChemEnv& che
 #if !defined(USE_SERIAL_IO)
   if(read) {
     if(rank == 0) cout << "Reading movecs and density files from disk ... ";
-    read_from_disk_group(ec, tensor_list, tensor_fnames, profile);
+    read_from_disk(ec, tensor_list, tensor_fnames, profile);
     if(rank == 0) cout << "done" << endl;
   }
-  else write_to_disk_group(ec, tensor_list, tensor_fnames, profile);
+  else write_to_disk(ec, tensor_list, tensor_fnames, profile);
 
 #else
   if(read) {
     if(rank == 0) cout << "Reading movecs and density files from disk ... ";
-    rw_mat_disk(ttensors.C_alpha, movecsfile_alpha, profile, true);
-    rw_mat_disk(ttensors.D_alpha, densityfile_alpha, profile, true);
+    rw_mat_disk(ec, ttensors.C_alpha, movecsfile_alpha, profile, true);
+    rw_mat_disk(ec, ttensors.D_alpha, densityfile_alpha, profile, true);
     if(is_uhf) {
-      rw_mat_disk(ttensors.C_beta, movecsfile_beta, profile, true);
-      rw_mat_disk(ttensors.D_beta, densityfile_beta, profile, true);
+      rw_mat_disk(ec, ttensors.C_beta, movecsfile_beta, profile, true);
+      rw_mat_disk(ec, ttensors.D_beta, densityfile_beta, profile, true);
     }
     if(rank == 0) cout << "done" << endl;
   }
   else {
-    rw_mat_disk(ttensors.C_alpha, movecsfile_alpha, profile);
-    rw_mat_disk(ttensors.D_alpha, densityfile_alpha, profile);
+    rw_mat_disk(ec, ttensors.C_alpha, movecsfile_alpha, profile);
+    rw_mat_disk(ec, ttensors.D_alpha, densityfile_alpha, profile);
     if(is_uhf) {
-      rw_mat_disk(ttensors.C_beta, movecsfile_beta, profile);
-      rw_mat_disk(ttensors.D_beta, densityfile_beta, profile);
+      rw_mat_disk(ec, ttensors.C_beta, movecsfile_beta, profile);
+      rw_mat_disk(ec, ttensors.D_beta, densityfile_beta, profile);
     }
   }
 #endif

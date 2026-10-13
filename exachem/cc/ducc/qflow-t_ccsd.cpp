@@ -735,8 +735,8 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
       if(fs::exists(t1file_qflow) && fs::exists(t2file_qflow)) {
         if(rank == 0) std::cout << "Reading " << t2file_qflow << std::endl;
-        read_from_disk(dt1, t1file_qflow);
-        read_from_disk(dt2, t2file_qflow);
+        read_from_disk(ec, dt1, t1file_qflow);
+        read_from_disk(ec, dt2, t2file_qflow);
         cycle_start = cycle;
         if(rank == 0) {
           json        jres_qflow;
@@ -759,7 +759,13 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     auto cycle_t1       = std::chrono::high_resolution_clock::now();
     cc_context.qf_cycle = cycle + 1;
     QflowTimers cycle_timers{};
-    if(rank == 0) std::cout << "Cycle " << cc_context.qf_cycle << " of " << cycles << std::endl;
+    if(rank == 0) {
+      if(cycle < cycles)
+        std::cout << "Cycle " << cc_context.qf_cycle << " of " << cycles << std::endl;
+      else
+        std::cout << std::endl
+                  << "Final pass: active-space statistics (no amplitude update)" << std::endl;
+    }
 
     t1file_qflow = cc_context.t1file_qflow + ".cycle" + std::to_string(cc_context.qf_cycle);
     t2file_qflow = cc_context.t2file_qflow + ".cycle" + std::to_string(cc_context.qf_cycle);
@@ -847,8 +853,9 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
         const auto& combination = sorted_combinations[pos];
         if(root_ppi == 0) {
-          qfstr << "[Cycle " << cycle + 1 << "] "
-                << "Combination (" << pos + 1 << "/" << ncombinations << "): ";
+          if(cycle < cycles) qfstr << "[Cycle " << cycle + 1 << "] ";
+          else qfstr << "[Final pass] ";
+          qfstr << "Combination (" << pos + 1 << "/" << ncombinations << "): ";
           for(int idx: combination) { qfstr << idx << " "; }
           qfstr << std::endl;
         }
@@ -1096,8 +1103,8 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
     ec.pg().barrier();
 
     if(restart) {
-      write_to_disk(dt1, t1file_qflow);
-      write_to_disk(dt2, t2file_qflow);
+      write_to_disk(ec, dt1, t1file_qflow);
+      write_to_disk(ec, dt2, t2file_qflow);
       write_qflow_results(ec, chem_env);
     } // restart
 
@@ -1126,8 +1133,9 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       avg_combos_pg /= nranks;
 
       std::cout << std::fixed << std::setprecision(2);
-      std::cout << "Total time for cycle " << cc_context.qf_cycle << ": " << cycletime << " secs"
-                << std::endl;
+      if(cycle < cycles) std::cout << "Total time for cycle " << cc_context.qf_cycle << ": ";
+      else std::cout << "Total time for final pass: ";
+      std::cout << cycletime << " secs" << std::endl;
       std::cout << " --> DUCC time range across groups (min/avg/max): " << min_ducc_time << " / "
                 << avg_ducc_time << " / " << max_ducc_time << " secs" << std::endl;
       std::cout << " --> VQE time range across groups (min/avg/max): " << min_vqe_solve_time
@@ -1148,7 +1156,8 @@ void ducc_qflow_driver(ExecutionContext& ec, ChemEnv& chem_env) {
   auto qftime = std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
 
   if(rank == 0) {
-    std::cout << "Total QFlow time: " << std::fixed << std::setprecision(2) << qftime << " secs"
+    std::cout << std::endl
+              << "Total QFlow time: " << std::fixed << std::setprecision(2) << qftime << " secs"
               << std::endl
               << std::endl;
   }

@@ -1215,8 +1215,8 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
           iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
 
           if(writet && ((iter + 1) % writet_iter == 0)) {
-            write_to_disk(d_t1, t1file);
-            write_to_disk(d_t2, t2file);
+            write_to_disk(ec, d_t1, t1file);
+            write_to_disk(ec, d_t2, t2file);
           }
 
           if(residual < thresh) {
@@ -1255,8 +1255,8 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
     }
 
     if(writet) {
-      write_to_disk(d_t1, t1file);
-      write_to_disk(d_t2, t2file);
+      write_to_disk(ec, d_t1, t1file);
+      write_to_disk(ec, d_t2, t2file);
       // if(computeTData && chem_env.ioptions.ccsd_options.writev) {
       //   fs::copy_file(t1file, ccsd_fp + ".full_t1amp", fs::copy_options::update_existing);
       //   fs::copy_file(t2file, ccsd_fp + ".full_t2amp", fs::copy_options::update_existing);

@@ -39,8 +39,8 @@ public:
                           EigenTensors& etensors, const std::string& files_prefix,
                           bool read = false) const;
 
-  virtual void rw_mat_disk(Tensor<T> tensor, const std::string& tfilename, bool profile,
-                           bool read = false) const;
+  virtual void rw_mat_disk(ExecutionContext& ec, Tensor<T> tensor, const std::string& tfilename,
+                           bool profile, bool read = false) const;
   virtual void print_mulliken(ChemEnv& chem_env, const Matrix& D, const Matrix& D_beta,
                               const Matrix& S) const;
   virtual void print_energies(ExecutionContext& ec, ChemEnv& chem_env, TAMMTensors<T>& ttensors,

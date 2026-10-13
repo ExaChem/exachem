@@ -251,11 +251,11 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
   // Write Embedding Potential to Disk (will be read during next SCF)
   if(rank0) tamm::eigen_to_tamm_tensor(scf_data.ttensors.H1, Vembedding[0]);
   ec.pg().barrier();
-  scf_engine.scf_output.rw_mat_disk(scf_data.ttensors.H1, ".vembedding_alpha", false, false);
+  scf_engine.scf_output.rw_mat_disk(ec, scf_data.ttensors.H1, ".vembedding_alpha", false, false);
   if(is_unrestricted) {
     if(rank0) tamm::eigen_to_tamm_tensor(scf_data.ttensors.H1, Vembedding[1]);
     ec.pg().barrier();
-    scf_engine.scf_output.rw_mat_disk(scf_data.ttensors.H1, ".vembedding_beta", false, false);
+    scf_engine.scf_output.rw_mat_disk(ec, scf_data.ttensors.H1, ".vembedding_beta", false, false);
   }
   ec.pg().barrier();
 

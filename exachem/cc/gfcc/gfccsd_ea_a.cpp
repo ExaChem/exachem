@@ -103,8 +103,8 @@ namespace exachem::cc::gfcc {
     const std::string dtmp_bab_file = files_prefix + ".W" + gfo.str() + ".a_dtmp_bab.l" + levelstr;
   
     if(fs::exists(dtmp_aaa_file) && fs::exists(dtmp_bab_file)) {
-      read_from_disk(dtmp_aaa, dtmp_aaa_file);
-      read_from_disk(dtmp_bab, dtmp_bab_file);
+      read_from_disk(gec, dtmp_aaa, dtmp_aaa_file);
+      read_from_disk(gec, dtmp_bab, dtmp_bab_file);
     }
     else {
       ComplexTensor DEArr_EA{O, V, V};
@@ -145,8 +145,8 @@ namespace exachem::cc::gfcc {
       }
       gec.pg().barrier();
       gsch.deallocate(DEArr_EA).execute();
-      write_to_disk(dtmp_aaa, dtmp_aaa_file);
-      write_to_disk(dtmp_bab, dtmp_bab_file);
+      write_to_disk(gec, dtmp_aaa, dtmp_aaa_file);
+      write_to_disk(gec, dtmp_bab, dtmp_bab_file);
     }
   
     //------------------------
@@ -283,9 +283,9 @@ namespace exachem::cc::gfcc {
 
           if(fs::exists(y1_a_inter_wpi_file) && fs::exists(y2_aaa_inter_wpi_file) &&
              fs::exists(y2_bab_inter_wpi_file)) {
-            read_from_disk(y1_a, y1_a_inter_wpi_file);
-            read_from_disk(y2_aaa, y2_aaa_inter_wpi_file);
-            read_from_disk(y2_bab, y2_bab_inter_wpi_file);
+            read_from_disk(ec, y1_a, y1_a_inter_wpi_file);
+            read_from_disk(ec, y2_aaa, y2_aaa_inter_wpi_file);
+            read_from_disk(ec, y2_bab, y2_bab_inter_wpi_file);
           }
           else {
             // clang-format off
@@ -506,9 +506,9 @@ namespace exachem::cc::gfcc {
             }
             sch.execute();
   
-            write_to_disk(y1_a, y1_a_inter_wpi_file);
-            write_to_disk(y2_aaa, y2_aaa_inter_wpi_file);
-            write_to_disk(y2_bab, y2_bab_inter_wpi_file);
+            write_to_disk(ec, y1_a, y1_a_inter_wpi_file);
+            write_to_disk(ec, y2_aaa, y2_aaa_inter_wpi_file);
+            write_to_disk(ec, y2_bab, y2_bab_inter_wpi_file);
   
             free_vec_tensors(Q1_a, Q2_aaa, Q2_bab);
             Q1_a.clear();
@@ -527,9 +527,9 @@ namespace exachem::cc::gfcc {
               files_prefix + ".y2_aaa.w" + gfo.str() + ".oi" + std::to_string(pi);
             const std::string y2_bab_conv_wpi_file =
               files_prefix + ".y2_bab.w" + gfo.str() + ".oi" + std::to_string(pi);
-            write_to_disk(y1_a, y1_a_conv_wpi_file);
-            write_to_disk(y2_aaa, y2_aaa_conv_wpi_file);
-            write_to_disk(y2_bab, y2_bab_conv_wpi_file);
+            write_to_disk(ec, y1_a, y1_a_conv_wpi_file);
+            write_to_disk(ec, y2_aaa, y2_aaa_conv_wpi_file);
+            write_to_disk(ec, y2_bab, y2_bab_conv_wpi_file);
             fs::remove(y1_a_inter_wpi_file);
             fs::remove(y2_aaa_inter_wpi_file);
             fs::remove(y2_bab_inter_wpi_file);

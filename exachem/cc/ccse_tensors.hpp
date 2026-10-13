@@ -242,17 +242,14 @@ public:
     }
   }
 
-  void write_to_disk(const std::string& fprefix) {
+  void write_to_disk(ExecutionContext& ec, const std::string& fprefix) {
     auto tensor_files = get_tensor_files(fprefix);
-    // TODO: Assume all on same ec for now
-    ExecutionContext& ec = get_ec(allocated_tensors[0]());
-    tamm::write_to_disk_group<T>(ec, allocated_tensors, tensor_files);
+    tamm::write_to_disk<T>(ec, allocated_tensors, tensor_files);
   }
 
-  void read_from_disk(const std::string& fprefix) {
-    auto              tensor_files = get_tensor_files(fprefix);
-    ExecutionContext& ec           = get_ec(allocated_tensors[0]());
-    tamm::read_from_disk_group<T>(ec, allocated_tensors, tensor_files);
+  void read_from_disk(ExecutionContext& ec, const std::string& fprefix) {
+    auto tensor_files = get_tensor_files(fprefix);
+    tamm::read_from_disk<T>(ec, allocated_tensors, tensor_files);
   }
 
   bool exist_on_disk(const std::string& fprefix) {

@@ -98,9 +98,9 @@ void GFCCSD_IP_A_Driver<T>::gfccsd_driver_ip_a(
   std::string dtmp_bab_file = files_prefix + ".W" + gfo.str() + ".r_dtmp_bab.l" + levelstr;
 
   if(fs::exists(dtmp_a_file) && fs::exists(dtmp_aaa_file) && fs::exists(dtmp_bab_file)) {
-    read_from_disk(dtmp_a, dtmp_a_file);
-    read_from_disk(dtmp_aaa, dtmp_aaa_file);
-    read_from_disk(dtmp_bab, dtmp_bab_file);
+    read_from_disk(gec, dtmp_a, dtmp_a_file);
+    read_from_disk(gec, dtmp_aaa, dtmp_aaa_file);
+    read_from_disk(gec, dtmp_bab, dtmp_bab_file);
   }
   else {
     ComplexTensor DEArr_IP1{O};
@@ -163,9 +163,9 @@ void GFCCSD_IP_A_Driver<T>::gfccsd_driver_ip_a(
     gec.pg().barrier();
     gsch.deallocate(DEArr_IP1).execute();
     gsch.deallocate(DEArr_IP2).execute();
-    write_to_disk(dtmp_a, dtmp_a_file);
-    write_to_disk(dtmp_aaa, dtmp_aaa_file);
-    write_to_disk(dtmp_bab, dtmp_bab_file);
+    write_to_disk(gec, dtmp_a, dtmp_a_file);
+    write_to_disk(gec, dtmp_aaa, dtmp_aaa_file);
+    write_to_disk(gec, dtmp_bab, dtmp_bab_file);
   }
 
   //------------------------
@@ -373,9 +373,9 @@ void GFCCSD_IP_A_Driver<T>::gfccsd_driver_ip_a(
 
       if(fs::exists(x1_a_inter_wpi_file) && fs::exists(x2_aaa_inter_wpi_file) &&
          fs::exists(x2_bab_inter_wpi_file)) {
-        read_from_disk(x1_a, x1_a_inter_wpi_file);
-        read_from_disk(x2_aaa, x2_aaa_inter_wpi_file);
-        read_from_disk(x2_bab, x2_bab_inter_wpi_file);
+        read_from_disk(ec, x1_a, x1_a_inter_wpi_file);
+        read_from_disk(ec, x2_aaa, x2_aaa_inter_wpi_file);
+        read_from_disk(ec, x2_bab, x2_bab_inter_wpi_file);
       }
 
       // GMRES
@@ -685,9 +685,9 @@ void GFCCSD_IP_A_Driver<T>::gfccsd_driver_ip_a(
         }
         sch.execute();
 
-        write_to_disk(x1_a, x1_a_inter_wpi_file);
-        write_to_disk(x2_aaa, x2_aaa_inter_wpi_file);
-        write_to_disk(x2_bab, x2_bab_inter_wpi_file);
+        write_to_disk(ec, x1_a, x1_a_inter_wpi_file);
+        write_to_disk(ec, x2_aaa, x2_aaa_inter_wpi_file);
+        write_to_disk(ec, x2_bab, x2_bab_inter_wpi_file);
 
         free_vec_tensors(Q1_a, Q2_aaa, Q2_bab);
         Q1_a.clear();
@@ -713,9 +713,9 @@ void GFCCSD_IP_A_Driver<T>::gfccsd_driver_ip_a(
           files_prefix + ".x2_aaa.w" + gfo.str() + ".oi" + std::to_string(pi);
         std::string x2_bab_conv_wpi_file =
           files_prefix + ".x2_bab.w" + gfo.str() + ".oi" + std::to_string(pi);
-        write_to_disk(x1_a, x1_a_conv_wpi_file);
-        write_to_disk(x2_aaa, x2_aaa_conv_wpi_file);
-        write_to_disk(x2_bab, x2_bab_conv_wpi_file);
+        write_to_disk(ec, x1_a, x1_a_conv_wpi_file);
+        write_to_disk(ec, x2_aaa, x2_aaa_conv_wpi_file);
+        write_to_disk(ec, x2_bab, x2_bab_conv_wpi_file);
         fs::remove(x1_a_inter_wpi_file);
         fs::remove(x2_aaa_inter_wpi_file);
         fs::remove(x2_bab_inter_wpi_file);

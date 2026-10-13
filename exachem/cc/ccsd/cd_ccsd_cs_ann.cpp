@@ -872,8 +872,8 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
           iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
 
           if(writet && ((iter + 1) % writet_iter == 0)) {
-            write_to_disk(t1_aa, t1file);
-            write_to_disk(t2_abab, t2file);
+            write_to_disk(ec, t1_aa, t1file);
+            write_to_disk(ec, t2_abab, t2file);
           }
 
           if(residual < thresh) { break; }
@@ -898,8 +898,8 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
     }
 
     if(writet) {
-      write_to_disk(t1_aa, t1file);
-      write_to_disk(t2_abab, t2file);
+      write_to_disk(ec, t1_aa, t1file);
+      write_to_disk(ec, t2_abab, t2file);
     }
 
     if(profile && ec.print()) {

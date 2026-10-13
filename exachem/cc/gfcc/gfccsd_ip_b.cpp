@@ -97,8 +97,8 @@ void GFCCSD_IP_B_Driver<T>::gfccsd_driver_ip_b(
     const std::string dtmp_aba_file = files_prefix + ".W" + gfo.str() + ".r_dtmp_aba.l" + levelstr;
   
     if(fs::exists(dtmp_bbb_file) && fs::exists(dtmp_aba_file)) {
-      read_from_disk(dtmp_bbb, dtmp_bbb_file);
-      read_from_disk(dtmp_aba, dtmp_aba_file);
+      read_from_disk(gec, dtmp_bbb, dtmp_bbb_file);
+      read_from_disk(gec, dtmp_aba, dtmp_aba_file);
     }
     else {
       ComplexTensor DEArr_IP{V, O, O};
@@ -144,8 +144,8 @@ void GFCCSD_IP_B_Driver<T>::gfccsd_driver_ip_b(
       gec.pg().barrier();
       gsch.deallocate(DEArr_IP).execute();
   
-      write_to_disk(dtmp_bbb, dtmp_bbb_file);
-      write_to_disk(dtmp_aba, dtmp_aba_file);
+      write_to_disk(gec, dtmp_bbb, dtmp_bbb_file);
+      write_to_disk(gec, dtmp_aba, dtmp_aba_file);
     }
   
     //------------------------
@@ -476,9 +476,9 @@ void GFCCSD_IP_B_Driver<T>::gfccsd_driver_ip_b(
                   .count();
             } // end iter
   
-            write_to_disk(x1_b, x1_b_wpi_file);
-            write_to_disk(x2_bbb, x2_bbb_wpi_file);
-            write_to_disk(x2_aba, x2_aba_wpi_file);
+            write_to_disk(ec, x1_b, x1_b_wpi_file);
+            write_to_disk(ec, x2_bbb, x2_bbb_wpi_file);
+            write_to_disk(ec, x2_aba, x2_aba_wpi_file);
   
             // sch.deallocate(e1,e2,xx1,xx2).execute();
             sch.deallocate(e1_b, e2_bbb, e2_aba, xx1_b, xx2_bbb, xx2_aba).execute();

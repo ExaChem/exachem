@@ -147,7 +147,7 @@ void CCSD_Natural_Orbitals<T>::ccsd_natural_orbitals(ChemEnv& chem_env, std::vec
 
   exachem::scf::SCFIO<TensorType> scf_output;
   scf_output.rw_mat_disk(
-    C_alpha_AO2, files_dir + "/scf/" + chem_env.sys_data.output_file_prefix + ".alpha.movecs",
+    ec, C_alpha_AO2, files_dir + "/scf/" + chem_env.sys_data.output_file_prefix + ".alpha.movecs",
     false, true); // read C
 
   // Movecs were written as AOxAO, so they need to be read as such, then transfered to AOxMO.
@@ -173,10 +173,11 @@ void CCSD_Natural_Orbitals<T>::ccsd_natural_orbitals(ChemEnv& chem_env, std::vec
     std::cout << "\nCCSD natural orbitals density written to " + files_dir + "/scf/" +
                    chem_env.sys_data.output_file_prefix + +".ccsd.alpha.density"
               << std::endl;
-  scf_output.rw_mat_disk(
-    C_alpha_AO2, files_dir + "/scf/" + chem_env.sys_data.output_file_prefix + +".ccsd.alpha.movecs",
-    false, false);
-  scf_output.rw_mat_disk(alpha_density,
+  scf_output.rw_mat_disk(ec, C_alpha_AO2,
+                         files_dir + "/scf/" + chem_env.sys_data.output_file_prefix +
+                           +".ccsd.alpha.movecs",
+                         false, false);
+  scf_output.rw_mat_disk(ec, alpha_density,
                          files_dir + "/scf/" + chem_env.sys_data.output_file_prefix +
                            ".ccsd.alpha.density",
                          false, false);

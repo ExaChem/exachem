@@ -1723,12 +1723,12 @@ op_exec.execute(vtaijb, true, ex_hw);
   if(read) {
     if(ec.pg().rank() == 0)
       std::cout << std::endl << "DUCC: [Level " << dlvl << "] Reading ducc tensors from disk..." << std::endl;
-    read_from_disk_group(ec, rwtensors, tfiles);
+    read_from_disk(ec, rwtensors, tfiles);
   }
   else {
     if(ec.pg().rank() == 0)
       std::cout << std::endl << "DUCC: [Level " << dlvl << "] Writing ducc tensors to disk..." << std::endl;
-    write_to_disk_group(ec, rwtensors, tfiles);
+    write_to_disk(ec, rwtensors, tfiles);
   }
 }
 }; // class DUCCInternal

@@ -42,7 +42,7 @@ std::string FCI<T>::generate_fcidump(ChemEnv& chem_env, ExecutionContext& ec,
   if(!fs::exists(files_dir)) fs::create_directories(files_dir);
 
   const std::string hcorefile = files_dir + "/../scf/" + sys_data.output_file_prefix + ".hcore";
-  read_from_disk(hcore, hcorefile);
+  read_from_disk(ec, hcore, hcorefile);
 
   Tensor<T> tmp{MSO, AO};
   // clang-format off

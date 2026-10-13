@@ -48,7 +48,7 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
                       ((fs::exists(t1file) && fs::exists(t2file) && fs::exists(cd_context.f1file) &&
                         fs::exists(cd_context.v2file)));
 
-  const bool use_subgroup = cc_context.use_subgroup;
+  const bool use_subgroup = false; // cc_context.use_subgroup;
 
   int nsranks = 0;
   if(use_subgroup) {
@@ -58,8 +58,9 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
     if(nsranks > ga_cnn) nsranks = ga_cnn;
     nsranks = nsranks * ec.ppn();
 
-    cc_context.sub_pg = ProcGroup::create_subgroup(ec.pg(), nsranks);
-    cc_context.sub_ec = nullptr;
+    cc_context.sub_pg   = ProcGroup::create_subgroup(ec.pg(), nsranks);
+    cc_context.sub_ec   = nullptr;
+    cc_context.owns_sub = true;
 
     if(cc_context.sub_pg.is_valid()) {
       cc_context.sub_ec =
@@ -67,7 +68,12 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
     }
   }
 
-  else cc_context.sub_ec = &ec;
+  else {
+    // borrowed: shares ec's group, so destroy_subgroup() must not destroy it
+    cc_context.sub_ec   = &ec;
+    cc_context.sub_pg   = ec.pg();
+    cc_context.owns_sub = false;
+  }
 
   // Scheduler sub_sch{*sub_ec};
 
@@ -90,8 +96,8 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
 
   if(ccsd_restart) {
     if(fs::exists(t1file) && fs::exists(t2file)) {
-      read_from_disk(d_t1, t1file);
-      read_from_disk(d_t2, t2file);
+      read_from_disk(ec, d_t1, t1file);
+      read_from_disk(ec, d_t2, t2file);
     }
     p_evl_sorted = tamm::diagonal(d_f1);
   }
@@ -197,6 +203,20 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
     }
   }
 
+  // Share results when run on subgroup with all other ranks.
+  if(use_subgroup) {
+    double&             task_corr  = cc_context.task_cc2 ? cc_context.cc2_correlation_energy
+                                                         : cc_context.ccsd_correlation_energy;
+    double&             task_total = cc_context.task_cc2 ? cc_context.cc2_total_energy
+                                                         : cc_context.ccsd_total_energy;
+    std::vector<double> results{residual, corr_energy, task_corr, task_total};
+    ec.pg().broadcast(results.data(), results.size(), 0);
+    residual    = results[0];
+    corr_energy = results[1];
+    task_corr   = results[2];
+    task_total  = results[3];
+  }
+
   ccsd_stats(ec, chem_env.scf_context.hf_energy, residual, corr_energy, ccsd_options.threshold,
              task_str);
 
@@ -238,13 +258,13 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
     if(compute_fullv2 && (ccsd_options.writet || ccsd_options.readt)) {
       if(v2tensors.exist_on_disk(files_prefix)) {
         v2tensors.allocate(ec, MO);
-        v2tensors.read_from_disk(files_prefix);
+        v2tensors.read_from_disk(ec, files_prefix);
         compute_fullv2 = false;
       }
     }
     if(compute_fullv2) {
       v2tensors = cholesky_2e::setupV2Tensors<T>(ec, cholVpr, ex_hw);
-      if(ccsd_options.writet) { v2tensors.write_to_disk(files_prefix); }
+      if(ccsd_options.writet) { v2tensors.write_to_disk(ec, files_prefix); }
     }
   }
 

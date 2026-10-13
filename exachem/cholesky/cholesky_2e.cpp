@@ -540,9 +540,12 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
     // cd_tensor_zero(g_r_tamm);
     cd_tensor_zero(g_chol_tamm);
 
+    int64_t count_on_disk = -1; // number of cholesky vectors written to disk
+
     auto write_chol_vectors = [&]() {
-      write_to_disk(g_d_tamm, diag_ao_file);
-      write_to_disk(g_chol_tamm, chol_ao_file);
+      write_to_disk(ec_dense, g_d_tamm, diag_ao_file);
+      write_to_disk(ec_dense, g_chol_tamm, chol_ao_file);
+      count_on_disk = count;
       if(rank == 0) {
         chem_env.run_context["cholesky_2e"]["num_chol_vecs"] = count;
         chem_env.write_run_context();
@@ -669,10 +672,11 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
     if(cd_restart) {
       cd_t1 = std::chrono::high_resolution_clock::now();
 
-      read_from_disk(g_d_tamm, diag_ao_file);
-      read_from_disk(g_chol_tamm, chol_ao_file);
+      read_from_disk(ec_dense, g_d_tamm, diag_ao_file);
+      read_from_disk(ec_dense, g_chol_tamm, chol_ao_file);
 
-      count = chem_env.run_context["cholesky_2e"]["num_chol_vecs"];
+      count         = chem_env.run_context["cholesky_2e"]["num_chol_vecs"];
+      count_on_disk = count;
 
       if(rank == 0)
         cout << endl << "- [CD restart] Number of cholesky vectors read = " << count << endl;
@@ -970,14 +974,14 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
       indx_d0[1]                    = (int64_t) blkoff[1] + (int64_t) eoff[1];
 
       // Restart
-      if(write_cv.first && count % write_cv.second == 0 && nbf > 1000) { write_chol_vectors(); }
+      if(write_cv.first && count % write_cv.second == 0) { write_chol_vectors(); }
 
     } // while
 
     if(rank == 0)
       std::cout << endl << "- Total number of cholesky vectors = " << count << std::endl;
 
-    if(write_cv.first && nbf > 1000) write_chol_vectors();
+    if(write_cv.first && count != count_on_disk) write_chol_vectors();
 
     Tensor<TensorType>::deallocate(g_d_tamm, g_r_tamm);
 

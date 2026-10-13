@@ -380,7 +380,7 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       d_t1_a_file,   d_t1_b_file,      d_t2_aaaa_file,   d_t2_bbbb_file,  d_t2_abab_file,
       cholOO_a_file, cholOO_b_file,    cholOV_a_file,    cholOV_b_file,   cholVV_a_file,
       cholVV_b_file, v2ijab_aaaa_file, v2ijab_bbbb_file, v2ijab_abab_file};
-    read_from_disk_group(ec, rtensors, rtfnames);
+    read_from_disk(ec, rtensors, rtfnames);
   }
   else {
     // clang-format off
@@ -433,7 +433,7 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
         d_t1_a_file,   d_t1_b_file,      d_t2_aaaa_file,   d_t2_bbbb_file,  d_t2_abab_file,
         cholOO_a_file, cholOO_b_file,    cholOV_a_file,    cholOV_b_file,   cholVV_a_file,
         cholVV_b_file, v2ijab_aaaa_file, v2ijab_bbbb_file, v2ijab_abab_file};
-      write_to_disk_group(ec, rtensors, rtfnames);
+      write_to_disk(ec, rtensors, rtfnames);
     }
 
     ec.pg().barrier();
@@ -593,7 +593,7 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           ix2_5_baab_file,   ix2_5_baba_file,   ix2_6_2_a_file,    ix2_6_2_b_file,
           ix2_6_3_aaaa_file, ix2_6_3_abba_file, ix2_6_3_abab_file, ix2_6_3_bbbb_file,
           ix2_6_3_baab_file, ix2_6_3_baba_file};
-        read_from_disk_group(ec, rtensors, rtfnames);
+        read_from_disk(ec, rtensors, rtfnames);
       }
       else {
         // clang-format off
@@ -752,7 +752,7 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           ix2_5_baab_file,   ix2_5_baba_file,   ix2_6_2_a_file,    ix2_6_2_b_file,
           ix2_6_3_aaaa_file, ix2_6_3_abba_file, ix2_6_3_abab_file, ix2_6_3_bbbb_file,
           ix2_6_3_baab_file, ix2_6_3_baba_file};
-        write_to_disk_group(ec, rtensors, rtfnames);
+        write_to_disk(ec, rtensors, rtfnames);
       }
 
       gfst_end = std::chrono::high_resolution_clock::now();
@@ -913,9 +913,9 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
             ComplexTensor q2_prev_bab{v_beta, o_alpha, o_beta, otis_prev_opt};
             sch.allocate(q1_prev_a, q2_prev_aaa, q2_prev_bab).execute();
 
-            read_from_disk(q1_prev_a, pq1_a_file);
-            read_from_disk(q2_prev_aaa, pq2_aaa_file);
-            read_from_disk(q2_prev_bab, pq2_bab_file);
+            read_from_disk(ec, q1_prev_a, pq1_a_file);
+            read_from_disk(ec, q2_prev_aaa, pq2_aaa_file);
+            read_from_disk(ec, q2_prev_bab, pq2_bab_file);
 
             { // retile q1 prev a,aaa,bab tensors
               int q1_prev_a_ga   = tamm_to_ga(ec, q1_prev_a);
@@ -1030,7 +1030,7 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
             }
 
             EXPECTS(gsvectors.size() == 3 * ngsvecs);
-            read_from_disk_group(ec, gsvectors, gsvectors_filenames);
+            read_from_disk(ec, gsvectors, gsvectors_filenames);
             auto gs_rv_end = std::chrono::high_resolution_clock::now();
             auto gs_read_time =
               std::chrono::duration_cast<std::chrono::duration<double>>((gs_rv_end - gs_rv_start))
@@ -1071,7 +1071,7 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
                   ComplexTensor i_q2_tamm_aaa = {v_alpha, o_alpha, o_alpha, otis_opt};
                   ComplexTensor i_q2_tamm_bab = {v_beta, o_alpha, o_beta, otis_opt};
                   sch.allocate(i_q1_tamm_a, i_q2_tamm_aaa, i_q2_tamm_bab).execute();
-                  read_from_disk_group<std::complex<T>>(
+                  read_from_disk<std::complex<T>>(
                     ec, std::vector{i_q1_tamm_a, i_q2_tamm_aaa, i_q2_tamm_bab},
                     {q1_a_file, q2_aaa_file, q2_bab_file}, gf_profile);
 
@@ -1237,9 +1237,9 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
                     NGA_Destroy(q1_tamm_a_ga);
                     NGA_Destroy(q2_tamm_aaa_ga);
                     NGA_Destroy(q2_tamm_bab_ga);
-                    write_to_disk_group<std::complex<T>>(
-                      ec, {i_q1_tamm_a, i_q2_tamm_aaa, i_q2_tamm_bab},
-                      {q1_a_file, q2_aaa_file, q2_bab_file}, gf_profile && ivec == ivec_start);
+                    write_to_disk<std::complex<T>>(ec, {i_q1_tamm_a, i_q2_tamm_aaa, i_q2_tamm_bab},
+                                                   {q1_a_file, q2_aaa_file, q2_bab_file},
+                                                   gf_profile && ivec == ivec_start);
                     sch.deallocate(i_q1_tamm_a, i_q2_tamm_aaa, i_q2_tamm_bab).execute();
                   }
                 }
@@ -1331,9 +1331,9 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
                   NGA_Destroy(q1_tamm_a_ga);
                   NGA_Destroy(q2_tamm_aaa_ga);
                   NGA_Destroy(q2_tamm_bab_ga);
-                  write_to_disk_group<std::complex<T>>(
-                    ec, {i_q1_tamm_a, i_q2_tamm_aaa, i_q2_tamm_bab},
-                    {q1_a_file, q2_aaa_file, q2_bab_file}, gf_profile && ivec == ivec_start);
+                  write_to_disk<std::complex<T>>(ec, {i_q1_tamm_a, i_q2_tamm_aaa, i_q2_tamm_bab},
+                                                 {q1_a_file, q2_aaa_file, q2_bab_file},
+                                                 gf_profile && ivec == ivec_start);
                   sch.deallocate(i_q1_tamm_a, i_q2_tamm_aaa, i_q2_tamm_bab).execute();
                 }
               }
@@ -1372,14 +1372,14 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
               NGA_Destroy(q2_tamm_bab_ga);
             }
 
-            write_to_disk(q1_tamm_a, q1_a_file);
-            write_to_disk(q2_tamm_aaa, q2_aaa_file);
-            write_to_disk(q2_tamm_bab, q2_bab_file);
+            write_to_disk(ec, q1_tamm_a, q1_a_file);
+            write_to_disk(ec, q2_tamm_aaa, q2_aaa_file);
+            write_to_disk(ec, q2_tamm_bab, q2_bab_file);
           } // end of !gs-restart
           else { // restart GS
-            read_from_disk(q1_tamm_a, q1_a_file);
-            read_from_disk(q2_tamm_aaa, q2_aaa_file);
-            read_from_disk(q2_tamm_bab, q2_bab_file);
+            read_from_disk(ec, q1_tamm_a, q1_a_file);
+            read_from_disk(ec, q2_tamm_aaa, q2_aaa_file);
+            read_from_disk(ec, q2_tamm_bab, q2_bab_file);
           }
 
           auto total_time_gs = std::chrono::duration_cast<std::chrono::duration<double>>(
@@ -1439,14 +1439,14 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 #else
           sch.execute(sch.ec().exhw());
 #endif
-            write_to_disk(Hx1_tamm_a, hx1_a_file);
-            write_to_disk(Hx2_tamm_aaa, hx2_aaa_file);
-            write_to_disk(Hx2_tamm_bab, hx2_bab_file);
+            write_to_disk(ec, Hx1_tamm_a, hx1_a_file);
+            write_to_disk(ec, Hx2_tamm_aaa, hx2_aaa_file);
+            write_to_disk(ec, Hx2_tamm_bab, hx2_bab_file);
           }
           else {
-            read_from_disk(Hx1_tamm_a, hx1_a_file);
-            read_from_disk(Hx2_tamm_aaa, hx2_aaa_file);
-            read_from_disk(Hx2_tamm_bab, hx2_bab_file);
+            read_from_disk(ec, Hx1_tamm_a, hx1_a_file);
+            read_from_disk(ec, Hx2_tamm_aaa, hx2_aaa_file);
+            read_from_disk(ec, Hx2_tamm_bab, hx2_bab_file);
           }
 
           // check q and hx files
@@ -1528,14 +1528,14 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
         // Write all tensors
         if(!gf_restart) {
-          write_to_disk(hsub_tamm_a, hsub_a_file);
-          write_to_disk(bsub_tamm_a, bsub_a_file);
-          write_to_disk(Cp_a, cp_a_file);
+          write_to_disk(ec, hsub_tamm_a, hsub_a_file);
+          write_to_disk(ec, bsub_tamm_a, bsub_a_file);
+          write_to_disk(ec, Cp_a, cp_a_file);
         }
         else {
-          read_from_disk(hsub_tamm_a, hsub_a_file);
-          read_from_disk(bsub_tamm_a, bsub_a_file);
-          read_from_disk(Cp_a, cp_a_file);
+          read_from_disk(ec, hsub_tamm_a, hsub_a_file);
+          read_from_disk(ec, bsub_tamm_a, bsub_a_file);
+          read_from_disk(ec, Cp_a, cp_a_file);
         }
 
         // check hsub,bsub,Cp
@@ -1838,9 +1838,9 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           ComplexTensor q2_prev_aba{v_alpha, o_beta, o_alpha, otis_prev};
           sch.allocate(q1_prev_b, q2_prev_bbb, q2_prev_aba).execute();
 
-          read_from_disk(q1_prev_b, pq1_b_file);
-          read_from_disk(q2_prev_bbb, pq2_bbb_file);
-          read_from_disk(q2_prev_aba, pq2_aba_file);
+          read_from_disk(ec, q1_prev_b, pq1_b_file);
+          read_from_disk(ec, q2_prev_bbb, pq2_bbb_file);
+          read_from_disk(ec, q2_prev_aba, pq2_aba_file);
 
           ivec_start = prev_qr_rank;
 
@@ -1895,9 +1895,9 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
             if(fs::exists(x1_b_wpi_file) && fs::exists(x2_bbb_wpi_file) &&
                fs::exists(x2_aba_wpi_file)) {
-              read_from_disk(q1_tmp_b, x1_b_wpi_file);
-              read_from_disk(q2_tmp_bbb, x2_bbb_wpi_file);
-              read_from_disk(q2_tmp_aba, x2_aba_wpi_file);
+              read_from_disk(ec, q1_tmp_b, x1_b_wpi_file);
+              read_from_disk(ec, q2_tmp_bbb, x2_bbb_wpi_file);
+              read_from_disk(ec, q2_tmp_aba, x2_aba_wpi_file);
             }
             else {
               tamm_terminate("ERROR: At least one of " + x1_b_wpi_file + " and " + x2_bbb_wpi_file +
@@ -1993,14 +1993,14 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
           sch.deallocate(q1_tmp_b, q2_tmp_bbb, q2_tmp_aba).execute();
 
-          write_to_disk(q1_tamm_b, q1_b_file);
-          write_to_disk(q2_tamm_bbb, q2_bbb_file);
-          write_to_disk(q2_tamm_aba, q2_aba_file);
+          write_to_disk(ec, q1_tamm_b, q1_b_file);
+          write_to_disk(ec, q2_tamm_bbb, q2_bbb_file);
+          write_to_disk(ec, q2_tamm_aba, q2_aba_file);
         }      // end of !gs-restart
         else { // restart GS
-          read_from_disk(q1_tamm_b, q1_b_file);
-          read_from_disk(q2_tamm_bbb, q2_bbb_file);
-          read_from_disk(q2_tamm_aba, q2_aba_file);
+          read_from_disk(ec, q1_tamm_b, q1_b_file);
+          read_from_disk(ec, q2_tamm_bbb, q2_bbb_file);
+          read_from_disk(ec, q2_tamm_aba, q2_aba_file);
         }
 
         if(rank == 0) {
@@ -2045,14 +2045,14 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 #else
           sch.execute();
 #endif
-          write_to_disk(Hx1_tamm_b, hx1_b_file);
-          write_to_disk(Hx2_tamm_bbb, hx2_bbb_file);
-          write_to_disk(Hx2_tamm_aba, hx2_aba_file);
+          write_to_disk(ec, Hx1_tamm_b, hx1_b_file);
+          write_to_disk(ec, Hx2_tamm_bbb, hx2_bbb_file);
+          write_to_disk(ec, Hx2_tamm_aba, hx2_aba_file);
         }
         else {
-          read_from_disk(Hx1_tamm_b, hx1_b_file);
-          read_from_disk(Hx2_tamm_bbb, hx2_bbb_file);
-          read_from_disk(Hx2_tamm_aba, hx2_aba_file);
+          read_from_disk(ec, Hx1_tamm_b, hx1_b_file);
+          read_from_disk(ec, Hx2_tamm_bbb, hx2_bbb_file);
+          read_from_disk(ec, Hx2_tamm_aba, hx2_aba_file);
         }
         auto   cc_q12 = std::chrono::high_resolution_clock::now();
         double time_q12 =
@@ -2107,15 +2107,15 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
       // Write all tensors
       if(!gf_restart) {
-        write_to_disk(hsub_tamm_b, hsub_b_file);
-        write_to_disk(bsub_tamm_b, bsub_b_file);
-        write_to_disk(Cp_b, cp_b_file);
+        write_to_disk(ec, hsub_tamm_b, hsub_b_file);
+        write_to_disk(ec, bsub_tamm_b, bsub_b_file);
+        write_to_disk(ec, Cp_b, cp_b_file);
         sch.deallocate(Hx1_tamm_b, Hx2_tamm_bbb, Hx2_tamm_aba).execute();
       }
       else {
-        read_from_disk(hsub_tamm_b, hsub_b_file);
-        read_from_disk(bsub_tamm_b, bsub_b_file);
-        read_from_disk(Cp_b, cp_b_file);
+        read_from_disk(ec, hsub_tamm_b, hsub_b_file);
+        read_from_disk(ec, bsub_tamm_b, bsub_b_file);
+        read_from_disk(ec, Cp_b, cp_b_file);
       }
 
       Complex2DMatrix hsub_b(qr_rank, qr_rank);
@@ -2427,49 +2427,49 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
        fs::exists(iy5_abab_file) && fs::exists(iy5_baab_file) && fs::exists(iy5_bbbb_file) &&
        fs::exists(iy5_baba_file) && fs::exists(iy5_abba_file) && fs::exists(iy6_a_file) &&
        fs::exists(iy6_b_file) && ccsd_options.gf_restart) {
-      read_from_disk(t2v2_v, t2v2_v_file);
-      read_from_disk(lt12_v_a, lt12_v_a_file);
-      read_from_disk(lt12_v_b, lt12_v_b_file);
-      read_from_disk(iy1_1_a, iy1_1_a_file);
-      read_from_disk(iy1_1_b, iy1_1_b_file);
-      read_from_disk(iy1_2_1_a, iy1_2_1_a_file);
-      read_from_disk(iy1_2_1_b, iy1_2_1_b_file);
-      read_from_disk(iy1_a, iy1_a_file);
-      read_from_disk(iy1_b, iy1_b_file);
-      read_from_disk(iy2_a, iy1_a_file);
-      read_from_disk(iy2_b, iy1_b_file);
-      read_from_disk(iy3_1_aaaa, iy3_1_aaaa_file);
-      read_from_disk(iy3_1_bbbb, iy3_1_bbbb_file);
-      read_from_disk(iy3_1_abab, iy3_1_abab_file);
-      read_from_disk(iy3_1_baba, iy3_1_baba_file);
-      read_from_disk(iy3_1_baab, iy3_1_baab_file);
-      read_from_disk(iy3_1_abba, iy3_1_abba_file);
-      read_from_disk(iy3_1_2_a, iy3_1_2_a_file);
-      read_from_disk(iy3_1_2_b, iy3_1_2_b_file);
-      read_from_disk(iy3_aaaa, iy3_aaaa_file);
-      read_from_disk(iy3_bbbb, iy3_bbbb_file);
-      read_from_disk(iy3_abab, iy3_abab_file);
-      read_from_disk(iy3_baba, iy3_baba_file);
-      read_from_disk(iy3_baab, iy3_baab_file);
-      read_from_disk(iy3_abba, iy3_abba_file);
-      read_from_disk(iy4_1_aaaa, iy4_1_aaaa_file);
-      read_from_disk(iy4_1_bbbb, iy4_1_bbbb_file);
-      read_from_disk(iy4_1_baba, iy4_1_baba_file);
-      read_from_disk(iy4_1_baab, iy4_1_baab_file);
-      read_from_disk(iy4_1_abba, iy4_1_abba_file);
-      read_from_disk(iy4_1_abab, iy4_1_abab_file);
-      read_from_disk(iy4_2_aaaa, iy4_2_aaaa_file);
-      read_from_disk(iy4_2_bbbb, iy4_2_bbbb_file);
-      read_from_disk(iy4_2_baab, iy4_2_baab_file);
-      read_from_disk(iy4_2_abba, iy4_2_abba_file);
-      read_from_disk(iy5_aaaa, iy5_aaaa_file);
-      read_from_disk(iy5_bbbb, iy5_bbbb_file);
-      read_from_disk(iy5_abab, iy5_abab_file);
-      read_from_disk(iy5_baba, iy5_baba_file);
-      read_from_disk(iy5_baab, iy5_baab_file);
-      read_from_disk(iy5_abba, iy5_abba_file);
-      read_from_disk(iy6_a, iy6_a_file);
-      read_from_disk(iy6_b, iy6_b_file);
+      read_from_disk(ec, t2v2_v, t2v2_v_file);
+      read_from_disk(ec, lt12_v_a, lt12_v_a_file);
+      read_from_disk(ec, lt12_v_b, lt12_v_b_file);
+      read_from_disk(ec, iy1_1_a, iy1_1_a_file);
+      read_from_disk(ec, iy1_1_b, iy1_1_b_file);
+      read_from_disk(ec, iy1_2_1_a, iy1_2_1_a_file);
+      read_from_disk(ec, iy1_2_1_b, iy1_2_1_b_file);
+      read_from_disk(ec, iy1_a, iy1_a_file);
+      read_from_disk(ec, iy1_b, iy1_b_file);
+      read_from_disk(ec, iy2_a, iy1_a_file);
+      read_from_disk(ec, iy2_b, iy1_b_file);
+      read_from_disk(ec, iy3_1_aaaa, iy3_1_aaaa_file);
+      read_from_disk(ec, iy3_1_bbbb, iy3_1_bbbb_file);
+      read_from_disk(ec, iy3_1_abab, iy3_1_abab_file);
+      read_from_disk(ec, iy3_1_baba, iy3_1_baba_file);
+      read_from_disk(ec, iy3_1_baab, iy3_1_baab_file);
+      read_from_disk(ec, iy3_1_abba, iy3_1_abba_file);
+      read_from_disk(ec, iy3_1_2_a, iy3_1_2_a_file);
+      read_from_disk(ec, iy3_1_2_b, iy3_1_2_b_file);
+      read_from_disk(ec, iy3_aaaa, iy3_aaaa_file);
+      read_from_disk(ec, iy3_bbbb, iy3_bbbb_file);
+      read_from_disk(ec, iy3_abab, iy3_abab_file);
+      read_from_disk(ec, iy3_baba, iy3_baba_file);
+      read_from_disk(ec, iy3_baab, iy3_baab_file);
+      read_from_disk(ec, iy3_abba, iy3_abba_file);
+      read_from_disk(ec, iy4_1_aaaa, iy4_1_aaaa_file);
+      read_from_disk(ec, iy4_1_bbbb, iy4_1_bbbb_file);
+      read_from_disk(ec, iy4_1_baba, iy4_1_baba_file);
+      read_from_disk(ec, iy4_1_baab, iy4_1_baab_file);
+      read_from_disk(ec, iy4_1_abba, iy4_1_abba_file);
+      read_from_disk(ec, iy4_1_abab, iy4_1_abab_file);
+      read_from_disk(ec, iy4_2_aaaa, iy4_2_aaaa_file);
+      read_from_disk(ec, iy4_2_bbbb, iy4_2_bbbb_file);
+      read_from_disk(ec, iy4_2_baab, iy4_2_baab_file);
+      read_from_disk(ec, iy4_2_abba, iy4_2_abba_file);
+      read_from_disk(ec, iy5_aaaa, iy5_aaaa_file);
+      read_from_disk(ec, iy5_bbbb, iy5_bbbb_file);
+      read_from_disk(ec, iy5_abab, iy5_abab_file);
+      read_from_disk(ec, iy5_baba, iy5_baba_file);
+      read_from_disk(ec, iy5_baab, iy5_baab_file);
+      read_from_disk(ec, iy5_abba, iy5_abba_file);
+      read_from_disk(ec, iy6_a, iy6_a_file);
+      read_from_disk(ec, iy6_b, iy6_b_file);
     }
     else {
       // clang-format off
@@ -2595,49 +2595,49 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       #endif
       // clang-format on
 
-      write_to_disk(t2v2_v, t2v2_v_file);
-      write_to_disk(lt12_v_a, lt12_v_a_file);
-      write_to_disk(lt12_v_b, lt12_v_b_file);
-      write_to_disk(iy1_1_a, iy1_1_a_file);
-      write_to_disk(iy1_1_b, iy1_1_b_file);
-      write_to_disk(iy1_2_1_a, iy1_2_1_a_file);
-      write_to_disk(iy1_2_1_b, iy1_2_1_b_file);
-      write_to_disk(iy1_a, iy1_a_file);
-      write_to_disk(iy1_b, iy1_b_file);
-      write_to_disk(iy2_a, iy2_a_file);
-      write_to_disk(iy2_b, iy2_b_file);
-      write_to_disk(iy3_1_aaaa, iy3_1_aaaa_file);
-      write_to_disk(iy3_1_bbbb, iy3_1_bbbb_file);
-      write_to_disk(iy3_1_abab, iy3_1_abab_file);
-      write_to_disk(iy3_1_baba, iy3_1_baba_file);
-      write_to_disk(iy3_1_baab, iy3_1_baab_file);
-      write_to_disk(iy3_1_abba, iy3_1_abba_file);
-      write_to_disk(iy3_1_2_a, iy3_1_2_a_file);
-      write_to_disk(iy3_1_2_b, iy3_1_2_b_file);
-      write_to_disk(iy3_aaaa, iy3_aaaa_file);
-      write_to_disk(iy3_bbbb, iy3_bbbb_file);
-      write_to_disk(iy3_abab, iy3_abab_file);
-      write_to_disk(iy3_baba, iy3_baba_file);
-      write_to_disk(iy3_baab, iy3_baab_file);
-      write_to_disk(iy3_abba, iy3_abba_file);
-      write_to_disk(iy4_1_aaaa, iy4_1_aaaa_file);
-      write_to_disk(iy4_1_bbbb, iy4_1_bbbb_file);
-      write_to_disk(iy4_1_baba, iy4_1_baba_file);
-      write_to_disk(iy4_1_baab, iy4_1_baab_file);
-      write_to_disk(iy4_1_abba, iy4_1_abba_file);
-      write_to_disk(iy4_1_abab, iy4_1_abab_file);
-      write_to_disk(iy4_2_aaaa, iy4_2_aaaa_file);
-      write_to_disk(iy4_2_bbbb, iy4_2_bbbb_file);
-      write_to_disk(iy4_2_baab, iy4_2_baab_file);
-      write_to_disk(iy4_2_abba, iy4_2_abba_file);
-      write_to_disk(iy5_aaaa, iy5_aaaa_file);
-      write_to_disk(iy5_bbbb, iy5_bbbb_file);
-      write_to_disk(iy5_abab, iy5_abab_file);
-      write_to_disk(iy5_baba, iy5_baba_file);
-      write_to_disk(iy5_baab, iy5_baab_file);
-      write_to_disk(iy5_abba, iy5_abba_file);
-      write_to_disk(iy6_a, iy6_a_file);
-      write_to_disk(iy6_b, iy6_b_file);
+      write_to_disk(ec, t2v2_v, t2v2_v_file);
+      write_to_disk(ec, lt12_v_a, lt12_v_a_file);
+      write_to_disk(ec, lt12_v_b, lt12_v_b_file);
+      write_to_disk(ec, iy1_1_a, iy1_1_a_file);
+      write_to_disk(ec, iy1_1_b, iy1_1_b_file);
+      write_to_disk(ec, iy1_2_1_a, iy1_2_1_a_file);
+      write_to_disk(ec, iy1_2_1_b, iy1_2_1_b_file);
+      write_to_disk(ec, iy1_a, iy1_a_file);
+      write_to_disk(ec, iy1_b, iy1_b_file);
+      write_to_disk(ec, iy2_a, iy2_a_file);
+      write_to_disk(ec, iy2_b, iy2_b_file);
+      write_to_disk(ec, iy3_1_aaaa, iy3_1_aaaa_file);
+      write_to_disk(ec, iy3_1_bbbb, iy3_1_bbbb_file);
+      write_to_disk(ec, iy3_1_abab, iy3_1_abab_file);
+      write_to_disk(ec, iy3_1_baba, iy3_1_baba_file);
+      write_to_disk(ec, iy3_1_baab, iy3_1_baab_file);
+      write_to_disk(ec, iy3_1_abba, iy3_1_abba_file);
+      write_to_disk(ec, iy3_1_2_a, iy3_1_2_a_file);
+      write_to_disk(ec, iy3_1_2_b, iy3_1_2_b_file);
+      write_to_disk(ec, iy3_aaaa, iy3_aaaa_file);
+      write_to_disk(ec, iy3_bbbb, iy3_bbbb_file);
+      write_to_disk(ec, iy3_abab, iy3_abab_file);
+      write_to_disk(ec, iy3_baba, iy3_baba_file);
+      write_to_disk(ec, iy3_baab, iy3_baab_file);
+      write_to_disk(ec, iy3_abba, iy3_abba_file);
+      write_to_disk(ec, iy4_1_aaaa, iy4_1_aaaa_file);
+      write_to_disk(ec, iy4_1_bbbb, iy4_1_bbbb_file);
+      write_to_disk(ec, iy4_1_baba, iy4_1_baba_file);
+      write_to_disk(ec, iy4_1_baab, iy4_1_baab_file);
+      write_to_disk(ec, iy4_1_abba, iy4_1_abba_file);
+      write_to_disk(ec, iy4_1_abab, iy4_1_abab_file);
+      write_to_disk(ec, iy4_2_aaaa, iy4_2_aaaa_file);
+      write_to_disk(ec, iy4_2_bbbb, iy4_2_bbbb_file);
+      write_to_disk(ec, iy4_2_baab, iy4_2_baab_file);
+      write_to_disk(ec, iy4_2_abba, iy4_2_abba_file);
+      write_to_disk(ec, iy5_aaaa, iy5_aaaa_file);
+      write_to_disk(ec, iy5_bbbb, iy5_bbbb_file);
+      write_to_disk(ec, iy5_abab, iy5_abab_file);
+      write_to_disk(ec, iy5_baba, iy5_baba_file);
+      write_to_disk(ec, iy5_baab, iy5_baab_file);
+      write_to_disk(ec, iy5_abba, iy5_abba_file);
+      write_to_disk(ec, iy6_a, iy6_a_file);
+      write_to_disk(ec, iy6_b, iy6_b_file);
     }
 
     level               = 1;
@@ -2748,9 +2748,9 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           ComplexTensor q2_prev_bab{o_beta, v_alpha, v_beta, otis_prev};
           sch.allocate(q1_prev_a, q2_prev_aaa, q2_prev_bab).execute();
 
-          read_from_disk(q1_prev_a, pq1_a_file);
-          read_from_disk(q2_prev_aaa, pq2_aaa_file);
-          read_from_disk(q2_prev_bab, pq2_bab_file);
+          read_from_disk(ec, q1_prev_a, pq1_a_file);
+          read_from_disk(ec, q2_prev_aaa, pq2_aaa_file);
+          read_from_disk(ec, q2_prev_bab, pq2_bab_file);
 
           ivec_start = prev_qr_rank;
 
@@ -2810,9 +2810,9 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
             if(fs::exists(y1_a_wpi_file) && fs::exists(y2_aaa_wpi_file) &&
                fs::exists(y2_bab_wpi_file)) {
-              read_from_disk(q1_tmp_a, y1_a_wpi_file);
-              read_from_disk(q2_tmp_aaa, y2_aaa_wpi_file);
-              read_from_disk(q2_tmp_bab, y2_bab_wpi_file);
+              read_from_disk(ec, q1_tmp_a, y1_a_wpi_file);
+              read_from_disk(ec, q2_tmp_aaa, y2_aaa_wpi_file);
+              read_from_disk(ec, q2_tmp_bab, y2_bab_wpi_file);
             }
             else {
               tamm_terminate("ERROR: At least one of " + y1_a_wpi_file + " and " + y2_aaa_wpi_file +
@@ -2904,14 +2904,14 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
           sch.deallocate(q1_tmp_a, q2_tmp_aaa, q2_tmp_bab).execute();
 
-          write_to_disk(q1_tamm_a, q1_a_file);
-          write_to_disk(q2_tamm_aaa, q2_aaa_file);
-          write_to_disk(q2_tamm_bab, q2_bab_file);
+          write_to_disk(ec, q1_tamm_a, q1_a_file);
+          write_to_disk(ec, q2_tamm_aaa, q2_aaa_file);
+          write_to_disk(ec, q2_tamm_bab, q2_bab_file);
         }      // end of !gs-restart
         else { // restart GS
-          read_from_disk(q1_tamm_a, q1_a_file);
-          read_from_disk(q2_tamm_aaa, q2_aaa_file);
-          read_from_disk(q2_tamm_bab, q2_bab_file);
+          read_from_disk(ec, q1_tamm_a, q1_a_file);
+          read_from_disk(ec, q2_tamm_aaa, q2_aaa_file);
+          read_from_disk(ec, q2_tamm_bab, q2_bab_file);
         }
 
         if(rank == 0) {
@@ -2962,14 +2962,14 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 #else
           sch.execute();
 #endif
-          write_to_disk(Hx1_tamm_a, hx1_a_file);
-          write_to_disk(Hx2_tamm_aaa, hx2_aaa_file);
-          write_to_disk(Hx2_tamm_bab, hx2_bab_file);
+          write_to_disk(ec, Hx1_tamm_a, hx1_a_file);
+          write_to_disk(ec, Hx2_tamm_aaa, hx2_aaa_file);
+          write_to_disk(ec, Hx2_tamm_bab, hx2_bab_file);
         }
         else {
-          read_from_disk(Hx1_tamm_a, hx1_a_file);
-          read_from_disk(Hx2_tamm_aaa, hx2_aaa_file);
-          read_from_disk(Hx2_tamm_bab, hx2_bab_file);
+          read_from_disk(ec, Hx1_tamm_a, hx1_a_file);
+          read_from_disk(ec, Hx2_tamm_aaa, hx2_aaa_file);
+          read_from_disk(ec, Hx2_tamm_bab, hx2_bab_file);
         }
         auto   cc_q12 = std::chrono::high_resolution_clock::now();
         double time_q12 =
@@ -3024,14 +3024,14 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
       if(rank == 0) std::cout << std::endl << "Time to compute Cp: " << time << " secs" << std::endl;
 
       if(!gf_restart) {
-        write_to_disk(hsub_tamm_a, hsub_a_file);
-        write_to_disk(bsub_tamm_a, bsub_a_file);
-        write_to_disk(Cp_a, cp_a_file);
+        write_to_disk(ec, hsub_tamm_a, hsub_a_file);
+        write_to_disk(ec, bsub_tamm_a, bsub_a_file);
+        write_to_disk(ec, Cp_a, cp_a_file);
       }
       else {
-        read_from_disk(hsub_tamm_a, hsub_a_file);
-        read_from_disk(bsub_tamm_a, bsub_a_file);
-        read_from_disk(Cp_a, cp_a_file);
+        read_from_disk(ec, hsub_tamm_a, hsub_a_file);
+        read_from_disk(ec, bsub_tamm_a, bsub_a_file);
+        read_from_disk(ec, Cp_a, cp_a_file);
       }
 
       Complex2DMatrix hsub_a(qr_rank, qr_rank);
@@ -3321,9 +3321,9 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
           ComplexTensor q2_prev_aba{o_alpha, v_beta, v_alpha, otis_prev};
           sch.allocate(q1_prev_b, q2_prev_bbb, q2_prev_aba).execute();
 
-          read_from_disk(q1_prev_b, pq1_b_file);
-          read_from_disk(q2_prev_bbb, pq2_bbb_file);
-          read_from_disk(q2_prev_aba, pq2_aba_file);
+          read_from_disk(ec, q1_prev_b, pq1_b_file);
+          read_from_disk(ec, q2_prev_bbb, pq2_bbb_file);
+          read_from_disk(ec, q2_prev_aba, pq2_aba_file);
 
           ivec_start = prev_qr_rank;
 
@@ -3378,9 +3378,9 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
             if(fs::exists(y1_b_wpi_file) && fs::exists(y2_bbb_wpi_file) &&
                fs::exists(y2_aba_wpi_file)) {
-              read_from_disk(q1_tmp_b, y1_b_wpi_file);
-              read_from_disk(q2_tmp_bbb, y2_bbb_wpi_file);
-              read_from_disk(q2_tmp_aba, y2_aba_wpi_file);
+              read_from_disk(ec, q1_tmp_b, y1_b_wpi_file);
+              read_from_disk(ec, q2_tmp_bbb, y2_bbb_wpi_file);
+              read_from_disk(ec, q2_tmp_aba, y2_aba_wpi_file);
             }
             else {
               tamm_terminate("ERROR: At least one of " + y1_b_wpi_file + " and " + y2_bbb_wpi_file +
@@ -3476,14 +3476,14 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
           sch.deallocate(q1_tmp_b, q2_tmp_bbb, q2_tmp_aba).execute();
 
-          write_to_disk(q1_tamm_b, q1_b_file);
-          write_to_disk(q2_tamm_bbb, q2_bbb_file);
-          write_to_disk(q2_tamm_aba, q2_aba_file);
+          write_to_disk(ec, q1_tamm_b, q1_b_file);
+          write_to_disk(ec, q2_tamm_bbb, q2_bbb_file);
+          write_to_disk(ec, q2_tamm_aba, q2_aba_file);
         }      // end of !gs-restart
         else { // restart GS
-          read_from_disk(q1_tamm_b, q1_b_file);
-          read_from_disk(q2_tamm_bbb, q2_bbb_file);
-          read_from_disk(q2_tamm_aba, q2_aba_file);
+          read_from_disk(ec, q1_tamm_b, q1_b_file);
+          read_from_disk(ec, q2_tamm_bbb, q2_bbb_file);
+          read_from_disk(ec, q2_tamm_aba, q2_aba_file);
         }
 
         if(rank == 0) {
@@ -3535,14 +3535,14 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 #else
           sch.execute();
 #endif
-          write_to_disk(Hx1_tamm_b, hx1_b_file);
-          write_to_disk(Hx2_tamm_bbb, hx2_bbb_file);
-          write_to_disk(Hx2_tamm_aba, hx2_aba_file);
+          write_to_disk(ec, Hx1_tamm_b, hx1_b_file);
+          write_to_disk(ec, Hx2_tamm_bbb, hx2_bbb_file);
+          write_to_disk(ec, Hx2_tamm_aba, hx2_aba_file);
         }
         else {
-          read_from_disk(Hx1_tamm_b, hx1_b_file);
-          read_from_disk(Hx2_tamm_bbb, hx2_bbb_file);
-          read_from_disk(Hx2_tamm_aba, hx2_aba_file);
+          read_from_disk(ec, Hx1_tamm_b, hx1_b_file);
+          read_from_disk(ec, Hx2_tamm_bbb, hx2_bbb_file);
+          read_from_disk(ec, Hx2_tamm_aba, hx2_aba_file);
         }
         auto   cc_q12 = std::chrono::high_resolution_clock::now();
         double time_q12 =
@@ -3595,15 +3595,15 @@ void GFCCSD_Driver<T>::gfccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
       // Write all tensors
       if(!gf_restart) {
-        write_to_disk(hsub_tamm_b, hsub_b_file);
-        write_to_disk(bsub_tamm_b, bsub_b_file);
-        write_to_disk(Cp_b, cp_b_file);
+        write_to_disk(ec, hsub_tamm_b, hsub_b_file);
+        write_to_disk(ec, bsub_tamm_b, bsub_b_file);
+        write_to_disk(ec, Cp_b, cp_b_file);
         sch.deallocate(Hx1_tamm_b, Hx2_tamm_bbb, Hx2_tamm_aba).execute();
       }
       else {
-        read_from_disk(hsub_tamm_b, hsub_b_file);
-        read_from_disk(bsub_tamm_b, bsub_b_file);
-        read_from_disk(Cp_b, cp_b_file);
+        read_from_disk(ec, hsub_tamm_b, hsub_b_file);
+        read_from_disk(ec, bsub_tamm_b, bsub_b_file);
+        read_from_disk(ec, Cp_b, cp_b_file);
       }
 
       Complex2DMatrix hsub_b(qr_rank, qr_rank);

@@ -229,13 +229,14 @@ void exachem::scf::SCFEngine::scf_orthogonalizer(ExecutionContext& ec, ChemEnv& 
       scf_data.tNortho_bc             = grid.index_space(chem_env.sys_data.nbf);
       scf_data.ttensors.X_alpha = grid.allocate<TensorType>(scf_data.tN_bc, scf_data.tNortho_bc);
       if(grid.participates())
-        scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
+        scf_output.rw_mat_disk(*scf_data.ttensors.X_alpha.execution_context(),
+                               scf_data.ttensors.X_alpha, fname[FileType::Ortho],
                                chem_env.ioptions.scf_options.profile, true);
     }
 #else
     scf_data.ttensors.X_alpha = {scf_data.tAO, scf_data.tAO_ortho};
     sch.allocate(scf_data.ttensors.X_alpha).execute();
-    scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
+    scf_output.rw_mat_disk(ec, scf_data.ttensors.X_alpha, fname[FileType::Ortho],
                            chem_env.ioptions.scf_options.profile, true);
 #endif
   }
@@ -251,10 +252,11 @@ void exachem::scf::SCFEngine::scf_orthogonalizer(ExecutionContext& ec, ChemEnv& 
     if(N >= chem_env.ioptions.scf_options.restart_size) {
 #if defined(USE_SCALAPACK)
       if(tamm::find_scalapack_grid(ec).participates())
-        scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
+        scf_output.rw_mat_disk(*scf_data.ttensors.X_alpha.execution_context(),
+                               scf_data.ttensors.X_alpha, fname[FileType::Ortho],
                                chem_env.ioptions.scf_options.profile);
 #else
-      scf_output.rw_mat_disk(scf_data.ttensors.X_alpha, fname[FileType::Ortho],
+      scf_output.rw_mat_disk(ec, scf_data.ttensors.X_alpha, fname[FileType::Ortho],
                              chem_env.ioptions.scf_options.profile);
 #endif
     }
@@ -414,24 +416,24 @@ void exachem::scf::SCFEngine::scf_final_io(ExecutionContext& ec, const ChemEnv& 
     if(rank == 0) cout << "done." << endl;
   }
 
-  scf_output.rw_mat_disk(scf_data.ttensors.H1, fname[FileType::Hcore],
+  scf_output.rw_mat_disk(ec, scf_data.ttensors.H1, fname[FileType::Hcore],
                          chem_env.ioptions.scf_options.profile);
   if(chem_env.sys_data.is_ks) {
     // write vxc to disk
-    scf_output.rw_mat_disk(scf_data.ttensors.VXC_alpha, fname[FileType::VxcAlpha],
+    scf_output.rw_mat_disk(ec, scf_data.ttensors.VXC_alpha, fname[FileType::VxcAlpha],
                            chem_env.ioptions.scf_options.profile);
     if(chem_env.sys_data.is_unrestricted)
-      scf_output.rw_mat_disk(scf_data.ttensors.VXC_beta, fname[FileType::VxcBeta],
+      scf_output.rw_mat_disk(ec, scf_data.ttensors.VXC_beta, fname[FileType::VxcBeta],
                              chem_env.ioptions.scf_options.profile);
   }
   if(chem_env.sys_data.is_qed) {
-    scf_output.rw_mat_disk(scf_data.ttensors.QED_Dx, fname[FileType::QEDDx],
+    scf_output.rw_mat_disk(ec, scf_data.ttensors.QED_Dx, fname[FileType::QEDDx],
                            chem_env.ioptions.scf_options.profile);
-    scf_output.rw_mat_disk(scf_data.ttensors.QED_Dy, fname[FileType::QEDDy],
+    scf_output.rw_mat_disk(ec, scf_data.ttensors.QED_Dy, fname[FileType::QEDDy],
                            chem_env.ioptions.scf_options.profile);
-    scf_output.rw_mat_disk(scf_data.ttensors.QED_Dz, fname[FileType::QEDDz],
+    scf_output.rw_mat_disk(ec, scf_data.ttensors.QED_Dz, fname[FileType::QEDDz],
                            chem_env.ioptions.scf_options.profile);
-    scf_output.rw_mat_disk(scf_data.ttensors.QED_Qxx, fname[FileType::QEDQxx],
+    scf_output.rw_mat_disk(ec, scf_data.ttensors.QED_Qxx, fname[FileType::QEDQxx],
                            chem_env.ioptions.scf_options.profile);
   }
 } // scf_final_io
@@ -797,10 +799,10 @@ exachem::scf::SCFEngine::update_movecs(ExecutionContext& ec, ChemEnv& chem_env) 
     schg.allocate(scf_data.ttensors.VXC_beta);
   schg.execute();
 
-  scf_output.rw_mat_disk(C_alpha_tamm, fname[FileType::AlphaMovecs],
+  scf_output.rw_mat_disk(ec, C_alpha_tamm, fname[FileType::AlphaMovecs],
                          chem_env.ioptions.scf_options.profile, true);
   if(chem_env.sys_data.is_unrestricted)
-    scf_output.rw_mat_disk(C_beta_tamm, fname[FileType::BetaMovecs],
+    scf_output.rw_mat_disk(ec, C_beta_tamm, fname[FileType::BetaMovecs],
                            chem_env.ioptions.scf_options.profile, true);
 
   if(rank == 0 && (chem_env.ioptions.scf_options.molden || chem_env.ioptions.scf_options.nwchem)) {
@@ -1050,9 +1052,11 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     declare_main_tensors(ec, chem_env);
 
     if(chem_env.ioptions.scf_options.read_vembedding) {
-      scf_output.rw_mat_disk(scf_data.ttensors.Vembedding_alpha, ".vembedding_alpha", false, true);
+      scf_output.rw_mat_disk(ec, scf_data.ttensors.Vembedding_alpha, ".vembedding_alpha", false,
+                             true);
       if(chem_env.sys_data.is_unrestricted)
-        scf_output.rw_mat_disk(scf_data.ttensors.Vembedding_beta, ".vembedding_beta", false, true);
+        scf_output.rw_mat_disk(ec, scf_data.ttensors.Vembedding_beta, ".vembedding_beta", false,
+                               true);
     }
 
     if(scf_data.do_dens_fit) {

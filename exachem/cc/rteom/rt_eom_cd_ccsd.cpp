@@ -799,10 +799,10 @@ void RT_EOM_CD_CCSD<T>::rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec,
 
       if(ts_start < ntimesteps) {
         if(t1_vo.exist_on_disk(rt_eom_fp)) {
-          t1_vo.read_from_disk(rt_eom_fp);
-          t2_vvoo.read_from_disk(rt_eom_fp);
-          t1_vo_old.read_from_disk(rt_eom_fp);
-          t2_vvoo_old.read_from_disk(rt_eom_fp);
+          t1_vo.read_from_disk(ec, rt_eom_fp);
+          t2_vvoo.read_from_disk(ec, rt_eom_fp);
+          t1_vo_old.read_from_disk(ec, rt_eom_fp);
+          t2_vvoo_old.read_from_disk(ec, rt_eom_fp);
         }
         if(ec.print()) std::cout << "Restarting from Timestep " << ts_start + 1 << std::endl;
       }
@@ -930,10 +930,10 @@ void RT_EOM_CD_CCSD<T>::rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec,
     } // microiter loop
 
     if(writet && ((titer + 1) % writet_iter == 0)) {
-      t1_vo.write_to_disk(rt_eom_fp);
-      t2_vvoo.write_to_disk(rt_eom_fp);
-      t1_vo_old.write_to_disk(rt_eom_fp);
-      t2_vvoo_old.write_to_disk(rt_eom_fp);
+      t1_vo.write_to_disk(ec, rt_eom_fp);
+      t2_vvoo.write_to_disk(ec, rt_eom_fp);
+      t1_vo_old.write_to_disk(ec, rt_eom_fp);
+      t2_vvoo_old.write_to_disk(ec, rt_eom_fp);
       if(ec.print()) {
         std::ofstream out(ts_file, std::ios::out);
         out << titer + 1 << std::endl;

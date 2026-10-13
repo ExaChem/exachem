@@ -103,8 +103,8 @@ namespace exachem::cc::gfcc {
     const std::string dtmp_aba_file = files_prefix + ".W" + gfo.str() + ".a_dtmp_aba.l" + levelstr;
   
     if(fs::exists(dtmp_bbb_file) && fs::exists(dtmp_aba_file)) {
-      read_from_disk(dtmp_bbb, dtmp_bbb_file);
-      read_from_disk(dtmp_aba, dtmp_aba_file);
+      read_from_disk(gec, dtmp_bbb, dtmp_bbb_file);
+      read_from_disk(gec, dtmp_aba, dtmp_aba_file);
     }
     else {
       ComplexTensor DEArr_EA{O, V, V};
@@ -150,8 +150,8 @@ namespace exachem::cc::gfcc {
       gec.pg().barrier();
       gsch.deallocate(DEArr_EA).execute();
   
-      write_to_disk(dtmp_bbb, dtmp_bbb_file);
-      write_to_disk(dtmp_aba, dtmp_aba_file);
+      write_to_disk(gec, dtmp_bbb, dtmp_bbb_file);
+      write_to_disk(gec, dtmp_aba, dtmp_aba_file);
     }
   
     //------------------------
@@ -454,9 +454,9 @@ namespace exachem::cc::gfcc {
                   .count();
             } // end iter
   
-            write_to_disk(y1_b, y1_b_wpi_file);
-            write_to_disk(y2_bbb, y2_bbb_wpi_file);
-            write_to_disk(y2_aba, y2_aba_wpi_file);
+            write_to_disk(ec, y1_b, y1_b_wpi_file);
+            write_to_disk(ec, y2_bbb, y2_bbb_wpi_file);
+            write_to_disk(ec, y2_aba, y2_aba_wpi_file);
   
             sch.deallocate(e1_b, e2_bbb, e2_aba, yy1_b, yy2_bbb, yy2_aba).execute();
           }

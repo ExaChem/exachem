@@ -40,5 +40,5 @@ public:
     this->movecs_so_file = files_prefix + ".movecs_so";
   }
 
-  void read_movecs_so() { tamm::read_from_disk(movecs_so, movecs_so_file); }
+  void read_movecs_so(ExecutionContext& ec) { tamm::read_from_disk(ec, movecs_so, movecs_so_file); }
 };

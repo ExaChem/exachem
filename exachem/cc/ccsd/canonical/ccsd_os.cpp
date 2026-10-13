@@ -2877,8 +2877,8 @@ ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& M
     */
 
     if(writet) {
-      write_to_disk(d_t1, t1file);
-      write_to_disk(d_t2, t2file);
+      write_to_disk(ec, d_t1, t1file);
+      write_to_disk(ec, d_t2, t2file);
     }
   }
   else if(!ccsd_restart) {
@@ -2934,8 +2934,8 @@ ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& M
         iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
 
         if(writet && ((iter + 1) % writet_iter == 0)) {
-          write_to_disk(d_t1, t1file);
-          write_to_disk(d_t2, t2file);
+          write_to_disk(ec, d_t1, t1file);
+          write_to_disk(ec, d_t2, t2file);
         }
 
         if(residual < thresh) { break; }
@@ -2955,8 +2955,8 @@ ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& M
     }
 
     if(writet) {
-      write_to_disk(d_t1, t1file);
-      write_to_disk(d_t2, t2file);
+      write_to_disk(ec, d_t1, t1file);
+      write_to_disk(ec, d_t2, t2file);
     }
 
     Tensor<T>::deallocate(d_r1_residual, d_r2_residual);
@@ -3035,8 +3035,8 @@ void ccsd_os_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   if(ccsd_restart) {
     if(fs::exists(t1file) && fs::exists(t2file)) {
-      read_from_disk(d_t1, t1file);
-      read_from_disk(d_t2, t2file);
+      read_from_disk(ec, d_t1, t1file);
+      read_from_disk(ec, d_t2, t2file);
     }
     p_evl_sorted = tamm::diagonal(d_f1);
   }

@@ -195,7 +195,7 @@ struct NewtonKrylovOptions {
   std::string preconditioner{"diagonal"}; // one of: diagonal, gmres
   int         krylov_dims{5};
   int         krylov_dims_precond{10};
-  double      eta{0.5};
+  double      eta{0.1};
   double      gamma{0.9};
   double      alpha{1.5};
   bool        adaptive_forcing{true}; // use the Eisenstat-Walker adaptive forcing term
@@ -315,8 +315,7 @@ public:
 
   // skip cholesky and use the value specified as the cholesky vector count.
   std::pair<bool, int> skip_cd{false, 100};
-  // enabled only if set to true and nbf > 1000
-  // write to disk after every count number of vectors are computed.
+  // if true, write to disk after every count number of vectors are computed (implies restart).
   std::pair<bool, int> write_cv{false, 5000};
   void                 print() override;
 };

@@ -486,12 +486,12 @@ std::tuple<double, double> ccsd_v2_driver(
             outFile << "d_t0_2p: " << t0_2p << "\n";
             outFile.close();
           }
-          write_to_disk(d_t1, t1file);
-          write_to_disk(d_t2, t2file);
-          write_to_disk(d_t1_1p, t1_1pfile);
-          write_to_disk(d_t2_1p, t2_1pfile);
-          write_to_disk(d_t1_2p, t1_2pfile);
-          write_to_disk(d_t2_2p, t2_2pfile);
+          write_to_disk(ec, d_t1, t1file);
+          write_to_disk(ec, d_t2, t2file);
+          write_to_disk(ec, d_t1_1p, t1_1pfile);
+          write_to_disk(ec, d_t2_1p, t2_1pfile);
+          write_to_disk(ec, d_t1_2p, t1_2pfile);
+          write_to_disk(ec, d_t2_2p, t2_2pfile);
         }
 
         if(residual < thresh) { break; }
@@ -611,11 +611,11 @@ void qed_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   scf::SCFIO<TensorType> scf_output;
   // read QED Dx,Dy,Dz
-  scf_output.rw_mat_disk(QED_Dx, files_dir + "/scf/" + sys_data.output_file_prefix + ".QED_Dx",
+  scf_output.rw_mat_disk(ec, QED_Dx, files_dir + "/scf/" + sys_data.output_file_prefix + ".QED_Dx",
                          debug, true);
-  scf_output.rw_mat_disk(QED_Dy, files_dir + "/scf/" + sys_data.output_file_prefix + ".QED_Dy",
+  scf_output.rw_mat_disk(ec, QED_Dy, files_dir + "/scf/" + sys_data.output_file_prefix + ".QED_Dy",
                          debug, true);
-  scf_output.rw_mat_disk(QED_Dz, files_dir + "/scf/" + sys_data.output_file_prefix + ".QED_Dz",
+  scf_output.rw_mat_disk(ec, QED_Dz, files_dir + "/scf/" + sys_data.output_file_prefix + ".QED_Dz",
                          debug, true);
 
   SCFOptions& scf_options = chem_env.ioptions.scf_options;
@@ -685,7 +685,7 @@ void qed_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   std::string densityfile_alpha =
     files_dir + "/scf/" + sys_data.output_file_prefix + ".alpha.density";
-  scf_output.rw_mat_disk(dens, densityfile_alpha, debug, true); // read density
+  scf_output.rw_mat_disk(ec, dens, densityfile_alpha, debug, true); // read density
 
   // clang-format off
     sch(dipole_x_exp()  = 0)
@@ -795,12 +795,12 @@ void qed_driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   if(ccsd_restart) {
     if(fs::exists(t1file) && fs::exists(t2file)) {
-      read_from_disk(d_t1, t1file);
-      read_from_disk(d_t2, t2file);
-      read_from_disk(d_t1_1p, chem_env.cc_context.t1_1pfile);
-      read_from_disk(d_t2_1p, chem_env.cc_context.t2_1pfile);
-      read_from_disk(d_t1_2p, chem_env.cc_context.t1_2pfile);
-      read_from_disk(d_t2_2p, chem_env.cc_context.t2_2pfile);
+      read_from_disk(ec, d_t1, t1file);
+      read_from_disk(ec, d_t2, t2file);
+      read_from_disk(ec, d_t1_1p, chem_env.cc_context.t1_1pfile);
+      read_from_disk(ec, d_t2_1p, chem_env.cc_context.t2_1pfile);
+      read_from_disk(ec, d_t1_2p, chem_env.cc_context.t1_2pfile);
+      read_from_disk(ec, d_t2_2p, chem_env.cc_context.t2_2pfile);
     }
     p_evl_sorted = tamm::diagonal(d_f1);
   }

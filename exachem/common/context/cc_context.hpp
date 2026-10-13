@@ -17,6 +17,7 @@ public:
   // CCSD module intializes these, calling method is responsible for destroying it
   ProcGroup         sub_pg;
   ExecutionContext* sub_ec{nullptr};
+  bool              owns_sub{false}; // false when sub_pg/sub_ec borrow the caller's ec
   bool              use_subgroup{false};
 
   int ccsd_iter{0};
@@ -117,11 +118,14 @@ public:
   Compute compute;
 
   void destroy_subgroup() {
-    if(sub_pg.is_valid()) {
+    if(owns_sub && sub_pg.is_valid()) {
       (*sub_ec).flush_and_sync();
       sub_pg.destroy_coll();
       delete sub_ec;
       // MemoryManagerGA::destroy_coll(sub_mgr);
     }
+    sub_pg   = ProcGroup{};
+    sub_ec   = nullptr;
+    owns_sub = false;
   }
 };

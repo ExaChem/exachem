@@ -371,8 +371,8 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
 
   if(eom_restart) {
     for(int root = 0; root < nroots; root++) {
-      read_from_disk(x1.at(root), xc1_file(root));
-      read_from_disk(x2.at(root), xc2_file(root));
+      read_from_disk(ec, x1.at(root), xc1_file(root));
+      read_from_disk(ec, x2.at(root), xc2_file(root));
     }
   }
   else eom_guess_opt(ec, MO, hbar_tis, nroots, n_occ_alpha, n_occ_beta, p_evl_sorted, x1);
@@ -768,8 +768,8 @@ void EOMCCSD_OPT<T>::right_eomccsd_driver(ChemEnv& chem_env, ExecutionContext& e
             // clang-format on
           }
 
-          write_to_disk(xc1.at(root), xc1_file(root));
-          write_to_disk(xc2.at(root), xc2_file(root));
+          write_to_disk(ec, xc1.at(root), xc1_file(root));
+          write_to_disk(ec, xc2.at(root), xc2_file(root));
         }
         if(mrank)
           std::cout << " Restart vectors for " << nroots << " roots written to " << eom_fp

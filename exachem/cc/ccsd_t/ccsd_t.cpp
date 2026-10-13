@@ -214,18 +214,18 @@ void exachem::cc::ccsd_t::CCSD_T_Driver<T>::ccsd_t_driver(ExecutionContext& ec, 
       // TODO: profile and re-enable as needed
       //  if(ccsd_options.writet) {
       //    ec.pg().barrier();
-      //    v2tensors.write_to_disk(files_prefix);
-      //    write_to_disk(t_d_t1, cc_context.full_t1file);
-      //    write_to_disk(t_d_t2, cc_context.full_t2file);
+      //    v2tensors.write_to_disk(ec, files_prefix);
+      //    write_to_disk(ec, t_d_t1, cc_context.full_t1file);
+      //    write_to_disk(ec, t_d_t2, cc_context.full_t2file);
       //  }
     }
     else {
       free_tensors(cholVpr);
       v2tensors.allocate(ec, MO1);
-      // read_from_disk(t_d_f1,f1file);
-      read_from_disk(t_d_t1, cc_context.full_t1file);
-      read_from_disk(t_d_t2, cc_context.full_t2file);
-      v2tensors.read_from_disk(files_prefix);
+      // read_from_disk(ec, t_d_f1,f1file);
+      read_from_disk(ec, t_d_t1, cc_context.full_t1file);
+      read_from_disk(ec, t_d_t2, cc_context.full_t2file);
+      v2tensors.read_from_disk(ec, files_prefix);
     }
     free_tensors(d_t1, d_t2);
   }

@@ -482,8 +482,8 @@ std::tuple<double, double> exachem::cc2::CD_CC2_CS_Engine<T>::run(
         iteration_print(chem_env, ec.pg(), iter, residual, energy, iter_time);
 
         if(writet && (((iter + 1) % writet_iter == 0) || (residual < thresh))) {
-          write_to_disk(t1_aa, t1file);
-          write_to_disk(t2_abab, t2file);
+          write_to_disk(ec, t1_aa, t1file);
+          write_to_disk(ec, t2_abab, t2file);
         }
 
         if(residual < thresh) { break; }

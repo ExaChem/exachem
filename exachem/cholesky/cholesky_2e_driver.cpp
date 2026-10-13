@@ -70,6 +70,21 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
   sys_data.n_frozen_virtual = ccsd_options.freeze_virtual;
   const bool do_freeze      = sys_data.n_frozen_core > 0 || sys_data.n_frozen_virtual > 0;
 
+  {
+    const int   n_occ = std::min(sys_data.n_occ_alpha, sys_data.n_occ_beta);
+    const int   n_vir = std::min(sys_data.n_vir_alpha, sys_data.n_vir_beta);
+    std::string err_msg;
+    if(sys_data.n_frozen_core >= n_occ)
+      err_msg += "\n  - freeze.core (" + std::to_string(sys_data.n_frozen_core) +
+                 ") must be less than the number of occupied orbitals (" + std::to_string(n_occ) +
+                 ")";
+    if(sys_data.n_frozen_virtual >= n_vir)
+      err_msg += "\n  - freeze.virtual (" + std::to_string(sys_data.n_frozen_virtual) +
+                 ") must be less than the number of virtual orbitals (" + std::to_string(n_vir) +
+                 ")";
+    if(!err_msg.empty()) tamm_terminate("\n[CC ERROR] Invalid freeze options:" + err_msg);
+  }
+
   if(readv2) {
     // if(chem_env.run_context.contains("mso_tilesize"))
     const int orig_ts = chem_env.run_context["mso_tilesize"];
@@ -149,9 +164,9 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
     if(ccsd_options.writet) {
       if(!fs::exists(files_dir)) fs::create_directories(files_dir);
 
-      write_to_disk<TensorType>(movecs_so, cd_context.movecs_so_file);
-      write_to_disk(cd_context.d_f1, cd_context.f1file);
-      if(do_cholesky) write_to_disk(cholVpr, cd_context.v2file);
+      write_to_disk<TensorType>(ec, movecs_so, cd_context.movecs_so_file);
+      write_to_disk(ec, cd_context.d_f1, cd_context.f1file);
+      if(do_cholesky) write_to_disk(ec, cholVpr, cd_context.v2file);
       chem_env.run_context["cholesky_2e"]["num_chol_vecs"] = chol_count;
       if(rank == 0) { chem_env.write_run_context(); }
     }
@@ -196,9 +211,9 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
       if(do_freeze != chem_env.run_context["do_freeze"]) {
         tamm_terminate("\n [Cholesky Error] Restart requires the freezing options to be the same");
       }
-      read_from_disk(cd_context.movecs_so, cd_context.movecs_so_file);
-      read_from_disk(cd_context.d_f1, cd_context.f1file);
-      if(do_cholesky) read_from_disk(cholVpr, cd_context.v2file);
+      read_from_disk(ec, cd_context.movecs_so, cd_context.movecs_so_file);
+      read_from_disk(ec, cd_context.d_f1, cd_context.f1file);
+      if(do_cholesky) read_from_disk(ec, cholVpr, cd_context.v2file);
       ec.pg().barrier();
     }
   }
@@ -238,7 +253,7 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
     Tensor<T>   hcore{AO, AO};
     Tensor<T>   hcore_mo{MO, MO};
     Tensor<T>::allocate(&ec, hcore, hcore_mo);
-    read_from_disk(hcore, hcorefile);
+    read_from_disk(ec, hcore, hcorefile);
 
     auto [mu, nu]   = AO.labels<2>("all");
     auto [mo1, mo2] = MO.labels<2>("all");

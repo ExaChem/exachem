@@ -644,11 +644,12 @@ std::vector<Tensor<T>> gmres_solver(ExecutionContext& ec, ChemEnv& chem_env, Ten
  * steps (when writet is enabled). amplitudes[0]/amplitudes[1] are the T1/T2 tensors.
  */
 template<typename T>
-void write_amplitudes(ChemEnv& chem_env, int iter, const std::vector<Tensor<T>>& amplitudes) {
+void write_amplitudes(ExecutionContext& ec, ChemEnv& chem_env, int iter,
+                      const std::vector<Tensor<T>>& amplitudes) {
   const auto& cc_options = chem_env.ioptions.ccsd_options;
   if(cc_options.writet && ((iter + 1) % cc_options.writet_iter == 0)) {
-    write_to_disk(amplitudes[0], chem_env.cc_context.t1file);
-    write_to_disk(amplitudes[1], chem_env.cc_context.t2file);
+    write_to_disk(ec, amplitudes[0], chem_env.cc_context.t1file);
+    write_to_disk(ec, amplitudes[1], chem_env.cc_context.t2file);
   }
 }
 
@@ -690,7 +691,7 @@ std::pair<double, double> newton_krylov_solver(ExecutionContext& ec, ChemEnv& ch
     }
 
     // Write amplitudes to disk after each Newton step so the run can be restarted.
-    write_amplitudes(chem_env, iter, iterative_solution);
+    write_amplitudes(ec, chem_env, iter, iterative_solution);
 
     if(res_fun_norm < newton_tol) {
       if(ec.print()) { std::cout << "Newton-Krylov is converged!" << std::endl; }
@@ -888,7 +889,7 @@ std::pair<double, double> preconditioned_newton_krylov_solver(
     }
 
     // Write amplitudes to disk after each Newton step so the run can be restarted.
-    write_amplitudes(chem_env, iter, iterative_solution);
+    write_amplitudes(ec, chem_env, iter, iterative_solution);
 
     if(res_fun_norm < newton_tol) {
       if(ec.pg().rank() == 0) {
@@ -1060,7 +1061,7 @@ inexact_newton_krylov_solver(ExecutionContext& ec, ChemEnv& chem_env, ResidualFu
     }
 
     // Write amplitudes to disk after each Newton step so the run can be restarted.
-    write_amplitudes(chem_env, iter, iterative_solution);
+    write_amplitudes(ec, chem_env, iter, iterative_solution);
 
     if(res_fun_norm < newton_tol) {
       if(ec.pg().rank() == 0) { std::cout << "Inexact Newton-Krylov is converged!" << std::endl; }

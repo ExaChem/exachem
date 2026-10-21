@@ -123,10 +123,10 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
   parse_option<double>(cc_options.rt_threshold, jrt_eom, "rt_threshold");
   parse_option<double>(cc_options.rt_step_size, jrt_eom, "rt_step_size");
   parse_option<double>(cc_options.rt_multiplier, jrt_eom, "rt_multiplier");
-  parse_option<double>(cc_options.secent_x, jrt_eom, "secent_x");
-  parse_option<double>(cc_options.h_red, jrt_eom, "h_red");
-  parse_option<double>(cc_options.h_inc, jrt_eom, "h_inc");
-  parse_option<double>(cc_options.h_max, jrt_eom, "h_max");
+  parse_option<double>(cc_options.rt_secant_x, jrt_eom, "rt_secant_x");
+  parse_option<double>(cc_options.rt_step_dec, jrt_eom, "rt_step_dec");
+  parse_option<double>(cc_options.rt_step_inc, jrt_eom, "rt_step_inc");
+  parse_option<double>(cc_options.rt_step_max, jrt_eom, "rt_step_max");
 
   // DLPNO
   json jdlpno = jcc["DLPNO"];

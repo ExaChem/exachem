@@ -218,10 +218,10 @@
           "rt_threshold": 1e-6,
           "rt_step_size": 0.025,
           "rt_multiplier": 0.5,
-          "secent_x": 0.1,
-          "h_red": 0.5,
-          "h_inc": 1.2,
-          "h_max": 0.25
+          "rt_secant_x": 0.1,
+          "rt_step_dec": 0.9,
+          "rt_step_inc": 1.1,
+          "rt_step_max": 0.05
         },
 
       "GFCCSD": {

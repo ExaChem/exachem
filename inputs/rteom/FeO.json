@@ -1,0 +1,50 @@
+{
+  "geometry": {
+    "coordinates": [
+      "Fe    0.00000000     0.00000000     1.5830000",
+      "O     0.00000000     0.00000000     0.0360000"
+    ],
+    "units": "angstrom"
+  },
+  "basis": {
+    "basisset": "cc-pvdz"
+  },
+  "common": {
+    "maxiter": 150,
+    "file_prefix": "feo"
+  },
+  "SCF": {
+    "conve": 1e-9,
+    "convd": 1e-8,    
+    "scf_type": "restricted",
+    "PRINT": {
+      "mulliken": false,
+      "mo_vectors" : [true,0.15]
+    }
+  },
+  "CD": {
+    "diagtol": 1e-5
+  },
+  "CC": {
+    "threshold": 1e-8,
+    "writet": true,
+    "debug": false,
+    "writet_iter": 1000,
+
+    "RT-EOMCC": {
+      "pcore"  : 1,
+      "ntimesteps": 15000,
+      "rt_microiter": 10,
+      "rt_threshold": 1e-6,
+      "rt_step_size": 0.0001,
+      "rt_multiplier": 0.5,
+      "rt_secant_x": 0.1,
+      "rt_step_dec": 0.9,
+      "rt_step_inc": 1.1,
+      "rt_step_max": 0.05
+    }
+  },
+  "TASK": {
+    "rteom_ccsd": true
+  }  
+}

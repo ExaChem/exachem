@@ -1,7 +1,7 @@
 /*
  * ExaChem: Open Source Exascale Computational Chemistry Software.
  *
- * Copyright 2023-2024 Pacific Northwest National Laboratory, Battelle Memorial Institute.
+ * Copyright 2023-2026 Pacific Northwest National Laboratory, Battelle Memorial Institute.
  *
  * See LICENSE.txt for details
  */
@@ -18,20 +18,15 @@ using CCEType = std::complex<double>;
 
 template<typename T>
 void RT_EOM_CD_CCSD<T>::ccsd_e_os(Scheduler& sch, const TiledIndexSpace& MO,
-                                  const TiledIndexSpace& CI, Tensor<T>& de, CCSE_Tensors<T>& t1,
-                                  CCSE_Tensors<T>& t2, std::vector<CCSE_Tensors<T>>& f1_se,
+                                  const TiledIndexSpace& CI, Tensor<T>& de, Tensor<T>& t1_aa,
+                                  Tensor<T>& t1_bb, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb,
+                                  Tensor<T>& t2_abab, std::vector<CCSE_Tensors<T>>& f1_se,
                                   std::vector<CCSE_Tensors<T>>& chol3d_se) {
   const auto [cind]                = CI.labels<1>("all");
   const auto [p1_va, p2_va, p3_va] = v_alpha.labels<3>("all");
   const auto [p1_vb, p2_vb, p3_vb] = v_beta.labels<3>("all");
   const auto [h3_oa, h4_oa, h6_oa] = o_alpha.labels<3>("all");
   const auto [h3_ob, h4_ob, h6_ob] = o_beta.labels<3>("all");
-
-  Tensor<T> t1_aa   = t1("aa");
-  Tensor<T> t1_bb   = t1("bb");
-  Tensor<T> t2_aaaa = t2("aaaa");
-  Tensor<T> t2_abab = t2("abab");
-  Tensor<T> t2_bbbb = t2("bbbb");
 
   // f1_se{f1_oo,f1_ov,f1_vo,f1_vv}
   // chol3d_se{chol3d_oo,chol3d_ov,chol3d_vo,chol3d_vv}
@@ -40,6 +35,9 @@ void RT_EOM_CD_CCSD<T>::ccsd_e_os(Scheduler& sch, const TiledIndexSpace& MO,
 
   // clang-format off
   sch
+  (t2_aaaa()                       = 0)
+  (t2_bbbb()                       = 0)  
+  (t2_abab()                       = 0)
   (_a01V(cind)                     = t1_aa(p3_va, h4_oa) * chol3d_ov("aa")(h4_oa, p3_va, cind), 
   "_a01V(cind)                     = t1_aa(p3_va, h4_oa) * chol3d_ov( aa )(h4_oa, p3_va, cind)")
   (_a02("aa")(h4_oa, h6_oa, cind)  = t1_aa(p3_va, h4_oa) * chol3d_ov("aa")(h6_oa, p3_va, cind), 
@@ -76,8 +74,9 @@ void RT_EOM_CD_CCSD<T>::ccsd_e_os(Scheduler& sch, const TiledIndexSpace& MO,
 
 template<typename T>
 void RT_EOM_CD_CCSD<T>::ccsd_t1_os(Scheduler& sch, const TiledIndexSpace& MO,
-                                   const TiledIndexSpace& CI, CCSE_Tensors<T>& r1_vo,
-                                   CCSE_Tensors<T>& t1, CCSE_Tensors<T>& t2,
+                                   const TiledIndexSpace& CI, Tensor<T>& i0_aa, Tensor<T>& i0_bb,
+                                   Tensor<T>& t1_aa, Tensor<T>& t1_bb, Tensor<T>& t2_aaaa,
+                                   Tensor<T>& t2_bbbb, Tensor<T>& t2_abab,
                                    std::vector<CCSE_Tensors<T>>& f1_se,
                                    std::vector<CCSE_Tensors<T>>& chol3d_se) {
   const auto [cind]                       = CI.labels<1>("all");
@@ -87,15 +86,6 @@ void RT_EOM_CD_CCSD<T>::ccsd_t1_os(Scheduler& sch, const TiledIndexSpace& MO,
   const auto [p1_vb, p2_vb, p3_vb]        = v_beta.labels<3>("all");
   const auto [h1_oa, h2_oa, h3_oa, h7_oa] = o_alpha.labels<4>("all");
   const auto [h1_ob, h2_ob, h3_ob, h7_ob] = o_beta.labels<4>("all");
-
-  Tensor<T> i0_aa = r1_vo("aa");
-  Tensor<T> i0_bb = r1_vo("bb");
-
-  Tensor<T> t1_aa   = t1("aa");
-  Tensor<T> t1_bb   = t1("bb");
-  Tensor<T> t2_aaaa = t2("aaaa");
-  Tensor<T> t2_abab = t2("abab");
-  Tensor<T> t2_bbbb = t2("bbbb");
 
   // f1_se{f1_oo,f1_ov,f1_vo,f1_vv}
   // chol3d_se{chol3d_oo,chol3d_ov,chol3d_vo,chol3d_vv}
@@ -109,8 +99,10 @@ void RT_EOM_CD_CCSD<T>::ccsd_t1_os(Scheduler& sch, const TiledIndexSpace& MO,
   auto chol3d_vv = chol3d_se[3];
 
   // clang-format off
-  sch
-    (i0_aa(p2_va, h1_oa)             =  1.0 * f1_vo("aa")(p2_va, h1_oa),
+ sch(t2_aaaa()                        = 0)
+    (t2_abab()                        = 0)
+    (t2_bbbb()                        = 0)     
+     (i0_aa(p2_va, h1_oa)             =  1.0 * f1_vo("aa")(p2_va, h1_oa),
     "i0_aa(p2_va, h1_oa)             =  1.0 * f1_vo( aa )(p2_va, h1_oa)")
     (i0_bb(p2_vb, h1_ob)             =  1.0 * f1_vo("bb")(p2_vb, h1_ob),
     "i0_bb(p2_vb, h1_ob)             =  1.0 * f1_vo( bb )(p2_vb, h1_ob)")
@@ -208,9 +200,10 @@ void RT_EOM_CD_CCSD<T>::ccsd_t1_os(Scheduler& sch, const TiledIndexSpace& MO,
 
 template<typename T>
 void RT_EOM_CD_CCSD<T>::ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO,
-                                   const TiledIndexSpace& CI, CCSE_Tensors<T>& r2,
-                                   CCSE_Tensors<T>& t1, CCSE_Tensors<T>& t2,
-                                   std::vector<CCSE_Tensors<T>>& f1_se,
+                                   const TiledIndexSpace& CI, Tensor<T>& i0_aaaa,
+                                   Tensor<T>& i0_bbbb, Tensor<T>& i0_abab, Tensor<T>& t1_aa,
+                                   Tensor<T>& t1_bb, Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb,
+                                   Tensor<T>& t2_abab, std::vector<CCSE_Tensors<T>>& f1_se,
                                    std::vector<CCSE_Tensors<T>>& chol3d_se,
                                    CCSE_Tensors<T>&              i0tmp) {
   const auto [cind]                                     = CI.labels<1>("all");
@@ -220,16 +213,6 @@ void RT_EOM_CD_CCSD<T>::ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO,
   const auto [p1_vb, p2_vb, p3_vb, p4_vb, p6_vb, p8_vb] = v_beta.labels<6>("all");
   const auto [h1_oa, h2_oa, h3_oa, h4_oa, h7_oa, h9_oa] = o_alpha.labels<6>("all");
   const auto [h1_ob, h2_ob, h3_ob, h4_ob, h8_ob, h9_ob] = o_beta.labels<6>("all");
-
-  Tensor<T> i0_aaaa = r2("aaaa");
-  Tensor<T> i0_abab = r2("abab");
-  Tensor<T> i0_bbbb = r2("bbbb");
-
-  const Tensor<T> t1_aa   = t1("aa");
-  const Tensor<T> t1_bb   = t1("bb");
-  const Tensor<T> t2_aaaa = t2("aaaa");
-  const Tensor<T> t2_abab = t2("abab");
-  const Tensor<T> t2_bbbb = t2("bbbb");
 
   // f1_se{f1_oo,f1_ov,f1_vo,f1_vv}
   // chol3d_se{chol3d_oo,chol3d_ov,chol3d_vo,chol3d_vv}
@@ -449,18 +432,22 @@ void RT_EOM_CD_CCSD<T>::ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO,
 template<typename T>
 void RT_EOM_CD_CCSD<T>::scale_complex_ip(Tensor<T> tensor, double alpha_real, double alpha_imag) {
   if constexpr(tamm::internal::is_complex_v<T>) {
-    std::function<T(T)> func = [&](T a) { return T(alpha_real * a.real(), alpha_imag * a.imag()); };
+    std::function<T(T)> func = [&](T a) {
+      T val(alpha_real * a.real(), alpha_imag * a.imag());
+      return val;
+    };
     apply_ewise_ip(tensor(), func);
   }
-  else tamm_terminate("[scale_complex_ip] Tensor type T not complex ...");
+  else tamm_terminate("[scale_complex_ip] T not complex ...");
 }
 
 template<typename T>
-void RT_EOM_CD_CCSD<T>::td_iteration_print(ChemEnv& chem_env, int iter, CCEType energy,
-                                           CCEType x1_1, CCEType x1_2, CCEType x2_1, CCEType x2_2,
-                                           CCEType x2_3, double time) {
+void RT_EOM_CD_CCSD<T>::td_iteration_print(ChemEnv& chem_env, int iter, double rt_step_size,
+                                           CCEType energy, CCEType x1_1, CCEType x1_2, CCEType x2_1,
+                                           CCEType x2_2, CCEType x2_3, double time) {
   std::cout.width(6);
   std::cout << std::right << iter + 1 << std::string(3, ' ');
+  std::cout << std::fixed << std::setprecision(6) << rt_step_size << std::string(5, ' ');
   std::cout << std::fixed << std::setprecision(13) << energy.real() << std::string(3, ' ');
   std::cout << std::fixed << std::setprecision(13) << energy.imag() << std::string(3, ' ');
   std::cout << std::fixed << std::setprecision(6) << x1_1.real() << std::string(3, ' ');
@@ -534,8 +521,12 @@ void RT_EOM_CD_CCSD<T>::complex_copy_swap(ExecutionContext& ec, Tensor<T> src, T
     Tensor<T> tensor = dest;
 
     auto copy_lambda = [&](const IndexVector& bid) {
-      const IndexVector     blockid = internal::translate_blockid(bid, tensor());
-      const tamm::TAMM_SIZE dsize   = tensor.block_size(blockid);
+      const IndexVector blockid = internal::translate_blockid(bid, tensor());
+
+      auto block_dims   = tensor.block_dims(blockid);
+      auto block_offset = tensor.block_offsets(blockid);
+
+      const tamm::TAMM_SIZE dsize = tensor.block_size(blockid);
 
       std::vector<T> sbuf(dsize);
       std::vector<T> dbuf(dsize, 0);
@@ -552,7 +543,37 @@ void RT_EOM_CD_CCSD<T>::complex_copy_swap(ExecutionContext& ec, Tensor<T> src, T
 
     block_for(ec, tensor(), copy_lambda);
   }
-  else tamm_terminate("[complex_copy_swap] Tensor type T not complex");
+  else tamm_terminate("[complex_copy_swap] Tensors provided are not complex");
+}
+
+template<typename T>
+void RT_EOM_CD_CCSD<T>::secant_update_ip(ExecutionContext& ec, Tensor<T> t, Tensor<T> t_upper,
+                                         Tensor<T> f_upper, Tensor<T> delta_t, Tensor<T> deno) {
+  // all five tensors share the same tiled index spaces, hence the same block structure
+  const T zero{};
+
+  auto update_lambda = [&](const IndexVector& bid) {
+    const IndexVector     blockid = internal::translate_blockid(bid, t());
+    const tamm::TAMM_SIZE bsize   = t.block_size(blockid);
+
+    std::vector<T> tbuf(bsize);
+    std::vector<T> tu_buf(bsize);
+    std::vector<T> fu_buf(bsize);
+    std::vector<T> dt_buf(bsize);
+    std::vector<T> de_buf(bsize);
+    t_upper.get(blockid, tu_buf);
+    f_upper.get(blockid, fu_buf);
+    delta_t.get(blockid, dt_buf);
+    deno.get(blockid, de_buf);
+
+    for(TAMM_SIZE i = 0; i < bsize; i++) {
+      if(de_buf[i] != zero) tbuf[i] = tu_buf[i] - fu_buf[i] * dt_buf[i] / de_buf[i];
+      else tbuf[i] = zero;
+    }
+    t.put(blockid, tbuf);
+  };
+
+  block_for(ec, t(), update_lambda);
 }
 
 template<typename T>
@@ -589,11 +610,17 @@ void RT_EOM_CD_CCSD<T>::rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec,
   o_beta  = {MO("occ"), range(oatiles, otiles)};
   v_beta  = {MO("virt"), range(vatiles, vtiles)};
 
-  const auto [cind]                       = CI.labels<1>("all");
-  const auto [p1_va, p2_va, p3_va, p4_va] = v_alpha.labels<4>("all");
-  const auto [p1_vb, p2_vb, p3_vb, p4_vb] = v_beta.labels<4>("all");
-  const auto [h1_oa, h2_oa, h3_oa, h4_oa] = o_alpha.labels<4>("all");
-  const auto [h1_ob, h2_ob, h3_ob, h4_ob] = o_beta.labels<4>("all");
+  auto [cind]                       = CI.labels<1>("all");
+  auto [p1_va, p2_va, p3_va, p4_va] = v_alpha.labels<4>("all");
+  auto [p1_vb, p2_vb, p3_vb, p4_vb] = v_beta.labels<4>("all");
+  auto [h1_oa, h2_oa, h3_oa, h4_oa] = o_alpha.labels<4>("all");
+  auto [h1_ob, h2_ob, h3_ob, h4_ob] = o_beta.labels<4>("all");
+
+  auto [i, j, k, l] = MO.labels<4>("occ");
+  auto [a, b, c, d] = MO.labels<4>("virt");
+
+  Scheduler   sch{ec};
+  ExecutionHW exhw = ec.exhw();
 
   Tensor<T> d_e{};
 
@@ -610,21 +637,159 @@ void RT_EOM_CD_CCSD<T>::rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec,
   std::vector<CCSE_Tensors<T>> f1_se{f1_oo, f1_ov, f1_vo, f1_vv};
   std::vector<CCSE_Tensors<T>> chol3d_se{chol3d_oo, chol3d_ov, chol3d_vo, chol3d_vv};
 
-  CCSE_Tensors<T> t1_vo{MO, {V, O}, "t1", {"aa", "bb"}};
-  CCSE_Tensors<T> t2_vvoo{MO, {V, V, O, O}, "t2", {"aaaa", "abab", "bbbb"}};
+  //  CCSE_Tensors<T> t1_vo{MO, {V, O}, "t1", {"aa", "bb"}};
+  //  CCSE_Tensors<T> t2_vvoo{MO, {V, V, O, O}, "t2", {"aaaa", "abab", "bbbb"}};
 
-  CCSE_Tensors<T> t1_vo_aux{MO, {V, O}, "t1_aux", {"aa", "bb"}};
-  CCSE_Tensors<T> t2_vvoo_aux{MO, {V, V, O, O}, "t2_aux", {"aaaa", "abab", "bbbb"}};
+  //  CCSE_Tensors<T> t1_vo_aux{MO, {V, O}, "t1_aux", {"aa", "bb"}};
+  //  CCSE_Tensors<T> t2_vvoo_aux{MO, {V, V, O, O}, "t2_aux", {"aaaa", "abab", "bbbb"}};
 
-  CCSE_Tensors<T> t1_vo_old{MO, {V, O}, "t1_old", {"aa", "bb"}};
-  CCSE_Tensors<T> t2_vvoo_old{MO, {V, V, O, O}, "t2_old", {"aaaa", "abab", "bbbb"}};
+  //  CCSE_Tensors<T> t1_vo_old{MO, {V, O}, "t1_old", {"aa", "bb"}};
+  //  CCSE_Tensors<T> t2_vvoo_old{MO, {V, V, O, O}, "t2_old", {"aaaa", "abab", "bbbb"}};
 
-  CCSE_Tensors<T> r1_vo   = CCSE_Tensors<T>{MO, {V, O}, "r1", {"aa", "bb"}};
-  CCSE_Tensors<T> r2_vvoo = CCSE_Tensors<T>{MO, {V, V, O, O}, "r2", {"aaaa", "abab", "bbbb"}};
+  //  CCSE_Tensors<T> r1_vo   = CCSE_Tensors<T>{MO, {V, O}, "r1", {"aa", "bb"}};
+  //  CCSE_Tensors<T> r2_vvoo = CCSE_Tensors<T>{MO, {V, V, O, O}, "r2", {"aaaa", "abab", "bbbb"}};
 
-  CCSE_Tensors<T> r1_vo_old = CCSE_Tensors<T>{MO, {V, O}, "r1_old", {"aa", "bb"}};
-  CCSE_Tensors<T> r2_vvoo_old =
-    CCSE_Tensors<T>{MO, {V, V, O, O}, "r2_old", {"aaaa", "abab", "bbbb"}};
+  //  CCSE_Tensors<T> r1_vo_old = CCSE_Tensors<T>{MO, {V, O}, "r1_old", {"aa", "bb"}};
+  //  CCSE_Tensors<T> r2_vvoo_old =
+  //   CCSE_Tensors<T>{MO, {V, V, O, O}, "r2_old", {"aaaa", "abab", "bbbb"}};
+
+  Tensor<T> t1_aa{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> t1_bb{{p1_vb, h1_ob}, {1, 1}};
+  Tensor<T> t1_aa_aux{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> t1_bb_aux{{p1_vb, h1_ob}, {1, 1}};
+  Tensor<T> t1_aa_old{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> t1_bb_old{{p1_vb, h1_ob}, {1, 1}};
+
+  Tensor<T> t1_aa_aux_copy{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> t1_bb_aux_copy{{p1_vb, h1_ob}, {1, 1}};
+
+  Tensor<T> t1_aa_diff{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> t1_bb_diff{{p1_vb, h1_ob}, {1, 1}};
+
+  Tensor<T> t1_aa_lower{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> t1_bb_lower{{p1_vb, h1_ob}, {1, 1}};
+
+  Tensor<T> t1_aa_upper{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> t1_bb_upper{{p1_vb, h1_ob}, {1, 1}};
+
+  Tensor<T> delta_t1_aa{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> delta_t1_bb{{p1_vb, h1_ob}, {1, 1}};
+
+  Tensor<T> f1_aa_upper{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> f1_bb_upper{{p1_vb, h1_ob}, {1, 1}};
+
+  Tensor<T> deno_aa{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> deno_bb{{p1_vb, h1_ob}, {1, 1}};
+
+  //
+  Tensor<T> t2_aaaa{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> t2_bbbb{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> t2_abab{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> t2_aaaa_aux{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> t2_bbbb_aux{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> t2_abab_aux{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> t2_aaaa_aux_copy{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> t2_bbbb_aux_copy{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> t2_abab_aux_copy{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> t2_aaaa_diff{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> t2_bbbb_diff{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> t2_abab_diff{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> t2_aaaa_old{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> t2_bbbb_old{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> t2_abab_old{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> t2_aaaa_lower{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> t2_bbbb_lower{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> t2_abab_lower{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> t2_aaaa_upper{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> t2_bbbb_upper{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> t2_abab_upper{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> f2_aaaa_upper{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> f2_bbbb_upper{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> f2_abab_upper{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> delta_t2_aaaa{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> delta_t2_bbbb{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> delta_t2_abab{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  //
+
+  Tensor<T> r1_aa{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> r1_bb{{p1_vb, h1_ob}, {1, 1}};
+
+  Tensor<T> r1_aa_old{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> r1_bb_old{{p1_vb, h1_ob}, {1, 1}};
+  Tensor<T> r1_aa_old_copy{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> r1_bb_old_copy{{p1_vb, h1_ob}, {1, 1}};
+
+  Tensor<T> r1_aa_upper_copy{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> r1_bb_upper_copy{{p1_vb, h1_ob}, {1, 1}};
+
+  Tensor<T> r1_aa_lower{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> r1_bb_lower{{p1_vb, h1_ob}, {1, 1}};
+  Tensor<T> r1_aa_upper{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> r1_bb_upper{{p1_vb, h1_ob}, {1, 1}};
+
+  Tensor<T> delta_r1_aa{{p1_va, h1_oa}, {1, 1}};
+  Tensor<T> delta_r1_bb{{p1_vb, h1_ob}, {1, 1}};
+
+  Tensor<T> r2_aaaa{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> r2_bbbb{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> r2_abab{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> r2_aaaa_old{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> r2_bbbb_old{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> r2_abab_old{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> r2_aaaa_old_copy{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> r2_bbbb_old_copy{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> r2_abab_old_copy{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> r2_aaaa_upper_copy{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> r2_bbbb_upper_copy{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> r2_abab_upper_copy{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> r2_aaaa_lower{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> r2_bbbb_lower{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> r2_abab_lower{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> r2_aaaa_upper{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> r2_bbbb_upper{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> r2_abab_upper{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> delta_r2_aaaa{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> delta_r2_bbbb{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> delta_r2_abab{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> deno_aaaa{{p1_va, p2_va, h1_oa, h2_oa}, {2, 2}};
+  Tensor<T> deno_bbbb{{p1_vb, p2_vb, h1_ob, h2_ob}, {2, 2}};
+  Tensor<T> deno_abab{{p1_va, p2_vb, h1_oa, h2_ob}, {2, 2}};
+
+  Tensor<T> t1_full_diff{{V, O}, {1, 1}};
+
+  sch
+    .allocate(t1_aa, t1_bb, t1_aa_aux, t1_bb_aux, t1_aa_aux_copy, t1_bb_aux_copy, t1_aa_diff,
+              t1_bb_diff, t1_aa_old, t1_bb_old, t2_aaaa, t2_bbbb, t2_abab, t2_aaaa_aux, t2_bbbb_aux,
+              t2_abab_aux, t2_aaaa_aux_copy, t2_bbbb_aux_copy, t2_abab_aux_copy, t2_aaaa_diff,
+              t2_bbbb_diff, t2_abab_diff, t2_aaaa_old, t2_bbbb_old, t2_abab_old, r1_aa, r1_bb,
+              r1_aa_old, r1_bb_old, r1_aa_old_copy, r1_bb_old_copy, r1_aa_upper_copy,
+              r1_bb_upper_copy, r2_aaaa, r2_bbbb, r2_abab, r2_aaaa_old, r2_bbbb_old, r2_abab_old,
+              r2_aaaa_old_copy, r2_bbbb_old_copy, r2_abab_old_copy, r2_aaaa_upper_copy,
+              r2_bbbb_upper_copy, r2_abab_upper_copy, t1_aa_lower, t1_bb_lower, t1_aa_upper,
+              t1_bb_upper, t2_aaaa_lower, t2_bbbb_lower, t2_abab_lower, t2_aaaa_upper,
+              t2_bbbb_upper, t2_abab_upper, r1_aa_lower, r1_bb_lower, r1_aa_upper, r1_bb_upper,
+              r2_aaaa_lower, r2_bbbb_lower, r2_abab_lower, r2_aaaa_upper, r2_bbbb_upper,
+              r2_abab_upper, delta_r1_aa, delta_r1_bb, delta_r2_aaaa, delta_r2_bbbb, delta_r2_abab,
+              delta_t1_aa, delta_t1_bb, delta_t2_aaaa, delta_t2_bbbb, delta_t2_abab, f1_aa_upper,
+              f1_bb_upper, f2_aaaa_upper, f2_bbbb_upper, f2_abab_upper, deno_aa, deno_bb, deno_aaaa,
+              deno_bbbb, deno_abab, t1_full_diff)
+    .execute();
 
   _a004 = CCSE_Tensors<T>{MO, {V, V, O, O}, "_a004", {"aaaa", "abab", "bbbb"}};
 
@@ -656,13 +821,35 @@ void RT_EOM_CD_CCSD<T>::rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec,
 
   CCSE_Tensors<CCEType> i0_t2_tmp{MO, {V, V, O, O}, "i0_t2_tmp", {"aaaa", "bbbb"}};
 
-  auto total_ccsd_mem = sum_tensor_sizes(cv3d, d_e, _a01V) +
-                        CCSE_Tensors<T>::sum_tensor_sizes_list(r1_vo, r2_vvoo, t1_vo, t2_vvoo) +
-                        CCSE_Tensors<T>::sum_tensor_sizes_list(
-                          r1_vo_old, r2_vvoo_old, t1_vo_aux, t2_vvoo_aux, t1_vo_old, t2_vvoo_old) +
-                        CCSE_Tensors<T>::sum_tensor_sizes_list(
-                          f1_oo, f1_ov, f1_vo, f1_vv, chol3d_oo, chol3d_ov, chol3d_vo, chol3d_vv) +
-                        CCSE_Tensors<T>::sum_tensor_sizes_list(_a02, _a03);
+  // All tensors below are allocated upfront and live for the entire time propagation,
+  // so the peak memory is the sum of all of them.
+  auto total_ccsd_mem =
+    sum_tensor_sizes(cv3d, d_e, _a01V) +
+    // T1: t1, aux, aux_copy, diff, old, lower, upper, delta, f1_upper, deno, t1_full_diff
+    sum_tensor_sizes(t1_aa, t1_bb, t1_aa_aux, t1_bb_aux, t1_aa_aux_copy, t1_bb_aux_copy, t1_aa_diff,
+                     t1_bb_diff, t1_aa_old, t1_bb_old, t1_aa_lower, t1_bb_lower, t1_aa_upper,
+                     t1_bb_upper, delta_t1_aa, delta_t1_bb, f1_aa_upper, f1_bb_upper, deno_aa,
+                     deno_bb, t1_full_diff) +
+    // T2: t2, aux, aux_copy, diff, old, lower, upper, delta, f2_upper, deno
+    sum_tensor_sizes(t2_aaaa, t2_bbbb, t2_abab, t2_aaaa_aux, t2_bbbb_aux, t2_abab_aux,
+                     t2_aaaa_aux_copy, t2_bbbb_aux_copy, t2_abab_aux_copy, t2_aaaa_diff,
+                     t2_bbbb_diff, t2_abab_diff, t2_aaaa_old, t2_bbbb_old, t2_abab_old,
+                     t2_aaaa_lower, t2_bbbb_lower, t2_abab_lower, t2_aaaa_upper, t2_bbbb_upper,
+                     t2_abab_upper, delta_t2_aaaa, delta_t2_bbbb, delta_t2_abab, f2_aaaa_upper,
+                     f2_bbbb_upper, f2_abab_upper, deno_aaaa, deno_bbbb, deno_abab) +
+    // R1: r1, old, old_copy, upper_copy, lower, upper, delta
+    sum_tensor_sizes(r1_aa, r1_bb, r1_aa_old, r1_bb_old, r1_aa_old_copy, r1_bb_old_copy,
+                     r1_aa_upper_copy, r1_bb_upper_copy, r1_aa_lower, r1_bb_lower, r1_aa_upper,
+                     r1_bb_upper, delta_r1_aa, delta_r1_bb) +
+    // R2: r2, old, old_copy, upper_copy, lower, upper, delta
+    sum_tensor_sizes(r2_aaaa, r2_bbbb, r2_abab, r2_aaaa_old, r2_bbbb_old, r2_abab_old,
+                     r2_aaaa_old_copy, r2_bbbb_old_copy, r2_abab_old_copy, r2_aaaa_upper_copy,
+                     r2_bbbb_upper_copy, r2_abab_upper_copy, r2_aaaa_lower, r2_bbbb_lower,
+                     r2_abab_lower, r2_aaaa_upper, r2_bbbb_upper, r2_abab_upper, delta_r2_aaaa,
+                     delta_r2_bbbb, delta_r2_abab) +
+    CCSE_Tensors<T>::sum_tensor_sizes_list(f1_oo, f1_ov, f1_vo, f1_vv, chol3d_oo, chol3d_ov,
+                                           chol3d_vo, chol3d_vv) +
+    CCSE_Tensors<T>::sum_tensor_sizes_list(_a02, _a03);
 
   // Intermediates
   auto total_ccsd_mem_tmp =
@@ -670,7 +857,7 @@ void RT_EOM_CD_CCSD<T>::rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec,
     CCSE_Tensors<T>::sum_tensor_sizes_list(i0_t2_tmp, _a01, _a04, _a05, _a06, _a001, _a004, _a006,
                                            _a008, _a009, _a017, _a019, _a020, _a021, _a022);
 
-  /* if(!cc_restart) */ total_ccsd_mem += total_ccsd_mem_tmp;
+  total_ccsd_mem += total_ccsd_mem_tmp;
 
   if(ec.print()) {
     std::cout << std::endl
@@ -678,15 +865,12 @@ void RT_EOM_CD_CCSD<T>::rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec,
               << std::setprecision(2) << total_ccsd_mem << " GiB" << std::endl;
   }
 
-  Scheduler   sch{ec};
-  ExecutionHW exhw = ec.exhw();
-
   sch.allocate(d_e, _a01V);
   CCSE_Tensors<T>::allocate_list(sch, f1_oo, f1_ov, f1_vo, f1_vv, chol3d_oo, chol3d_ov, chol3d_vo,
                                  chol3d_vv);
-  CCSE_Tensors<T>::allocate_list(sch, r1_vo, r2_vvoo, t1_vo, t2_vvoo);
-  CCSE_Tensors<T>::allocate_list(sch, r1_vo_old, r2_vvoo_old, t1_vo_aux, t2_vvoo_aux, t1_vo_old,
-                                 t2_vvoo_old);
+  //  CCSE_Tensors<T>::allocate_list(sch, r1_vo, r2_vvoo, t1_vo, t2_vvoo);
+  //  CCSE_Tensors<T>::allocate_list(sch, r1_vo_old, r2_vvoo_old, t1_vo_aux, t2_vvoo_aux, t1_vo_old,
+  //                                 t2_vvoo_old);
   CCSE_Tensors<T>::allocate_list(sch, _a02, _a03);
   sch.execute();
 
@@ -766,62 +950,120 @@ void RT_EOM_CD_CCSD<T>::rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec,
 
   sch.execute(exhw);
 
-  const int    ntimesteps    = chem_env.ioptions.ccsd_options.ntimesteps;
-  const int    rt_microiter  = chem_env.ioptions.ccsd_options.rt_microiter;
-  const double rt_multiplier = chem_env.ioptions.ccsd_options.rt_multiplier;
-  const double rt_step_size  = chem_env.ioptions.ccsd_options.rt_step_size;
-  const double scale_factor  = rt_multiplier * rt_step_size;
+  const int ntimesteps   = chem_env.ioptions.ccsd_options.ntimesteps;
+  const int rt_microiter = chem_env.ioptions.ccsd_options.rt_microiter;
+  // const double rt_multiplier = chem_env.ioptions.ccsd_options.rt_multiplier;
+  double rt_step_size = chem_env.ioptions.ccsd_options.rt_step_size;
+  // const double scale_factor  = rt_multiplier * rt_step_size;
 
-  CCSE_Tensors<T>::initialize(sch, 0, t1_vo, t2_vvoo, t1_vo_aux, t2_vvoo_aux, t1_vo_old,
-                              t2_vvoo_old);
+  const double h_max = chem_env.ioptions.ccsd_options.rt_step_max;
+  //  double h_min = 0.001;
+  const double scx       = chem_env.ioptions.ccsd_options.rt_secant_x;
+  const double h_red_fac = chem_env.ioptions.ccsd_options.rt_step_dec;
+  const double h_inc_fac = chem_env.ioptions.ccsd_options.rt_step_inc;
+
+  // step 1: Initialize
+
+  // clang-format off
+  sch(t1_aa()         = 0)
+    (t1_bb()         = 0)
+    (t1_aa_aux()     = 0)
+    (t1_bb_aux()     = 0)
+    (t1_aa_diff()    = 0)
+    (t1_bb_diff()    = 0)
+    (t1_aa_old()     = 0)
+    (t1_bb_old()     = 0)
+    (t2_aaaa()       = 0)
+    (t2_bbbb()       = 0)
+    (t2_abab()       = 0)
+    (t2_aaaa_aux()   = 0)
+    (t2_bbbb_aux()   = 0)
+    (t2_abab_aux()   = 0)
+    (t2_aaaa_diff()  = 0)
+    (t2_bbbb_diff()  = 0)
+    (t2_abab_diff()  = 0)
+    (t2_aaaa_old()   = 0)
+    (t2_bbbb_old()   = 0)
+    (t2_abab_old()   = 0);
+  // clang-format on
+
   sch.execute();
 
   if(ec.print()) {
     std::cout << "Number of RT-EOM-CC time steps          : " << ntimesteps << std::endl;
-    std::cout << "Max number of Euler iterations          : " << rt_microiter << std::endl;
-    std::cout << "Length of RT-EOM-CC time step (in au)   : " << rt_step_size << std::endl;
-    std::cout << "Implicit Euler eomcc amplitude threshold: " << thresh << std::endl << std::endl;
+    std::cout << "Max number of micro-iterations          : " << rt_microiter << std::endl;
+    std::cout << "Initial time step size (in au)          : " << std::fixed << std::setprecision(3)
+              << rt_step_size << std::endl;
+    std::cout << "Max time step size (in au)              : " << h_max << std::endl;
+    std::cout << "Step size decrease / increase factors   : " << std::setprecision(2) << h_red_fac
+              << " / " << h_inc_fac << std::endl;
+    std::cout << "Secant initial-guess scaling            : " << std::setprecision(3) << scx
+              << std::endl;
+    std::cout << "Secant amplitude threshold              : " << std::scientific
+              << std::setprecision(0) << thresh << std::endl
+              << std::endl;
+    std::cout << std::defaultfloat << std::setprecision(6); // restore stream defaults
   }
 
-  int         ts_start  = 0;
-  std::string dcdt_file = rt_eom_fp + ".dcdt";
-  std::string ts_file   = rt_eom_fp + ".restart_ts";
+  int         ts_start   = 0;
+  double      total_time = 0.0; //
+  std::string dcdt_file  = rt_eom_fp + ".dcdt";
+  std::string ts_file    = rt_eom_fp + ".restart_ts";
+
+  std::string t1_aa_file     = rt_eom_fp + ".t1_aa";
+  std::string t1_bb_file     = rt_eom_fp + ".t1_bb";
+  std::string t1_aa_old_file = rt_eom_fp + ".t1_aa_old";
+  std::string t1_bb_old_file = rt_eom_fp + ".t1_bb_old";
+
+  std::string t2_aaaa_file     = rt_eom_fp + ".t2_aaaa";
+  std::string t2_bbbb_file     = rt_eom_fp + ".t2_bbbb";
+  std::string t2_abab_file     = rt_eom_fp + ".t2_abab";
+  std::string t2_aaaa_old_file = rt_eom_fp + ".t2_aaaa_old";
+  std::string t2_bbbb_old_file = rt_eom_fp + ".t2_bbbb_old";
+  std::string t2_abab_old_file = rt_eom_fp + ".t2_abab_old";
+
+  // restart tensors are read/written as one group so a checkpoint is committed all-or-nothing
+  std::vector<Tensor<T>>   restart_tensors{t1_aa,   t1_bb,   t1_aa_old,   t1_bb_old,   t2_aaaa,
+                                         t2_bbbb, t2_abab, t2_aaaa_old, t2_bbbb_old, t2_abab_old};
+  std::vector<std::string> restart_files{
+    t1_aa_file,   t1_bb_file,   t1_aa_old_file,   t1_bb_old_file,   t2_aaaa_file,
+    t2_bbbb_file, t2_abab_file, t2_aaaa_old_file, t2_bbbb_old_file, t2_abab_old_file};
 
   if(cc_restart) {
     bool ts_file_exists = fs::exists(ts_file);
     if(ts_file_exists) {
       if(ec.print()) {
         std::ifstream in(ts_file);
-        if(in.is_open()) in >> ts_start;
+        if(in.is_open()) in >> ts_start >> total_time >> rt_step_size;
       }
       ec.pg().broadcast(&ts_start, 0);
       // else tamm_terminate("[RT-EOM-CC] restart file " + ts_file + " is missing ");
 
       if(ts_start < ntimesteps) {
-        if(t1_vo.exist_on_disk(rt_eom_fp)) {
-          t1_vo.read_from_disk(ec, rt_eom_fp);
-          t2_vvoo.read_from_disk(ec, rt_eom_fp);
-          t1_vo_old.read_from_disk(ec, rt_eom_fp);
-          t2_vvoo_old.read_from_disk(ec, rt_eom_fp);
-        }
+        if(fs::exists(t1_aa_file)) { read_from_disk(ec, restart_tensors, restart_files, profile); }
         if(ec.print()) std::cout << "Restarting from Timestep " << ts_start + 1 << std::endl;
       }
     }
   }
 
+  // step 2: time-propagation starts
+
   for(int titer = ts_start; titer < ntimesteps; titer++) {
     if(ec.print()) std::cout << std::right << "Timestep " << titer + 1 << std::endl;
 
-    // step 1
-    ccsd_e_os(sch, MO, CI, d_e, t1_vo, t2_vvoo, f1_se, chol3d_se);
+    total_time += rt_step_size;
+
+    // step 3: compute the cumulant with the available T, this goes to DCDT file
+
+    ccsd_e_os(sch, MO, CI, d_e, t1_aa, t1_bb, t2_aaaa, t2_bbbb, t2_abab, f1_se, chol3d_se);
     sch.execute(exhw, profile);
 
     if(ec.print()) {
       T                 energy = get_scalar(d_e);
       std::stringstream dcdt_out; // dcdt
-      dcdt_out << std::fixed << std::setprecision(6) << (titer * rt_step_size)
-               << std::string(3, ' ') << std::setprecision(13) << energy.real()
-               << std::string(3, ' ') << energy.imag() << std::string(5, ' ') << titer + 1
+      dcdt_out << titer + 1 << "\t" << std::fixed << std::setprecision(6)
+               << (total_time - rt_step_size) << std::string(3, ' ') << std::setprecision(13)
+               << energy.real() << std::string(3, ' ') << energy.imag() << std::string(5, ' ')
                << std::endl;
 
       std::ofstream out(dcdt_file, std::ios::out | std::ofstream::app);
@@ -835,113 +1077,637 @@ void RT_EOM_CD_CCSD<T>::rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec,
         {"real", energy.real()}, {"imag", energy.imag()}};
     }
 
-    // CCSE_Tensors<T>::initialize(sch, 0, r1_vo, r2_vvoo, r1_vo_old, r2_vvoo_old);
+    // step 4 (t_old = t); keep a copy of the current T as T_old
 
-    // step 2 (t_old = t)
-    CCSE_Tensors<T>::copy(sch, t1_vo, t1_vo_old);
-    CCSE_Tensors<T>::copy(sch, t2_vvoo, t2_vvoo_old);
+    // clang-format off
+    sch(t1_aa_old()   = 0)
+       (t1_bb_old()   = 0)
+       (t2_aaaa_old() = 0)
+       (t2_bbbb_old() = 0)
+       (t2_abab_old() = 0)        
+       (t1_aa_old()   += t1_aa())
+       (t1_bb_old()   += t1_bb())
+       (t2_aaaa_old() += t2_aaaa())
+       (t2_bbbb_old() += t2_bbbb())
+       (t2_abab_old() += t2_abab());
+    // clang-format on
+
     sch.execute();
 
-    // step 3
-    ccsd_t1_os(sch, MO, CI, r1_vo_old, t1_vo_old, t2_vvoo_old, f1_se, chol3d_se);
-    ccsd_t2_os(sch, MO, CI, r2_vvoo_old, t1_vo_old, t2_vvoo_old, f1_se, chol3d_se, i0_t2_tmp);
+    // step 5 (R_old = CC_R(T_old); Compute R_old using the T_old
+
+    ccsd_t1_os(sch, MO, CI, r1_aa_old, r1_bb_old, t1_aa_old, t1_bb_old, t2_aaaa_old, t2_bbbb_old,
+               t2_abab_old, f1_se, chol3d_se);
+    ccsd_t2_os(sch, MO, CI, r2_aaaa_old, r2_bbbb_old, r2_abab_old, t1_aa_old, t1_bb_old,
+               t2_aaaa_old, t2_bbbb_old, t2_abab_old, f1_se, chol3d_se, i0_t2_tmp);
     sch.execute(exhw, profile);
 
-    // if(ec.print() && debug) std::cout << "Step 3 debug r1,r2 old norm ..." << std::endl;
-    // if(debug) debug_full_rt(sch,MO,r1_vo_old,r2_vvoo_old);
+    // step 6: Compute T_aux; (T_aux = T_old+i*0.5*h*R_old)
 
+    // keep a copy of R_old before modifying
+
+    // clang-format off
+    sch(r1_aa_old_copy()  = 0)
+       (r1_aa_old_copy() += r1_aa_old())
+       (r1_bb_old_copy()  = 0)	
+       (r1_bb_old_copy() += r1_bb_old())
+       (r2_aaaa_old_copy()= 0)
+       (r2_bbbb_old_copy()= 0) 
+       (r2_abab_old_copy()= 0)  
+       (r2_aaaa_old_copy()  += r2_aaaa_old())
+       (r2_bbbb_old_copy()  += r2_bbbb_old())
+       (r2_abab_old_copy()  += r2_abab_old());
+    // clang-format on
+
+    sch.execute();
+
+    double scale_factor1 = 0.5 * rt_step_size;
+
+    scale_complex_ip(r1_aa_old, scale_factor1, -scale_factor1);
+    scale_complex_ip(r1_bb_old, scale_factor1, -scale_factor1);
+    scale_complex_ip(r2_aaaa_old, scale_factor1, -scale_factor1);
+    scale_complex_ip(r2_bbbb_old, scale_factor1, -scale_factor1);
+    scale_complex_ip(r2_abab_old, scale_factor1, -scale_factor1);
+
+    // clang-format off
+    sch (t1_aa_aux()  = 0)
+	      (t1_bb_aux()  = 0)
+        (t2_aaaa_aux() = 0)
+        (t2_bbbb_aux() = 0)
+        (t2_abab_aux() = 0)	     
+	      (t1_aa_aux()   += t1_aa_old())
+        (t1_bb_aux()     += t1_bb_old())
+        (t2_aaaa_aux()   += t2_aaaa_old())
+        (t2_bbbb_aux()   += t2_bbbb_old())
+        (t2_abab_aux()   += t2_abab_old());
+    // clang-format on
+
+    sch.execute();
+
+    // (t_aux += r_old)
+
+    complex_copy_swap(ec, r1_aa_old, t1_aa_aux);
+    complex_copy_swap(ec, r1_bb_old, t1_bb_aux);
+    complex_copy_swap(ec, r2_aaaa_old, t2_aaaa_aux);
+    complex_copy_swap(ec, r2_bbbb_old, t2_bbbb_aux);
+    complex_copy_swap(ec, r2_abab_old, t2_abab_aux);
+
+    // step 7: Compute guess Ts for the micro-iterations
+
+    double lower_factor = 1.0 - scx;
+    double upper_factor = 1.0 + scx;
+
+    double lower_scale_factor = lower_factor * rt_step_size;
+    // double lower_scale_factor =lower_factor*0.0005;
+
+    // clang-format off
+    sch(r1_aa_old()    = 0)
+       (r1_aa_old()   += r1_aa_old_copy())
+       (r1_bb_old()    = 0)
+       (r1_bb_old()   += r1_bb_old_copy())
+       (r2_aaaa_old()  = 0)
+       (r2_aaaa_old() += r2_aaaa_old_copy())
+       (r2_bbbb_old()  = 0)
+       (r2_bbbb_old() += r2_bbbb_old_copy())
+       (r2_abab_old()  = 0)
+       (r2_abab_old() += r2_abab_old_copy());
+    // clang-format on
+
+    sch.execute();
+
+    scale_complex_ip(r1_aa_old, lower_scale_factor, -lower_scale_factor);
+    scale_complex_ip(r1_bb_old, lower_scale_factor, -lower_scale_factor);
+    scale_complex_ip(r2_aaaa_old, lower_scale_factor, -lower_scale_factor);
+    scale_complex_ip(r2_bbbb_old, lower_scale_factor, -lower_scale_factor);
+    scale_complex_ip(r2_abab_old, lower_scale_factor, -lower_scale_factor);
+
+    // clang-format off
+    sch (t1_aa_lower()      = 0)
+	      (t1_bb_lower()      = 0)
+        (t2_aaaa_lower()    = 0)
+        (t2_bbbb_lower()    = 0)
+        (t2_abab_lower()    = 0) 	
+        (t1_aa_lower()     += t1_aa_old())
+        (t1_bb_lower()     += t1_bb_old())
+        (t2_aaaa_lower()   += t2_aaaa_old())
+        (t2_bbbb_lower()   += t2_bbbb_old())
+        (t2_abab_lower()   += t2_abab_old());
+    // clang-format on
+    sch.execute();
+
+    // (t_lower += r_old)
+
+    complex_copy_swap(ec, r1_aa_old, t1_aa_lower);
+    complex_copy_swap(ec, r1_bb_old, t1_bb_lower);
+    complex_copy_swap(ec, r2_aaaa_old, t2_aaaa_lower);
+    complex_copy_swap(ec, r2_bbbb_old, t2_bbbb_lower);
+    complex_copy_swap(ec, r2_abab_old, t2_abab_lower);
+
+    double upper_scale_factor = upper_factor * rt_step_size;
+
+    // double upper_scale_factor =upper_factor*0.0005;
+
+    // clang-format off
+    sch(r1_aa_old()    = 0)
+       (r1_aa_old()   += r1_aa_old_copy())
+       (r1_bb_old()    = 0)
+       (r1_bb_old()   += r1_bb_old_copy())
+       (r2_aaaa_old()  = 0)
+       (r2_aaaa_old() += r2_aaaa_old_copy())
+       (r2_bbbb_old()  = 0)
+       (r2_bbbb_old() += r2_bbbb_old_copy())
+       (r2_abab_old()  = 0)
+       (r2_abab_old() += r2_abab_old_copy());
+    // clang-format on
+    sch.execute();
+
+    scale_complex_ip(r1_aa_old, upper_scale_factor, -upper_scale_factor);
+    scale_complex_ip(r1_bb_old, upper_scale_factor, -upper_scale_factor);
+    scale_complex_ip(r2_aaaa_old, upper_scale_factor, -upper_scale_factor);
+    scale_complex_ip(r2_bbbb_old, upper_scale_factor, -upper_scale_factor);
+    scale_complex_ip(r2_abab_old, upper_scale_factor, -upper_scale_factor);
+
+    // clang-format off
+  sch(t1_aa_upper()   = 0)
+     (t1_bb_upper()   = 0)
+     (t2_aaaa_upper() = 0) 
+     (t2_bbbb_upper() = 0)
+     (t2_abab_upper() = 0)      
+     (t1_aa_upper()   += t1_aa_old())
+     (t1_bb_upper()   += t1_bb_old())
+     (t2_aaaa_upper() += t2_aaaa_old())
+     (t2_bbbb_upper() += t2_bbbb_old())
+     (t2_abab_upper() += t2_abab_old());
+    // clang-format on
+    sch.execute();
+
+    // (t_upper += r_old)
+
+    complex_copy_swap(ec, r1_aa_old, t1_aa_upper);
+    complex_copy_swap(ec, r1_bb_old, t1_bb_upper);
+    complex_copy_swap(ec, r2_aaaa_old, t2_aaaa_upper);
+    complex_copy_swap(ec, r2_bbbb_old, t2_bbbb_upper);
+    complex_copy_swap(ec, r2_abab_old, t2_abab_upper);
+
+    // sch(r1_aa_lower() = 0)
+    //    (r1_bb_lower() = 0)
+    //    (r2_aaaa_lower() = 0)
+    //    (r2_bbbb_lower() = 0)
+    //    (r2_abab_lower() = 0)
+    //    (r1_aa_upper() = 0)
+    //    (r1_bb_upper() = 0)
+    //    (r2_aaaa_upper() = 0)
+    //    (r2_bbbb_upper() = 0)
+    //    (r2_abab_upper() = 0);
+    //    sch.execute();
+
+    // step 8: Compute guess residual with guess Ts
+    //(R_lower = CC_R(T_lower); Compute R_lower using the T_lower
+    //(R_upper = CC_R(T_upper); Compute R_upper using the T_upper
+    //
+    ccsd_t1_os(sch, MO, CI, r1_aa_lower, r1_bb_lower, t1_aa_lower, t1_bb_lower, t2_aaaa_lower,
+               t2_bbbb_lower, t2_abab_lower, f1_se, chol3d_se);
+    ccsd_t2_os(sch, MO, CI, r2_aaaa_lower, r2_bbbb_lower, r2_abab_lower, t1_aa_lower, t1_bb_lower,
+               t2_aaaa_lower, t2_bbbb_lower, t2_abab_lower, f1_se, chol3d_se, i0_t2_tmp);
+    ccsd_t1_os(sch, MO, CI, r1_aa_upper, r1_bb_upper, t1_aa_upper, t1_bb_upper, t2_aaaa_upper,
+               t2_bbbb_upper, t2_abab_upper, f1_se, chol3d_se);
+    ccsd_t2_os(sch, MO, CI, r2_aaaa_upper, r2_bbbb_upper, r2_abab_upper, t1_aa_upper, t1_bb_upper,
+               t2_aaaa_upper, t2_bbbb_upper, t2_abab_upper, f1_se, chol3d_se, i0_t2_tmp);
+    sch.execute(exhw, profile);
+
+    // std::cout << std::fixed << "rt_step_size before entering micro-iter" << std::endl;
+    // std::cout << std::fixed << std::setprecision(6) << rt_step_size << std::endl;
+
+    int li = 0;
+    // step 9: Micro-iteration starts here
     // microiter loop
-    for(int li = 0; li < rt_microiter; li++) {
+    for(li = 0; li < rt_microiter; li++) {
       const auto mt_start = std::chrono::high_resolution_clock::now();
 
-      // step 4
-      // t-aux = t_old
-      CCSE_Tensors<T>::copy(sch, t1_vo_old, t1_vo_aux);
-      CCSE_Tensors<T>::copy(sch, t2_vvoo_old, t2_vvoo_aux);
+      // std::cout << "time-step fixed during the micro-iter at" << std::endl;
+      // std::cout << std::fixed << std::setprecision(6) << rt_step_size << std::endl;
+
+      // step 10: Compute delta R
+      // Delta R = R_lower- R_upper
+
+      // clang-format off
+      sch(delta_r1_aa()     = 0)
+        (delta_r1_bb()     = 0)
+        (delta_r2_aaaa()   = 0)
+        (delta_r2_bbbb()   = 0) 
+        (delta_r2_abab()   = 0)   
+        (delta_r1_aa()     = r1_aa_lower())
+        (delta_r1_aa()    += -1.0*r1_aa_upper())
+        (delta_r1_bb()     = r1_bb_lower())
+        (delta_r1_bb()    += -1.0*r1_bb_upper())
+        (delta_r2_aaaa()  += r2_aaaa_lower())
+        (delta_r2_aaaa()  += -1.0*r2_aaaa_upper())
+        (delta_r2_bbbb()  += r2_bbbb_lower())
+        (delta_r2_bbbb()  += -1.0*r2_bbbb_upper())
+        (delta_r2_abab()  += r2_abab_lower())
+        (delta_r2_abab()  += -1.0*r2_abab_upper());
+      // clang-format on
       sch.execute();
 
-      // r1=r2=0
-      // step 5
-      ccsd_t1_os(sch, MO, CI, r1_vo, t1_vo, t2_vvoo, f1_se, chol3d_se);
-      ccsd_t2_os(sch, MO, CI, r2_vvoo, t1_vo, t2_vvoo, f1_se, chol3d_se, i0_t2_tmp);
+      // step 11: Computer delta T,
+      // Delta T = T_upper - T_lower
+
+      // clang-format off
+      sch(delta_t1_aa()    = 0)
+        (delta_t1_bb()     = 0)
+        (delta_t2_aaaa()   = 0)
+        (delta_t2_bbbb()   = 0) 
+        (delta_t2_abab()   = 0)     
+        (delta_t1_aa()    += t1_aa_upper())
+        (delta_t1_aa()    += -1.0*t1_aa_lower())
+        (delta_t1_bb()    += t1_bb_upper())
+        (delta_t1_bb()    += -1.0*t1_bb_lower())
+        (delta_t2_aaaa()  += t2_aaaa_upper())
+        (delta_t2_aaaa()  += -1.0*t2_aaaa_lower())
+        (delta_t2_bbbb()  += t2_bbbb_upper())
+        (delta_t2_bbbb()  += -1.0*t2_bbbb_lower())
+        (delta_t2_abab()  += t2_abab_upper())
+        (delta_t2_abab()  += -1.0*t2_abab_lower());
+      // clang-format on
+      sch.execute();
+
+      // keep a copy of R_upper before modifying
+
+      // clang-format off
+      sch(r1_aa_upper_copy()  = 0)
+        (r1_aa_upper_copy() += r1_aa_upper())
+        (r1_bb_upper_copy()  = 0)
+        (r1_bb_upper_copy() += r1_bb_upper())
+        (r2_aaaa_upper_copy()= 0)
+        (r2_bbbb_upper_copy()= 0)
+        (r2_abab_upper_copy()= 0)
+        (r2_aaaa_upper_copy()  += r2_aaaa_upper())
+        (r2_bbbb_upper_copy()  += r2_bbbb_upper())
+        (r2_abab_upper_copy()  += r2_abab_upper());
+      // clang-format on
+      sch.execute();
+
+      // step 12: compute f_upper
+      //  f_upper = t_upper-[t_aux+i*0.5*h*R_upper]
+
+      //   double scale_factor2 =0.5*rt_step_size;
+
+      scale_complex_ip(r1_aa_upper, scale_factor1, -scale_factor1);
+      scale_complex_ip(r1_bb_upper, scale_factor1, -scale_factor1);
+      scale_complex_ip(r2_aaaa_upper, scale_factor1, -scale_factor1);
+      scale_complex_ip(r2_bbbb_upper, scale_factor1, -scale_factor1);
+      scale_complex_ip(r2_abab_upper, scale_factor1, -scale_factor1);
+
+      // std::cout << "scale_factor1 and rt_step_size" << std::endl;
+      // std::cout << scale_factor1 << "\t" << rt_step_size << std::endl;
+
+      // clang-format off
+      sch(t1_aa_aux_copy()   = 0)
+        (t1_bb_aux_copy()    = 0)
+        (t2_aaaa_aux_copy()  = 0)
+        (t2_bbbb_aux_copy()  = 0)
+        (t2_abab_aux_copy()  = 0)
+        (t1_aa_aux_copy()   += t1_aa_aux())
+        (t1_bb_aux_copy()   += t1_bb_aux())
+        (t2_aaaa_aux_copy() += t2_aaaa_aux())
+        (t2_bbbb_aux_copy() += t2_bbbb_aux())
+        (t2_abab_aux_copy() += t2_abab_aux());
+      // clang-format on
+      sch.execute();
+
+      // (t_aux_copy =t_aux+r_upper)
+
+      complex_copy_swap(ec, r1_aa_upper, t1_aa_aux_copy);
+      complex_copy_swap(ec, r1_bb_upper, t1_bb_aux_copy);
+      complex_copy_swap(ec, r2_aaaa_upper, t2_aaaa_aux_copy);
+      complex_copy_swap(ec, r2_bbbb_upper, t2_bbbb_aux_copy);
+      complex_copy_swap(ec, r2_abab_upper, t2_abab_aux_copy);
+
+      // Compute f_upper
+
+      // clang-format off
+      sch(f1_aa_upper()     = 0)
+	       (f1_bb_upper()     = 0)
+         (f2_aaaa_upper()   = 0)
+         (f2_bbbb_upper()   = 0)
+         (f2_abab_upper()   = 0) 	 
+         (f1_aa_upper()     = t1_aa_upper())
+         (f1_aa_upper()    += -1.0*t1_aa_aux_copy())
+         (f1_bb_upper()     = t1_bb_upper())
+         (f1_bb_upper()    += -1.0*t1_bb_aux_copy())
+         (f2_aaaa_upper()   = t2_aaaa_upper())
+         (f2_aaaa_upper()  += -1.0*t2_aaaa_aux_copy())
+         (f2_bbbb_upper()   = t2_bbbb_upper())
+         (f2_bbbb_upper()  += -1.0*t2_bbbb_aux_copy())
+         (f2_abab_upper()   = t2_abab_upper())
+         (f2_abab_upper()  += -1.0*t2_abab_aux_copy());
+      // clang-format on
+      sch.execute();
+
+      // step 13 Compute the denominator
+      //  deno = \delta T +i*0.5*h*\delta R
+
+      scale_complex_ip(delta_r1_aa, scale_factor1, -scale_factor1);
+      scale_complex_ip(delta_r1_bb, scale_factor1, -scale_factor1);
+      scale_complex_ip(delta_r2_aaaa, scale_factor1, -scale_factor1);
+      scale_complex_ip(delta_r2_bbbb, scale_factor1, -scale_factor1);
+      scale_complex_ip(delta_r2_abab, scale_factor1, -scale_factor1);
+
+      // clang-format off
+      sch (deno_aa()   = 0)
+          (deno_bb()   = 0)
+          (deno_aaaa() = 0)
+          (deno_bbbb() = 0) 
+          (deno_abab() = 0)  
+          (deno_aa()   += delta_t1_aa())
+          (deno_bb()   += delta_t1_bb())
+          (deno_aaaa() += delta_t2_aaaa())
+          (deno_bbbb() += delta_t2_bbbb())
+          (deno_abab() += delta_t2_abab());
+      // clang-format on
+      sch.execute();
+
+      // deno = deno+delta_r
+
+      complex_copy_swap(ec, delta_r1_aa, deno_aa);
+      complex_copy_swap(ec, delta_r1_bb, deno_bb);
+      complex_copy_swap(ec, delta_r2_aaaa, deno_aaaa);
+      complex_copy_swap(ec, delta_r2_bbbb, deno_bbbb);
+      complex_copy_swap(ec, delta_r2_abab, deno_abab);
+
+      // step 14
+      secant_update_ip(ec, t1_aa, t1_aa_upper, f1_aa_upper, delta_t1_aa, deno_aa);
+      secant_update_ip(ec, t1_bb, t1_bb_upper, f1_bb_upper, delta_t1_bb, deno_bb);
+
+      secant_update_ip(ec, t2_aaaa, t2_aaaa_upper, f2_aaaa_upper, delta_t2_aaaa, deno_aaaa);
+      secant_update_ip(ec, t2_bbbb, t2_bbbb_upper, f2_bbbb_upper, delta_t2_bbbb, deno_bbbb);
+      secant_update_ip(ec, t2_abab, t2_abab_upper, f2_abab_upper, delta_t2_abab, deno_abab);
+
+      // step 15
+      //  compute the cumulant
+      //    std::cout << "computing the cumulant" << std::endl;
+
+      ccsd_e_os(sch, MO, CI, d_e, t1_aa, t1_bb, t2_aaaa, t2_bbbb, t2_abab, f1_se, chol3d_se);
       sch.execute(exhw, profile);
 
-      // step 6 (r += r_old)
-      CCSE_Tensors<T>::copy(sch, r1_vo_old, r1_vo, true);
-      CCSE_Tensors<T>::copy(sch, r2_vvoo_old, r2_vvoo, true);
+      /*      const T t1_aa_norm   = tamm::norm(t1_aa);
+            const T t1_bb_norm   = tamm::norm(t1_bb);
+            const T t2_aaaa_norm = tamm::norm(t2_aaaa);
+            const T t2_abab_norm = tamm::norm(t2_abab);
+            const T t2_bbbb_norm = tamm::norm(t2_bbbb);
+
+            const T t1_aa_upper_norm   = tamm::norm(t1_aa_upper);
+            const T t1_bb_upper_norm   = tamm::norm(t1_bb_upper);
+            const T t2_aaaa_upper_norm = tamm::norm(t2_aaaa_upper);
+            const T t2_abab_upper_norm = tamm::norm(t2_abab_upper);
+            const T t2_bbbb_upper_norm = tamm::norm(t2_bbbb_upper);
+
+            const T x1_1 = std::abs(t1_aa_upper_norm - t1_aa_norm);
+            const T x1_2 = std::abs(t1_bb_upper_norm - t1_bb_norm);
+            const T x2_1 = std::abs(t2_aaaa_upper_norm - t2_aaaa_norm);
+            const T x2_2 = std::abs(t2_abab_upper_norm - t2_abab_norm);
+            const T x2_3 = std::abs(t2_bbbb_upper_norm - t2_bbbb_norm);
+      */
+
+      // clang-format off
+      sch (t1_aa_diff()    = t1_aa_upper())
+          (t1_aa_diff()   += -1.0*t1_aa())
+          (t1_bb_diff()    = t1_bb_upper())
+          (t1_bb_diff()   += -1.0*t1_bb())	
+          (t2_aaaa_diff()  = t2_aaaa_upper())
+          (t2_aaaa_diff() += -1.0*t2_aaaa())
+          (t2_bbbb_diff()  = t2_bbbb_upper())
+          (t2_bbbb_diff() += -1.0*t2_bbbb()) 
+          (t2_abab_diff()  = t2_abab_upper())
+          (t2_abab_diff() += -1.0*t2_abab());
+      
+      if(debug) {
+        sch(t1_full_diff()             = 0)
+          (t1_full_diff(p3_va, h4_oa) += t1_aa_diff(p3_va, h4_oa))
+          (t1_full_diff(p3_vb, h4_ob) += t1_bb_diff(p3_vb, h4_ob));
+      }
+      // clang-format on
+
       sch.execute();
 
-      // step 7
-      scale_complex_ip(r1_vo("aa"), scale_factor, -scale_factor);
-      scale_complex_ip(r1_vo("bb"), scale_factor, -scale_factor);
-      scale_complex_ip(r2_vvoo("aaaa"), scale_factor, -scale_factor);
-      scale_complex_ip(r2_vvoo("abab"), scale_factor, -scale_factor);
-      scale_complex_ip(r2_vvoo("bbbb"), scale_factor, -scale_factor);
+      double x1_1 = std::abs(tamm::norm(t1_aa_diff));
+      double x1_2 = std::abs(tamm::norm(t1_bb_diff));
+      double x2_1 = std::abs(tamm::norm(t2_aaaa_diff));
+      double x2_2 = std::abs(tamm::norm(t2_bbbb_diff));
+      double x2_3 = std::abs(tamm::norm(t2_abab_diff));
 
-      // step 8 (t_aux += r)
-      // CCSE_Tensors<T>::copy(sch, r1_vo, t1_vo_aux, true);
-      // CCSE_Tensors<T>::copy(sch, r2_vvoo, t2_vvoo_aux, true);
-      // sch.execute();
-      complex_copy_swap(ec, r1_vo("aa"), t1_vo_aux("aa"));
-      complex_copy_swap(ec, r1_vo("bb"), t1_vo_aux("bb"));
-      complex_copy_swap(ec, r2_vvoo("aaaa"), t2_vvoo_aux("aaaa"));
-      complex_copy_swap(ec, r2_vvoo("abab"), t2_vvoo_aux("abab"));
-      complex_copy_swap(ec, r2_vvoo("bbbb"), t2_vvoo_aux("bbbb"));
+      // double x1_1_r  =0.0;
+      // double x1_1_im = 0.0;
+      // double x1_2_r  = 0.0;
+      // double x1_2_im = 0.0;
+      // double x2_1_r  = 0.0;
+      // double x2_1_im =0.0;
+      // double x2_2_r  = 0.0;
+      // double x2_2_im = 0.0;
+      // double x2_3_r  =0.0;
+      // double x2_3_im = 0.0;
 
-      // step 9
-      ccsd_e_os(sch, MO, CI, d_e, t1_vo_aux, t2_vvoo_aux, f1_se, chol3d_se);
+      if(ec.print() && debug) {
+        const auto de_energy        = get_scalar(d_e);
+        auto       t1_full_diff_eig = tamm_to_eigen_matrix(t1_full_diff);
+
+        std::vector<double> real_parts(sys_data.nocc * sys_data.nvir);
+        std::vector<double> imag_parts(sys_data.nocc * sys_data.nvir);
+
+        int counter = 0;
+
+        for(int i = 0; i < sys_data.nvir; i++) {
+          for(int j = 0; j < sys_data.nocc; j++) {
+            std::complex<double> value = t1_full_diff_eig(i, j);
+
+            real_parts[counter] = std::real(value);
+            imag_parts[counter] = std::imag(value);
+
+            counter++;
+          }
+        }
+        const double threshold = 1e-12;
+        std::cout << "Real Parts:" << std::endl;
+        for(const auto& val: real_parts) {
+          if(std::abs(val) > threshold) {
+            std::cout << std::fixed << std::setprecision(10) << val << " ";
+          }
+        }
+        std::cout << std::endl;
+
+        std::cout << "Imaginary Parts:" << std::endl;
+        for(const auto& val: imag_parts) {
+          if(std::abs(val) > threshold) {
+            std::cout << std::fixed << std::setprecision(10) << val << " ";
+          }
+        }
+        std::cout << std::endl;
+
+        // Calculate the Euclidean norm of the real parts
+        double norm_real_parts = 0.0;
+        for(const auto& val: real_parts) { norm_real_parts += val * val; }
+        norm_real_parts = std::sqrt(norm_real_parts);
+
+        // Calculate the Euclidean norm of the imaginary parts
+        double norm_imag_parts = 0.0;
+        for(const auto& val: imag_parts) { norm_imag_parts += val * val; }
+        norm_imag_parts = std::sqrt(norm_imag_parts);
+
+        // Print the results
+        std::cout << "Norm of real parts: " << std::fixed << std::setprecision(10)
+                  << norm_real_parts << std::endl;
+        std::cout << "Norm of imaginary parts: " << std::fixed << std::setprecision(10)
+                  << norm_imag_parts << std::endl;
+
+        std::cout.width(6);
+        std::cout << std::right << li + 1 << std::string(3, ' ');
+        std::cout << std::fixed << std::setprecision(6) << rt_step_size << std::string(5, ' ');
+        std::cout << std::fixed << std::setprecision(13) << de_energy << std::string(3, ' ');
+        std::cout << std::fixed << std::setprecision(2);
+        std::cout << std::endl;
+      }
+
+      // clang-format off
+      sch(r1_aa_upper()    = 0)
+         (r1_aa_upper()   += r1_aa_upper_copy())
+         (r1_bb_upper()    = 0)
+         (r1_bb_upper()   += r1_bb_upper_copy())
+         (r2_aaaa_upper()  = 0)
+         (r2_aaaa_upper() += r2_aaaa_upper_copy())
+         (r2_bbbb_upper()  = 0)
+         (r2_bbbb_upper() += r2_bbbb_upper_copy())
+         (r2_abab_upper()  = 0)
+         (r2_abab_upper() += r2_abab_upper_copy());
+      // clang-format on
+      sch.execute();
+
+      //      std::cout << "t1_aa_norm" << std:: endl;
+      //      std::cout << t1_aa_norm << std:: endl;
+
+      // clang-format off
+      sch(t1_aa_lower()   = 0)
+         (t1_aa_lower()  += t1_aa_upper())
+	       (t1_bb_lower()   = 0)
+         (t1_bb_lower()  += t1_bb_upper())
+         (t2_aaaa_lower() = 0)
+	       (t2_aaaa_lower() += t2_aaaa_upper())
+	       (t2_bbbb_lower() = 0)
+         (t2_bbbb_lower() += t2_bbbb_upper())
+	       (t2_abab_lower() = 0)
+         (t2_abab_lower() += t2_abab_upper())
+	       (t1_aa_upper()   = 0)
+         (t1_aa_upper()  += t1_aa())
+	       (t1_bb_upper()   = 0)
+         (t1_bb_upper()  += t1_bb())
+	       (t2_aaaa_upper() = 0)
+         (t2_aaaa_upper() += t2_aaaa())
+	       (t2_bbbb_upper() = 0)
+         (t2_bbbb_upper() += t2_bbbb())
+	       (t2_abab_upper()  = 0)
+         (t2_abab_upper() += t2_abab())
+	       (r1_aa_lower()   = 0)
+         (r1_aa_lower()   = r1_aa_upper())
+	       (r1_bb_lower()   = 0)
+         (r1_bb_lower()   = r1_bb_upper())
+	       (r2_aaaa_lower() = 0)
+         (r2_aaaa_lower() = r2_aaaa_upper())
+	       (r2_bbbb_lower() = 0)
+         (r2_bbbb_lower() += r2_bbbb_upper())
+	       (r2_abab_lower() = 0)
+         (r2_abab_lower() += r2_abab_upper());
+      // clang-format on
+      sch.execute();
+
+      ccsd_t1_os(sch, MO, CI, r1_aa_upper, r1_bb_upper, t1_aa, t1_bb, t2_aaaa, t2_bbbb, t2_abab,
+                 f1_se, chol3d_se);
+      ccsd_t2_os(sch, MO, CI, r2_aaaa_upper, r2_bbbb_upper, r2_abab_upper, t1_aa, t1_bb, t2_aaaa,
+                 t2_bbbb, t2_abab, f1_se, chol3d_se, i0_t2_tmp);
       sch.execute(exhw, profile);
-
-      // step 10
-      const T t1_aa_norm   = tamm::norm(t1_vo("aa"));
-      const T t1_bb_norm   = tamm::norm(t1_vo("bb"));
-      const T t2_aaaa_norm = tamm::norm(t2_vvoo("aaaa"));
-      const T t2_abab_norm = tamm::norm(t2_vvoo("abab"));
-      const T t2_bbbb_norm = tamm::norm(t2_vvoo("bbbb"));
-
-      const T t1_aux_aa_norm   = tamm::norm(t1_vo_aux("aa"));
-      const T t1_aux_bb_norm   = tamm::norm(t1_vo_aux("bb"));
-      const T t2_aux_aaaa_norm = tamm::norm(t2_vvoo_aux("aaaa"));
-      const T t2_aux_abab_norm = tamm::norm(t2_vvoo_aux("abab"));
-      const T t2_aux_bbbb_norm = tamm::norm(t2_vvoo_aux("bbbb"));
-
-      const T x1_1 = std::abs(t1_aux_aa_norm - t1_aa_norm);
-      const T x1_2 = std::abs(t1_aux_bb_norm - t1_bb_norm);
-      const T x2_1 = std::abs(t2_aux_aaaa_norm - t2_aaaa_norm);
-      const T x2_2 = std::abs(t2_aux_abab_norm - t2_abab_norm);
-      const T x2_3 = std::abs(t2_aux_bbbb_norm - t2_bbbb_norm);
-
-      // step 11 (t = t_aux)
-      CCSE_Tensors<T>::copy(sch, t1_vo_aux, t1_vo);
-      CCSE_Tensors<T>::copy(sch, t2_vvoo_aux, t2_vvoo);
-      sch.execute();
 
       const auto mt_end = std::chrono::high_resolution_clock::now();
       auto       mi_time =
         std::chrono::duration_cast<std::chrono::duration<double>>((mt_end - mt_start)).count();
 
-      if(ec.print())
-        td_iteration_print(chem_env, li, get_scalar(d_e), x1_1, x1_2, x2_1, x2_2, x2_3, mi_time);
+      if(ec.print()) {
+        td_iteration_print(chem_env, li, rt_step_size, get_scalar(d_e), x1_1, x1_2, x2_1, x2_2,
+                           x2_3, mi_time);
+      }
 
-      // step 12
-      if((x1_1.real() < thresh) && (x1_2.real() < thresh) && (x2_1.real() < thresh) &&
-         (x2_2.real() < thresh) && (x2_3.real() < thresh))
+      // step 16
+      // variable time-steps
+      // std::cout << "for the next time-step, it will be printed again before next time starts" <<
+      // std::endl; std::cout << std::fixed << std::setprecision(6) << rt_step_size1 << std::endl;
+      //     if (li >= 6) {
+      //          rt_step_size1 = h_red_fac * rt_step_size;
+      //            } else if (li <= 2) {
+      //            rt_step_size1 = h_inc_fac * rt_step_size;
+      //             }
+
+      //    if (rt_step_size > h_max) {
+      //            rt_step_size1 = h_max;
+      //             }
+      //  std::cout << "li" << li+1 << std::endl;
+      //  std::cout << "rt_step_size1" << li+1 << std::endl;
+
+      // ec.pg().broadcast(&rt_step_size, 0);
+
+      // step 17
+      if((x1_1 < thresh) && (x1_2 < thresh) && (x2_1 < thresh) && (x2_2 < thresh) &&
+         (x2_3 < thresh)) {
+        li++;
         break;
+      }
+
     } // microiter loop
+      //
+
+    //      li = li+1;
+
+    if(ec.print() && debug)
+      std::cout << "Number of micro-iterations to converge: " << li << std::endl;
+    if(li >= 6) {
+      rt_step_size = h_red_fac * rt_step_size;
+      if(ec.print())
+        std::cout << "rt_step_size is decreased for the next time-step by a factor of: "
+                  << h_red_fac << std::endl;
+    }
+    else if(li <= 3) {
+      if(ec.print())
+        std::cout << "rt_step_size is increased for the next time-step by a factor of: "
+                  << h_inc_fac << std::endl;
+      rt_step_size = h_inc_fac * rt_step_size;
+    }
+
+    if(rt_step_size > h_max) {
+      if(ec.print()) std::cout << "rt_step_size reached the maximum value:" << std::endl;
+      rt_step_size = h_max;
+    }
+
+    // rt_step_size = rt_step_size1;
+
+    // std::cout << "for the next time-step, it is:" << std::endl;
+    // std::cout << std::fixed << std::setprecision(6) << rt_step_size << std::endl;
+
+    // step 18
 
     if(writet && ((titer + 1) % writet_iter == 0)) {
-      t1_vo.write_to_disk(ec, rt_eom_fp);
-      t2_vvoo.write_to_disk(ec, rt_eom_fp);
-      t1_vo_old.write_to_disk(ec, rt_eom_fp);
-      t2_vvoo_old.write_to_disk(ec, rt_eom_fp);
+      // only advance the restart timestep once the tensors are committed; on failure the
+      // previous checkpoint (tensors + timestep file) stays consistent
+      const bool restart_written = write_to_disk(ec, restart_tensors, restart_files, profile);
       if(ec.print()) {
-        std::ofstream out(ts_file, std::ios::out);
-        out << titer + 1 << std::endl;
-        out.close();
+        if(!restart_written)
+          std::cout << "[RT-EOM-CC] WARNING: failed to write restart tensors at timestep "
+                    << titer + 1 << "; keeping the previous checkpoint" << std::endl;
+        else {
+          std::ofstream out(ts_file, std::ios::out);
+          out << titer + 1 << " " << total_time << " " << rt_step_size << std::endl;
+          out.close();
+        }
       }
     }
 
   } // end timestep loop
+    //
 
   if(ec.print()) {
     if(ts_start < ntimesteps) chem_env.write_json_data();
@@ -961,12 +1727,30 @@ void RT_EOM_CD_CCSD<T>::rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec,
                                    _a008, _a009, _a017, _a019, _a020, _a021, _a022);
 
   CCSE_Tensors<T>::deallocate_list(sch, _a02, _a03);
-  CCSE_Tensors<T>::deallocate_list(sch, r1_vo, r2_vvoo, t1_vo, t2_vvoo);
-  CCSE_Tensors<T>::deallocate_list(sch, r1_vo_old, r2_vvoo_old, t1_vo_aux, t2_vvoo_aux, t1_vo_old,
-                                   t2_vvoo_old);
   CCSE_Tensors<T>::deallocate_list(sch, f1_oo, f1_ov, f1_vo, f1_vv, chol3d_oo, chol3d_ov, chol3d_vo,
                                    chol3d_vv);
-  sch.deallocate(d_e, _a01V).execute();
+  sch.deallocate(d_e, _a01V);
+  sch.deallocate(t1_aa, t1_bb, t1_aa_old, t1_bb_old, t1_aa_aux, t1_bb_aux);
+  sch.deallocate(t2_aaaa, t2_bbbb, t2_abab, t2_aaaa_old, t2_bbbb_old, t2_abab_old, t2_aaaa_aux,
+                 t2_bbbb_aux, t2_abab_aux);
+  sch.deallocate(r1_aa, r1_bb, r1_aa_old, r1_bb_old, r2_aaaa, r2_bbbb, r2_abab, r2_aaaa_old,
+                 r2_bbbb_old, r2_abab_old);
+  sch.deallocate(t1_aa_aux_copy, t1_bb_aux_copy, t2_aaaa_aux_copy, t2_bbbb_aux_copy,
+                 t2_abab_aux_copy);
+  sch.deallocate(t1_aa_diff, t1_bb_diff, t2_aaaa_diff, t2_bbbb_diff, t2_abab_diff, t1_full_diff);
+  sch.deallocate(r1_aa_old_copy, r1_bb_old_copy, r2_aaaa_old_copy, r2_bbbb_old_copy,
+                 r2_abab_old_copy);
+  sch.deallocate(r1_aa_upper_copy, r1_bb_upper_copy, r2_aaaa_upper_copy, r2_bbbb_upper_copy,
+                 r2_abab_upper_copy);
+  sch.deallocate(t1_aa_lower, t1_bb_lower, t2_aaaa_lower, t2_bbbb_lower, t2_abab_lower);
+  sch.deallocate(t1_aa_upper, t1_bb_upper, t2_aaaa_upper, t2_bbbb_upper, t2_abab_upper);
+  sch.deallocate(r1_aa_lower, r1_bb_lower, r2_aaaa_lower, r2_bbbb_lower, r2_abab_lower);
+  sch.deallocate(r1_aa_upper, r1_bb_upper, r2_aaaa_upper, r2_bbbb_upper, r2_abab_upper);
+  sch.deallocate(delta_r1_aa, delta_r1_bb, delta_r2_aaaa, delta_r2_bbbb, delta_r2_abab);
+  sch.deallocate(delta_t1_aa, delta_t1_bb, delta_t2_aaaa, delta_t2_bbbb, delta_t2_abab);
+  sch.deallocate(f1_aa_upper, f1_bb_upper, f2_aaaa_upper, f2_bbbb_upper, f2_abab_upper);
+  sch.deallocate(deno_aa, deno_bb, deno_aaaa, deno_bbbb, deno_abab);
+  sch.execute();
 }
 
 void rt_eom_cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) {

@@ -428,16 +428,16 @@
             "rt_multiplier": {
               "type": "number"
             },
-            "secent_x": {
+            "rt_secant_x": {
               "type": "number"
             },
-            "h_red": {
+            "rt_step_dec": {
               "type": "number"
             },
-            "h_inc": {
+            "rt_step_inc": {
               "type": "number"
             },
-            "h_max": {
+            "rt_step_max": {
               "type": "number"
             }
           }

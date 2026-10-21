@@ -46,19 +46,23 @@ public:
 protected:
   // energy evaluation
   virtual void ccsd_e_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
-                         Tensor<T>& de, CCSE_Tensors<T>& t1, CCSE_Tensors<T>& t2,
+                         Tensor<T>& de, Tensor<T>& t1_aa, Tensor<T>& t1_bb, Tensor<T>& t2_aaaa,
+                         Tensor<T>& t2_bbbb, Tensor<T>& t2_abab,
                          std::vector<CCSE_Tensors<T>>& f1_se,
                          std::vector<CCSE_Tensors<T>>& chol3d_se);
 
   // t1 residual
   virtual void ccsd_t1_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
-                          CCSE_Tensors<T>& r1_vo, CCSE_Tensors<T>& t1, CCSE_Tensors<T>& t2,
+                          Tensor<T>& i0_aa, Tensor<T>& i0_bb, Tensor<T>& t1_aa, Tensor<T>& t1_bb,
+                          Tensor<T>& t2_aaaa, Tensor<T>& t2_bbbb, Tensor<T>& t2_abab,
                           std::vector<CCSE_Tensors<T>>& f1_se,
                           std::vector<CCSE_Tensors<T>>& chol3d_se);
 
   // t2 residual
   virtual void ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const TiledIndexSpace& CI,
-                          CCSE_Tensors<T>& r2, CCSE_Tensors<T>& t1, CCSE_Tensors<T>& t2,
+                          Tensor<T>& i0_aaaa, Tensor<T>& i0_bbbb, Tensor<T>& i0_abab,
+                          Tensor<T>& t1_aa, Tensor<T>& t1_bb, Tensor<T>& t2_aaaa,
+                          Tensor<T>& t2_bbbb, Tensor<T>& t2_abab,
                           std::vector<CCSE_Tensors<T>>& f1_se,
                           std::vector<CCSE_Tensors<T>>& chol3d_se, CCSE_Tensors<T>& i0tmp);
 
@@ -72,10 +76,14 @@ protected:
   virtual void complex_copy_swap(ExecutionContext& ec, Tensor<T> src, Tensor<T> dest,
                                  bool update = true);
 
+  // Element-wise secant update: t = t_upper - f_upper * delta_t / deno  (t = 0 where deno == 0)
+  virtual void secant_update_ip(ExecutionContext& ec, Tensor<T> t, Tensor<T> t_upper,
+                                Tensor<T> f_upper, Tensor<T> delta_t, Tensor<T> deno);
+
   // Iteration print helper
-  virtual void td_iteration_print(ChemEnv& chem_env, int iter, CCEType energy, CCEType x1_1,
-                                  CCEType x1_2, CCEType x2_1, CCEType x2_2, CCEType x2_3,
-                                  double time);
+  virtual void td_iteration_print(ChemEnv& chem_env, int iter, double rt_step_size, CCEType energy,
+                                  CCEType x1_1, CCEType x1_2, CCEType x2_1, CCEType x2_2,
+                                  CCEType x2_3, double time);
 };
 
 } // namespace exachem::rteom_cc::ccsd

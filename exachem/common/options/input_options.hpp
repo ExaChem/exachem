@@ -249,10 +249,10 @@ public:
   double rt_threshold{1e-6};
   double rt_step_size{0.025};
   double rt_multiplier{0.5};
-  double secent_x{0.1};
-  double h_red{0.5};
-  double h_inc{1.2};
-  double h_max{0.25};
+  double rt_secant_x{0.1};
+  double rt_step_dec{0.9};
+  double rt_step_inc{1.1};
+  double rt_step_max{0.05};
 
   bool skip_ccsd{false};
   int  cache_size{8};

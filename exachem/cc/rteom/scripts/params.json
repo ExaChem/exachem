@@ -1,8 +1,16 @@
 {
-  "delta_real": 0.025,
-  "E_Ext_l": 2.5,
-  "E_Ext_h": 2.5,
-  "dE_local": 0.0005,
-  "E_c": -1.35654,
-  "E_Corr_0": -0.23517
+  "delta_real": 0.01,
+  "E_Ext_l": 5.0,
+  "E_Ext_h": 5.0,
+  "dE_local": 0.001,
+  "E_c": 0.0,
+  "E_Corr_0": 0.0,
+
+  "use_pade": true,
+  "pade_order": 800,
+  "pade_reg": 1.0e-8,
+  "pade_eta": 0.0,
+  "pade_nfit": 0,
+  "pade_dt": 0.05,
+  "pade_root_radius": 1.000001
 }

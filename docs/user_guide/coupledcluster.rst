@@ -263,7 +263,10 @@ The RT-EOMCCSD procedure is described in the following paper.
    "rt_microiter": 20,
    "rt_threshold": 1e-6,
    "rt_step_size": 0.025,
-   "rt_multiplier": 0.5
+   "rt_secant_x": 0.1,
+   "rt_step_dec": 0.9,
+   "rt_step_inc": 1.1,
+   "rt_step_max": 0.05
  }
 
 :pcore: ``[default=0]`` The occupied orbital with its corresponding index needs to be moved to a virtual orbital while maintaining a hole in the occupied subspace. The SCF eigenvector analysis assists in selecting the appropriate index for this orbital. Note that the value for `pcore` orbitals should be provided starting from 1, rather than 0. A value greater than 0 is required for an *RT-EOMCCSD* calculation.
@@ -272,14 +275,91 @@ The input file for an *RT-EOMCCSD* calculation describes the closed-shell **refe
 
 :rt_threshold: ``[default=1e-6]`` Specifies the convergence threshold for the time-dependent EOMCCSD calculation.
 
-:rt_microiter: ``[default=20]`` Specifies the number of microiterations performed within each macroiteration.
+:rt_microiter: ``[default=20]`` Specifies the maximum number of micro-iterations performed within each time step.
 
 :ntimesteps: ``[default=10]`` Specifies the number of timesteps used in the time propagation of the wavefunction.
 
-:rt_step_size: ``[default=0.025]`` Specifies the step size used in the time propagation of the wavefunction.
+:rt_step_size: ``[default=0.025]`` Specifies the step size used in the time propagation of the wavefunction. For *RT-EOMCCSD* this is the initial step size, which is adjusted after every time step (see ``rt_step_dec``, ``rt_step_inc`` and ``rt_step_max``).
 
-:rt_multiplier: ``[default=0.5]`` Specifies a multiplier factor that scales the step size in the time propagation of the wavefunction.
+*RT-EOMCCSD* propagates the amplitudes with the trapezoidal rule, solving the implicit equation at each time step by secant micro-iterations. The step size is adapted between time steps based on how many micro-iterations the previous step needed. The following options control this scheme.
 
-.. note::
+:rt_secant_x: ``[default=0.1]`` Scaling parameter for the two initial secant guesses, which are built from the previous amplitudes advanced by ``(1 - rt_secant_x)`` and ``(1 + rt_secant_x)`` times the current step size.
 
-   The same options described here can be used to run an RT-EOM-CC2 calculation using task ``rteom_cc2`` in the input file.
+:rt_step_dec: ``[default=0.9]`` Factor by which the step size is reduced for the next time step when the current time step needed 7 or more micro-iterations (or did not converge within ``rt_microiter``).
+
+:rt_step_inc: ``[default=1.1]`` Factor by which the step size is increased for the next time step when the current time step converged in 4 or fewer micro-iterations.
+
+:rt_step_max: ``[default=0.05]`` Maximum step size. The adapted step size is capped at this value.
+
+Analysis scripts
+----------------
+
+An *RT-EOMCCSD* calculation writes the time derivative of the cumulant, :math:`dC/dt`, at every time step to ``<prefix>.dcdt`` in the ``rteom`` subdirectory of the run's files directory. Each line holds the time step number, the time (au) and the real and imaginary parts of :math:`dC/dt`. The scripts in ``exachem/cc/rteom/scripts`` post-process this file. They need ``numpy``, ``plotly`` and ``kaleido`` (``pip3 install numpy plotly kaleido``).
+
+``plot_dcdt.py`` plots the real and imaginary parts of :math:`dC/dt` against time and writes ``<prefix>.dcdt.re_im_vs_t.png``:
+
+.. code-block:: bash
+
+   python3 plot_dcdt.py <prefix>.dcdt
+
+``rteom_analysis.py`` builds the cumulant and the retarded Green's function from :math:`dC/dt`, Fourier transforms it to get the spectral function, and fits the quasiparticle (QP) peak with a Lorentzian to report the QP binding energy (eV) and strength. With ``use_pade`` enabled, it also computes the spectral function from a linear-prediction Padé fit of the Green's function, which extrapolates the time signal to infinite time.
+
+.. code-block:: bash
+
+   python3 rteom_analysis.py <prefix>.dcdt params.json
+
+Output files, all named after the dcdt file and written to the current directory:
+
+- ``.cumulant_gf.txt``: time, cumulant (real, imag) and Green's function (real, imag).
+- ``.ft_greens_function.txt`` and ``.ft_gf.png``: energy (eV) and spectral function from the Fourier transform.
+- ``.pade_greens_function.txt``, ``.pade_gf.png`` and ``.pade_uniform_gf_t.txt``: the same from the Padé fit, and the Green's function on the uniform time grid used for the fit (only with ``use_pade``).
+- ``.ft_beta.txt`` and ``.dc2dt2.txt``: :math:`\beta(\omega)` and :math:`-i\,d^2C/dt^2`.
+
+If a restarted calculation appended time steps that were already in the file, the last entry for each time step is kept and the cleaned file is written to ``<prefix>.dcdt.new``.
+
+``params.json`` (a template is provided next to the scripts) holds the analysis parameters:
+
+.. code-block:: json
+
+ {
+   "delta_real": 0.01,
+   "E_Ext_l": 5.0,
+   "E_Ext_h": 5.0,
+   "dE_local": 0.001,
+   "E_c": 0.0,
+   "E_Corr_0": 0.0,
+
+   "use_pade": true,
+   "pade_order": 800,
+   "pade_reg": 1.0e-8,
+   "pade_eta": 0.0,
+   "pade_nfit": 0,
+   "pade_dt": 0.05,
+   "pade_root_radius": 1.000001
+ }
+
+:delta_real: Broadening parameter (au), added as an imaginary part to the energy grid.
+
+:E_Ext_l, E_Ext_h: Energy extensions (au) below and above the reference energy ``E_c + E_Corr_0``. The grid runs from ``-E_Ext_l`` to ``E_Ext_h`` relative to it.
+
+:dE_local: Energy-grid spacing (au).
+
+:E_c: Core orbital energy (au), i.e. the orbital energy of the ``pcore`` orbital in the closed-shell reference SCF.
+
+:E_Corr_0: *N*-electron ground-state correlation energy (au), from a separate CCSD calculation on the closed-shell reference.
+
+:use_pade: ``[default=false]`` Also compute the spectral function from a linear-prediction Padé fit.
+
+:pade_order: ``[default=200]`` Number of linear-prediction coefficients (poles) in the fit. It is reduced automatically if it is too large for the number of fitted points.
+
+:pade_reg: ``[default=1e-8]`` Tikhonov regularization of the linear-prediction least-squares fit.
+
+:pade_eta: ``[default=0.0]`` Optional extra exponential damping (au) applied to the signal before fitting.
+
+:pade_nfit: ``[default=0]`` Number of points of the uniform grid used in the fit. 0 uses all of them.
+
+:pade_dt: ``[default=0.05]`` Time step (au) of the uniform grid the Green's function is resampled on for the fit. Set it to the ``rt_step_max`` used in the calculation.
+
+:pade_root_radius: ``[default=1.000001]`` Only poles with modulus up to this value (non-growing terms) are kept.
+
+:trim_last_points: ``[default=0]`` Number of time steps dropped from the end of the dcdt file before the analysis.

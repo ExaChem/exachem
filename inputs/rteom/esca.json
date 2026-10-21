@@ -55,7 +55,11 @@
       "ntimesteps": 4001,
       "rt_microiter": 4,
       "rt_step_size": 0.05,
-      "rt_multiplier": 0.5
+      "rt_multiplier": 0.5,
+      "rt_secant_x": 0.1,
+      "rt_step_dec": 0.9,
+      "rt_step_inc": 1.1,
+      "rt_step_max": 0.05
     }
   },
   "TASK": {

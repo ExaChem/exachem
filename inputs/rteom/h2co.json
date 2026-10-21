@@ -42,7 +42,11 @@
       "rt_microiter": 20,
       "rt_threshold": 1e-6,
       "rt_step_size": 0.025,
-      "rt_multiplier": 0.5
+      "rt_multiplier": 0.5,
+      "rt_secant_x": 0.1,
+      "rt_step_dec": 0.9,
+      "rt_step_inc": 1.1,
+      "rt_step_max": 0.05
     }
   },
   "TASK": {

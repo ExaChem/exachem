@@ -32,7 +32,7 @@ This section is used to define projector-based quantum embedding parameters.
 
 :lambda: ``[default=1.0e6]`` The level-shift value used to move the eigenvalues of the projected orbitals.
 
-:use_ksref: If **true**, use a Kohn-Sham reference to start post-HF calculations.
+:use_ksref: If **true**, use a Kohn-Sham reference to start post-HF calculations. This includes FCIDUMP: with a DFT low level, **false** writes the file in Hartree-Fock orbitals and **true** writes it in Kohn-Sham orbitals.
 
 :partition: Type of partitioning scheme for the active and inactive subsystems.
 
@@ -44,7 +44,7 @@ This section is used to define projector-based quantum embedding parameters.
     * :strong:`"huzinaga"`
     * :strong:`"level"`
 
-:high_level: A string specifying the high-level calculation. It can be a combination of exchange-correlation functionals, a string identifying the post-HF method, or FCIDUMP for active space integral writeout.
+:high_level: A string specifying the high-level calculation. It can be a combination of exchange-correlation functionals, a string identifying the post-HF method, or FCIDUMP for active space integral writeout. FCIDUMP does not compute a high-level energy, so the run prints the ``Embedding energy correction`` instead: add it to an energy computed from the file to get the embedded total energy.
 
     * :strong:`"HF"`
     * :strong:`"PBE0"`

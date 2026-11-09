@@ -130,6 +130,8 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
 
   auto skip_cd = cd_options.skip_cd;
 
+  const bool frozen_core_needed = cd_context.keep_frozen_core && sys_data.n_frozen_core > 0;
+
   if(!readv2 && !skip_cd.first) {
     TiledIndexSpace N    = MO("all");
     cd_context.d_f1      = Tensor<T>{{N, N}, {1, 1}};
@@ -172,6 +174,10 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
       write_to_disk(ec, cd_context.d_f1, cd_context.f1file);
       if(do_cholesky) write_to_disk(ec, cholVpr, cd_context.v2file);
       chem_env.run_context["cholesky_2e"]["num_chol_vecs"] = chol_count;
+      if(frozen_core_needed) {
+        write_to_disk(ec, cd_context.frozen_core_potential, cd_context.frozen_core_file);
+        chem_env.run_context["cholesky_2e"]["frozen_core_energy"] = cd_context.frozen_core_energy;
+      }
       if(rank == 0) { chem_env.write_run_context(); }
     }
   }
@@ -218,6 +224,17 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
       read_from_disk(ec, cd_context.movecs_so, cd_context.movecs_so_file);
       read_from_disk(ec, cd_context.d_f1, cd_context.f1file);
       if(do_cholesky) read_from_disk(ec, cholVpr, cd_context.v2file);
+      if(frozen_core_needed) {
+        if(!fs::exists(cd_context.frozen_core_file) ||
+           !chem_env.run_context["cholesky_2e"].contains("frozen_core_energy")) {
+          tamm_terminate("\n [Cholesky restart] Frozen core data not found: [" +
+                         cd_context.frozen_core_file + "]. Rerun the cholesky decomposition");
+        }
+        cd_context.frozen_core_energy = chem_env.run_context["cholesky_2e"]["frozen_core_energy"];
+        cd_context.frozen_core_potential = Tensor<T>{{N, N}, {1, 1}};
+        Tensor<T>::allocate(&ec, cd_context.frozen_core_potential);
+        read_from_disk(ec, cd_context.frozen_core_potential, cd_context.frozen_core_file);
+      }
       ec.pg().barrier();
     }
   }

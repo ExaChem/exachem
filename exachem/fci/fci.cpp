@@ -17,7 +17,11 @@ using namespace tamm;
 namespace exachem::fci {
 template<typename T>
 void FCI<T>::driver(ExecutionContext& ec, ChemEnv& chem_env) {
-  chem_env.cd_context.keep_movecs_so = true;
+  if(chem_env.ioptions.cd_options.skip_cd.first)
+    tamm_terminate("INPUT FILE ERROR: CD option skip_cd cannot be used with the fcidump task");
+
+  chem_env.cd_context.keep_movecs_so   = true;
+  chem_env.cd_context.keep_frozen_core = true;
   exachem::cholesky_2e::Cholesky_2E_Driver<T> cholesky_driver;
   cholesky_driver.cholesky_2e_driver(ec, chem_env);
 
@@ -64,6 +68,7 @@ void FCI<T>::driver(ExecutionContext& ec, ChemEnv& chem_env) {
 #endif
 
   free_tensors(lcao, d_f1, full_v2);
+  if(chem_env.sys_data.n_frozen_core > 0) free_tensors(cd_context.frozen_core_potential);
 
   ec.flush_and_sync();
 }

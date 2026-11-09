@@ -329,8 +329,8 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
   const std::vector<std::string> dft{"PBE", "SCAN", "R2SCAN", "BLYP", "PBE0"};
   bool&                          is_ks     = chem_env.sys_data.is_ks;
   bool&                          use_ksref = chem_env.ioptions.embedding_options.use_ksref;
-  const std::vector<std::string> correlated_methods{"MP2",     "CC2",   "CCSD", "CCSD_CANONICAL",
-                                                    "CCSD(T)", "CCSDT", "DUCC", "QFLOW"};
+  const std::vector<std::string> correlated_methods{
+    "MP2", "CC2", "CCSD", "CCSD_CANONICAL", "CCSD(T)", "CCSDT", "DUCC", "QFLOW", "FCIDUMP"};
   // If high level is HF, clear out the xc for scf
   if(high_level[0] == "HF") {
     is_ks = false;
@@ -476,10 +476,16 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
               << std::endl
               << std::fixed << std::setprecision(10) << "Energy AB     : " << std::right
               << std::setw(20) << energy_ab_low << std::endl
-              << "Energy A(low) : " << std::right << std::setw(20) << energy_a_low << std::endl
-              << "Energy A(high): " << std::right << std::setw(20) << energy_a_high << std::endl
-              << "Total Energy  : " << std::right << std::setw(20)
-              << energy_ab_low + (energy_a_high - energy_a_low) << std::endl;
+              << "Energy A(low) : " << std::right << std::setw(20) << energy_a_low << std::endl;
+    if(high_level[0] == "FCIDUMP") {
+      std::cout << "Embedding energy correction (AB - A(low)): " << std::right << std::setw(20)
+                << energy_ab_low - energy_a_low << std::endl;
+    }
+    else {
+      std::cout << "Energy A(high): " << std::right << std::setw(20) << energy_a_high << std::endl
+                << "Total Energy  : " << std::right << std::setw(20)
+                << energy_ab_low + (energy_a_high - energy_a_low) << std::endl;
+    }
   }
 }
 

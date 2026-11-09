@@ -414,6 +414,9 @@ void Cholesky_2E_Util::update_sysdata(ExecutionContext& ec, ChemEnv& chem_env, T
     sys_data.nbf -= (sys_data.n_frozen_core + sys_data.n_frozen_virtual);
     sys_data.n_occ_alpha -= sys_data.n_frozen_core;
     sys_data.n_vir_alpha -= sys_data.n_frozen_virtual;
+    sys_data.nelectrons -= 2 * sys_data.n_frozen_core;
+    sys_data.nelectrons_alpha -= sys_data.n_frozen_core;
+    sys_data.nelectrons_beta -= sys_data.n_frozen_core;
     if(is_mso) {
       sys_data.n_occ_beta -= sys_data.n_frozen_core;
       sys_data.n_vir_beta -= sys_data.n_frozen_virtual;
@@ -477,6 +480,93 @@ Matrix Cholesky_2E_Util::reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat, bool
 
   emat.resize(0, 0);
   return cvec;
+}
+
+// Energy and potential of the frozen core orbitals, which are only available before the MO
+// transform. lcao_full and lcao_active are only used on rank 0.
+template<typename T>
+static void compute_frozen_core(ExecutionContext& ec, ChemEnv& chem_env, Tensor<T> chol_ao,
+                                const Matrix& lcao_full, const Matrix& lcao_active) {
+  const SystemData& sys_data   = chem_env.sys_data;
+  CDContext&        cd_context = chem_env.cd_context;
+
+  const auto rank  = ec.pg().rank().value();
+  const int  ncore = sys_data.n_frozen_core;
+  const int  noa   = sys_data.n_occ_alpha;
+  const int  nocc  = noa + sys_data.n_occ_beta;
+  const int  nva   = sys_data.n_vir_alpha;
+
+  const TiledIndexSpace& tMO = chem_env.is_context.MSO;
+  const TiledIndexSpace  tAO = chol_ao.tiled_index_spaces()[0];
+  const TiledIndexSpace  tCI = chol_ao.tiled_index_spaces()[2];
+
+  auto [mu, nu, rho, sigma] = tAO.template labels<4>("all");
+  auto cind                 = tCI.label("all");
+
+  Tensor<T> hcore{tAO, tAO};
+  Tensor<T> D_a{tAO, tAO};
+  Tensor<T> D_b{tAO, tAO};
+  Tensor<T> J{tAO, tAO};
+  Tensor<T> G_a{tAO, tAO};
+  Tensor<T> G_b{tAO, tAO};
+  Tensor<T> Y{tCI};
+  Tensor<T> half{tAO, tAO, tCI};
+  Tensor<T> energy{};
+
+  Scheduler sch{ec};
+  sch.allocate(hcore, D_a, D_b, J, G_a, G_b, Y, half, energy).execute();
+  read_from_disk(ec, hcore, chem_env.get_files_prefix("", "scf") + ".hcore");
+
+  if(rank == 0) {
+    // The columns of lcao_full are occ_alpha, occ_beta, ..., with the core orbitals first in each
+    const Matrix C_a = lcao_full.middleCols(0, ncore);
+    const Matrix C_b = lcao_full.middleCols(noa + ncore, ncore);
+    Matrix       D   = C_a * C_a.transpose();
+    eigen_to_tamm_tensor(D_a, D);
+    D = C_b * C_b.transpose();
+    eigen_to_tamm_tensor(D_b, D);
+  }
+  ec.pg().barrier();
+
+  // clang-format off
+  sch
+    (Y(cind)             = chol_ao(mu,nu,cind) * D_a(mu,nu))
+    (Y(cind)            += chol_ao(mu,nu,cind) * D_b(mu,nu))
+    (J(mu,nu)            = chol_ao(mu,nu,cind) * Y(cind))
+    (half(mu,sigma,cind) = chol_ao(mu,rho,cind) * D_a(rho,sigma))
+    (G_a(mu,nu)          = J(mu,nu))
+    (G_a(mu,nu)         -= half(mu,sigma,cind) * chol_ao(sigma,nu,cind))
+    (half(mu,sigma,cind) = chol_ao(mu,rho,cind) * D_b(rho,sigma))
+    (G_b(mu,nu)          = J(mu,nu))
+    (G_b(mu,nu)         -= half(mu,sigma,cind) * chol_ao(sigma,nu,cind))
+    (energy()            = hcore(mu,nu) * D_a(mu,nu))
+    (energy()           += hcore(mu,nu) * D_b(mu,nu))
+    (energy()           += 0.5 * G_a(mu,nu) * D_a(mu,nu))
+    (energy()           += 0.5 * G_b(mu,nu) * D_b(mu,nu))
+    .execute(ec.exhw());
+  // clang-format on
+
+  cd_context.frozen_core_energy = get_scalar(energy);
+
+  cd_context.frozen_core_potential = Tensor<T>{{tMO, tMO}, {1, 1}};
+  Tensor<T>::allocate(&ec, cd_context.frozen_core_potential);
+
+  if(rank == 0) {
+    // Keep only the columns of one spin, so that each spin block sees its own potential
+    Matrix C_a = lcao_active;
+    Matrix C_b = lcao_active;
+    for(int p = 0; p < lcao_active.cols(); p++) {
+      const bool is_alpha = p < noa || (p >= nocc && p < nocc + nva);
+      (is_alpha ? C_b : C_a).col(p).setZero();
+    }
+    const Matrix G_a_eig = tamm_to_eigen_matrix(G_a);
+    const Matrix G_b_eig = tamm_to_eigen_matrix(G_b);
+    Matrix       G_mo    = C_a.transpose() * G_a_eig * C_a + C_b.transpose() * G_b_eig * C_b;
+    eigen_to_tamm_tensor(cd_context.frozen_core_potential, G_mo);
+  }
+  ec.pg().barrier();
+
+  sch.deallocate(hcore, D_a, D_b, J, G_a, G_b, Y, half, energy).execute();
 }
 
 template<typename TensorType>
@@ -1126,8 +1216,14 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
   Scheduler sch{ec};
 
   if(do_freeze) {
-    Matrix lcao_new;
-    if(rank == 0) lcao_new = reshape_mo_matrix(chem_env, lcao_eig, true);
+    Matrix     lcao_new;
+    const bool core_terms = sys_data.n_frozen_core > 0 && chem_env.cd_context.keep_frozen_core;
+    Matrix     lcao_full;
+    if(rank == 0) {
+      if(core_terms) lcao_full = lcao_eig; // reshape_mo_matrix clears lcao_eig
+      lcao_new = reshape_mo_matrix(chem_env, lcao_eig, true);
+    }
+    if(core_terms) compute_frozen_core(ec, chem_env, g_chol_ao_tamm, lcao_full, lcao_new);
     sch.deallocate(lcao).execute();
     lcao = Tensor<TensorType>{tAO, tMO};
     sch.allocate(lcao).execute();

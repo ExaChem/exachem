@@ -24,6 +24,11 @@ template<typename T>
 void write_fcidump_file(ChemEnv& chem_env, Tensor<T> H_MO, Tensor<T> full_v2,
                         std::vector<int> orbsym, std::string filename);
 
+// One-shot HF energy of the occupied MSOs, evaluated from the one- and two-electron integrals that
+// go into the FCIDUMP file: core_energy + sum_i h_ii + 1/2 sum_ij [(ii|jj) - (ij|ji)]
+template<typename T>
+T one_shot_hf_energy(ChemEnv& chem_env, Tensor<T> H_MO, Tensor<T> full_v2, T core_energy);
+
 // Transform the AO core Hamiltonian to the MO basis of lcao and write an FCIDUMP file to
 // filename (default: chem_env.get_files_prefix("", "fci") + ".fcidump")
 template<typename T>

@@ -161,6 +161,49 @@ void fcidump::write_1el_ints(std::ofstream& file, SystemData& sys_data, Tensor<T
 }
 
 template<typename T>
+T fcidump::one_shot_hf_energy(ChemEnv& chem_env, Tensor<T> H_MO, Tensor<T> full_v2, T core_energy) {
+  ExecutionContext&      ec = get_ec(full_v2());
+  const TiledIndexSpace& MO = chem_env.is_context.MSO;
+  const TiledIndexSpace  O  = MO("occ");
+  const auto [i, j, k, l]   = MO.labels<4>("occ");
+
+  // In the MSO basis the density is the identity over the occupied orbitals
+  Tensor<T> D{{O, O}, {1, 1}};
+  Tensor<T> G{{O, O}, {1, 1}};
+  Tensor<T> energy{};
+
+  Scheduler sch{ec};
+  sch.allocate(D, G, energy)(D(i, j) = 0).execute();
+
+  auto set_identity = [&](const IndexVector& bid) {
+    const IndexVector blockid = internal::translate_blockid(bid, D());
+    if(blockid[0] != blockid[1]) return;
+
+    const TAMM_SIZE size = D.block_size(blockid);
+    const size_t    dim  = D.block_dims(blockid)[0];
+    std::vector<T>  buf(size, 0);
+    for(size_t x = 0; x < dim; x++) buf[x * dim + x] = 1;
+    D.put(blockid, buf);
+  };
+  block_for(ec, D(), set_identity);
+
+  // clang-format off
+  sch
+    (G(i,j)    = full_v2(i,j,k,l) * D(k,l))
+    (G(i,j)   -= full_v2(i,k,j,l) * D(k,l))
+    (energy()  = H_MO(i,j) * D(i,j))
+    (energy() += 0.5 * G(i,j) * D(i,j))
+    .execute(ec.exhw());
+  // clang-format on
+
+  const T e_total = core_energy + get_scalar(energy);
+
+  sch.deallocate(D, G, energy).execute();
+
+  return e_total;
+}
+
+template<typename T>
 void fcidump::write_fcidump_file(ChemEnv& chem_env, Tensor<T> H_MO, Tensor<T> full_v2,
                                  std::vector<int> orbsym, std::string filename) {
   SystemData& sys_data = chem_env.sys_data;
@@ -172,6 +215,13 @@ void fcidump::write_fcidump_file(ChemEnv& chem_env, Tensor<T> H_MO, Tensor<T> fu
   int         isym     = 1;
 
   ExecutionContext& ec = get_ec(full_v2());
+
+  // With frozen core orbitals, H_MO already includes their potential, so the scalar term only
+  // needs their energy. frozen_core_energy is zero when no core orbitals are frozen.
+  const double core_energy = chem_env.cd_context.frozen_core_energy;
+  const double scalar      = nuc_rep + core_energy;
+
+  const double e_one_shot = one_shot_hf_energy<T>(chem_env, H_MO, full_v2, scalar);
 
   if(ec.pg().rank() == 0) {
     std::ofstream file(filename);
@@ -187,11 +237,28 @@ void fcidump::write_fcidump_file(ChemEnv& chem_env, Tensor<T> H_MO, Tensor<T> fu
 
     write_2el_ints(file, sys_data, full_v2, norbs, is_uhf);
     write_1el_ints(file, sys_data, H_MO, norbs, is_uhf);
-    file << std::setw(16) << nuc_rep << "     " << 0 << "   " << 0 << "   " << 0 << "   " << 0
+    file << std::setw(16) << scalar << "     " << 0 << "   " << 0 << "   " << 0 << "   " << 0
          << std::endl;
 
-    std::cout << std::endl << "Integral file written to: " << filename << std::endl;
+    std::cout << std::endl << "FCIDUMP file written to: " << filename << std::endl;
     file.close();
+  }
+
+  if(ec.pg().rank() == 0) {
+    std::cout << std::fixed << std::setprecision(10);
+    if(sys_data.n_frozen_core > 0) std::cout << "Frozen core energy: " << core_energy << std::endl;
+    if(sys_data.is_ks) {
+      std::cout << "One-shot HF energy (on Kohn-Sham orbitals): " << e_one_shot << std::endl;
+    }
+    else {
+      const double e_scf = chem_env.scf_context.hf_energy;
+      const double diff  = e_one_shot - e_scf;
+      std::cout << "One-shot HF energy: " << e_one_shot << std::endl
+                << "SCF energy        : " << e_scf << std::endl
+                << "Difference        : " << std::scientific << std::setprecision(4) << diff
+                << std::endl
+                << std::defaultfloat;
+    }
   }
 }
 
@@ -221,6 +288,9 @@ void fcidump::generate_fcidump(ChemEnv& chem_env, ExecutionContext& ec, const Te
     .deallocate(tmp).execute(ex_hw);
   // clang-format on
 
+  if(sys_data.n_frozen_core > 0 && chem_env.cd_context.keep_frozen_core)
+    sch(hcore_mo(z1, z2) += chem_env.cd_context.frozen_core_potential(z1, z2)).execute(ex_hw);
+
   // One entry per orbital in the MO space (linear dependencies and frozen orbitals excluded)
   const size_t     nmso = MSO.max_num_indices();
   std::vector<int> symvec(sys_data.is_unrestricted ? nmso : nmso / 2, 1);
@@ -235,6 +305,9 @@ template void fcidump::write_2el_ints<double>(std::ofstream& file, SystemData& s
 
 template void fcidump::write_1el_ints<double>(std::ofstream& file, SystemData& sys_data,
                                               Tensor<double> h, int norb, bool is_uhf);
+
+template double fcidump::one_shot_hf_energy<double>(ChemEnv& chem_env, Tensor<double> H_MO,
+                                                    Tensor<double> full_v2, double core_energy);
 
 template void fcidump::write_fcidump_file<double>(ChemEnv& chem_env, Tensor<double> H_MO,
                                                   Tensor<double> full_v2, std::vector<int> orbsym,

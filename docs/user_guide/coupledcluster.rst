@@ -91,6 +91,8 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
    * :strong:`core`: The specified number of lowest-lying occupied orbitals are excluded.
    * :strong:`virtual`: The specified number of highest-lying virtual orbitals are excluded.
 
+   With the ``fcidump`` task, frozen core orbitals are removed from the FCIDUMP file and their effect on the remaining orbitals is kept: the one-electron integrals include the frozen core potential and the scalar term is the nuclear repulsion plus the frozen core energy. ``NELEC`` counts only the unfrozen electrons.
+
 :PRINT: This block allows specifying a couple of printing options. When enabled, they provide the following
 
    * :strong:`noprint`: Suppress all printing output (Note: not implemented for all CC modules yet).

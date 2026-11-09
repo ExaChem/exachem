@@ -1,0 +1,44 @@
+{
+  "geometry": {
+    "coordinates": [
+      "O    0.0  0.0  0.0",
+      "H    0.0  0.0  1.8324"
+    ],
+    "units": "bohr"
+  },
+  "basis": {
+    "basisset": "cc-pvdz"
+  },
+  "common": {
+    "maxiter": 200
+  },
+  "SCF": {
+    "charge": 0,
+    "multiplicity": 2,
+    "scf_type": "unrestricted",
+    "conve": 1e-11,
+    "convd": 1e-10,
+    "diis_hist": 10,
+    "tol_lindep": 1e-06
+  },
+  "CD": {
+    "diagtol": 1e-12
+  },
+  "CC": {
+    "threshold": 1e-09,
+    "ndiis": 5,
+    "ccsd_maxiter": 200,
+    "freeze": {
+      "core": 1,
+      "virtual": 2
+    },
+    "PRINT": {
+      "rdm": [
+        1
+      ]
+    }
+  },
+  "TASK": {
+    "ccsd_lambda": true
+  }
+}

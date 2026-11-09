@@ -55,10 +55,15 @@ $MPIEXEC $EXE_PATH  $CHEM_INP/seh2.json
 
 #EOMCCSD
 $MPIEXEC $EXE_PATH $CHEM_INP/h2o_eom.json
+
 #CCSD_Lambda
 $MPIEXEC $EXE_PATH $CHEM_INP/butanol2_lambda.json
+$MPIEXEC $EXE_PATH $CHEM_INP/h2o_ccsdnatorb.json
+$MPIEXEC $EXE_PATH $CHEM_INP/oh_ccsdnatorb.json
+
 #GF_CCSD
 $MPIEXEC $EXE_PATH $CHEM_INP/co.json
+
 #DUCC-T_CCSD
 $MPIEXEC $EXE_PATH $CHEM_INP/h2o_ducc.json
 

@@ -243,6 +243,19 @@ for ref_file in ref_files:
             ref_correction = ref_lambda_data[i]
             cur_correction = cur_lambda_data[i]
             rcheck &= check_results(ref_correction,cur_correction,ccsd_threshold,i)
+
+        # Natural orbital occupations are only computed when CC:PRINT:rdm starts with 1
+        cc_rdm = ref_data["input"].get("CC", {}).get("PRINT", {}).get("rdm", [])
+        if not isinstance(cc_rdm, list): cc_rdm = [cc_rdm]
+        if cc_rdm and cc_rdm[0] == 1:
+            ref_no_data = ref_data["output"]["CCSD_Lambda"]["natural_orbital_occupation"]
+            cur_no_data = cur_data["output"]["CCSD_Lambda"]["natural_orbital_occupation"]
+            for spin in ['alpha','beta']:
+                ref_occ = ref_no_data[spin]
+                cur_occ = cur_no_data[spin]
+                for orb in ref_occ:
+                    rcheck &= check_results(ref_occ[orb],cur_occ[orb],ccsd_threshold,
+                                            spin + " natural orbital " + orb + " occupation")
         if not rcheck: sys.exit(1)
 
     if "EOMCCSD" in ref_data["output"]:

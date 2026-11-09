@@ -37,6 +37,7 @@ public:
     auto       vec_analysis = chem_env.ioptions.scf_options.mo_vectors_analysis;
     const bool is_spherical = (chem_env.ioptions.scf_options.gaussian_type == "spherical");
     if(vec_analysis.first) {
+      std::ostringstream  ss;
       std::vector<double> occup_alpha(sys_data.nbf, 0.0);
       for(int i = 0; i < sys_data.n_occ_alpha; i++) {
         occup_alpha[i] = 1.0;
@@ -49,58 +50,67 @@ public:
       libint2::BasisSet& shells = chem_env.shells;
       BasisSetMap        bsm(atoms, shells, is_spherical);
 
-      cout << std::fixed << std::setprecision(6);
+      ss << std::fixed << std::setprecision(6);
       if(is_rhf)
-        cout << endl << std::string(10, ' ') << "RHF Final Molecular Orbital Analysis" << endl;
+        ss << endl << std::string(10, ' ') << "RHF Final Molecular Orbital Analysis" << endl;
       else
-        cout << endl
-             << std::string(10, ' ') << "UHF Final Alpha Molecular Orbital Analysis" << endl;
-      cout << std::string(10, ' ') << std::string(36, '-') << endl;
+        ss << endl << std::string(10, ' ') << "UHF Final Alpha Molecular Orbital Analysis" << endl;
+      ss << std::string(10, ' ') << std::string(36, '-') << endl;
 
       const auto mksp = std::string(4, ' ');
 
       for(auto i = 0; i < sys_data.nbf; i++) {
-        cout << endl
-             << mksp << "Vector" << mksp << i + 1 << "  Occ = " << occup_alpha[i]
-             << "  E = " << F_MO_alpha(i, i) << endl;
+        ss << endl
+           << mksp << "Vector" << mksp << i + 1 << "  Occ = " << occup_alpha[i]
+           << "  E = " << F_MO_alpha(i, i) << endl;
 
-        cout << mksp << "Bfn." << mksp << "Coefficient" << mksp << "Atom+Function" << endl;
-        cout << mksp << std::string(45, '-') << endl;
+        ss << mksp << "Bfn." << mksp << "Coefficient" << mksp << "Atom+Function" << endl;
+        ss << mksp << std::string(45, '-') << endl;
         for(size_t j = 0; j < (size_t) sys_data.nbf_orig; j++) {
           if(std::abs(C_alpha_eig(j, i)) >= vec_analysis.second) {
             auto atom_pos = bsm.bf2atom[j];
-            cout << mksp << std::setw(4) << std::right << j + 1 << mksp << std::setw(10)
-                 << std::right << C_alpha_eig(j, i) << mksp << std::setw(3) << std::right
-                 << atom_pos + 1 << "  " << std::left << std::setw(2)
-                 << bsm.atominfo[atom_pos].symbol << "  " << std::left << std::setw(2)
-                 << bsm.bf_comp[j] << endl;
+            ss << mksp << std::setw(4) << std::right << j + 1 << mksp << std::setw(10) << std::right
+               << C_alpha_eig(j, i) << mksp << std::setw(3) << std::right << atom_pos + 1 << "  "
+               << std::left << std::setw(2) << bsm.atominfo[atom_pos].symbol << "  " << std::left
+               << std::setw(2) << bsm.bf_comp[j] << endl;
           }
         }
       }
 
       if(!is_rhf) {
-        cout << endl
-             << endl
-             << std::string(20, ' ') << "UHF Final Beta Molecular Orbital Analysis" << endl;
-        cout << std::string(20, ' ') << std::string(42, '-') << endl;
+        ss << endl
+           << endl
+           << std::string(20, ' ') << "UHF Final Beta Molecular Orbital Analysis" << endl;
+        ss << std::string(20, ' ') << std::string(42, '-') << endl;
 
         for(auto i = 0; i < sys_data.nbf; i++) {
-          cout << endl
-               << "Vector\t" << i + 1 << "  Occ = " << occup_beta[i] << "  E = " << F_MO_beta(i, i)
-               << endl;
+          ss << endl
+             << "Vector\t" << i + 1 << "  Occ = " << occup_beta[i] << "  E = " << F_MO_beta(i, i)
+             << endl;
 
-          cout << "Bfn. \t Coefficient \t Atom+Function" << endl;
-          cout << std::string(50, '-') << endl;
+          ss << "Bfn. \t Coefficient \t Atom+Function" << endl;
+          ss << std::string(50, '-') << endl;
           for(size_t j = 0; j < (size_t) sys_data.nbf_orig; j++) {
             if(std::abs(C_beta_eig(j, i)) >= vec_analysis.second) {
               auto atom_pos = bsm.bf2atom[j];
-              cout << j + 1 << "\t" << C_beta_eig(j, i) << "\t" << atom_pos + 1 << "  "
-                   << bsm.atominfo[atom_pos].symbol << "  " << bsm.bf_comp[j] << endl;
+              ss << j + 1 << "\t" << C_beta_eig(j, i) << "\t" << atom_pos + 1 << "  "
+                 << bsm.atominfo[atom_pos].symbol << "  " << bsm.bf_comp[j] << endl;
             }
           }
         }
       }
-      cout << std::defaultfloat;
+      ss << std::defaultfloat;
+
+      // cout << ss.str();
+      const std::string files_dir = chem_env.get_files_dir();
+      if(!fs::exists(files_dir)) fs::create_directories(files_dir);
+      const std::string mofile = chem_env.get_files_prefix() + ".mo_vectors";
+      std::ofstream     ofs(mofile);
+      if(ofs) {
+        ofs << ss.str();
+        cout << endl << "MO vectors analysis written to " << mofile << endl;
+      }
+      else cout << endl << "[WARNING] could not open " << mofile << " for writing" << endl;
     }
   }
 

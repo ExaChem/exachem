@@ -243,6 +243,6 @@ The values listed below are the defaults where few options are automatically adj
 
    * :strong:`mos_txt`: Writes the coeffcient matrix (lcao), transformed core Hamilotonian, Fock, and 2e integral tensors in molecular spin-orbital (MSO) basis to disk as text files.
    * :strong:`mulliken`: Mulliken population analysis will be carried out on both the input and output densities, providing explicit population analysis of the basis functions.
-   * :strong:`mo_vectors`: Enables molecular orbital analysis. Prints all orbitals with energies :math:`\geq` the specified threshold.
+   * :strong:`mo_vectors`: Enables molecular orbital analysis. For every orbital, lists its occupation, energy, and the AO coefficients whose magnitude is :math:`\geq` the specified threshold. The analysis is written to the file ``<input>_files/<scf_type>/<input>.mo_vectors``.
 
  

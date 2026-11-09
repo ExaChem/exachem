@@ -192,13 +192,12 @@ public:
 // Options for the Jacobian-free Newton-Krylov CC solver (CC.solvers.newton_krylov).
 struct NewtonKrylovOptions {
   std::string preconditioner{"jacobi"}; // one of: jacobi, identity
-  int         krylov_dims{5};           // zero applies the preconditioner directly
+  int         krylov_dims{6};           // zero applies the preconditioner directly
   double      eta{0.1};
-  double      gamma{0.9};
+  double      gamma{0.05};
   double      alpha{1.5};
-  bool        adaptive_forcing{true}; // use the Eisenstat-Walker adaptive forcing term
-  double      newton_tol{-1.0};       // sentinel: <0 means "follow the CC threshold"
-  double      gmres_tol{-1.0};        // sentinel: <0 means "follow the CC threshold"
+  double      newton_tol{-1.0};      // <0 means "follow the CC threshold"
+  double      gmres_tol{newton_tol}; // <0 means "follow the CC threshold"
 };
 
 // CC amplitude solver selection and per-solver options (CC.solvers).

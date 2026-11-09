@@ -134,7 +134,6 @@ void CCSDOptions::print() {
     print_option("nk_eta", solvers.newton_krylov.eta, 22);
     print_option("nk_gamma", solvers.newton_krylov.gamma, 22);
     print_option("nk_alpha", solvers.newton_krylov.alpha, 22);
-    print_option("nk_adaptive_forcing", solvers.newton_krylov.adaptive_forcing, 22);
     print_option("nk_newton_tol", solvers.newton_krylov.newton_tol, 22);
     print_option("nk_gmres_tol", solvers.newton_krylov.gmres_tol, 22);
   }

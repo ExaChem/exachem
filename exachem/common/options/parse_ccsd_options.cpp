@@ -92,11 +92,11 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
   parse_option<double>(nk.eta, jnk, "eta");
   parse_option<double>(nk.gamma, jnk, "gamma");
   parse_option<double>(nk.alpha, jnk, "alpha");
-  parse_option<bool>(nk.adaptive_forcing, jnk, "adaptive_forcing");
   parse_option<double>(nk.newton_tol, jnk, "newton_tol");
   parse_option<double>(nk.gmres_tol, jnk, "gmres_tol");
-  // Resolve the tolerance options: an unspecified tol follows the CC threshold.
+  // Explicit negative tolerances follow the CC threshold.
   if(nk.newton_tol < 0) nk.newton_tol = cc_options.threshold;
+  if(!jnk.contains("gmres_tol")) nk.gmres_tol = nk.newton_tol;
   if(nk.gmres_tol < 0) nk.gmres_tol = cc_options.threshold;
   if(jnk.contains("variant") || jnk.contains("krylov_dims_precond")) {
     tamm_terminate("[INPUT FILE ERROR]: newton_krylov.variant and krylov_dims_precond "

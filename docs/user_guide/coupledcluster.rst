@@ -49,11 +49,10 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
       "solver_type": "diis",
       "newton_krylov": {
          "preconditioner": "jacobi",
-         "krylov_dims": 5,
+         "krylov_dims": 6,
          "eta": 0.1,
-         "gamma": 0.9,
+         "gamma": 0.05,
          "alpha": 1.5,
-         "adaptive_forcing": true,
          "newton_tol": 1e-6,
          "gmres_tol": 1e-6
       }
@@ -111,13 +110,12 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
 :newton_krylov: Options for the Newton-Krylov solver. These apply only when ``solver_type`` is set to ``newton_krylov``.
 
    * :strong:`preconditioner`: ``[default=jacobi]`` Applies the diagonal Fock preconditioner through DIIS's existing ``jacobi`` or ``jacobi_cs`` routines. ``identity`` applies no preconditioning.
-   * :strong:`krylov_dims`: ``[default=5]`` The maximum number of Arnoldi steps for the inner Newton GMRES solve. Set to ``0`` to apply the preconditioner correction directly, :math:`x_{k+1}=x_k-M^{-1}F(x_k)`, without Jacobian-vector products. With the default preconditioner, this gives Jacobi iteration.
-   * :strong:`eta`: ``[default=0.1]`` The initial Eisenstat-Walker forcing term, which controls how tightly the inner GMRES solve is converged in the early Newton iterations to avoid over-solving.
-   * :strong:`gamma`: ``[default=0.9]`` Coefficient of the Eisenstat-Walker forcing term update :math:`\eta = \gamma\,(\lVert F_k\rVert / \lVert F_{k-1}\rVert)^{\alpha}`.
+   * :strong:`krylov_dims`: ``[default=6]`` The maximum number of Arnoldi steps for the inner Newton GMRES solve. Set to ``0`` to apply the preconditioner correction directly, :math:`x_{k+1}=x_k-M^{-1}F(x_k)`, without Jacobian-vector products. With the default preconditioner, this gives Jacobi iteration.
+   * :strong:`eta`: ``[default=0.1]`` The initial Eisenstat-Walker forcing term, which controls how tightly the inner GMRES solve is converged in the first Newton step to avoid over-solving.
+   * :strong:`gamma`: ``[default=0.05]`` Coefficient of the Eisenstat-Walker forcing term update :math:`\eta = \gamma\,(\lVert F_k\rVert / \lVert F_{k-1}\rVert)^{\alpha}`.
    * :strong:`alpha`: ``[default=1.5]`` Exponent of the Eisenstat-Walker forcing term update (see ``gamma``).
-   * :strong:`adaptive_forcing`: ``[default=true]`` When enabled, uses the Eisenstat-Walker adaptive forcing term to stop the inner GMRES solve early (when the residual falls below ``eta`` times the right-hand-side norm), avoiding over-solving the linearized system in the early Newton iterations.
-   * :strong:`newton_tol`: ``[default=threshold]`` Convergence threshold for the outer Newton iterations; the solver stops when the residual norm :math:`\lVert F(x)\rVert` falls below this value. If unspecified, it follows the CCSD ``threshold``.
-   * :strong:`gmres_tol`: ``[default=threshold]`` Convergence threshold for the inner GMRES solve. If unspecified, it follows the CCSD ``threshold``.
+   * :strong:`newton_tol`: ``[default=CC.threshold]`` Convergence threshold for the outer Newton iterations; the solver stops when the residual norm :math:`\lVert F(x)\rVert` falls below this value. A negative value follows the CCSD ``threshold``.
+   * :strong:`gmres_tol`: ``[default=newton_tol]`` Convergence threshold for the inner GMRES solve. If omitted, uses the resolved ``newton_tol``. An explicit negative value follows the CCSD ``threshold``.
 
 Newton-Krylov Solvers
 ---------------------
@@ -137,11 +135,8 @@ Jacobi iteration may converge slowly or fail to converge. Jacobi is the default 
 
 :strong:`Tuning the forcing parameters`
 
-   The parameters ``eta``, ``gamma``, ``alpha``, and ``adaptive_forcing`` control the accuracy of the inner GMRES solve.
-
    * A larger ``eta`` or ``gamma`` generally allows looser inner solves, reducing computational cost but potentially slowing Newton convergence. If inner solves are unnecessarily expensive, increase ``eta`` or ``gamma``; if they are too loose, decrease ``eta`` or ``gamma``.
    * A larger ``alpha`` makes the forcing term decrease more rapidly as the nonlinear residual decreases, resulting in tighter inner solves.
-   * With ``adaptive_forcing=false``, the inner GMRES solve uses ``gmres_tol`` directly.
    * Typical range: :math:`1 < \alpha \le 2` and :math:`0 < \gamma < 1`.
 
 .. note::

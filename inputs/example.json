@@ -170,13 +170,12 @@
           "solver_type": "diis",
           "newton_krylov": {
             "preconditioner": "jacobi",
-            "krylov_dims": 5,
+            "krylov_dims": 6,
             "eta": 0.1,
-            "gamma": 0.9,
+            "gamma": 0.05,
             "alpha": 1.5,
-            "adaptive_forcing": true,
-            "newton_tol": 1e-6,
-            "gmres_tol": 1e-6
+            "newton_tol": 1e-8,
+            "gmres_tol": 1e-8
           }
         },
         "readt": false,

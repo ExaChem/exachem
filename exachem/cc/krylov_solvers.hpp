@@ -142,6 +142,26 @@ double inner_prod(ExecutionContext& ec, const std::vector<Tensor<T>>& v,
   const double innerp = get_scalar(d_s);
   return innerp;
 }
+
+// Apply the forward Jacobi operator using the orbital energies and level shift.
+template<typename T>
+void apply_jacobi_forward(ExecutionContext& ec, const Tensor<T>& eps,
+                          const std::vector<Tensor<T>>& v, std::vector<Tensor<T>>& out,
+                          double shift) {
+  const auto& spaces = v[1].tiled_index_spaces();
+  auto [a]           = spaces[0].template labels<1>("all");
+  auto [b]           = spaces[1].template labels<1>("all");
+  auto [i]           = spaces[2].template labels<1>("all");
+  auto [j]           = spaces[3].template labels<1>("all");
+  Scheduler{ec}(out[0](a, i) = eps(a) * v[0](a, i))(out[0](a, i) -= eps(i) * v[0](a, i))(
+    out[0](a, i) += shift * v[0](a, i))(out[1](a, b, i, j) = eps(a) * v[1](a, b, i, j))(
+    out[1](a, b, i, j) += eps(b) * v[1](a, b, i, j))(out[1](a, b, i, j) -=
+                                                     eps(i) * v[1](a, b, i, j))(
+    out[1](a, b, i, j) -= eps(j) * v[1](a, b, i, j))(out[1](a, b, i, j) +=
+                                                     (2.0 * shift) * v[1](a, b, i, j))
+    .execute(ec.exhw());
+}
+
 /**
  * @brief Newton-Krylov solver for nonlinear systems using GMRES with Arnoldi iteration.
  *
@@ -176,8 +196,8 @@ double inner_prod(ExecutionContext& ec, const std::vector<Tensor<T>>& v,
  *
  * Additional inputs:
  *  1. GMRES convergence tolerance.
- *  2. Eisenstat-Walker forcing term parameters for inexact Newton methods.
- *  3. Flags for adaptive forcing and iteration printing.
+ *  2. Eisenstat-Walker forcing term for inexact Newton methods.
+ *  3. Iteration printing and preconditioned residual handling.
  *
  * Procedure:
  *  1. Normalize the right-hand side to obtain the first Krylov basis vector.
@@ -196,8 +216,7 @@ double inner_prod(ExecutionContext& ec, const std::vector<Tensor<T>>& v,
  *
  *  4. Stop if either
  *       - the GMRES residual satisfies the prescribed tolerance, or
- *       - the Eisenstat-Walker forcing criterion is satisfied (when adaptive
- *         forcing is enabled), or
+ *       - the Eisenstat-Walker forcing criterion is satisfied, or
  *       - the Krylov subspace reaches the prescribed dimension.
  *
  *  5. Solve the final least-squares problem and recover the solution
@@ -221,10 +240,8 @@ double inner_prod(ExecutionContext& ec, const std::vector<Tensor<T>>& v,
  * @param krylov_dims Maximum Krylov subspace dimension.
  *
  * Additional input variables:
- * @param gmres_tol Absolute convergence tolerance for the GMRES residual.
- * @param eta Initial Eisenstat-Walker forcing term (default = 0.5).
- * @param gamma User-defined Eisenstat-Walker parameter (default = 0.5).
- * @param alpha User-defined Eisenstat-Walker exponent (default = 1.5).
+ * @param gmres_tol Absolute convergence tolerance for the unpreconditioned GMRES residual.
+ * @param eta Eisenstat-Walker forcing term supplied by the outer iteration (default = 0.1).
  *
  * The Eisenstat-Walker forcing term is typically updated externally as
  *
@@ -232,17 +249,18 @@ double inner_prod(ExecutionContext& ec, const std::vector<Tensor<T>>& v,
  *
  * where gamma and alpha are user-defined parameters.
  *
- * @param adaptive_forcing
- *        If true, terminates GMRES once the residual satisfies
+ * GMRES terminates once the residual satisfies
  *
  *            ||r|| <= eta ||b||,
  *
- *        thereby avoiding over-solving the linear system during early Newton
- *        iterations.
+ * thereby avoiding over-solving the linear system during early Newton iterations.
  *
  * @param verbose
  *        If true, prints the GMRES iteration number, residual norm, current
  *        energy, and elapsed iteration time.
+ * @param preconditioned
+ *        Preconditioner name ("jacobi" or "identity") for testing ||M*r|| <= gmres_tol.
+ *        An empty string tests ||r|| <= gmres_tol directly.
  *
  * Output variables:
  * With krylov_dims == 0, return rhs unchanged as a direct preconditioner correction.
@@ -252,9 +270,8 @@ double inner_prod(ExecutionContext& ec, const std::vector<Tensor<T>>& v,
 template<typename MVPFun, typename T>
 std::vector<Tensor<T>> gmres_solver(ExecutionContext& ec, ChemEnv& chem_env, Tensor<T>& d_e,
                                     MVPFun&& mvpfn, std::vector<Tensor<T>>&& rhs, int krylov_dims,
-                                    double gmres_tol, double eta = 0.1, double gamma = 0.9,
-                                    double alpha = 1.5, bool adaptive_forcing = false,
-                                    bool verbose = false) {
+                                    double gmres_tol, double eta = 0.1, bool verbose = false,
+                                    const std::string& preconditioned = "") {
   using Matrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
   using Vector = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 
@@ -263,6 +280,18 @@ std::vector<Tensor<T>> gmres_solver(ExecutionContext& ec, ChemEnv& chem_env, Ten
   if(!std::isfinite(rhs_norm))
     throw std::invalid_argument("GMRES right-hand side norm must be finite");
   if(rhs_norm == 0.0) return zeroslike(ec, rhs);
+
+  Tensor<T>              eps{};
+  std::vector<Tensor<T>> linear_residual, unpreconditioned;
+  if(!preconditioned.empty()) {
+    linear_residual  = zeroslike(ec, rhs);
+    unpreconditioned = preconditioned == "jacobi" ? zeroslike(ec, rhs) : linear_residual;
+    if(preconditioned == "jacobi") {
+      eps      = Tensor<T>{chem_env.is_context.MSO};
+      auto [p] = chem_env.is_context.MSO.labels<1>("all");
+      sch.allocate(eps)(eps(p) = chem_env.cd_context.d_f1(p, p)).execute();
+    }
+  }
 
   std::vector<std::vector<Tensor<T>>> Q(krylov_dims + 1);
 
@@ -275,7 +304,7 @@ std::vector<Tensor<T>> gmres_solver(ExecutionContext& ec, ChemEnv& chem_env, Ten
   Vector    y;
   auto      solution = std::move(rhs);
   Tensor<T> dot_scalar{};
-  if(krylov_dims > 0) Tensor<T>::allocate(&ec, dot_scalar);
+  Tensor<T>::allocate(&ec, dot_scalar);
   for(int k = 0; k < krylov_dims; k++) {
     final_k = k;
     Q[k]    = std::move(solution);
@@ -304,6 +333,20 @@ std::vector<Tensor<T>> gmres_solver(ExecutionContext& ec, ChemEnv& chem_env, Ten
     Vector residual      = e1 - Hk * y;
     double residual_norm = residual.norm();
 
+    if(!preconditioned.empty() && !(residual_norm <= eta * rhs_norm)) {
+      for(size_t n = 0; n < linear_residual.size(); ++n) {
+        sch(linear_residual[n]() = -y(k) * v[n]());
+        for(int q = 0; q <= k; ++q) sch(linear_residual[n]() += residual(q) * Q[q][n]());
+      }
+      sch.execute();
+      if(preconditioned == "jacobi")
+        apply_jacobi_forward(ec, eps, linear_residual, unpreconditioned,
+                             chem_env.ioptions.ccsd_options.lshift);
+    }
+    const bool converged =
+      residual_norm <= eta * rhs_norm ||
+      (!preconditioned.empty() ? compute_norm(unpreconditioned) : residual_norm) <= gmres_tol;
+
     auto   iter_end  = std::chrono::high_resolution_clock::now();
     double iter_time = std::chrono::duration<double>(iter_end - iter_start).count();
 
@@ -316,8 +359,6 @@ std::vector<Tensor<T>> gmres_solver(ExecutionContext& ec, ChemEnv& chem_env, Ten
       }
     }
 
-    const bool converged = residual_norm <= gmres_tol ||
-                           (adaptive_forcing && residual_norm <= eta * rhs_norm);
     if(converged && verbose && ec.pg().rank() == 0) std::cout << "GMRES converged.\n";
 
     solution = std::move(v);
@@ -336,7 +377,12 @@ std::vector<Tensor<T>> gmres_solver(ExecutionContext& ec, ChemEnv& chem_env, Ten
 
   for(auto& qvec: Q)
     for(auto& t: qvec) sch.deallocate(t);
-  if(krylov_dims > 0) sch.deallocate(dot_scalar);
+  sch.deallocate(dot_scalar);
+  for(auto& t: linear_residual) sch.deallocate(t);
+  if(preconditioned == "jacobi") {
+    for(auto& t: unpreconditioned) sch.deallocate(t);
+    sch.deallocate(eps);
+  }
 
   sch.execute();
 
@@ -433,7 +479,7 @@ void write_amplitudes(ExecutionContext& ec, ChemEnv& chem_env, int iter,
  * Jacobian-vector products use finite differences of F(x).
  * Eisenstat-Walker forcing controls the inner GMRES tolerance, with krylov_dims
  * limiting the number of Arnoldi steps. Outer convergence uses ||F(x)||.
- * With krylov_dims == 0, GMRES returns -M^{-1} F(x) without a Jacobian action.
+ * With krylov_dims == 0, directly apply -M^{-1} F(x) without calling GMRES.
  *
  * @tparam ResidualFun Callable returning writable residual scratch tensors. PNK may overwrite
  * their data; each evaluation must regenerate the residual. Returned tensor storage remains
@@ -456,7 +502,6 @@ preconditioned_newton_krylov_solver(ExecutionContext& ec, ChemEnv& chem_env,
   [[maybe_unused]] const double eta         = nk.eta;
   const double                  gamma       = nk.gamma;
   const double                  alpha       = nk.alpha;
-  const bool                    adaptive_forcing = nk.adaptive_forcing;
 
   auto  sch                = Scheduler{ec};
   auto& iterative_solution = initial_guess;
@@ -511,8 +556,7 @@ preconditioned_newton_krylov_solver(ExecutionContext& ec, ChemEnv& chem_env,
 
     // Eisenstat-Walker forcing term evaluation.
     double current_eta = eta;
-    if(iter == 0) { current_eta = eta; }
-    else {
+    if(iter > 0) {
       double ratio = res_fun_norm / previous_residual_norm;
       current_eta  = std::min(0.9, gamma * std::pow(ratio, alpha));
       current_eta  = std::max(current_eta, 1e-8);
@@ -545,8 +589,10 @@ preconditioned_newton_krylov_solver(ExecutionContext& ec, ChemEnv& chem_env,
     scale_tensors(M_inv_res_fun, -1.0);
 
     // GMRES inner loop to solve the linearized system M^{-1}*J*delta_x = -M^{-1}*F(x)
-    auto delta_x = gmres_solver(ec, chem_env, d_e, M_inv_jvp, std::move(M_inv_res_fun), krylov_dims,
-                                gmres_tol, current_eta, gamma, alpha, adaptive_forcing, true);
+    auto delta_x = krylov_dims == 0
+                     ? std::move(M_inv_res_fun)
+                     : gmres_solver(ec, chem_env, d_e, M_inv_jvp, std::move(M_inv_res_fun),
+                                    krylov_dims, gmres_tol, current_eta, true, nk.preconditioner);
     tensor_arithmetic(sch, iterative_solution, delta_x, 1.0);
 
     for(auto& t: res_fun) sch.deallocate(t);

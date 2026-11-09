@@ -175,6 +175,8 @@ The (T) implementation and additional optimizations on various GPU architectures
 - If no checkpoint exists, (T) starts from the first task.
 - Resuming requires the same ``ccsdt_tilesize``; a different tilesize stops the run with an error.
 - A changed CC ``threshold`` discards the checkpoint and starts (T) from the first task.
+- To discard a checkpoint manually, remove the ``"ccsd_t"`` entry from the ``.runcontext.json`` file. (T) then starts from the first task.
+- A checkpoint is saved only after all the tasks before it have finished. When some (T) tasks take much longer than others, checkpoints can be saved later than every 5%, several at a time.
 - Checkpointing is disabled with ``skip_ccsd``.
 
 

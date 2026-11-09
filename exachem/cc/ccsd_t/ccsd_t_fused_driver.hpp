@@ -16,9 +16,12 @@
 #endif
 #include "exachem/cc/ccsd_t/ccsd_t_common.hpp"
 
+#include <atomic>
 #include <cstddef>
+#include <deque>
 #include <span>
 #include <string>
+#include <thread>
 
 namespace exachem::cc::ccsd_t {
 
@@ -61,6 +64,41 @@ inline int checkCudaKernelCompatible(bool r0) {
   else { return -1; }
 }
 #endif
+
+/**
+ * A copy of one rank's [T] and (T) energies (energy_l) at (T) checkpoint k, taken once every task
+ * this rank ran below the checkpoint has added its energies. See the (T) checkpoint section of
+ * CCSD_T_Fused_Driver::execute for how checkpoints work.
+ *
+ * On a GPU, a task's energies are added to energy_l by hostEnergyReduce, a host function queued
+ * on the GPU stream after the task's kernel. The copy is queued on the same stream after them
+ * (ckpt_snapshot_energies), so the rank never waits for the GPU at a checkpoint. Waiting for the
+ * GPU there (gpuDeviceSynchronize) stops the CPU from preparing the next task while the GPU
+ * finishes the current one.
+ *
+ * ready is set by the thread that runs the stream's host functions and read by the rank's main
+ * thread, so it is stored with release and loaded with acquire ordering: once ready is seen, the
+ * copied energies are too.
+ */
+template<typename T>
+struct CkptSnapshot {
+  size_t            k        = 0;
+  const T*          energy_l = nullptr;
+  T                 energy[2]{};
+  std::atomic<bool> ready{false};
+};
+
+/**
+ * Copies energy_l into a CkptSnapshot and marks it ready. Queued as a host function on the GPU
+ * stream, or called directly on the CPU, where the energies are already up to date.
+ */
+template<typename T>
+inline void ckpt_snapshot_energies(void* data) {
+  auto* s      = static_cast<CkptSnapshot<T>*>(data);
+  s->energy[0] = s->energy_l[0];
+  s->energy[1] = s->energy_l[1];
+  s->ready.store(true, std::memory_order_release);
+}
 
 template<typename T>
 class CCSD_T_Fused_Driver {
@@ -416,8 +454,10 @@ std::tuple<T, T, double, double, size_t> CCSD_T_Fused_Driver<T>::execute(
     std::cout << std::endl << "Total number of tasks = " << total_tasks << std::endl;
   }
 
-  // (T) checkpoint: with writet, the progress is saved in the run context every 5% of the tasks.
-  // readt (or writet) resumes from a saved checkpoint.
+  // Restarting (T) from a checkpoint:
+  //  - writet: resume from the saved checkpoint, and keep writing new ones.
+  //  - readt:  resume from the saved checkpoint, but do not write new ones.
+  //  - skip_ccsd turns both off. It is a mode for timing (T) and has no real CCSD amplitudes.
   const CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
   const bool         skip_ccsd    = ccsd_options.skip_ccsd;
   const bool         write_ckpt   = ccsd_options.writet && !skip_ccsd;
@@ -432,6 +472,8 @@ std::tuple<T, T, double, double, size_t> CCSD_T_Fused_Driver<T>::execute(
   if(read_ckpt) {
     if(chem_env.run_context.contains("ccsd_t")) {
       const auto& ckpt = chem_env.run_context["ccsd_t"];
+      // A task number only means the same work with the same tiling. A checkpoint from a
+      // different tiling cannot be used, so stop and tell the user how to fix it.
       if(ckpt["total_tasks"].get<size_t>() != total_tasks || ckpt["noab"].get<Index>() != noab ||
          ckpt["nvab"].get<Index>() != nvab ||
          ckpt["mso_tilesize_triples"].get<int>() != ts_triples) {
@@ -445,6 +487,13 @@ std::tuple<T, T, double, double, size_t> CCSD_T_Fused_Driver<T>::execute(
                    ".runcontext.json file to restart (T) from the first task";
         tamm_terminate(err_msg);
       }
+      // A different CC threshold gives different CCSD amplitudes, so the saved energies do not
+      // belong to this run. This is a deliberate rerun, not a mistake: drop the checkpoint and
+      // start (T) from the first task.
+      // Only the threshold is checked, not the amplitudes themselves. This is intentional.
+      // A CCSD restart runs one more iteration (unless noscf), so a resumed (T) can mix
+      // energies from slightly different amplitudes. In our tests, the difference is
+      // typically ~1e-11 hartree with a CCSD threshold of 1e-6.
       const double ckpt_threshold = ckpt["threshold"].get<double>();
       if(ckpt_threshold != threshold) {
         if(rank0) {
@@ -459,7 +508,10 @@ std::tuple<T, T, double, double, size_t> CCSD_T_Fused_Driver<T>::execute(
       }
       else {
         start_task = ckpt["tasks_done"].get<size_t>();
-        // only rank 0 starts from the saved energies, the per-rank energies are summed at the end
+        // Each rank sums the energies of only the tasks it runs; all ranks' sums are added up
+        // on rank 0 after the loop. The tasks done before the restart are not run again, so
+        // their saved total is added once, by starting rank 0 from it (the other ranks start
+        // from zero).
         if(rank0) {
           energy_l[0] = ckpt["energy1"].get<T>();
           energy_l[1] = ckpt["energy2"].get<T>();
@@ -495,40 +547,150 @@ std::tuple<T, T, double, double, size_t> CCSD_T_Fused_Driver<T>::execute(
     std::cout.precision(prec);
   };
 
-  // With writet, a checkpoint is written every 5% of the tasks. Every rank walks every task
-  // number in the same order and runs the tasks it claimed in that order, so when all ranks reach
-  // the same task number, every task below it is done.
+  /*
+   * (T) checkpoints (writet)
+   *
+   * Checkpoint k (1..20) is at task number total_tasks * k / 20, every 5% of the tasks. Every rank
+   * walks every task number in the same order and runs the tasks it claimed in that order, so
+   * once all ranks have passed a checkpoint's task number, every task below it is done. A
+   * checkpoint saves that task number and the [T] and (T) energies summed over those tasks, and a
+   * restart hands out tasks from there.
+   *
+   * How a checkpoint is made, without any rank waiting for another:
+   *   1. When a rank passes checkpoint k, it takes a snapshot of its energies
+   * (snapshot_checkpoint). On a GPU the snapshot becomes ready later, once the GPU has reached it.
+   *   2. When the snapshot is ready, the rank adds it to slot k of a small GA, the two elements
+   *      2(k-1) and 2(k-1)+1, and increments counter k-1 (add_to_checkpoints).
+   *   3. Rank 0 writes checkpoint k to the run context once counter k-1 equals the number of
+   *      ranks, i.e. slot k holds every rank's energies (save_checkpoints).
+   *   4. After the task loop, every rank adds to the last checkpoint, at total_tasks, and rank 0
+   *      keeps checking until it has written it.
+   *
+   * A collective (a reduce or a barrier) is not used: it would make every rank wait at each
+   * checkpoint for the slowest task below it, and single tasks can run for a large part of (T).
+   * A checkpoint is still only written once that slowest task finishes, so on systems with a few
+   * long tasks the checkpoints can be written late and several at once.
+   */
   const size_t nckpts          = 20;
+  auto         ckpt_task       = [&](size_t k) { return total_tasks * k / nckpts; };
   auto         next_ckpt_after = [&](size_t task) {
-    for(size_t k = 1; k <= nckpts; k++) {
-      const size_t boundary = total_tasks * k / nckpts;
-      if(boundary > task) return boundary;
-    }
-    return total_tasks;
+    size_t k = 1;
+    while(k < nckpts && ckpt_task(k) <= task) k++;
+    return k;
   };
 
-  double ckpt_wait_time = 0; // time spent writing checkpoints, not counted as work
-  // collective: called by every rank at the same task number
-  auto write_checkpoint = [&](size_t tasks_done) {
-    const auto ckpt_start = std::chrono::high_resolution_clock::now();
+  // ckpt_ga holds the 20 slots and ckpt_count the 20 counters, both created once per (T) run
+  const auto                       nranks         = ec.pg().size().value();
+  int                              ckpt_ga        = 0;
+  std::unique_ptr<AtomicCounterGA> ckpt_count     = nullptr;
+  std::vector<size_t>              ckpts_added    = {}; // the checkpoints this rank added to
+  size_t                           ckpts_saved    = 0;  // rank 0: the first of them not written
+  double                           ckpt_wait_time = 0;  // subtracted from the (T) work time
+  if(write_ckpt) {
+    int64_t ckpt_size   = 2 * nckpts;
+    char    ckpt_name[] = "ccsd_t_ckpt";
+    ckpt_ga = NGA_Create_config64(to_ga_eltype(tensor_element_type<T>()), 1, &ckpt_size, ckpt_name,
+                                  nullptr, ec.pg().ga_pg());
+    GA_Zero(ckpt_ga);
+    ckpt_count = std::make_unique<AtomicCounterGA>(ec.pg(), nckpts);
+    ckpt_count->allocate(0);
+  }
+
+  // The host function queued for a snapshot keeps a pointer to it, so snapshots must never move:
+  // a deque keeps its elements in place as more are added, a vector would not.
+  std::deque<CkptSnapshot<T>> snapshots;
+  size_t                      snapshots_added = 0; // the first snapshot not yet added to the GA
+
+  /**
+   * Step 1: takes this rank's snapshot for checkpoint k. On a GPU, ckpt_snapshot_energies is
+   * queued on the same stream as the hostEnergyReduce calls, so it runs after the energies of
+   * every task this rank launched before the checkpoint have been added. On the CPU the snapshot
+   * is taken right away.
+   */
+  auto snapshot_checkpoint = [&](size_t k) {
+    CkptSnapshot<T>& snap = snapshots.emplace_back();
+    snap.k                = k;
+    snap.energy_l         = energy_l.data();
 #if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-    // the energies are accumulated asynchronously
-    gpuDeviceSynchronize();
+    gpuStream_t& stream = tamm::GPUStreamPool::getInstance().getStream();
 #endif
-    const T ckpt_energy1 = ec.pg().reduce(&energy_l[0], ReduceOp::sum, 0);
-    const T ckpt_energy2 = ec.pg().reduce(&energy_l[1], ReduceOp::sum, 0);
-    if(rank0) {
+#if defined(USE_CUDA)
+    CUDA_SAFE(cudaLaunchHostFunc(stream.first, ckpt_snapshot_energies<T>, &snap));
+#elif defined(USE_HIP)
+    HIP_SAFE(hipLaunchHostFunc(stream.first, ckpt_snapshot_energies<T>, &snap));
+#elif defined(USE_DPCPP)
+    CkptSnapshot<T>* snap_ptr = &snap;
+    stream.first.submit(
+      [&](sycl::handler& cgh) { cgh.host_task([=]() { ckpt_snapshot_energies<T>(snap_ptr); }); });
+#else
+    ckpt_snapshot_energies<T>(&snap);
+#endif
+  };
+
+  /**
+   * Step 2: adds this rank's snapshots that are ready to their checkpoints, in checkpoint order,
+   * and returns true if any were added. For checkpoint k:
+   *  - NGA_Acc64 adds the snapshot energies to slot k, which holds the energies summed over the
+   *    ranks that have added theirs so far.
+   *  - GA_Init_fence starts tracking the ranks the accumulate is sent to, and GA_Fence waits until
+   *    it has been applied on them: an accumulate can complete after it returns, and rank 0 must
+   *    not read slot k before it holds every rank's energies.
+   *  - fetch_add then increments counter k-1, the number of ranks that have added to slot k.
+   */
+  auto add_to_checkpoints = [&]() {
+    bool added = false;
+    while(snapshots_added < snapshots.size() &&
+          snapshots[snapshots_added].ready.load(std::memory_order_acquire)) {
+      const auto       ckpt_start = std::chrono::high_resolution_clock::now();
+      CkptSnapshot<T>& snap       = snapshots[snapshots_added];
+      int64_t          lo = 2 * (snap.k - 1), hi = lo + 1, ld = 1;
+      T                alpha = 1.0;
+      GA_Init_fence();
+      NGA_Acc64(ckpt_ga, &lo, &hi, snap.energy, &ld, &alpha);
+      GA_Fence();
+      ckpt_count->fetch_add(snap.k - 1, 1);
+      ckpts_added.push_back(snap.k);
+      snapshots_added++;
+      added = true;
+      ckpt_wait_time += std::chrono::duration_cast<std::chrono::duration<double>>(
+                          std::chrono::high_resolution_clock::now() - ckpt_start)
+                          .count();
+    }
+    return added;
+  };
+
+  /**
+   * Step 3, rank 0 only: writes the checkpoints that every rank has added its energies to, in
+   * checkpoint order. Only the checkpoints rank 0 has added to can be complete, so it goes
+   * through those. Each rank adds to checkpoints in order, so checkpoint k+1 can only be complete
+   * once checkpoint k is, and it stops at the first one that is not. For checkpoint k:
+   *  - fetch_add with an increment of 0 reads counter k-1 without changing it.
+   *  - Once the counter equals the number of ranks, NGA_Get64 reads the summed energies from
+   *    slot k, and the "ccsd_t" entry of the run context json is updated and written, with the
+   * number of tasks done, the energies, and the tiling and threshold a restart is checked against.
+   * It is called whenever rank 0 adds to a checkpoint, after each of rank 0's tasks, and at the
+   * end until the last checkpoint is written.
+   */
+  auto save_checkpoints = [&]() {
+    const auto ckpt_start = std::chrono::high_resolution_clock::now();
+    while(ckpts_saved < ckpts_added.size()) {
+      const size_t k = ckpts_added[ckpts_saved];
+      if(ckpt_count->fetch_add(k - 1, 0) < nranks) break;
+      int64_t lo = 2 * (k - 1), hi = lo + 1, ld = 1;
+      T       energies[2];
+      NGA_Get64(ckpt_ga, &lo, &hi, energies, &ld);
       auto& ckpt                   = chem_env.run_context["ccsd_t"];
       ckpt["total_tasks"]          = total_tasks;
       ckpt["noab"]                 = noab;
       ckpt["nvab"]                 = nvab;
       ckpt["mso_tilesize_triples"] = ts_triples;
       ckpt["threshold"]            = threshold;
-      ckpt["tasks_done"]           = tasks_done;
-      ckpt["energy1"]              = ckpt_energy1;
-      ckpt["energy2"]              = ckpt_energy2;
+      ckpt["tasks_done"]           = ckpt_task(k);
+      ckpt["energy1"]              = energies[0];
+      ckpt["energy2"]              = energies[1];
       chem_env.write_run_context();
-      print_progress(tasks_done);
+      print_progress(ckpt_task(k));
+      ckpts_saved++;
     }
     ckpt_wait_time += std::chrono::duration_cast<std::chrono::duration<double>>(
                         std::chrono::high_resolution_clock::now() - ckpt_start)
@@ -561,9 +723,17 @@ std::tuple<T, T, double, double, size_t> CCSD_T_Fused_Driver<T>::execute(
             //     for (size_t t_h1b = 0; t_h1b < noab; t_h1b++) {
             //     for (size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
             // #endif
-            if(write_ckpt && current_task == next_ckpt && next_ckpt < total_tasks) {
-              write_checkpoint(current_task);
-              next_ckpt = next_ckpt_after(current_task);
+            // Checkpoints (see the overview above the checkpoint setup):
+            //  1. At a checkpoint's task number, take this rank's snapshot.
+            //  2. Add this rank's ready snapshots to the GA. On a GPU a snapshot is ready only
+            //     after the work queued before it finishes, so this is checked on every pass.
+            //  3. Rank 0 writes the checkpoints that are now complete.
+            if(write_ckpt) {
+              if(next_ckpt < nckpts && current_task == ckpt_task(next_ckpt)) {
+                snapshot_checkpoint(next_ckpt);
+                next_ckpt = next_ckpt_after(current_task);
+              }
+              if(add_to_checkpoints() && rank0) save_checkpoints();
             }
 
             current_task++;
@@ -643,6 +813,7 @@ std::tuple<T, T, double, double, size_t> CCSD_T_Fused_Driver<T>::execute(
               } // h3b
 
               next = ac->fetch_add(0, 1);
+              if(write_ckpt && rank0) save_checkpoints();
             } // next == taskcount
 
             // report progress every 20% of the tasks
@@ -662,7 +833,35 @@ std::tuple<T, T, double, double, size_t> CCSD_T_Fused_Driver<T>::execute(
   }
   // } // end seq h3b
 
-  if(write_ckpt && start_task < total_tasks) write_checkpoint(total_tasks);
+  if(write_ckpt) {
+    if(start_task < total_tasks) snapshot_checkpoint(nckpts);
+#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
+    // the only GPU wait for checkpoints: once, after the loop, so the last snapshot is taken
+    gpuDeviceSynchronize();
+#endif
+    add_to_checkpoints();
+    // Step 4: rank 0 can finish its tasks long before the others, so it keeps writing
+    // checkpoints as they complete until the last one is written
+    if(rank0) {
+      const auto   wait_start = std::chrono::high_resolution_clock::now();
+      const double wait_time  = ckpt_wait_time;
+      save_checkpoints();
+      // Rank 0 gets here only when it has no tasks left, so this waits in time it would
+      // otherwise spend idle in the barrier below. Checking every 100 ms instead of nonstop keeps
+      // it from flooding the rank that holds the counters with reads and from spinning a core;
+      // the last checkpoint is written at most 100 ms late.
+      while(ckpts_saved < ckpts_added.size()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        save_checkpoints();
+      }
+      ckpt_wait_time = wait_time + std::chrono::duration_cast<std::chrono::duration<double>>(
+                                     std::chrono::high_resolution_clock::now() - wait_start)
+                                     .count();
+    }
+    ec.pg().barrier();
+    ckpt_count->deallocate();
+    GA_Destroy(ckpt_ga);
+  }
 
   if(rank == 0) std::cout << std::endl << std::endl;
 

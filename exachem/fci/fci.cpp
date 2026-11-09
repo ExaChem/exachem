@@ -15,55 +15,6 @@
 using namespace tamm;
 
 namespace exachem::fci {
-// Implementations for template class FCI
-template<typename T>
-std::string FCI<T>::generate_fcidump(ChemEnv& chem_env, ExecutionContext& ec,
-                                     const TiledIndexSpace& MSO, Tensor<T>& lcao, Tensor<T>& d_f1,
-                                     Tensor<T>& full_v2, ExecutionHW ex_hw) {
-  // int nactv = chem_env.ioptions.fci_options.nactive;
-  Scheduler sch{ec};
-
-  std::cout.precision(15);
-
-  const auto [z1, z2] = MSO.labels<2>("all");
-
-  // Transform d_f1 from Fock operator to the one-electron operator representation
-  TiledIndexSpace AO  = lcao.tiled_index_spaces()[0];
-  const auto [mu, nu] = AO.labels<2>("all");
-
-  Tensor<T> hcore{AO, AO};
-  Tensor<T> hcore_mo{{MSO, MSO}, {1, 1}};
-  Tensor<T>::allocate(&ec, hcore, hcore_mo);
-
-  SystemData&       sys_data     = chem_env.sys_data;
-  const std::string out_fp       = chem_env.workspace_dir;
-  const std::string files_dir    = out_fp + chem_env.ioptions.scf_options.scf_type + "/fci";
-  const std::string files_prefix = /*out_fp;*/ files_dir + "/" + sys_data.output_file_prefix;
-  if(!fs::exists(files_dir)) fs::create_directories(files_dir);
-
-  const std::string hcorefile = files_dir + "/../scf/" + sys_data.output_file_prefix + ".hcore";
-  read_from_disk(ec, hcore, hcorefile);
-
-  Tensor<T> tmp{MSO, AO};
-  // clang-format off
-  sch.allocate(tmp)
-    (tmp(z1,nu) = lcao(mu,z1) * hcore(mu,nu))
-    (hcore_mo(z1,z2) = tmp(z1,nu) * lcao(nu,z2))
-    .deallocate(tmp,hcore).execute();
-  // clang-format on
-
-  std::vector<int> symvec(sys_data.nbf_orig);
-  if(sys_data.is_unrestricted) symvec.resize(2 * sys_data.nbf_orig);
-  std::fill(symvec.begin(), symvec.end(), 1);
-
-  // write fcidump file
-  const std::string fcid_file = files_prefix + ".fcidump";
-  fcidump::write_fcidump_file(chem_env, hcore_mo, full_v2, symvec, fcid_file);
-
-  free_tensors(hcore_mo);
-  return files_prefix;
-}
-
 template<typename T>
 void FCI<T>::driver(ExecutionContext& ec, ChemEnv& chem_env) {
   chem_env.cd_context.keep_movecs_so = true;
@@ -100,9 +51,16 @@ void FCI<T>::driver(ExecutionContext& ec, ChemEnv& chem_env) {
 
   Tensor<T> lcao = cd_context.movecs_so;
 
-  const std::string files = generate_fcidump(chem_env, ec, MO, lcao, d_f1, full_v2, ex_hw);
+  const TiledIndexSpace& AO = lcao.tiled_index_spaces()[0];
+  Tensor<T>              hcore{AO, AO};
+  Tensor<T>::allocate(&ec, hcore);
+  read_from_disk(ec, hcore, chem_env.get_files_prefix("", "scf") + ".hcore");
+
+  fcidump::generate_fcidump(chem_env, ec, hcore, lcao, full_v2, ex_hw);
+  free_tensors(hcore);
 #if defined(USE_MACIS)
-  if(chem_env.ioptions.task_options.fci) macis_driver(ec, chem_env, files);
+  if(chem_env.ioptions.task_options.fci)
+    macis_driver(ec, chem_env, chem_env.get_files_prefix("", "fci"));
 #endif
 
   free_tensors(lcao, d_f1, full_v2);

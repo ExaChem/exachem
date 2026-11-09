@@ -166,9 +166,9 @@ void fcidump::write_fcidump_file(ChemEnv& chem_env, Tensor<T> H_MO, Tensor<T> fu
   SystemData& sys_data = chem_env.sys_data;
   double      nuc_rep  = sys_data.results["output"]["SCF"]["nucl_rep_energy"];
   bool        is_uhf   = sys_data.is_unrestricted;
-  int         norbs    = is_uhf ? sys_data.nbf_orig * 2 : sys_data.nbf_orig;
+  int         norbs    = static_cast<int>(orbsym.size());
   int         nelec    = sys_data.nelectrons;
-  int         spin     = 0; // chem_env.ioptions.scf_options.multiplicity;
+  int         spin     = sys_data.nelectrons_alpha - sys_data.nelectrons_beta;
   int         isym     = 1;
 
   ExecutionContext& ec = get_ec(full_v2());
@@ -195,6 +195,41 @@ void fcidump::write_fcidump_file(ChemEnv& chem_env, Tensor<T> H_MO, Tensor<T> fu
   }
 }
 
+template<typename T>
+void fcidump::generate_fcidump(ChemEnv& chem_env, ExecutionContext& ec, const Tensor<T>& hcore,
+                               const Tensor<T>& lcao, const Tensor<T>& full_v2, ExecutionHW ex_hw,
+                               std::string filename) {
+  SystemData& sys_data = chem_env.sys_data;
+
+  if(filename.empty()) filename = chem_env.get_files_prefix("", "fci") + ".fcidump";
+  const fs::path files_dir = fs::path(filename).parent_path();
+  if(!files_dir.empty() && !fs::exists(files_dir)) fs::create_directories(files_dir);
+
+  const TiledIndexSpace& AO  = lcao.tiled_index_spaces()[0];
+  const TiledIndexSpace& MSO = lcao.tiled_index_spaces()[1];
+  const auto [mu, nu]        = AO.labels<2>("all");
+  const auto [z1, z2]        = MSO.labels<2>("all");
+
+  // Transform the core Hamiltonian to the one-electron integrals in the MO basis
+  Tensor<T> hcore_mo{{MSO, MSO}, {1, 1}};
+  Tensor<T> tmp{MSO, AO};
+  Scheduler sch{ec};
+  // clang-format off
+  sch.allocate(hcore_mo, tmp)
+    (tmp(z1,nu) = lcao(mu,z1) * hcore(mu,nu))
+    (hcore_mo(z1,z2) = tmp(z1,nu) * lcao(nu,z2))
+    .deallocate(tmp).execute(ex_hw);
+  // clang-format on
+
+  // One entry per orbital in the MO space (linear dependencies and frozen orbitals excluded)
+  const size_t     nmso = MSO.max_num_indices();
+  std::vector<int> symvec(sys_data.is_unrestricted ? nmso : nmso / 2, 1);
+
+  write_fcidump_file(chem_env, hcore_mo, full_v2, symvec, filename);
+
+  free_tensors(hcore_mo);
+}
+
 template void fcidump::write_2el_ints<double>(std::ofstream& file, SystemData& sys_data,
                                               Tensor<double> V, int norb, bool is_uhf, int offset);
 
@@ -204,3 +239,9 @@ template void fcidump::write_1el_ints<double>(std::ofstream& file, SystemData& s
 template void fcidump::write_fcidump_file<double>(ChemEnv& chem_env, Tensor<double> H_MO,
                                                   Tensor<double> full_v2, std::vector<int> orbsym,
                                                   std::string filename);
+
+template void fcidump::generate_fcidump<double>(ChemEnv& chem_env, ExecutionContext& ec,
+                                                const Tensor<double>& hcore,
+                                                const Tensor<double>& lcao,
+                                                const Tensor<double>& full_v2, ExecutionHW ex_hw,
+                                                std::string filename);

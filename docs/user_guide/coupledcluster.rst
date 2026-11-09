@@ -47,10 +47,8 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
    "solvers": {
       "solver_type": "diis",
       "newton_krylov": {
-         "variant": "preconditioned",
-         "preconditioner": "diagonal",
+         "preconditioner": "jacobi",
          "krylov_dims": 5,
-         "krylov_dims_precond": 10,
          "eta": 0.1,
          "gamma": 0.9,
          "alpha": 1.5,
@@ -103,50 +101,36 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
    * :strong:`solver_type`: ``[default=diis]`` Selects the amplitude solver. One of:
 
      * :strong:`diis`: The standard DIIS-accelerated Jacobi iteration. This is the default and long-standing CC solver.
-     * :strong:`newton_krylov`: A Jacobian-free Newton-Krylov solver that solves the nonlinear residual equations :math:`F(x)=0` with an inner GMRES (Arnoldi) linear solve at each Newton step. Configured by the ``newton_krylov`` block below.
+     * :strong:`newton_krylov`: A Jacobian-free Newton-Krylov solver that solves the nonlinear residual equations :math:`F(x)=0` with an optional inner GMRES (Arnoldi) linear solve at each Newton step. Configured by the ``newton_krylov`` block below.
+
+       Supported only for standalone ``TASK.ccsd`` and ``TASK.ccsd_canonical``.
 
 :newton_krylov: Options for the Newton-Krylov solver. These apply only when ``solver_type`` is set to ``newton_krylov``.
 
-   * :strong:`variant`: ``[default=preconditioned]`` Selects the Newton-Krylov variant. One of:
-
-     * :strong:`general`: Jacobian-free Newton-Krylov with an unpreconditioned inner GMRES solve.
-     * :strong:`preconditioned`: Newton-Krylov with the diagonal (Fock) preconditioner applied to the inner GMRES solve.
-     * :strong:`inexact`: Inexact Newton-Krylov, which solves :math:`M\,\delta x = -F(x)` directly with the preconditioner action as the linear operator (the GMRES analog of fixed-point/energy-denominator updates).
-
-   * :strong:`preconditioner`: ``[default=diagonal]`` Selects the preconditioner used by the ``preconditioned`` and ``inexact`` variants. One of:
-
-     * :strong:`diagonal`: Applies the inverse orbital-energy denominators directly (the diagonal Fock preconditioner).
-     * :strong:`gmres`: Uses an inner GMRES solve with the Fock preconditioner action.
-
-   * :strong:`krylov_dims`: ``[default=5]`` The Krylov subspace dimension (maximum number of Arnoldi steps) for the inner GMRES solve of the linearized system :math:`J\,\delta x = -F(x)` at each Newton iteration.
-   * :strong:`krylov_dims_precond`: ``[default=10]`` The Krylov subspace dimension for the ``gmres`` preconditioner's inner solve (applying :math:`M^{-1}`). This option is not used with the ``diagonal`` preconditioner and is generally set larger than ``krylov_dims`` when ``gmres`` is selected.
+   * :strong:`preconditioner`: ``[default=jacobi]`` Applies the diagonal Fock preconditioner through DIIS's existing ``jacobi`` or ``jacobi_cs`` routines. ``identity`` applies no preconditioning.
+   * :strong:`krylov_dims`: ``[default=5]`` The maximum number of Arnoldi steps for the inner Newton GMRES solve. Set to ``0`` to apply the preconditioner correction directly, :math:`x_{k+1}=x_k-M^{-1}F(x_k)`, without Jacobian-vector products. With the default preconditioner, this gives Jacobi iteration.
    * :strong:`eta`: ``[default=0.1]`` The initial Eisenstat-Walker forcing term, which controls how tightly the inner GMRES solve is converged in the early Newton iterations to avoid over-solving.
    * :strong:`gamma`: ``[default=0.9]`` Coefficient of the Eisenstat-Walker forcing term update :math:`\eta = \gamma\,(\lVert F_k\rVert / \lVert F_{k-1}\rVert)^{\alpha}`.
    * :strong:`alpha`: ``[default=1.5]`` Exponent of the Eisenstat-Walker forcing term update (see ``gamma``).
    * :strong:`adaptive_forcing`: ``[default=true]`` When enabled, uses the Eisenstat-Walker adaptive forcing term to stop the inner GMRES solve early (when the residual falls below ``eta`` times the right-hand-side norm), avoiding over-solving the linearized system in the early Newton iterations.
-   * :strong:`newton_tol`: ``[default=threshold]`` Convergence threshold for the outer Newton iterations; the solver stops when the residual norm :math:`\lVert F(x)\rVert` falls below this value. If unspecified, it follows the CCSD ``threshold``.
-   * :strong:`gmres_tol`: ``[default=threshold]`` Convergence threshold for the inner GMRES solve. If unspecified, it follows the CCSD ``threshold``.
+   * :strong:`newton_tol`: ``[default=1e-8]`` Convergence threshold for the outer Newton iterations; the solver stops when the residual norm :math:`\lVert F(x)\rVert` falls below this value. A negative value follows the CCSD ``threshold``.
+   * :strong:`gmres_tol`: ``[default=1e-8]`` Convergence threshold for the inner GMRES solve. A negative value follows the CCSD ``threshold``.
 
 Newton-Krylov Solvers
 ---------------------
 
 The Newton-Krylov solvers are useful for challenging coupled-cluster calculations, including Hubbard models and strongly correlated systems, where the standard DIIS-accelerated  
-Jacobi iteration may converge slowly or fail to converge. The default solver for such cases is the preconditioned Newton-Krylov variant.
+Jacobi iteration may converge slowly or fail to converge. Jacobi is the default Newton-Krylov preconditioner for the currently supported canonical gauge. Noncanonical-gauge selection is not implemented; the full Fock-block Sylvester inverse is retained internally for future support.
 
 .. note::
 
-   These solvers are currently available for CCSD only, which has a preconditioner (the diagonal Fock preconditioner) available.
+   These solvers are currently available for CCSD only.
 
-:strong:`Choosing a variant`
+:strong:`Choosing the preconditioner and Krylov dimension`
 
-   * :strong:`preconditioned`: Use when a preconditioner is available and an unpreconditioned GMRES solve is slow or struggles to converge.
-   * :strong:`general`: Use when no preconditioner is available, the Jacobian is already well-conditioned, or to evaluate the effect of the preconditioner.
-   * :strong:`inexact`: Use when the preconditioner provides a good approximation to the Newton step and a cheaper inner solve is preferred. This can also serve as an alternative to fixed-point iteration without explicit energy denominators.
-
-:strong:`Tuning krylov_dims and krylov_dims_precond`
-
-   * ``krylov_dims`` controls the maximum Krylov subspace dimension of the main GMRES solve. Increase it if GMRES stagnates or frequently reaches the dimension limit; decrease it if GMRES converges quickly, to reduce memory usage and orthogonalization costs.
-   * ``krylov_dims_precond`` controls the Krylov subspace dimension of the preconditioner solve. Increase it if the preconditioner is not providing a sufficiently accurate correction; decrease it if the preconditioner is already effective, to reduce computational cost. This is typically chosen to be larger than ``krylov_dims``.
+   * Use ``preconditioner: jacobi`` for diagonal Fock preconditioning, or ``preconditioner: identity`` to evaluate the effect of removing preconditioning.
+   * Positive ``krylov_dims`` controls the maximum Krylov subspace dimension. Increase it if GMRES stagnates or frequently reaches the dimension limit; decrease it to reduce memory usage and orthogonalization costs.
+   * Set ``krylov_dims: 0`` for direct preconditioner updates. The inner tolerance and forcing parameters have no effect in this mode.
 
 :strong:`Tuning the forcing parameters`
 

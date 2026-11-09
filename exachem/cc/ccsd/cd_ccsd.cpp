@@ -87,12 +87,15 @@ void exachem::cc::ccsd::cd_ccsd_driver(ExecutionContext& ec, ChemEnv& chem_env) 
   Tensor<T>              d_r1, d_r2, d_t1, d_t2;
   std::vector<Tensor<T>> d_r1s, d_r2s, d_t1s, d_t2s;
 
+  const int history_size = ccsd_options.solvers.solver_type == "newton_krylov" ? 0
+                                                                               : ccsd_options.ndiis;
+
   if(is_rhf)
     std::tie(p_evl_sorted, d_t1, d_t2, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s) =
-      setupTensors_cs(ec, MO, d_f1, ccsd_options.ndiis, ccsd_restart && ccsdstatus && scf_conv);
+      setupTensors_cs(ec, MO, d_f1, history_size, ccsd_restart && ccsdstatus && scf_conv);
   else
     std::tie(p_evl_sorted, d_t1, d_t2, d_r1, d_r2, d_r1s, d_r2s, d_t1s, d_t2s) =
-      setupTensors(ec, MO, d_f1, ccsd_options.ndiis, ccsd_restart && ccsdstatus && scf_conv);
+      setupTensors(ec, MO, d_f1, history_size, ccsd_restart && ccsdstatus && scf_conv);
 
   if(ccsd_restart) {
     if(fs::exists(t1file) && fs::exists(t2file)) {

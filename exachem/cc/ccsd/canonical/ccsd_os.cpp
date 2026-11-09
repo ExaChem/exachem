@@ -8,7 +8,6 @@
 
 #include "ccsd_os.hpp"
 
-#include "exachem/cc/ccsd/canonical/canonical_ccsd_preconditioner.hpp"
 #include "exachem/cc/krylov_solvers.hpp"
 
 namespace exachem::cc::ccsd_os {
@@ -2783,11 +2782,8 @@ ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& M
   // clang-format on
 
   // *************************************************
-  // Solver selection. The Newton-Krylov solvers read their options directly from
-  // chem_env; only the solver_type/variant selectors and the preconditioner's
-  // Krylov dimension / tolerance are referenced here.
+  // Solver selection. Newton-Krylov reads its options directly from chem_env.
   const auto& sv = chem_env.ioptions.ccsd_options.solvers;
-  const auto& nk = sv.newton_krylov;
 
   // Build MP2 initial guess. Skip it whenever the amplitude files exist, i.e. whenever d_t1/d_t2
   // were read from disk in the driver, so a restart continues from those amplitudes instead of
@@ -2820,28 +2816,13 @@ ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& M
     return ccsd_residuals<T>(sch, chem_env, MO, f, eri, t1, t2, d_e, r1, r2, x, d_r);
   };
 
-  // This is the preconditioner inverse application function input for the preconditioned
-  const size_t           n_occ_total = static_cast<size_t>(n_occ_alpha + n_occ_beta);
-  std::vector<T>         eps_occ(p_evl_sorted.begin(), p_evl_sorted.begin() + n_occ_total);
-  std::vector<T>         eps_virt(p_evl_sorted.begin() + n_occ_total, p_evl_sorted.end());
-  std::vector<Tensor<T>> inverse_denominators;
-  if(nk.preconditioner == "diagonal") {
-    inverse_denominators =
-      exachem::cc::ccsd_os::initialize_diagonal_preconditioner<T>(ec, d_t, eps_occ, eps_virt, T(0));
-  }
-  const auto preconditioner_type = nk.preconditioner == "gmres" ? PreconditionerType::GMRES
-                                                                : PreconditionerType::Diagonal;
-
-  auto preconditioner_inverse_application =
-    [&](const std::vector<Tensor<T>>& vector_to_be_preconditioned) -> std::vector<Tensor<T>> {
-    return exachem::cc::ccsd_os::apply_preconditioner_inverse<T>(
-      preconditioner_type, ec, chem_env, d_e, sch, MO, f, eri, vector_to_be_preconditioned,
-      nk.krylov_dims_precond, nk.gmres_tol, inverse_denominators);
-  };
-
-  auto precond_action =
-    [&](const std::vector<Tensor<T>>& preconditoned_vector) -> std::vector<Tensor<T>> {
-    return preconditioner_action<T>(sch, MO, f, eri, preconditoned_vector);
+  auto preconditioner = [&](std::vector<Tensor<T>> r) {
+    auto result = zeroslike(ec, r);
+    jacobi(ec, r[0], result[0], -1.0 * zshiftl, false, p_evl_sorted, n_occ_alpha, n_occ_beta);
+    jacobi(ec, r[1], result[1], -2.0 * zshiftl, false, p_evl_sorted, n_occ_alpha, n_occ_beta);
+    scale_tensors(result, -1.0);
+    ec.pg().barrier();
+    return result;
   };
 
   // *************************************************
@@ -2849,19 +2830,8 @@ ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& M
   chem_env.cc_context.ccsd_iter = -1;
 
   if(sv.solver_type == "newton_krylov") {
-    // Newton-Krylov solver path. Dispatch to the variant selected via
-    // CC.solvers.newton_krylov.variant (general | preconditioned | inexact).
-    if(nk.variant == "general") {
-      std::tie(residual, energy) = newton_krylov_solver(ec, chem_env, residual_fun, d_e, d_t);
-    }
-    else if(nk.variant == "inexact") {
-      std::tie(residual, energy) =
-        inexact_newton_krylov_solver(ec, chem_env, residual_fun, precond_action, d_e, d_t);
-    }
-    else { // "preconditioned" (default)
-      std::tie(residual, energy) = preconditioned_newton_krylov_solver(
-        ec, chem_env, residual_fun, preconditioner_inverse_application, d_e, d_t);
-    }
+    std::tie(residual, energy) =
+      preconditioned_newton_krylov_solver(ec, chem_env, residual_fun, preconditioner, d_e, d_t);
 
     /*
     // Re-sync the spin-block amplitude maps from the converged d_t1/d_t2.
@@ -2971,7 +2941,6 @@ ccsd_v2_driver(ChemEnv& chem_env, ExecutionContext& ec, const TiledIndexSpace& M
     residual = 0.0;
   }
 
-  for(auto& denominator: inverse_denominators) sch.deallocate(denominator);
   sch.execute();
 
   for(auto& [name, t]: t1) sch.deallocate(t);

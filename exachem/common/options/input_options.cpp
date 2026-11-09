@@ -128,11 +128,9 @@ void CCSDOptions::print() {
   print_option("freeze_virtual", freeze_virtual, 22);
 
   print_option("solver_type", solvers.solver_type, 22);
-  print_option("nk_variant", solvers.newton_krylov.variant, 22);
-  print_option("nk_preconditioner", solvers.newton_krylov.preconditioner, 22);
   if(solvers.solver_type == "newton_krylov") {
+    print_option("nk_preconditioner", solvers.newton_krylov.preconditioner, 22);
     print_option("nk_krylov_dims", solvers.newton_krylov.krylov_dims, 22);
-    print_option("nk_krylov_dims_precond", solvers.newton_krylov.krylov_dims_precond, 22);
     print_option("nk_eta", solvers.newton_krylov.eta, 22);
     print_option("nk_gamma", solvers.newton_krylov.gamma, 22);
     print_option("nk_alpha", solvers.newton_krylov.alpha, 22);

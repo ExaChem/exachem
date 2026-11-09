@@ -8,8 +8,6 @@
  */
 
 #include "exachem/cc/ccsd/cd_ccsd_cs_ann.hpp"
-#include "exachem/cc/ccsd/canonical/canonical_ccsd_preconditioner.hpp"
-#include "exachem/cc/ccsd/cd_ccsd_preconditioner.hpp"
 #include "exachem/cc/krylov_solvers.hpp"
 #include <span>
 
@@ -726,7 +724,6 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
   sch.execute();
 
   const auto& sv = chem_env.ioptions.ccsd_options.solvers;
-  const auto& nk = sv.newton_krylov;
 
   // Enter the iterative block for a fresh run OR whenever Newton-Krylov is selected (NK also
   // resumes from restart amplitudes). A converged non-NK restart falls through to the single energy
@@ -767,7 +764,7 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
 
     // ===================== Newton-Krylov solver path =====================
     // Reuses the generic exachem::cc::solvers machinery; closed-shell specifics are the reduced
-    // aa/abab residual and the shared cs preconditioner (cd_ccsd_preconditioner.cpp).
+    // aa/abab residual and Jacobi preconditioner.
     chem_env.cc_context.ccsd_iter = -1;
 
     std::vector<Tensor<T>> d_t{t1_aa, t2_abab};
@@ -788,43 +785,18 @@ std::tuple<double, double> exachem::cc::ccsd::CD_CCSD_CS<T>::cd_ccsd_cs_driver(
       return d_r;
     };
 
-    // Closed-shell Fock preconditioner (shared, cd_ccsd_preconditioner.cpp) on the reduced blocks.
-    auto precond_action = [&](const std::vector<Tensor<T>>& pv) -> std::vector<Tensor<T>> {
-      return preconditioner_action_cs(sch, MO, f1_oo, f1_vv, pv, exhw);
-    };
-    const size_t           n_occ_total = static_cast<size_t>(2 * n_occ_alpha);
-    std::vector<T>         eps_occ(p_evl_sorted.begin(), p_evl_sorted.begin() + n_occ_total);
-    std::vector<T>         eps_virt(p_evl_sorted.begin() + n_occ_total, p_evl_sorted.end());
-    std::vector<Tensor<T>> inverse_denominators;
-    if(nk.preconditioner == "diagonal") {
-      inverse_denominators = exachem::cc::ccsd_os::initialize_diagonal_preconditioner<T>(
-        ec, d_t, eps_occ, eps_virt, T(0));
-    }
-    const auto preconditioner_type = nk.preconditioner == "gmres"
-                                       ? exachem::cc::ccsd_os::PreconditionerType::GMRES
-                                       : exachem::cc::ccsd_os::PreconditionerType::Diagonal;
-    auto       preconditioner_inverse_application =
-      [&](const std::vector<Tensor<T>>& v) -> std::vector<Tensor<T>> {
-      if(preconditioner_type == exachem::cc::ccsd_os::PreconditionerType::Diagonal) {
-        return exachem::cc::ccsd_os::diagonal_preconditioner_inverse_application<T>(
-          ec, v, inverse_denominators);
-      }
-      return gmres_solver(ec, chem_env, d_e, precond_action, v, nk.krylov_dims_precond,
-                          nk.gmres_tol);
+    auto preconditioner = [&](std::vector<Tensor<T>> r) {
+      auto result = zeroslike(ec, r);
+      jacobi_cs(ec, r[0], result[0], -1.0 * zshiftl, false, p_evl_sorted, n_occ_alpha, n_vir_alpha);
+      jacobi_cs(ec, r[1], result[1], -2.0 * zshiftl, false, p_evl_sorted, n_occ_alpha, n_vir_alpha);
+      scale_tensors(result, -1.0);
+      ec.pg().barrier();
+      return result;
     };
 
     if(sv.solver_type == "newton_krylov") {
-      if(nk.variant == "general") {
-        std::tie(residual, energy) = newton_krylov_solver(ec, chem_env, residual_fun, d_e, d_t);
-      }
-      else if(nk.variant == "inexact") {
-        std::tie(residual, energy) =
-          inexact_newton_krylov_solver(ec, chem_env, residual_fun, precond_action, d_e, d_t);
-      }
-      else { // "preconditioned" (default)
-        std::tie(residual, energy) = preconditioned_newton_krylov_solver(
-          ec, chem_env, residual_fun, preconditioner_inverse_application, d_e, d_t);
-      }
+      std::tie(residual, energy) =
+        preconditioned_newton_krylov_solver(ec, chem_env, residual_fun, preconditioner, d_e, d_t);
       // keep t2_aaaa consistent with the converged t2_abab for downstream use
       ccsd_amp_update(sch, t2_abab, t2_aaaa);
       sch.execute(exhw);

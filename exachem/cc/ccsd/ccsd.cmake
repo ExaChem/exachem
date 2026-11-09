@@ -11,7 +11,6 @@ set(CCSD_SRCS
     ${CCSD_SRCDIR}/canonical/ccsd_canonical.cpp
     ${CCSD_SRCDIR}/canonical/ccsd_cs.cpp
     ${CCSD_SRCDIR}/canonical/ccsd_os.cpp
-    ${CCSD_SRCDIR}/canonical/canonical_ccsd_preconditioner.cpp
     )
 
 set(CCSD_INCLUDES
@@ -23,6 +22,5 @@ set(CCSD_INCLUDES
     ${CCSD_SRCDIR}/canonical/ccsd_canonical.hpp
     ${CCSD_SRCDIR}/canonical/ccsd_cs.hpp
     ${CCSD_SRCDIR}/canonical/ccsd_os.hpp
-    ${CCSD_SRCDIR}/canonical/canonical_ccsd_preconditioner.hpp
 )
 

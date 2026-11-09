@@ -7,8 +7,6 @@
  */
 
 #include "exachem/cc/ccsd/cd_ccsd_os_ann.hpp"
-#include "exachem/cc/ccsd/canonical/canonical_ccsd_preconditioner.hpp"
-#include "exachem/cc/ccsd/cd_ccsd_preconditioner.hpp"
 #include "exachem/cc/krylov_solvers.hpp"
 #include <span>
 
@@ -1047,7 +1045,6 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
   sch.execute();
 
   const auto& sv = chem_env.ioptions.ccsd_options.solvers;
-  const auto& nk = sv.newton_krylov;
 
   // Enter the iterative block for a fresh run OR whenever Newton-Krylov is selected (NK also
   // resumes from restart amplitudes). A converged non-NK restart falls through to the single energy
@@ -1121,46 +1118,18 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
       return d_r;
     };
 
-    // Cholesky diagonal (Fock) preconditioner M*y on the full V/O spaces (shared with the CS
-    // driver, defined in cd_ccsd_preconditioner.cpp).
-    auto precond_action = [&](const std::vector<Tensor<T>>& pv) -> std::vector<Tensor<T>> {
-      return exachem::cc::ccsd::preconditioner_action_os(sch, MO, f1_oo, f1_vv, pv, exhw);
-    };
-
-    const size_t           n_occ_total = static_cast<size_t>(n_occ_alpha + n_occ_beta);
-    std::vector<T>         eps_occ(p_evl_sorted.begin(), p_evl_sorted.begin() + n_occ_total);
-    std::vector<T>         eps_virt(p_evl_sorted.begin() + n_occ_total, p_evl_sorted.end());
-    std::vector<Tensor<T>> inverse_denominators;
-    if(nk.preconditioner == "diagonal") {
-      inverse_denominators = exachem::cc::ccsd_os::initialize_diagonal_preconditioner<T>(
-        ec, d_t, eps_occ, eps_virt, T(0));
-    }
-    const auto preconditioner_type = nk.preconditioner == "gmres"
-                                       ? exachem::cc::ccsd_os::PreconditionerType::GMRES
-                                       : exachem::cc::ccsd_os::PreconditionerType::Diagonal;
-
-    auto preconditioner_inverse_application =
-      [&](const std::vector<Tensor<T>>& v) -> std::vector<Tensor<T>> {
-      if(preconditioner_type == exachem::cc::ccsd_os::PreconditionerType::Diagonal) {
-        return exachem::cc::ccsd_os::diagonal_preconditioner_inverse_application<T>(
-          ec, v, inverse_denominators);
-      }
-      return gmres_solver(ec, chem_env, d_e, precond_action, v, nk.krylov_dims_precond,
-                          nk.gmres_tol);
+    auto preconditioner = [&](std::vector<Tensor<T>> r) {
+      auto result = zeroslike(ec, r);
+      jacobi(ec, r[0], result[0], -1.0 * zshiftl, false, p_evl_sorted, n_occ_alpha, n_occ_beta);
+      jacobi(ec, r[1], result[1], -2.0 * zshiftl, false, p_evl_sorted, n_occ_alpha, n_occ_beta);
+      scale_tensors(result, -1.0);
+      ec.pg().barrier();
+      return result;
     };
 
     if(sv.solver_type == "newton_krylov") {
-      if(nk.variant == "general") {
-        std::tie(residual, energy) = newton_krylov_solver(ec, chem_env, residual_fun, d_e, d_t);
-      }
-      else if(nk.variant == "inexact") {
-        std::tie(residual, energy) =
-          inexact_newton_krylov_solver(ec, chem_env, residual_fun, precond_action, d_e, d_t);
-      }
-      else { // "preconditioned" (default)
-        std::tie(residual, energy) = preconditioned_newton_krylov_solver(
-          ec, chem_env, residual_fun, preconditioner_inverse_application, d_e, d_t);
-      }
+      std::tie(residual, energy) =
+        preconditioned_newton_krylov_solver(ec, chem_env, residual_fun, preconditioner, d_e, d_t);
       // amplitudes are written to disk below (shared with the DIIS path)
     }
     else {

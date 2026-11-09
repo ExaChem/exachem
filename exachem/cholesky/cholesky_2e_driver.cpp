@@ -37,6 +37,9 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
               << "- #occupied, #virtual = " << sys_data.nocc << ", " << sys_data.nvir << std::endl;
   }
 
+  // MO orbitals semicanonicalization
+  cholesky_2e::semicanonicalization(ec, chem_env);
+
   std::string files_dir    = chem_env.get_files_dir();
   std::string files_prefix = chem_env.get_files_prefix();
 

@@ -46,10 +46,14 @@ public:
                               bool is_mso = true);
   // reshape F/lcao after freezing
   virtual Matrix reshape_mo_matrix(ChemEnv& chem_env, Matrix& emat, bool is_lcao = false);
+
+  virtual void semicanonicalization(ExecutionContext& ec, ChemEnv& chem_env);
 };
 
 // Backward compatibility wrapper functions
 int get_ts_recommendation(ExecutionContext& ec, ChemEnv& chem_env);
+
+void semicanonicalization(ExecutionContext& ec, ChemEnv& chem_env);
 
 std::tuple<TiledIndexSpace, TAMM_SIZE> setup_mo_red(ExecutionContext& ec, ChemEnv& chem_env,
                                                     bool triples = false);

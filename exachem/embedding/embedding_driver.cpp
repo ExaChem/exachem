@@ -6,6 +6,9 @@
 #include "exachem/scf/scf_engine.hpp"
 #include "exachem/scf/scf_guess.hpp"
 
+#include "exachem/cholesky/cholesky_2e_driver.hpp"
+#include "exachem/common/fcidump.hpp"
+
 #if defined(ENABLE_CC)
 #include "exachem/cc/ccsd/canonical/ccsd_canonical.hpp"
 #include "exachem/cc/ccsd/canonical/ccsd_cs.hpp"
@@ -317,7 +320,6 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
   scratch.resize(0, 0);
   // S1_eigen.resize(0,0);
   for(int ispin = 0; ispin < nspin; ispin++) {
-    Vembedding[ispin].resize(0, 0);
     Dens_a[ispin].resize(0, 0);
     Dens_b[ispin].resize(0, 0);
     Dens_ab[ispin].resize(0, 0);
@@ -329,25 +331,24 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
   bool&                          use_ksref = chem_env.ioptions.embedding_options.use_ksref;
   const std::vector<std::string> correlated_methods{"MP2",     "CC2",   "CCSD", "CCSD_CANONICAL",
                                                     "CCSD(T)", "CCSDT", "DUCC", "QFLOW"};
-  if(std::find(correlated_methods.begin(), correlated_methods.end(), high_level[0]) ==
-     correlated_methods.end()) {
-    use_ksref = false;
-  } // In DFT-in-DFT cases, energy_a_high only populates if use_ksref = false
-  if(!use_ksref) {
+  // If high level is HF, clear out the xc for scf
+  if(high_level[0] == "HF") {
     is_ks = false;
     chem_env.ioptions.scf_options.xc_type.clear();
-    for(auto& ihigh: high_level) {
-      if(ihigh.rfind("XC_", 0) == 0) {
-        is_ks = true;
-        chem_env.ioptions.scf_options.xc_type.push_back(ihigh);
-      }
-      else if(std::find(dft.begin(), dft.end(), ihigh) == dft.end()) {
-        if(is_ks) tamm_terminate("Invalid high-level specification");
-      }
-      else {
-        is_ks = true;
-        chem_env.ioptions.scf_options.xc_type.push_back(ihigh);
-      }
+  }
+  // If high level is a correlated method based on a HF reference determinant, clear out the xc for
+  // scf
+  else if(std::find(correlated_methods.begin(), correlated_methods.end(), high_level[0]) !=
+            correlated_methods.end() &&
+          !use_ksref) {
+    is_ks = false;
+    chem_env.ioptions.scf_options.xc_type.clear();
+  }
+  // If high level is DFT, replace xc with that for the high level DFT
+  for(auto& ihigh: high_level) {
+    if(ihigh.rfind("XC_", 0) == 0 || std::find(dft.begin(), dft.end(), ihigh) != dft.end()) {
+      is_ks = true;
+      chem_env.ioptions.scf_options.xc_type.push_back(ihigh);
     }
   }
   chem_env.ioptions.scf_options.noscf           = false;
@@ -365,28 +366,30 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
 
   // Run system A(high-level)
   double energy_a_high = 0.0;
-  std::cout.rdbuf(NULL);
   scf::scf_driver(ec, chem_env);
-  if(use_ksref) {
+  // If high level is HF or DFT, set energy_a_high to the converged SCF energy
+  if(high_level[0] == "HF" || std::find(dft.begin(), dft.end(), high_level[0]) != dft.end()) {
+    energy_a_high = chem_env.scf_context.hf_energy;
+  }
+  // If high level is a correlated method and based on a KS reference determinant, run a one-shot HF
+  else if(std::find(correlated_methods.begin(), correlated_methods.end(), high_level[0]) !=
+            correlated_methods.end() &&
+          use_ksref) {
     chem_env.ioptions.scf_options.lshift = 0.0;
     chem_env.ioptions.scf_options.noscf  = true;
     chem_env.sys_data.is_ks              = false;
     scf::scf_driver(ec, chem_env);
     chem_env.scf_context.skip_scf = true;
   }
-  else if(is_ks || high_level[0] == "HF") {
-    energy_a_high = chem_env.scf_context.hf_energy;
-    // Deallocate tensors from SCF context
-    Tensor<TensorType>::deallocate(chem_env.scf_context.C_AO, chem_env.scf_context.F_AO);
-    if(is_unrestricted)
-      Tensor<TensorType>::deallocate(chem_env.scf_context.C_beta_AO,
-                                     chem_env.scf_context.F_beta_AO);
-  }
-  else {
+  // If high level is a correlated method and based on a HF reference determinant, we already have
+  // what we need
+  else if(std::find(correlated_methods.begin(), correlated_methods.end(), high_level[0]) !=
+            correlated_methods.end() &&
+          !use_ksref) {
     chem_env.scf_context.skip_scf = true;
     ec.pg().barrier();
   }
-  std::cout.rdbuf(orig_buf);
+  // Will skip SCF in subsequent calls to correlated methods
   if(rank0)
     std::cout << std::fixed << std::setprecision(10) << "Energy A(mean-field): " << std::right
               << std::setw(20) << chem_env.scf_context.hf_energy << std::endl
@@ -438,6 +441,33 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
       chem_env.ioptions.task_options.ducc.second = "default";
       cc::ducc::ducc_driver(ec, chem_env);
     }
+  }
+  else if(high_level[0] == "FCIDUMP") {
+    if(rank0) {
+      std::cout << "Calling FCIDUMP and exiting - skipping the high-level calculation" << std::endl;
+      std::cout << "Will write <i| hcore+Vembed |j> and <ij| 1/r |kl> for MSOs in the active space"
+                << std::endl;
+    }
+    fci_driver_embedding(ec, chem_env, Vembedding, is_unrestricted, rank0);
+    ec.pg().barrier();
+  }
+  else if(high_level[0] != "HF" && high_level[0] != "FCIDUMP" &&
+          std::find(correlated_methods.begin(), correlated_methods.end(), high_level[0]) ==
+            correlated_methods.end() &&
+          std::find(dft.begin(), dft.end(), high_level[0]) == dft.end()) {
+    tamm_terminate("Invalid high-level specification: " + high_level[0]);
+  }
+
+  // Deallocate tensors from SCF context
+  if(chem_env.scf_context.C_AO.is_allocated())
+    Tensor<TensorType>::deallocate(chem_env.scf_context.C_AO);
+  if(chem_env.scf_context.F_AO.is_allocated())
+    Tensor<TensorType>::deallocate(chem_env.scf_context.F_AO);
+  if(is_unrestricted) {
+    if(chem_env.scf_context.C_beta_AO.is_allocated())
+      Tensor<TensorType>::deallocate(chem_env.scf_context.C_beta_AO);
+    if(chem_env.scf_context.F_beta_AO.is_allocated())
+      Tensor<TensorType>::deallocate(chem_env.scf_context.F_beta_AO);
   }
 
   // Print final results
@@ -595,6 +625,122 @@ void print_eigs(ExecutionContext& ec, Tensor<double>& F_tamm, Tensor<double>& C_
     if(imo + 1 % 5 == 0) std::cout << std::endl;
   }
   std::cout << std::endl;
+}
+
+void fci_driver_embedding(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Matrix>& Vembedding,
+                          const bool is_unrestricted, bool rank0) {
+  chem_env.cd_context.keep_movecs_so = true;
+  cholesky_2e::cholesky_2e_driver(ec, chem_env);
+  std::string files_prefix = chem_env.get_files_prefix();
+  CDContext&  cd_context   = chem_env.cd_context;
+  chem_env.cc_context.init_filenames(files_prefix);
+  const TiledIndexSpace& MO      = chem_env.is_context.MSO;
+  const TiledIndexSpace& CI      = chem_env.is_context.CI;
+  const TiledIndexSpace  N_MSO   = MO("all");
+  Tensor<T>              d_f1    = cd_context.d_f1;
+  Tensor<T>              cholVpr = cd_context.cholV2;
+  const auto [cindex]            = CI.labels<1>("all");
+  const auto [p, q, r, s]        = MO.labels<4>("all");
+  Tensor<T> full_v2{N_MSO, N_MSO, N_MSO, N_MSO};
+  Tensor<T>::allocate(&ec, full_v2);
+  ExecutionHW ex_hw = ec.exhw();
+  Scheduler   sch{ec};
+  sch(full_v2(p, r, q, s) = cholVpr(p, r, cindex) * cholVpr(q, s, cindex)).execute(ex_hw);
+  Tensor<T>              lcao = cd_context.movecs_so;
+  const TiledIndexSpace& AO   = lcao.tiled_index_spaces()[0];
+  const auto [mu, nu]         = AO.labels<2>("all");
+  Tensor<T> hcore{AO, AO};
+  Tensor<T> hcore_eff_alpha{AO, AO};
+  Tensor<T> hcore_eff_beta{AO, AO};
+  Tensor<T>::allocate(&ec, hcore);
+  Tensor<T>::allocate(&ec, hcore_eff_alpha);
+  Tensor<T>::allocate(&ec, hcore_eff_beta);
+  read_from_disk(ec, hcore, chem_env.get_files_prefix("", "scf") + ".hcore");
+  if(rank0) tamm::eigen_to_tamm_tensor(hcore_eff_alpha, Vembedding[0]);
+  ec.pg().barrier();
+  sch(hcore_eff_alpha(mu, nu) += hcore(mu, nu)).execute(ec.exhw());
+  if(is_unrestricted) {
+    if(rank0) tamm::eigen_to_tamm_tensor(hcore_eff_beta, Vembedding[1]);
+    ec.pg().barrier();
+    sch(hcore_eff_beta(mu, nu) += hcore(mu, nu)).execute(ec.exhw());
+  }
+  else sch(hcore_eff_beta(mu, nu) = hcore_eff_alpha(mu, nu)).execute(ec.exhw());
+  generate_fcidump_embedding(chem_env, ec, hcore_eff_alpha, hcore_eff_beta, lcao, full_v2, ex_hw);
+  free_tensors(hcore, hcore_eff_alpha, hcore_eff_beta, lcao, full_v2, cholVpr, d_f1);
+  int nspin{(int) Vembedding.size()};
+  for(int ispin = 0; ispin < nspin; ispin++) { Vembedding[ispin].resize(0, 0); }
+}
+
+template<typename T>
+void generate_fcidump_embedding(ChemEnv& chem_env, ExecutionContext& ec,
+                                const Tensor<T>& hcore_eff_alpha, const Tensor<T>& hcore_eff_beta,
+                                const Tensor<T>& lcao, const Tensor<T>& full_v2, ExecutionHW ex_hw,
+                                std::string filename) {
+  SystemData&  sys_data    = chem_env.sys_data;
+  const size_t n_occ_alpha = sys_data.n_occ_alpha;
+  const size_t n_occ_beta  = sys_data.n_occ_beta;
+  const size_t n_vir_alpha = sys_data.n_vir_alpha;
+  const size_t n_vir_beta  = sys_data.n_vir_beta;
+  const size_t nmo_occ     = n_occ_alpha + n_occ_beta;
+  const size_t nmo_vir     = n_vir_alpha + n_vir_beta;
+  if(filename.empty()) filename = chem_env.get_files_prefix("", "fci") + ".fcidump";
+  const fs::path files_dir = fs::path(filename).parent_path();
+  if(!files_dir.empty() && !fs::exists(files_dir)) fs::create_directories(files_dir);
+  const TiledIndexSpace& AO  = lcao.tiled_index_spaces()[0];
+  const TiledIndexSpace& MSO = lcao.tiled_index_spaces()[1];
+  const auto [mu, nu]        = AO.labels<2>("all");
+  const auto [z1, z2]        = MSO.labels<2>("all");
+  // Transform the core Hamiltonian to the one-electron integrals in the MO basis
+  Tensor<T> hcore_eff_alpha_mo{{MSO, MSO}, {1, 1}};
+  Tensor<T> hcore_eff_beta_mo{{MSO, MSO}, {1, 1}};
+  Tensor<T> hcore_eff_mo{{MSO, MSO}, {1, 1}};
+  Tensor<T> tmp_alpha{MSO, AO};
+  Tensor<T> tmp_beta{MSO, AO};
+  Scheduler sch{ec};
+  // clang-format off
+  sch.allocate(hcore_eff_alpha_mo, tmp_alpha)
+    (tmp_alpha(z1,nu) = lcao(mu,z1) * hcore_eff_alpha(mu,nu))
+    (hcore_eff_alpha_mo(z1,z2) = tmp_alpha(z1,nu) * lcao(nu,z2))
+    .deallocate(tmp_alpha).execute(ex_hw);
+  sch.allocate(hcore_eff_beta_mo, tmp_beta)
+    (tmp_beta(z1,nu) = lcao(mu,z1) * hcore_eff_beta(mu,nu))
+    (hcore_eff_beta_mo(z1,z2) = tmp_beta(z1,nu) * lcao(nu,z2))
+    .deallocate(tmp_beta).execute(ex_hw);
+  Matrix hcore_eff_alpha_mo_eig(nmo_occ + nmo_vir, nmo_occ + nmo_vir);
+  Matrix hcore_eff_beta_mo_eig(nmo_occ + nmo_vir, nmo_occ + nmo_vir);
+  tamm::tamm_to_eigen_tensor(hcore_eff_alpha_mo, hcore_eff_alpha_mo_eig);
+  tamm::tamm_to_eigen_tensor(hcore_eff_beta_mo, hcore_eff_beta_mo_eig);
+  // Create one generalized hcore_eff_mo_eig in the basis {alpha_o, beta_o, alpha_v, beta_v}
+  // Inspired by the generalized Fock matrix construction in cholesky::TwoIndexTransform::two_index_transform
+  // Note that hcore_eff_alpha_mo_eig and hcore_eff_beta_mo_eig are each represented in the full MSO basis, so we select the relevant blocks
+  // clang-format on 
+  Matrix hcore_eff_mo_eig; 
+  hcore_eff_mo_eig.setZero(nmo_occ + nmo_vir, nmo_occ + nmo_vir);
+  /*
+        hcore_MO   = |  hcore_MO_alpha_oo           0             hcore_MO_alpha_ov            0         |
+                     |      0               hcore_MO_beta_oo            0             hcore_MO_beta_ov   |
+                     |  hcore_MO_alpha_vo           0             hcore_MO_alpha_vv            0         |
+                     |      0               hcore_MO_beta_vo            0             hcore_MO_beta_vv   |
+  */
+  hcore_eff_mo_eig.block(0,       0,        n_occ_alpha, n_occ_alpha) = hcore_eff_alpha_mo_eig.block(0,       0,        n_occ_alpha, n_occ_alpha); // alpha_oo
+  hcore_eff_mo_eig.block(0,       nmo_occ,  n_occ_alpha, n_vir_alpha) = hcore_eff_alpha_mo_eig.block(0,       nmo_occ,  n_occ_alpha, n_vir_alpha); // alpha_ov
+  hcore_eff_mo_eig.block(nmo_occ, 0,        n_vir_alpha, n_occ_alpha) = hcore_eff_alpha_mo_eig.block(nmo_occ, 0,        n_vir_alpha, n_occ_alpha); // alpha_vo
+  hcore_eff_mo_eig.block(nmo_occ, nmo_occ,  n_vir_alpha, n_vir_alpha) = hcore_eff_alpha_mo_eig.block(nmo_occ, nmo_occ,  n_vir_alpha, n_vir_alpha); // alpha_vv
+
+  hcore_eff_mo_eig.block(n_occ_alpha,         n_occ_alpha,         n_occ_beta, n_occ_beta) = hcore_eff_beta_mo_eig.block(n_occ_alpha,         n_occ_alpha,         n_occ_beta, n_occ_beta); // beta_oo
+  hcore_eff_mo_eig.block(n_occ_alpha,         nmo_occ+n_vir_alpha, n_occ_beta, n_vir_beta) = hcore_eff_beta_mo_eig.block(n_occ_alpha,         nmo_occ+n_vir_alpha, n_occ_beta, n_vir_beta); // beta_ov
+  hcore_eff_mo_eig.block(nmo_occ+n_vir_alpha, n_occ_alpha,         n_vir_beta, n_occ_beta) = hcore_eff_beta_mo_eig.block(nmo_occ+n_vir_alpha, n_occ_alpha,         n_vir_beta, n_occ_beta); // beta_vo
+  hcore_eff_mo_eig.block(nmo_occ+n_vir_alpha, nmo_occ+n_vir_alpha, n_vir_beta, n_vir_beta) = hcore_eff_beta_mo_eig.block(nmo_occ+n_vir_alpha, nmo_occ+n_vir_alpha, n_vir_beta, n_vir_beta); // beta_vv
+  // One entry per orbital in the MO space (linear dependencies and frozen orbitals excluded)
+  Tensor<T>::allocate(&ec, hcore_eff_mo);
+  tamm::eigen_to_tamm_tensor(hcore_eff_mo, hcore_eff_mo_eig);
+  const size_t     nmso = MSO.max_num_indices();
+  std::vector<int> symvec(sys_data.is_unrestricted ? nmso : nmso / 2, 1);
+  fcidump::write_fcidump_file(chem_env, hcore_eff_mo, full_v2, symvec, filename);
+  free_tensors(hcore_eff_alpha_mo, hcore_eff_beta_mo, hcore_eff_mo);
+  hcore_eff_alpha_mo_eig.resize(0, 0);
+  hcore_eff_beta_mo_eig.resize(0, 0);
+  hcore_eff_mo_eig.resize(0, 0);
 }
 
 } // namespace exachem::embedding

@@ -34,5 +34,12 @@ void permute_orbitals(ChemEnv& chem_env, const Matrix& C_occ, const Matrix& S, T
                       const int nocc, const int nvirtual);
 void print_eigs(ExecutionContext& ec, Tensor<double>& F_tamm, Tensor<double>& C_tamm, size_t N,
                 size_t NMO);
+void fci_driver_embedding(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Matrix>& Vembedding,
+                          const bool is_unrestricted, bool rank0);
+template<typename T>
+void generate_fcidump_embedding(ChemEnv& chem_env, ExecutionContext& ec,
+                                const Tensor<T>& hcore_eff_alpha, const Tensor<T>& hcore_eff_beta,
+                                const Tensor<T>& lcao, const Tensor<T>& full_v2, ExecutionHW ex_hw,
+                                std::string filename = "");
 
 } // namespace exachem::embedding

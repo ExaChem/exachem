@@ -44,7 +44,14 @@ This section is used to define projector-based quantum embedding parameters.
     * :strong:`"huzinaga"`
     * :strong:`"level"`
 
-:high_level: A string specifying the high-level calculation. It can be a combination of exchange-correlation functionals, or a string identifying the post-HF method.
+:high_level: A string specifying the high-level calculation. It can be a combination of exchange-correlation functionals, a string identifying the post-HF method, or FCIDUMP for active space integral writeout.
+
+    * :strong:`"HF"`
+    * :strong:`"PBE0"`
+    * :strong:`"MP2"`
+    * :strong:`"CCSD"`
+    * :strong:`"CCSD_CANONICAL"`
+    * :strong:`"FCIDUMP"`
 
 :pao_thresh1: Norm-based threshold to control the number of PAOs kept.
 

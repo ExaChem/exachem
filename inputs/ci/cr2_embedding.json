@@ -30,7 +30,7 @@
     "use_ksref": true,
     "lambda": 1.0e6,
     "high_level": ["CCSD(T)"],
-    "nactive_mos": [9]
+    "nactive_occ_orbitals": [9]
   },
   "CC": {
     "threshold": 1e-06,

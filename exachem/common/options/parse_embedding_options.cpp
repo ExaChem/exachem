@@ -21,9 +21,9 @@ void ParseEmbeddingOptions::operator()(ChemEnv& chem_env) {
 void ParseEmbeddingOptions::parse_check(json& jinput) {
   if(!jinput.contains("EMBEDDING")) return;
   // clang-format off
-  const std::vector<std::string> valid_embedding{"high_level", "active_atoms", "lambda",
-     "partition", "nactive_mos", "freeze_projected", "projector", "iterative_vembedding",
-     "pao_thresh1", "pao_thresh2", "use_ksref"};
+  const std::vector<std::string> valid_embedding{"high_level", "active_atoms", "active_orbitals", "lambda",
+     "partition", "nactive_occ_orbitals", "nactive_vir_orbitals", "avas_occ_threshold", "avas_vir_threshold", 
+     "freeze_projected", "projector", "iterative_vembedding", "pao_thresh1", "pao_thresh2", "use_ksref"};
   // clang-format on
 
   for(auto& el: jinput["EMBEDDING"].items()) {
@@ -42,7 +42,12 @@ void ParseEmbeddingOptions::parse(ChemEnv& chem_env) {
   parse_option<std::string>(embedding_options.partition, jemb, "partition");
   parse_option<std::string>(embedding_options.projector, jemb, "projector");
   parse_option<std::vector<int>>(embedding_options.active_atoms, jemb, "active_atoms");
-  parse_option<std::vector<int>>(embedding_options.nactive_orbitals, jemb, "nactive_mos");
+  parse_option<std::unordered_map<std::string, std::unordered_set<std::string>>>(
+    embedding_options.active_orbitals, jemb, "active_orbitals");
+  parse_option<std::vector<int>>(embedding_options.nactive_occ_orbitals, jemb,
+                                 "nactive_occ_orbitals");
+  parse_option<std::vector<int>>(embedding_options.nactive_vir_orbitals, jemb,
+                                 "nactive_vir_orbitals");
   parse_option<double>(embedding_options.lambda, jemb, "lambda");
   parse_option<double>(embedding_options.pao_thresh1, jemb, "pao_thresh1");
   parse_option<double>(embedding_options.pao_thresh2, jemb, "pao_thresh2");
@@ -70,8 +75,9 @@ void ParseEmbeddingOptions::parse(ChemEnv& chem_env) {
     tamm_terminate("INPUT FILE ERROR: EMBEDDING option lambda should be greater than 0.0");
   }
 
-  if(embedding_options.active_atoms.empty()) {
-    tamm_terminate("INPUT FILE ERROR: EMBEDDING option active_atoms is empty");
+  if(embedding_options.active_atoms.empty() && embedding_options.active_orbitals.empty()) {
+    tamm_terminate(
+      "INPUT FILE ERROR: EMBEDDING options active_atoms and active_orbitals are both empty");
   }
 
   std::string& projector = embedding_options.projector;
@@ -82,12 +88,12 @@ void ParseEmbeddingOptions::parse(ChemEnv& chem_env) {
 
   std::string& partition = embedding_options.partition;
   std::transform(partition.begin(), partition.end(), partition.begin(), ::toupper);
-  const std::vector<std::string> partition_valid{"SPADE"};
+  const std::vector<std::string> partition_valid{"SPADE", "AVAS"};
   if(std::find(partition_valid.begin(), partition_valid.end(), partition) == partition_valid.end())
-    tamm_terminate("INPUT FILE ERROR: EMBEDDING option partition is not SPADE");
+    tamm_terminate("INPUT FILE ERROR: EMBEDDING option partition is not SPADE or AVAS");
 
-  for(auto& i_acc_mos: embedding_options.nactive_orbitals) {
+  for(auto& i_acc_mos: embedding_options.nactive_occ_orbitals) {
     if(i_acc_mos < 1)
-      tamm_terminate("INPUT FILE ERROR: EMBEDDING option nactive_mos should be > 0");
+      tamm_terminate("INPUT FILE ERROR: EMBEDDING option nactive_occ_mos should be > 0");
   }
 }

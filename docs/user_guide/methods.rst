@@ -10,4 +10,5 @@ Quantum Mechanical Methods
     coupledcluster
     qed
     gfcc/gfcc
+    embedding
     bibliography

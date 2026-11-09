@@ -25,6 +25,8 @@ void   embedding_driver(ExecutionContext& ec, ChemEnv& chem_env);
 void   embedding(ExecutionContext& ec, ChemEnv& chem_env);
 Matrix spade(const Matrix& S12, const Matrix& C_occ, const std::vector<int> indicesToKeep,
              const int n_acc_mos, bool rank0);
+Matrix avas(const Matrix& S1_eigen, const Matrix& C_occ, const std::vector<int> indicesToKeep,
+            const double avas_threshold, const int n_acc_mos, bool rank0);
 Matrix paos(const Matrix& S, const Matrix& C_occ, const std::vector<int> indicesToKeep, bool rank0,
             double pao_thresh1 = 0.05, double pao_thresh2 = 0.0001);
 Matrix sqrtm(const Matrix& mat);

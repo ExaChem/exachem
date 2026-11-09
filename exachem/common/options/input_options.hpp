@@ -93,17 +93,21 @@ public:
 
 class EmbeddingOptions: public CommonOptions {
 public:
-  std::vector<std::string> high_level{"ccsd"};
-  std::vector<int>         active_atoms{};
-  std::vector<int>         nactive_orbitals{};
-  std::string              partition{"spade"};
-  std::string              projector{"huzinaga"};
-  bool                     freeze_projected{true};
-  bool                     iterative_vembedding{false};
-  bool                     use_ksref{false};
-  double                   lambda{1.0};
-  double                   pao_thresh1{0.05};
-  double                   pao_thresh2{0.0001};
+  std::vector<std::string>                                         high_level{"ccsd"};
+  std::vector<int>                                                 active_atoms{};
+  std::unordered_map<std::string, std::unordered_set<std::string>> active_orbitals{};
+  std::vector<int>                                                 nactive_occ_orbitals{};
+  std::vector<int>                                                 nactive_vir_orbitals{};
+  std::string                                                      partition{"spade"};
+  std::string                                                      projector{"huzinaga"};
+  bool                                                             freeze_projected{true};
+  bool                                                             iterative_vembedding{false};
+  bool                                                             use_ksref{false};
+  double                                                           lambda{1.0};
+  double                                                           avas_occ_threshold{0.1};
+  double                                                           avas_vir_threshold{0.1};
+  double                                                           pao_thresh1{0.05};
+  double                                                           pao_thresh2{0.0001};
 };
 
 class PDOSOptions: public CommonOptions {

@@ -42,15 +42,19 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
   if(rank0) std::cout << "\n" << header << "\n";
 
   // Get embedding options
-  const std::string&      projector          = chem_env.ioptions.embedding_options.projector;
-  const double            lambda             = chem_env.ioptions.embedding_options.lambda;
-  const bool              freeze_projected   = chem_env.ioptions.embedding_options.freeze_projected;
-  std::vector<int>&       n_acc_mos          = chem_env.ioptions.embedding_options.nactive_orbitals;
-  const std::string&      partition          = chem_env.ioptions.embedding_options.partition;
-  const std::vector<int>& active_atoms       = chem_env.ioptions.embedding_options.active_atoms;
-  const std::vector<std::string>& high_level = chem_env.ioptions.embedding_options.high_level;
-  const bool                      do_spade   = partition == "SPADE";
-  const bool                      huzinaga   = projector == "HUZINAGA";
+  const std::string&      projector        = chem_env.ioptions.embedding_options.projector;
+  const double            lambda           = chem_env.ioptions.embedding_options.lambda;
+  const bool              freeze_projected = chem_env.ioptions.embedding_options.freeze_projected;
+  std::vector<int>&       n_acc_occ_mos = chem_env.ioptions.embedding_options.nactive_occ_orbitals;
+  std::vector<int>&       n_acc_vir_mos = chem_env.ioptions.embedding_options.nactive_vir_orbitals;
+  const std::string&      partition     = chem_env.ioptions.embedding_options.partition;
+  const std::vector<int>& active_atoms  = chem_env.ioptions.embedding_options.active_atoms;
+  const std::unordered_map<std::string, std::unordered_set<std::string>> active_orbitals =
+    chem_env.ioptions.embedding_options.active_orbitals;
+  const double avas_occ_threshold = chem_env.ioptions.embedding_options.avas_occ_threshold;
+  const double avas_vir_threshold = chem_env.ioptions.embedding_options.avas_vir_threshold;
+  const std::vector<std::string>& high_level  = chem_env.ioptions.embedding_options.high_level;
+  const bool                      huzinaga    = projector == "HUZINAGA";
   const double                    pao_thresh1 = chem_env.ioptions.embedding_options.pao_thresh1;
   const double                    pao_thresh2 = chem_env.ioptions.embedding_options.pao_thresh2;
 
@@ -100,31 +104,75 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
   }
 
   // Get active orbitals
+  std::vector<int> indicesToKeep;
+  auto             atom2shell = chem_env.shells.atom2shell(atoms);
+  auto             shell2bf   = chem_env.shells.shell2bf();
+  auto             shell_type = [](size_t nbf) -> std::string {
+    switch(nbf) {
+      case 1: return "s";
+      case 3: return "p";
+      case 5: return "d";
+      case 7: return "f";
+      default: return "";
+    }
+  };
+  // Select indices for the active orbitals
+  if(!active_orbitals.empty()) {
+    for(const auto& [iatom_str, target_shells]: active_orbitals) {
+      int iatom = std::stoi(iatom_str);
+      for(auto ish: atom2shell[iatom]) {
+        auto&       shell = chem_env.shells[ish];
+        std::string type  = shell_type(shell.size());
+        if(!target_shells.contains(type)) { continue; }
+        for(size_t ibf = shell2bf[ish]; ibf < shell2bf[ish] + shell.size(); ++ibf) {
+          indicesToKeep.push_back(ibf);
+        }
+      }
+    }
+  }
+  else { // Use active_atoms
+    for(auto iatom: active_atoms) {
+      for(auto ish: atom2shell[iatom]) {
+        for(size_t ibf = shell2bf[ish]; ibf < shell2bf[ish] + chem_env.shells[ish].size(); ibf++) {
+          indicesToKeep.push_back(ibf);
+        }
+      }
+    }
+  }
+
+  if(n_acc_occ_mos.empty()) {
+    n_acc_occ_mos.push_back(0);
+    if(is_unrestricted) n_acc_occ_mos.push_back(0);
+  }
+  if(n_acc_vir_mos.empty()) {
+    n_acc_vir_mos.push_back(0);
+    if(is_unrestricted) n_acc_vir_mos.push_back(0);
+  }
   std::vector<Matrix> C_occ_active;
   std::vector<Matrix> C_uno_active;
-  if(do_spade) {
-    // Get the indeces of the active basis functions
-    std::vector<int> indicesToKeep;
-    auto             atom2shell = chem_env.shells.atom2shell(atoms);
-    auto             shell2bf   = chem_env.shells.shell2bf();
-    for(auto iatom: active_atoms)
-      for(auto ish: atom2shell[iatom])
-        for(size_t ibf = shell2bf[ish]; ibf < shell2bf[ish] + chem_env.shells[ish].size(); ibf++)
-          indicesToKeep.push_back(ibf);
-
-    if(n_acc_mos.empty()) {
-      n_acc_mos.push_back(0);
-      if(is_unrestricted) n_acc_mos.push_back(0);
+  if(partition == "AVAS") {
+    C_occ_active.push_back(
+      avas(S1_eigen, C_occ[0], indicesToKeep, avas_occ_threshold, n_acc_occ_mos[0], rank0));
+    C_uno_active.push_back(
+      avas(S1_eigen, C_vir[0], indicesToKeep, avas_vir_threshold, n_acc_vir_mos[0], rank0));
+    if(is_unrestricted) {
+      C_occ_active.push_back(
+        avas(S1_eigen, C_occ[1], indicesToKeep, avas_occ_threshold, n_acc_occ_mos[1], rank0));
+      C_uno_active.push_back(
+        avas(S1_eigen, C_vir[1], indicesToKeep, avas_vir_threshold, n_acc_vir_mos[1], rank0));
     }
-    C_occ_active.push_back(spade(S12_eigen, C_occ[0], indicesToKeep, n_acc_mos[0], rank0));
+  }
+  else if(partition == "SPADE") {
+    C_occ_active.push_back(spade(S12_eigen, C_occ[0], indicesToKeep, n_acc_occ_mos[0], rank0));
     C_uno_active.push_back(
       paos(S1_eigen, C_occ[0], indicesToKeep, rank0, pao_thresh1, pao_thresh2));
     if(is_unrestricted) {
-      C_occ_active.push_back(spade(S12_eigen, C_occ[1], indicesToKeep, n_acc_mos[1], rank0));
+      C_occ_active.push_back(spade(S12_eigen, C_occ[1], indicesToKeep, n_acc_occ_mos[1], rank0));
       C_uno_active.push_back(
         paos(S1_eigen, C_occ[1], indicesToKeep, rank0, pao_thresh1, pao_thresh2));
     }
   }
+
   if(rank0) {
     std::cout << "Number of active occupied MOs: " << C_occ_active[0].cols();
     if(is_unrestricted) { std::cout << ", " << C_occ_active[1].cols() << "\n"; }
@@ -279,6 +327,12 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
   const std::vector<std::string> dft{"PBE", "SCAN", "R2SCAN", "BLYP", "PBE0"};
   bool&                          is_ks     = chem_env.sys_data.is_ks;
   bool&                          use_ksref = chem_env.ioptions.embedding_options.use_ksref;
+  const std::vector<std::string> correlated_methods{"MP2",     "CC2",   "CCSD", "CCSD_CANONICAL",
+                                                    "CCSD(T)", "CCSDT", "DUCC", "QFLOW"};
+  if(std::find(correlated_methods.begin(), correlated_methods.end(), high_level[0]) ==
+     correlated_methods.end()) {
+    use_ksref = false;
+  } // In DFT-in-DFT cases, energy_a_high only populates if use_ksref = false
   if(!use_ksref) {
     is_ks = false;
     chem_env.ioptions.scf_options.xc_type.clear();
@@ -432,33 +486,53 @@ Matrix spade(const Matrix& S12, const Matrix& C_occ, const std::vector<int> indi
   return C_occ * eigenvectors.rightCols(n_act_mos);
 }
 
+Matrix avas(const Matrix& S1_eigen, const Matrix& C_occ, const std::vector<int> target_indices,
+            const double avas_threshold, const int n_acc_mos, bool rank0) {
+  Matrix              sigma = S1_eigen(target_indices, target_indices);
+  Matrix              S21   = S1_eigen(target_indices, Eigen::placeholders::all);
+  Matrix              P     = S21.transpose() * sigma.inverse() * S21;
+  Matrix              SA    = C_occ.transpose() * P * C_occ;
+  size_t              Nocc  = SA.rows();
+  std::vector<double> eigvals(Nocc);
+  lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, Nocc, SA.data(), Nocc, eigvals.data());
+  Matrix eigenvectors = SA.transpose();
+  size_t n_act_mos    = 0;
+  if(n_acc_mos == 0) {
+    for(double val: eigvals)
+      if(val > avas_threshold) n_act_mos++;
+  }
+  else { n_act_mos = n_acc_mos; }
+  if(rank0) {
+    std::cout << std::setprecision(10) << std::endl;
+    std::cout << "*** AVAS ALGORITHM ***" << std::endl;
+    for(auto x: eigvals) std::cout << x << std::endl;
+    std::cout << std::endl;
+  }
+  return C_occ * eigenvectors.rightCols(n_act_mos);
+}
+
 Matrix paos(const Matrix& S, const Matrix& C_occ, const std::vector<int> indicesToKeep, bool rank0,
             double pao_thresh1, double pao_thresh2) {
   // double    pao_thresh1 = 0.01;
   // double    pao_thresh2 = 0.00001;
+  const int Npao1 = indicesToKeep.size();
   const int N     = S.rows();
-  Matrix    c_pao = Eigen::MatrixXd::Identity(N, N) - C_occ * C_occ.transpose() * S;
+  Matrix    c_pao = (Eigen::MatrixXd::Identity(N, N) -
+                  C_occ * C_occ.transpose() * S)(Eigen::placeholders::all, indicesToKeep);
 
-  Matrix           SC = S(indicesToKeep, Eigen::placeholders::all) * c_pao;
+  Matrix           SC = S * c_pao;
   std::vector<int> active_paos;
-  for(size_t ipao = 0; ipao < (size_t) N; ipao++) {
-    double norb = c_pao(indicesToKeep, ipao).dot(SC.col(ipao));
+  for(size_t ipao = 0; ipao < (size_t) Npao1; ipao++) {
+    double norb = c_pao(Eigen::placeholders::all, ipao).dot(SC.col(ipao));
     if(std::abs(norb) > pao_thresh1) { active_paos.push_back(ipao); }
   }
 
-  Matrix c_pao_prime = c_pao(Eigen::placeholders::all, active_paos);
-  size_t Npaos       = c_pao_prime.cols();
-  SC                 = S * c_pao_prime;
-  for(size_t ipao = 0; ipao < Npaos; ipao++) {
-    double norm = 1.0 / std::sqrt(c_pao_prime.col(ipao).dot(SC.col(ipao)));
-    c_pao_prime.col(ipao) *= norm;
-    SC.col(ipao) *= norm;
-  }
-
-  Matrix              s_pao = c_pao_prime.transpose() * SC;
+  Matrix              c_pao_prime = c_pao(Eigen::placeholders::all, active_paos);
+  Matrix              CSC         = c_pao_prime.transpose() * S * c_pao_prime;
+  const int           Npaos       = c_pao_prime.cols();
   std::vector<double> eigvals(Npaos);
-  lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, Npaos, s_pao.data(), Npaos, eigvals.data());
-  Matrix eigenvectors = s_pao.transpose();
+  lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, Npaos, CSC.data(), Npaos, eigvals.data());
+  Matrix eigenvectors = CSC.transpose();
   active_paos.clear();
   for(size_t ipao = 0; ipao < Npaos; ipao++) {
     if(eigvals[ipao] > pao_thresh2) {

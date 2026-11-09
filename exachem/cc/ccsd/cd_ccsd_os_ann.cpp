@@ -8,7 +8,6 @@
 
 #include "exachem/cc/ccsd/cd_ccsd_os_ann.hpp"
 #include "exachem/cc/krylov_solvers.hpp"
-#include <span>
 
 using namespace exachem::cc::solvers;
 
@@ -256,359 +255,6 @@ void CD_CCSD_OS<T>::ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const 
   auto chol3d_vo = chol3d_se[2];
   auto chol3d_vv = chol3d_se[3];
 
-  auto hw = sch.ec().exhw();
-  // auto rank = sch.ec().pg().rank();
-
-  // "_a022( aaaa )(p3_va,p4_va,p2_va,p1_va)     =  1.0   * _a021_os( aa )(p3_va,p2_va,cind) *
-  // _a021_os( aa )(p4_va,p1_va,cind)")
-  // "_a022( bbbb )(p3_vb,p4_vb,p2_vb,p1_vb)     =  1.0   * _a021_os( bb )(p3_vb,p2_vb,cind) *
-  // _a021_os( bb )(p4_vb,p1_vb,cind)"
-  // "_a022( abab )(p3_va,p4_vb,p2_va,p1_vb)     =  1.0   * _a021_os( aa )(p3_va,p2_va,cind) *
-  // _a021_os( bb )(p4_vb,p1_vb,cind)")
-
-  int   a22_flag = 0;
-  auto& oprof    = tamm::OpProfiler::instance();
-
-  auto compute_v4_term = [=, this, &a22_flag, &oprof](const IndexVector& cblkid, span<T> cbuf) {
-    Tensor<T>                         a22_tmp;
-    std::unique_ptr<LabeledTensor<T>> lhsp_, rhs1p_, rhs2p_;
-
-    auto [cind]                       = CI.labels<1>("all");
-    auto [p1_va, p2_va, p3_va, p4_va] = v_alpha_os.labels<4>("all");
-    auto [p1_vb, p2_vb, p3_vb, p4_vb] = v_beta_os.labels<4>("all");
-
-    if(a22_flag == 1) {
-      a22_tmp = {v_alpha_os, v_alpha_os, v_alpha_os, v_alpha_os};
-      lhsp_   = std::make_unique<LabeledTensor<T>>(a22_tmp, p3_va, p4_va, p2_va, p1_va);
-      rhs1p_  = std::make_unique<LabeledTensor<T>>(_a021_os("aa"), p3_va, p2_va, cind);
-      rhs2p_  = std::make_unique<LabeledTensor<T>>(_a021_os("aa"), p4_va, p1_va, cind);
-    }
-    else if(a22_flag == 2) {
-      a22_tmp = {v_beta_os, v_beta_os, v_beta_os, v_beta_os};
-      lhsp_   = std::make_unique<LabeledTensor<T>>(a22_tmp, p3_vb, p4_vb, p2_vb, p1_vb);
-      rhs1p_  = std::make_unique<LabeledTensor<T>>(_a021_os("bb"), p3_vb, p2_vb, cind);
-      rhs2p_  = std::make_unique<LabeledTensor<T>>(_a021_os("bb"), p4_vb, p1_vb, cind);
-    }
-    else if(a22_flag == 3) {
-      a22_tmp = {v_alpha_os, v_beta_os, v_alpha_os, v_beta_os};
-      lhsp_   = std::make_unique<LabeledTensor<T>>(a22_tmp, p3_va, p4_vb, p2_va, p1_vb);
-      rhs1p_  = std::make_unique<LabeledTensor<T>>(_a021_os("aa"), p3_va, p2_va, cind);
-      rhs2p_  = std::make_unique<LabeledTensor<T>>(_a021_os("bb"), p4_vb, p1_vb, cind);
-    }
-    else { tamm_terminate("[CCSD-OS] This line should be unreachable"); }
-
-    LabeledTensor<T>& lhs_  = *lhsp_;
-    LabeledTensor<T>& rhs1_ = *rhs1p_;
-    LabeledTensor<T>& rhs2_ = *rhs2p_;
-
-    // mult op constructor
-    auto lhs_lbls  = lhs_.labels();
-    auto rhs1_lbls = rhs1_.labels();
-    auto rhs2_lbls = rhs2_.labels();
-
-    IntLabelVec lhs_int_labels_;
-    IntLabelVec rhs1_int_labels_;
-    IntLabelVec rhs2_int_labels_;
-
-    auto labels{lhs_lbls};
-    labels.insert(labels.end(), rhs1_lbls.begin(), rhs1_lbls.end());
-    labels.insert(labels.end(), rhs2_lbls.begin(), rhs2_lbls.end());
-
-    internal::update_labels(labels);
-
-    lhs_lbls  = IndexLabelVec(labels.begin(), labels.begin() + lhs_.labels().size());
-    rhs1_lbls = IndexLabelVec(labels.begin() + lhs_.labels().size(),
-                              labels.begin() + lhs_.labels().size() + rhs1_.labels().size());
-    rhs2_lbls = IndexLabelVec(labels.begin() + lhs_.labels().size() + rhs1_.labels().size(),
-                              labels.begin() + lhs_.labels().size() + rhs1_.labels().size() +
-                                rhs2_.labels().size());
-    lhs_.set_labels(lhs_lbls);
-    rhs1_.set_labels(rhs1_lbls);
-    rhs2_.set_labels(rhs2_lbls);
-
-    // fillin_int_labels
-    std::map<TileLabelElement, int> primary_labels_map;
-    int                             cnt = -1;
-    for(const auto& lbl: lhs_.labels()) { primary_labels_map[lbl.primary_label()] = --cnt; }
-    for(const auto& lbl: rhs1_.labels()) { primary_labels_map[lbl.primary_label()] = --cnt; }
-    for(const auto& lbl: rhs2_.labels()) { primary_labels_map[lbl.primary_label()] = --cnt; }
-    for(const auto& lbl: lhs_.labels()) {
-      lhs_int_labels_.push_back(primary_labels_map[lbl.primary_label()]);
-    }
-    for(const auto& lbl: rhs1_.labels()) {
-      rhs1_int_labels_.push_back(primary_labels_map[lbl.primary_label()]);
-    }
-    for(const auto& lbl: rhs2_.labels()) {
-      rhs2_int_labels_.push_back(primary_labels_map[lbl.primary_label()]);
-    }
-    // todo: validate
-
-    using TensorElType1 = T;
-    using TensorElType2 = T;
-    using TensorElType3 = T;
-
-    // determine set of all labels for do_work
-    IndexLabelVec all_labels{lhs_.labels()};
-    all_labels.insert(all_labels.end(), rhs1_.labels().begin(), rhs1_.labels().end());
-    all_labels.insert(all_labels.end(), rhs2_.labels().begin(), rhs2_.labels().end());
-    // LabelLoopNest loop_nest{all_labels};
-
-    // execute-bufacc
-    IndexLabelVec lhs_labels{lhs_.labels()};
-    IndexLabelVec rhs1_labels{rhs1_.labels()};
-    IndexLabelVec rhs2_labels{rhs2_.labels()};
-    IndexLabelVec all_rhs_labels{rhs1_.labels()};
-    all_rhs_labels.insert(all_rhs_labels.end(), rhs2_.labels().begin(), rhs2_.labels().end());
-
-    // compute the reduction labels
-    std::sort(lhs_labels.begin(), lhs_labels.end());
-    auto unique_labels = internal::unique_entries_by_primary_label(all_rhs_labels);
-    std::sort(unique_labels.begin(), unique_labels.end());
-    IndexLabelVec reduction_labels; //{reduction.begin(), reduction.end()};
-    std::set_difference(unique_labels.begin(), unique_labels.end(), lhs_labels.begin(),
-                        lhs_labels.end(), std::back_inserter(reduction_labels));
-
-    std::vector<int> rhs1_map_output;
-    std::vector<int> rhs2_map_output;
-    std::vector<int> rhs1_map_reduction;
-    std::vector<int> rhs2_map_reduction;
-    // const auto&      lhs_lbls = lhs_.labels();
-    for(auto& lbl: rhs1_labels) {
-      auto it_out = std::find(lhs_lbls.begin(), lhs_lbls.end(), lbl);
-      if(it_out != lhs_lbls.end()) rhs1_map_output.push_back(it_out - lhs_lbls.begin());
-      else rhs1_map_output.push_back(-1);
-
-      // auto it_red = std::find(reduction.begin(), reduction.end(), lbl);
-      auto it_red = std::find(reduction_labels.begin(), reduction_labels.end(), lbl);
-      if(it_red != reduction_labels.end())
-        rhs1_map_reduction.push_back(it_red - reduction_labels.begin());
-      else rhs1_map_reduction.push_back(-1);
-    }
-
-    for(auto& lbl: rhs2_labels) {
-      auto it_out = std::find(lhs_lbls.begin(), lhs_lbls.end(), lbl);
-      if(it_out != lhs_lbls.end()) rhs2_map_output.push_back(it_out - lhs_lbls.begin());
-      else rhs2_map_output.push_back(-1);
-
-      auto it_red = std::find(reduction_labels.begin(), reduction_labels.end(), lbl);
-      if(it_red != reduction_labels.end())
-        rhs2_map_reduction.push_back(it_red - reduction_labels.begin());
-      else rhs2_map_reduction.push_back(-1);
-    }
-
-    auto ctensor = lhs_.tensor();
-    auto atensor = rhs1_.tensor();
-    auto btensor = rhs2_.tensor();
-
-    std::vector<std::unique_ptr<AddBuf<TensorElType1, TensorElType2, TensorElType3>>> add_bufs;
-
-    // compute blockids from the loop indices. itval is the loop index
-    // execute_bufacc(ec, hw);
-    LabelLoopNest lhs_loop_nest{lhs_.labels()};
-    IndexVector   translated_ablockid, translated_bblockid, translated_cblockid;
-    auto          it    = lhs_loop_nest.begin();
-    auto          itval = *it;
-    for(; it != lhs_loop_nest.end(); ++it) {
-      itval = *it;
-      // auto        it   = ivec.begin();
-      IndexVector c_block_id{itval};
-      translated_cblockid = internal::translate_blockid(c_block_id, lhs_);
-      if(translated_cblockid == cblkid) break;
-    }
-
-    // execute
-    // const auto& ldist = lhs_.tensor().distribution();
-    // for(const auto& lblockid: lhs_loop_nest) {
-    //   const auto translated_lblockid = internal::translate_blockid(lblockid, lhs_);
-    //   if(lhs_.tensor().is_non_zero(translated_lblockid) &&
-    //       std::get<0>(ldist.locate(translated_lblockid)) == rank) {
-    //     lambda(lblockid);
-    //   }
-
-    const size_t csize = ctensor.block_size(translated_cblockid);
-    // std::vector<TensorElType1> cbuf(csize, 0);
-    memset(cbuf.data(), 0x00, csize * sizeof(TensorElType1));
-    const auto& cdims = ctensor.block_dims(translated_cblockid);
-
-    SizeVec cdims_sz;
-    for(const auto v: cdims) { cdims_sz.push_back(v); }
-
-    std::unique_ptr<AddBuf<TensorElType1, TensorElType2, TensorElType3>> ab_owner;
-#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-    TensorElType2* th_a{nullptr};
-    TensorElType3* th_b{nullptr};
-    auto&          thandle = GPUStreamPool::getInstance().getStream();
-
-    ab_owner = std::make_unique<AddBuf<TensorElType1, TensorElType2, TensorElType3>>(
-      th_a, th_b, nullptr, translated_cblockid);
-    // Non-owning observer; ownership moves into add_bufs below. Taken before the move, since
-    // unique_ptr::get() would return null afterwards. GPU-only: the CPU path reaches the same
-    // object through add_bufs[0].get().
-    AddBuf<TensorElType1, TensorElType2, TensorElType3>* ab = ab_owner.get();
-#else
-    gpuStream_t thandle{};
-    ab_owner = std::make_unique<AddBuf<TensorElType1, TensorElType2, TensorElType3>>(
-      ctensor, nullptr, translated_cblockid);
-#endif
-    add_bufs.push_back(std::move(ab_owner));
-
-    // LabelLoopNest inner_loop{reduction_lbls};
-    LabelLoopNest inner_loop{reduction_labels};
-
-    // int loop_counter = 0;
-
-    TensorElType1* cbuf_dev_ptr{nullptr};
-    TensorElType1* cbuf_tmp_dev_ptr{nullptr};
-    auto&          memHostPool = tamm::RMMMemoryManager::getInstance().getHostMemoryPool();
-
-#if(defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP))
-    auto& memDevicePool = tamm::RMMMemoryManager::getInstance().getDeviceMemoryPool();
-
-    std::span<TensorElType1> cbuf_dev_span;
-    std::span<TensorElType1> cbuf_tmp_dev_span;
-    if(hw == ExecutionHW::GPU) {
-      cbuf_dev_ptr = (cbuf_dev_span = memDevicePool.allocate_span<TensorElType1>(csize)).data();
-      cbuf_tmp_dev_ptr =
-        (cbuf_tmp_dev_span = memDevicePool.allocate_span<TensorElType1>(csize)).data();
-
-      gpuMemsetAsync(cbuf_dev_ptr, csize * sizeof(TensorElType1), thandle);
-      gpuMemsetAsync(cbuf_tmp_dev_ptr, csize * sizeof(TensorElType1), thandle);
-    }
-#endif
-
-    for(const auto& inner_it_val: inner_loop) { // k
-
-      IndexVector a_block_id(rhs1_.labels().size());
-
-      for(size_t i = 0; i < rhs1_map_output.size(); i++) {
-        if(rhs1_map_output[i] != -1) { a_block_id[i] = itval[rhs1_map_output[i]]; }
-      }
-
-      for(size_t i = 0; i < rhs1_map_reduction.size(); i++) {
-        if(rhs1_map_reduction[i] != -1) { a_block_id[i] = inner_it_val[rhs1_map_reduction[i]]; }
-      }
-
-      const auto translated_ablockid = internal::translate_blockid(a_block_id, rhs1_);
-      if(!atensor.is_non_zero(translated_ablockid)) continue;
-
-      IndexVector b_block_id(rhs2_.labels().size());
-
-      for(size_t i = 0; i < rhs2_map_output.size(); i++) {
-        if(rhs2_map_output[i] != -1) { b_block_id[i] = itval[rhs2_map_output[i]]; }
-      }
-
-      for(size_t i = 0; i < rhs2_map_reduction.size(); i++) {
-        if(rhs2_map_reduction[i] != -1) { b_block_id[i] = inner_it_val[rhs2_map_reduction[i]]; }
-      }
-
-      const auto translated_bblockid = internal::translate_blockid(b_block_id, rhs2_);
-      if(!btensor.is_non_zero(translated_bblockid)) continue;
-
-      // compute block size and allocate buffers for abuf and bbuf
-      const size_t asize = atensor.block_size(translated_ablockid);
-      const size_t bsize = btensor.block_size(translated_bblockid);
-
-      TensorElType2*           abuf{nullptr};
-      TensorElType3*           bbuf{nullptr};
-      std::span<TensorElType2> abuf_span = memHostPool.allocate_span<TensorElType2>(asize);
-      std::span<TensorElType3> bbuf_span = memHostPool.allocate_span<TensorElType3>(bsize);
-      abuf                               = abuf_span.data();
-      bbuf                               = bbuf_span.data();
-
-      {
-        TimerGuard tg_get{&oprof.multOpGetTime};
-        atensor.get(translated_ablockid, {abuf, asize});
-        btensor.get(translated_bblockid, {bbuf, bsize});
-      }
-
-      const auto& adims = atensor.block_dims(translated_ablockid);
-      const auto& bdims = btensor.block_dims(translated_bblockid);
-
-      // changed cscale from 0 to 1 to aggregate on cbuf
-      T cscale{1};
-
-      SizeVec adims_sz, bdims_sz;
-      for(const auto v: adims) { adims_sz.push_back(v); }
-      for(const auto v: bdims) { bdims_sz.push_back(v); }
-
-      // A*B
-      {
-        TimerGuard                                           tg_bc{&oprof.multOpBCTime};
-        AddBuf<TensorElType1, TensorElType2, TensorElType3>* abptr{nullptr};
-#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-        // Spans own the device blocks; AddBuf keeps the raw pointers it needs for the
-        // kernel call. Freeing the span guarantees the size matches the allocation.
-        std::span<TensorElType2> ta_span;
-        std::span<TensorElType3> tb_span;
-        if(hw == ExecutionHW::GPU) {
-          abptr   = ab;
-          ab->ta_ = (ta_span = memDevicePool.allocate_span<TensorElType2>(asize)).data();
-          ab->tb_ = (tb_span = memDevicePool.allocate_span<TensorElType3>(bsize)).data();
-        }
-        else abptr = add_bufs[0].get();
-#else
-        abptr = add_bufs[0].get();
-#endif
-        abptr->abuf_ = abuf;
-        abptr->bbuf_ = bbuf;
-
-        kernels::block_multiply<T, TensorElType1, TensorElType2, TensorElType3>(
-#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
-          abptr->ta_, abptr->tb_,
-#endif
-          thandle, 1.0, abptr->abuf_, adims_sz, rhs1_int_labels_, abptr->bbuf_, bdims_sz,
-          rhs2_int_labels_, cscale, cbuf.data(), cdims_sz, lhs_int_labels_, hw, false, cbuf_dev_ptr,
-          cbuf_tmp_dev_ptr);
-
-#if(defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP))
-        if(hw == ExecutionHW::GPU) {
-          memDevicePool.deallocate(ta_span);
-          memDevicePool.deallocate(tb_span);
-        }
-#endif
-      } // A * B
-
-      memHostPool.deallocate(abuf_span);
-      memHostPool.deallocate(bbuf_span);
-    } // end of reduction loop
-
-    // add the computed update to the tensor
-    {
-#if(defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP))
-      // copy to host
-      if(hw == ExecutionHW::GPU) {
-        TimerGuard               tg_bc{&oprof.multOpBCTime};
-        TensorElType1*           cbuf_tmp{nullptr};
-        std::span<TensorElType1> cbuf_tmp_span = memHostPool.allocate_span<TensorElType1>(csize);
-        cbuf_tmp                               = cbuf_tmp_span.data();
-        std::memset(cbuf_tmp, 0, csize * sizeof(TensorElType1));
-        {
-          TimerGuard tg_copy{&oprof.multOpCopyTime};
-          gpuMemcpyAsync<TensorElType1>(cbuf_tmp, cbuf_dev_ptr, csize, gpuMemcpyDeviceToHost,
-                                        thandle);
-          gpuStreamSynchronize(thandle);
-        }
-        // cbuf+=cbuf_tmp
-        blas::axpy(csize, TensorElType1{1}, cbuf_tmp, 1, cbuf.data(), 1);
-
-        memHostPool.deallocate(cbuf_tmp_span);
-
-        memDevicePool.deallocate(cbuf_dev_span);
-        memDevicePool.deallocate(cbuf_tmp_dev_span);
-      }
-#endif
-    }
-
-    // add_bufs owns the AddBuf objects via unique_ptr; clearing frees them
-    add_bufs.clear();
-
-    // lhsp_/rhs1p_/rhs2p_ freed automatically when their unique_ptrs go out of scope
-  };
-
-  a22_aaaa_os = Tensor<T>{{v_alpha_os, v_alpha_os, v_alpha_os, v_alpha_os}, compute_v4_term};
-  a22_abab_os = Tensor<T>{{v_alpha_os, v_beta_os, v_alpha_os, v_beta_os}, compute_v4_term};
-  a22_bbbb_os = Tensor<T>{{v_beta_os, v_beta_os, v_beta_os, v_beta_os}, compute_v4_term};
-
   // clang-format off
   sch
     (_a017_os("aa")(p3_va, h2_oa, cind)         = -1.0   * t2_aaaa(p1_va, p3_va, h3_oa, h2_oa) * chol3d_ov("aa")(h3_oa, p1_va, cind),
@@ -697,37 +343,35 @@ void CD_CCSD_OS<T>::ccsd_t2_os(Scheduler& sch, const TiledIndexSpace& MO, const 
     (i0_bbbb(p3_vb, p4_vb, h1_ob, h2_ob)        =  0.5   * _a017_os("bb")(p3_vb, h1_ob, cind) * _a017_os("bb")(p4_vb, h2_ob, cind),
     "i0_bbbb(p3_vb, p4_vb, h1_ob, h2_ob)        =  0.5   * _a017_os( bb )(p3_vb, h1_ob, cind) * _a017_os( bb )(p4_vb, h2_ob, cind)")
     (i0_abab(p3_va, p4_vb, h1_oa, h2_ob)        =  1.0   * _a017_os("aa")(p3_va, h1_oa, cind) * _a017_os("bb")(p4_vb, h2_ob, cind),
-    "i0_abab(p3_va, p4_vb, h1_oa, h2_ob)        =  1.0   * _a017_os( aa )(p3_va, h1_oa, cind) * _a017_os( bb )(p4_vb, h2_ob, cind)").execute(hw);
+    "i0_abab(p3_va, p4_vb, h1_oa, h2_ob)        =  1.0   * _a017_os( aa )(p3_va, h1_oa, cind) * _a017_os( bb )(p4_vb, h2_ob, cind)");
 
-
-
-    // sch(_a022("aaaa")(p3_va,p4_va,p2_va,p1_va)  =  1.0   * _a021_os("aa")(p3_va,p2_va,cind) * _a021_os("aa")(p4_va,p1_va,cind),
-    // "_a022( aaaa )(p3_va,p4_va,p2_va,p1_va)     =  1.0   * _a021_os( aa )(p3_va,p2_va,cind) * _a021_os( aa )(p4_va,p1_va,cind)")
-    // (_a022("abab")(p3_va,p4_vb,p2_va,p1_vb)     =  1.0   * _a021_os("aa")(p3_va,p2_va,cind) * _a021_os("bb")(p4_vb,p1_vb,cind),
-    // "_a022( abab )(p3_va,p4_vb,p2_va,p1_vb)     =  1.0   * _a021_os( aa )(p3_va,p2_va,cind) * _a021_os( bb )(p4_vb,p1_vb,cind)")
-    // (_a022("bbbb")(p3_vb,p4_vb,p2_vb,p1_vb)     =  1.0   * _a021_os("bb")(p3_vb,p2_vb,cind) * _a021_os("bb")(p4_vb,p1_vb,cind),
-    // "_a022( bbbb )(p3_vb,p4_vb,p2_vb,p1_vb)     =  1.0   * _a021_os( bb )(p3_vb,p2_vb,cind) * _a021_os( bb )(p4_vb,p1_vb,cind)")
-    // (i0_aaaa(p3_va, p4_va, h1_oa, h2_oa)       +=  1.0   * _a022("aaaa")(p3_va, p4_va, p2_va, p1_va) * t2_aaaa(p2_va,p1_va,h1_oa,h2_oa),
-    // "i0_aaaa(p3_va, p4_va, h1_oa, h2_oa)       +=  1.0   * _a022( aaaa )(p3_va, p4_va, p2_va, p1_va) * t2_aaaa(p2_va,p1_va,h1_oa,h2_oa)")
-    // (i0_bbbb(p3_vb, p4_vb, h1_ob, h2_ob)       +=  1.0   * _a022("bbbb")(p3_vb, p4_vb, p2_vb, p1_vb) * t2_bbbb(p2_vb,p1_vb,h1_ob,h2_ob),
-    // "i0_bbbb(p3_vb, p4_vb, h1_ob, h2_ob)       +=  1.0   * _a022( bbbb )(p3_vb, p4_vb, p2_vb, p1_vb) * t2_bbbb(p2_vb,p1_vb,h1_ob,h2_ob)")
-    // (i0_abab(p3_va, p4_vb, h1_oa, h2_ob)       +=  4.0   * _a022("abab")(p3_va, p4_vb, p2_va, p1_vb) * t2_abab(p2_va,p1_vb,h1_oa,h2_ob),
-    // "i0_abab(p3_va, p4_vb, h1_oa, h2_ob)       +=  4.0   * _a022( abab )(p3_va, p4_vb, p2_va, p1_vb) * t2_abab(p2_va,p1_vb,h1_oa,h2_ob)");
-
-    a22_flag = 1;
+    // V^4 terms: stored in _a022_os when the driver allocated it (CC.store_v4), otherwise lazy
+    // tensors whose blocks are computed from _a021_os whenever the contractions below read them.
+    if(a22_abab_os.is_allocated()) {
+      sch(_a022_os("aaaa")(p3_va,p4_va,p2_va,p1_va)  =  1.0   * _a021_os("aa")(p3_va,p2_va,cind) * _a021_os("aa")(p4_va,p1_va,cind),
+      "_a022_os( aaaa )(p3_va,p4_va,p2_va,p1_va)     =  1.0   * _a021_os( aa )(p3_va,p2_va,cind) * _a021_os( aa )(p4_va,p1_va,cind)")
+      (_a022_os("abab")(p3_va,p4_vb,p2_va,p1_vb)     =  1.0   * _a021_os("aa")(p3_va,p2_va,cind) * _a021_os("bb")(p4_vb,p1_vb,cind),
+      "_a022_os( abab )(p3_va,p4_vb,p2_va,p1_vb)     =  1.0   * _a021_os( aa )(p3_va,p2_va,cind) * _a021_os( bb )(p4_vb,p1_vb,cind)")
+      (_a022_os("bbbb")(p3_vb,p4_vb,p2_vb,p1_vb)     =  1.0   * _a021_os("bb")(p3_vb,p2_vb,cind) * _a021_os("bb")(p4_vb,p1_vb,cind),
+      "_a022_os( bbbb )(p3_vb,p4_vb,p2_vb,p1_vb)     =  1.0   * _a021_os( bb )(p3_vb,p2_vb,cind) * _a021_os( bb )(p4_vb,p1_vb,cind)");
+    }
+    else {
+      a22_aaaa_os = Tensor<T>::lazy(sch.ec(), {p3_va, p4_va, p2_va, p1_va},
+                                    1.0 * _a021_os("aa")(p3_va, p2_va, cind) * _a021_os("aa")(p4_va, p1_va, cind));
+      a22_abab_os = Tensor<T>::lazy(sch.ec(), {p3_va, p4_vb, p2_va, p1_vb},
+                                    1.0 * _a021_os("aa")(p3_va, p2_va, cind) * _a021_os("bb")(p4_vb, p1_vb, cind));
+      a22_bbbb_os = Tensor<T>::lazy(sch.ec(), {p3_vb, p4_vb, p2_vb, p1_vb},
+                                    1.0 * _a021_os("bb")(p3_vb, p2_vb, cind) * _a021_os("bb")(p4_vb, p1_vb, cind));
+    }
 
     sch(i0_aaaa(p3_va, p4_va, h1_oa, h2_oa)       +=  1.0   * a22_aaaa_os(p3_va, p4_va, p2_va, p1_va) * t2_aaaa(p2_va,p1_va,h1_oa,h2_oa),
-       "i0_aaaa(p3_va, p4_va, h1_oa, h2_oa)       +=  1.0   * a22_aaaa_os(p3_va, p4_va, p2_va, p1_va) * t2_aaaa(p2_va,p1_va,h1_oa,h2_oa)").execute(hw);
-
-    a22_flag = 2;
+       "i0_aaaa(p3_va, p4_va, h1_oa, h2_oa)       +=  1.0   * a22_aaaa_os(p3_va, p4_va, p2_va, p1_va) * t2_aaaa(p2_va,p1_va,h1_oa,h2_oa)");
 
     sch(i0_bbbb(p3_vb, p4_vb, h1_ob, h2_ob)       +=  1.0   * a22_bbbb_os(p3_vb, p4_vb, p2_vb, p1_vb) * t2_bbbb(p2_vb,p1_vb,h1_ob,h2_ob),
-       "i0_bbbb(p3_vb, p4_vb, h1_ob, h2_ob)       +=  1.0   * a22_bbbb_os(p3_vb, p4_vb, p2_vb, p1_vb) * t2_bbbb(p2_vb,p1_vb,h1_ob,h2_ob)").execute(hw);
-
-    a22_flag = 3;
+       "i0_bbbb(p3_vb, p4_vb, h1_ob, h2_ob)       +=  1.0   * a22_bbbb_os(p3_vb, p4_vb, p2_vb, p1_vb) * t2_bbbb(p2_vb,p1_vb,h1_ob,h2_ob)");
 
     sch(i0_abab(p3_va, p4_vb, h1_oa, h2_ob)       +=  4.0   * a22_abab_os(p3_va, p4_vb, p2_va, p1_vb) * t2_abab(p2_va,p1_vb,h1_oa,h2_ob),
-       "i0_abab(p3_va, p4_vb, h1_oa, h2_ob)       +=  4.0   * a22_abab_os(p3_va, p4_vb, p2_va, p1_vb) * t2_abab(p2_va,p1_vb,h1_oa,h2_ob)").execute(hw);
+       "i0_abab(p3_va, p4_vb, h1_oa, h2_ob)       +=  4.0   * a22_abab_os(p3_va, p4_vb, p2_va, p1_vb) * t2_abab(p2_va,p1_vb,h1_oa,h2_ob)");
 
     sch(_a019_os("aaaa")(h4_oa, h3_oa, h1_oa, h2_oa) += -0.125 * _a004_os("aaaa")(p1_va, p2_va, h3_oa, h4_oa) * t2_aaaa(p1_va,p2_va,h1_oa,h2_oa),
     "_a019_os( aaaa )(h4_oa, h3_oa, h1_oa, h2_oa)    += -0.125 * _a004_os( aaaa )(p1_va, p2_va, h3_oa, h4_oa) * t2_aaaa(p1_va,p2_va,h1_oa,h2_oa)")
@@ -925,8 +569,9 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
   _a017_os  = CCSE_Tensors<T>{MO, {V, O, CI}, "_a017_os", {"aa", "bb"}};
   _a021_os  = CCSE_Tensors<T>{MO, {V, V, CI}, "_a021_os", {"aa", "bb"}};
 
-  _a019_os = CCSE_Tensors<T>{MO, {O, O, O, O}, "_a019_os", {"aaaa", "abab", "bbbb"}};
-  // _a022 = CCSE_Tensors<T>{MO, {V, V, V, V}, "_a022", {"aaaa", "abab", "bbbb"}};
+  _a019_os            = CCSE_Tensors<T>{MO, {O, O, O, O}, "_a019_os", {"aaaa", "abab", "bbbb"}};
+  const bool store_v4 = chem_env.ioptions.ccsd_options.store_v4;
+  if(store_v4) _a022_os = CCSE_Tensors<T>{MO, {V, V, V, V}, "_a022_os", {"aaaa", "abab", "bbbb"}};
   _a020_os =
     CCSE_Tensors<T>{MO, {V, O, V, O}, "_a020_os", {"aaaa", "abab", "baab", "abba", "baba", "bbbb"}};
 
@@ -943,9 +588,9 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
     total_ccsd_mem += sum_tensor_sizes(d_r1s[ri], d_r2s[ri], d_t1s[ri], d_t2s[ri]);
 
   // Intermediates
-  // const double v4int_size = CCSE_Tensors<T>::sum_tensor_sizes_list(_a022);
-  double total_ccsd_mem_tmp =
-    sum_tensor_sizes(_a02V_os, _a007V_os) /*+ v4int_size */ +
+  const double v4int_size = store_v4 ? CCSE_Tensors<T>::sum_tensor_sizes_list(_a022_os) : 0.0;
+  double       total_ccsd_mem_tmp =
+    sum_tensor_sizes(_a02V_os, _a007V_os) + v4int_size +
     CCSE_Tensors<T>::sum_tensor_sizes_list(i0_t2_tmp, _a01_os, _a04_os, _a05_os, _a06_os, _a001_os,
                                            _a004_os, _a006_os, _a008_os, _a009_os, _a017_os,
                                            _a019_os, _a020_os, _a021_os);
@@ -954,10 +599,11 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
 
   if(ec.print()) {
     std::cout << std::endl
-              << "Total CPU memory required for Open Shell Cholesky CCSD calculation: "
+              << "Estimated system RAM required for Open Shell Cholesky CCSD calculation: "
               << std::fixed << std::setprecision(2) << total_ccsd_mem << " GiB" << std::endl;
-    // std::cout << " (V^4 intermediate size: " << std::fixed << std::setprecision(2) << v4int_size
-    //           << " GiB)" << std::endl;
+    if(store_v4)
+      std::cout << " (V^4 intermediate size: " << std::fixed << std::setprecision(2) << v4int_size
+                << " GiB)" << std::endl;
   }
   check_memory_requirements(ec, total_ccsd_mem);
 
@@ -1054,7 +700,13 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
     sch.allocate(_a02V_os, _a007V_os);
     CCSE_Tensors<T>::allocate_list(sch, _a004_os, i0_t2_tmp, _a01_os, _a04_os, _a05_os, _a06_os,
                                    _a001_os, _a006_os, _a008_os, _a009_os, _a017_os, _a019_os,
-                                   _a020_os, _a021_os); // _a022
+                                   _a020_os, _a021_os);
+    if(store_v4) {
+      CCSE_Tensors<T>::allocate_list(sch, _a022_os);
+      a22_aaaa_os = _a022_os("aaaa");
+      a22_abab_os = _a022_os("abab");
+      a22_bbbb_os = _a022_os("bbbb");
+    }
     sch.execute();
     // clang-format off
     sch
@@ -1244,7 +896,8 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
     sch.deallocate(_a02V_os, _a007V_os, d_r1_residual, d_r2_residual);
     CCSE_Tensors<T>::deallocate_list(sch, _a004_os, i0_t2_tmp, _a01_os, _a04_os, _a05_os, _a06_os,
                                      _a001_os, _a006_os, _a008_os, _a009_os, _a017_os, _a019_os,
-                                     _a020_os, _a021_os); //_a022
+                                     _a020_os, _a021_os);
+    if(store_v4) CCSE_Tensors<T>::deallocate_list(sch, _a022_os);
 
   } // no restart
   else {

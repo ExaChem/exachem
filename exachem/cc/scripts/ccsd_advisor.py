@@ -56,6 +56,7 @@ def parseargs(argv=None):
     parser.add_argument('-cache',     '--cache_size',     type=int,  default=8,     help='(T) cache size')
     parser.add_argument('-ts',        '--ccsdt_tilesize', type=int,  default=40,    help='(T) tilesize')
     parser.add_argument('-skip_ccsd', '--skip_ccsd',      type=bool, default=False, help='#skip_ccsd')
+    parser.add_argument('-store_v4',  '--store_v4',       action='store_true',      help='store the V^4 intermediate (CC.store_v4)')
 
     # Process arguments
     args = parser.parse_args()
@@ -212,23 +213,25 @@ if is_uhf:
 ccsd_mem += _a01 + _a04 + _a05 + _a06 + _a001 + _a004 + _a006 \
             + _a008 + _a009 + _a017 + _a019 +_a020 + _a021
 
+# The V^4 intermediate is stored only with store_v4; by default it is computed on the fly as a
+# lazy tensor.
+if cc_args.store_v4:
+    ccsd_mem += v_alpha*v_alpha*v_beta*v_beta
+    if is_uhf: ccsd_mem += v_alpha*v_alpha*v_alpha*v_alpha+v_beta*v_beta*v_beta*v_beta
+
 gib=1024*1024*1024.0
 
+# Sizes are reported plain and doubled. GA MPI-PR allocates TAMM tensors in POSIX shared
+# memory, backed by /dev/shm, whose tmpfs size Linux limits to 50% of system RAM by default.
+# Node counts use the doubled sizes.
+ccsd_mem_plain = round(ccsd_mem*8/gib,2)
+chol_mem_plain = round(chol_mem*8/gib,2)
+
 #Multiply by 2 to account for posix shared mem
+# TODO: revisit if the /dev/shm limit is lifted: the node count estimates for CCSD and (T)
+# would then use the plain sizes.
 ccsd_mem = round(2*ccsd_mem*8/gib,2) #bytes
 chol_mem = round(2*chol_mem*8/gib,2) #bytes 
-
-v4_mem = v_alpha*v_alpha*v_beta*v_beta
-if is_uhf: v4_mem += v_alpha*v_alpha*v_alpha*v_alpha+v_beta*v_beta*v_beta*v_beta
-v4_mem *= 8.0 #bytes
-#Multiply by 2 to account for posix shared mem
-v4_mem = round(2*v4_mem/gib,2)
-
-# print("---------------------------------------------------------------------------")
-# print(" - Storage required V^4 intermediate: " + str(v4_mem) + " GiB")
-# old_mem = v4_mem+ccsd_mem
-# print(" - Total CPU memory required if V^4 intermediate is stored: " + str(old_mem) + " GiB")
-# print("---------------------------------------------------------------------------")
 
 nnodes = math.ceil(ccsd_mem/cpu_mem)
 
@@ -236,8 +239,11 @@ nranks = nnodes*ppn
 
 print("nbf: "    + str(nbf))
 
-print("\nTotal CPU memory required for Cholesky decomp of the 2e integrals: " + str(chol_mem) + " GiB")
-print("\nTotal CPU memory required for CCSD calculation: " + str(ccsd_mem) + " GiB\n")
+print("\nEstimated system RAM required for Cholesky decomp of the 2e integrals: "
+      + str(chol_mem_plain) + " GiB")
+print("(Requires at least " + str(chol_mem) + " GiB of system RAM if /dev/shm is limited to 50% of system RAM)")
+print("\nEstimated system RAM required for CCSD calculation: " + str(ccsd_mem_plain) + " GiB")
+print("(Requires at least " + str(ccsd_mem) + " GiB of system RAM if /dev/shm is limited to 50% of system RAM)\n")
 
 
 VabOab = v_alpha*o_beta*v_beta*o_alpha
@@ -367,6 +373,7 @@ size_T_d2_v2 = max_d2_kernels_pertask * (max_pdim * max_pdim * max_pdim) * (max_
 
 # base (T) memory required for input tensors
 ccsd_t_mem_base = 2*round(ccsd_t_mem,2) # 2 for posix shared mem
+ccsd_t_mem_base_plain = round(ccsd_t_mem,2)
 
 # Calculate per-rank memory requirements (independent of nranks_t)
 extra_buf_mem_per_rank = size_T_s1_t1 + size_T_s1_v2 + size_T_d1_t2 + size_T_d1_v2 + size_T_d2_t2 + size_T_d2_v2
@@ -437,10 +444,15 @@ total_ccsd_t_mem,total_extra_buf_mem,total_cache_mem = 0,0,0
 def print_ccsd_memory_stats(nnodes_t,total_ccsd_t_mem,total_extra_buf_mem,total_cache_mem):
     total_cache_mem = round(total_cache_mem,2)
     total_extra_buf_mem = round(total_extra_buf_mem,2)
+    # Only the input tensors are TAMM tensors; the buffers and the cache are not doubled.
+    total_ccsd_t_mem_plain = round(total_ccsd_t_mem - ccsd_t_mem_base + ccsd_t_mem_base_plain,2)
     total_ccsd_t_mem = round(total_ccsd_t_mem,2)
 
-    print(f"\nTotal CPU memory required for (T) calculation on {nnodes_t} nodes: {total_ccsd_t_mem} GiB")
-    print(f"-- memory required for the input tensors: {ccsd_t_mem_base} GiB")
+    print(f"\nEstimated system RAM required for (T) calculation on {nnodes_t} nodes: "
+          f"{total_ccsd_t_mem_plain} GiB")
+    print(f"(Requires at least {total_ccsd_t_mem} GiB of system RAM if /dev/shm is limited to 50% of system RAM)")
+    print(f"-- memory required for the input tensors: {ccsd_t_mem_base_plain} GiB "
+          f"({ccsd_t_mem_base} GiB if /dev/shm is limited to 50% of system RAM)")
     print(f"-- memory required for intermediate buffers: {total_extra_buf_mem} GiB")
     cache_msg = "-- memory required for caching t1,t2,v2 blocks"
     if total_cache_mem > (ccsd_t_mem_base + total_extra_buf_mem) / 2.0:

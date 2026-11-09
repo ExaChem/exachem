@@ -356,6 +356,9 @@
         "ext_data_path": {
           "type": "string"
         },
+        "store_v4": {
+          "type": "boolean"
+        },
         "PRINT": {
           "type": "object",
           "properties": {

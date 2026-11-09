@@ -30,6 +30,7 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
  
    "debug": false,
    "profile": false,
+   "store_v4": false,
 
    "freeze": {
       "atomic": false,
@@ -82,6 +83,8 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
 :debug: ``[default=false]`` enable diagnostic printing for CC calculations.
 
 :profile: ``[default=false]`` When enabled, writes a csv file containing the performance data for every tensor contraction. Useful for profiling contractions. Also applies to the sub-sections (*EOMCCSD*, *GFCCSD*, etc).
+
+:store_v4: ``[default=false]`` By default the :math:`V^4` (four-virtual-index) intermediate is not stored: its blocks are recomputed from the Cholesky vectors each time the doubles residual reads them, which removes the largest tensor from the memory requirement at the cost of extra computation. Enable to compute the intermediate once per iteration and keep it in memory instead, which is faster when it fits. Its size is then included in the reported memory requirement. This option currently applies only to Cholesky-based CCSD; it may be extended in the future to other methods where a similar :math:`V^4` intermediate occurs.
 
 :freeze: This block allows specifying freezing options. Some of the lowest-lying core orbitals and/or some of the highest-lying virtual orbitals may be excluded using this block. No orbitals are frozen by default.
 

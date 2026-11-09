@@ -216,6 +216,7 @@ public:
                              // (unless set in the input); see parse_ccsd_options
   bool                    readt{false};
   bool                    writet{false};
+  bool                    store_v4{false};
   bool                    gf_restart{false};
   bool                    gf_ip{true};
   bool                    gf_ea{false};

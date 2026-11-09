@@ -28,7 +28,7 @@ void ParseCCSDOptions::parse_check(json& jinput) {
       "readt",    "writet",       "writet_iter",  "debug",
       "nactive_oa", "nactive_ob", "nactive_va", "nactive_vb", 
       "qflow_cycles", "qflow_threshold", "qflow_nproc_pc",
-      "profile",      "balance_tiles",  "ext_data_path"};
+      "profile",      "balance_tiles",  "ext_data_path", "store_v4"};
   // clang-format on
   for(auto& el: jinput["CC"].items()) {
     if(std::find(valid_cc.begin(), valid_cc.end(), el.key()) == valid_cc.end())
@@ -58,6 +58,7 @@ void ParseCCSDOptions::parse(ChemEnv& chem_env) {
   parse_option<bool>(cc_options.debug, jcc, "debug");
   parse_option<bool>(cc_options.readt, jcc, "readt");
   parse_option<bool>(cc_options.writet, jcc, "writet");
+  parse_option<bool>(cc_options.store_v4, jcc, "store_v4");
   parse_option<int>(cc_options.writet_iter, jcc, "writet_iter");
   parse_option<bool>(cc_options.balance_tiles, jcc, "balance_tiles");
   parse_option<bool>(cc_options.profile, jcc, "profile");

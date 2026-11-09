@@ -186,6 +186,7 @@
         "debug": false,
         "profile": false,
         "balance_tiles": true,
+        "store_v4": false,
 
         "ext_data_path": "",
 

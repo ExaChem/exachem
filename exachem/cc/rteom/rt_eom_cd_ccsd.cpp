@@ -861,7 +861,7 @@ void RT_EOM_CD_CCSD<T>::rt_eom_cd_ccsd(ChemEnv& chem_env, ExecutionContext& ec,
 
   if(ec.print()) {
     std::cout << std::endl
-              << "Total CPU memory required for RT-EOM-Cholesky CCSD calculation: "
+              << "Estimated system RAM required for RT-EOM-Cholesky CCSD calculation: "
               << std::setprecision(2) << total_ccsd_mem << " GiB" << std::endl;
   }
 

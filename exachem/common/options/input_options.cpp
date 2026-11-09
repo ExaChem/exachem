@@ -144,6 +144,7 @@ void CCSDOptions::print() {
 
   print_option("readt", readt, 22);
   print_option("writet", writet, 22);
+  print_option("store_v4", store_v4, 22);
   print_option("writet_iter", writet_iter, 22);
   print_option("profile", profile, 22);
   print_option("balance_tiles", balance_tiles, 22);

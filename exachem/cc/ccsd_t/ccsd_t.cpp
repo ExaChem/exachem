@@ -159,8 +159,8 @@ void exachem::cc::ccsd_t::CCSD_T_Driver<T>::ccsd_t_driver(ExecutionContext& ec, 
     double total_ccsd_t_mem = ccsd_t_mem + total_extra_buf_mem + total_cache_mem;
     if(rank == 0) {
       std::cout << std::string(70, '-') << std::fixed << std::setprecision(2) << std::endl;
-      std::cout << "Total CPU memory required for (T) calculation = " << total_ccsd_t_mem << " GiB"
-                << std::endl;
+      std::cout << "Estimated system RAM required for (T) calculation = " << total_ccsd_t_mem
+                << " GiB" << std::endl;
       std::cout << " -- memory required for the input tensors: " << ccsd_t_mem << " GiB"
                 << std::endl;
       std::cout << " -- memory required for intermediate buffers: " << total_extra_buf_mem << " GiB"

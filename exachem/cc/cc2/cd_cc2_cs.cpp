@@ -375,7 +375,7 @@ std::tuple<double, double> exachem::cc2::CD_CC2_CS_Engine<T>::run(
 
   if(ec.print()) {
     std::cout << std::endl
-              << "Total CPU memory required for Closed Shell Cholesky CC2 calculation: "
+              << "Estimated system RAM required for Closed Shell Cholesky CC2 calculation: "
               << std::fixed << std::setprecision(2) << total_cc2_mem << " GiB" << std::endl;
   }
   check_memory_requirements(ec, total_cc2_mem);

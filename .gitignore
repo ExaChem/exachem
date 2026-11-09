@@ -25,3 +25,6 @@ bkp/
 
 #Misc
 clang-format
+
+#Python
+__pycache__/

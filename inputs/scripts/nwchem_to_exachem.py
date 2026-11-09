@@ -120,7 +120,7 @@ def parse_nwchem_input(input_file):
   scf_opt["charge"] = 0
   scf_opt["multiplicity"] = 1
   scf_opt["lshift"] = 0
-  scf_opt["damp"] = 100
+  scf_opt["damp"] = 0
   scf_opt["type"] = "restricted"
   scf_opt["maxiter"] = 50
   scf_opt["PRINT"]["mulliken"] = False
@@ -139,7 +139,7 @@ def parse_nwchem_input(input_file):
   dft_opt["diis_hist"] = 10
   dft_opt["multiplicity"] = 1
   dft_opt["lshift"] = 0
-  dft_opt["damp"] = 100
+  dft_opt["damp"] = 0
   dft_opt["type"] = "restricted"
   dft_opt["maxiter"] = 50
   dft_opt["PRINT"]["mulliken"] = False
@@ -296,7 +296,7 @@ def parse_nwchem_input(input_file):
           continue
         if line.startswith("xc") and "hfexch" in line: dft_opt["hfexch"] = True
         if 'convergence' in line:
-          if 'damp' in line: dft_opt["damp"]    = 100-int(get_next_word(line,"damp"))
+          if 'damp' in line: dft_opt["damp"]    = int(get_next_word(line,"damp"))
           if 'lshift' in line: dft_opt["lshift"]  = float(get_next_word(line,"lshift"))
 
           if 'energy' in line:

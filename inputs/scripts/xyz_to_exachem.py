@@ -143,7 +143,7 @@ if __name__ == '__main__':
     scf_opt["charge"] = charge
     scf_opt["multiplicity"] = mult
     scf_opt["lshift"] = 0
-    scf_opt["damp"] = 100
+    scf_opt["damp"] = 0
     scf_opt["scf_type"] = scf_type
     scf_opt["debug"] = False
     scf_opt["restart"] = False

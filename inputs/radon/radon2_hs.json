@@ -59,7 +59,6 @@
     "convd": 1e-8,
     "charge": 3,    
     "multiplicity": 4,
-    "damp": 100,
     "scf_type": "unrestricted"
   },
   "CD": {

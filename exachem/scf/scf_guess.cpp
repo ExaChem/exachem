@@ -681,7 +681,7 @@ void exachem::scf::SCFGuess<T>::scf_diagonalize(Scheduler& sch, const ChemEnv& c
     if(hl_gap < 1e-2 && !(chem_env.ioptions.scf_options.lshift > 0)) {
       scf_data.lshift_reset = true;
       scf_data.lshift       = 0.5;
-      if(rank == 0) cout << "Resetting lshift to " << scf_data.lshift << endl;
+      // if(rank == 0) cout << "Resetting lshift to " << scf_data.lshift << endl;
     }
   }
 }

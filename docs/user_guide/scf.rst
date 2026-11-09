@@ -29,7 +29,8 @@ The values listed below are the defaults where few options are automatically adj
    "convd": 1e-7,
    "diis_hist": 10,
    "tilesize": 30,
-   "damp": 100,
+   "damp": 0,
+   "conv_damp": 1e-4,
    "nnodes": 1,
    "writem": 1,
    "debug": false,
@@ -113,7 +114,9 @@ The values listed below are the defaults where few options are automatically adj
 :tilesize: The tilesize for the AO dimension. An integer value that is automatically set to ``ceil(Nbf * 0.05)``
  if the user has not explicitly set it. It is recommended to let the SCF module automatically determine this value.
 
-:damp: damping (mixing) factor for the density matrix where :math:`0 \leq \alpha \leq 100`.  Specifies the percentage of the current iterations density mixed with the previous iterations density. ``default=100`` indicates no damping.
+:damp: damping (mixing) factor for the density matrix where :math:`0 \leq \alpha < 100`.  Specifies the percentage of the previous iterations density mixed with the current iterations density. ``default=0`` indicates no damping.
+
+:conv_damp: ``[default=1e-4]`` Density damping is applied only in iterations where the density RMS error exceeds this threshold.
 
 :writem: ``[default=1]`` An integer specifying the frequency (as number of iterations) after which the movecs and density matrices are written to disk for restarting the calculation.
 

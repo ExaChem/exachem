@@ -23,7 +23,7 @@ void ParseSCFOptions::parse_check(json& jinput) {
   // clang-format off
   const std::vector<std::string> valid_scf{"charge", "multiplicity", "lshift", "tol_int", "tol_sch",
     "tol_lindep", "conve", "convd", "diis_hist","tilesize","df_tilesize",
-    "damp","writem","nnodes","restart","noscf", "molden", "moldenfile", "guess",
+    "damp","conv_damp","writem","nnodes","restart","noscf", "molden", "moldenfile", "guess",
     "debug","profile","scf_type", "n_lindep","restart_size","scalapack_nb",
     "scalapack_np_row", "scalapack_np_col", "ext_data_path", "PRINT",
     "qed_omegas", "qed_lambdas", "qed_volumes", "qed_polvecs", "hubbard",
@@ -71,6 +71,7 @@ void ParseSCFOptions::parse(ChemEnv& chem_env) {
   parse_option<uint32_t>(scf_options.AO_tilesize, jscf, "tilesize");
   parse_option<uint32_t>(scf_options.dfAO_tilesize, jscf, "df_tilesize");
   parse_option<int>(scf_options.damp, jscf, "damp");
+  parse_option<double>(scf_options.conv_damp, jscf, "conv_damp");
   parse_option<int>(scf_options.writem, jscf, "writem");
   parse_option<int>(scf_options.nnodes, jscf, "nnodes");
   parse_option<bool>(scf_options.restart, jscf, "restart");
@@ -143,6 +144,12 @@ void ParseSCFOptions::parse(ChemEnv& chem_env) {
 
   if(scf_options.nnodes < 1 || scf_options.nnodes > 100) {
     tamm_terminate("INPUT FILE ERROR: SCF option nnodes should be a number between 1 and 100");
+  }
+  if(scf_options.damp < 0 || scf_options.damp >= 100) {
+    tamm_terminate("INPUT FILE ERROR: SCF option damp should be a number between 0 and 99");
+  }
+  if(scf_options.conv_damp < 0) {
+    tamm_terminate("INPUT FILE ERROR: SCF option conv_damp should be >= 0");
   }
   if(scf_options.multiplicity > 1 && scf_options.scf_type != "unrestricted") {
     tamm_terminate(

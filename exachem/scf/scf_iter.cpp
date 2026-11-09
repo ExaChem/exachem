@@ -22,10 +22,11 @@ exachem::scf::SCFIter<T>::scf_iter_body(ExecutionContext& ec, const ChemEnv& che
   const SystemData& sys_data    = chem_env.sys_data;
   const SCFOptions& scf_options = chem_env.ioptions.scf_options;
 
-  const bool   is_uhf   = sys_data.is_unrestricted;
-  const bool   is_rhf   = sys_data.is_restricted;
-  const bool   is_cuscf = sys_data.is_cuscf;
-  const double lshift   = scf_data.lshift;
+  const bool   is_uhf     = sys_data.is_unrestricted;
+  const bool   is_rhf     = sys_data.is_restricted;
+  const bool   is_cuscf   = sys_data.is_cuscf;
+  const double lshift     = scf_data.lshift;
+  scf_data.lshift_applied = lshift;
 
   Tensor<T>& H1       = ttensors.H1;
   Tensor<T>& S1       = ttensors.S1;
@@ -270,10 +271,13 @@ exachem::scf::SCFIter<T>::scf_iter_body(ExecutionContext& ec, const ChemEnv& che
   }
 
   const auto   damp  = scf_options.damp;
-  const double alpha = damp / 100.0;
+  const double alpha = 1.0 - damp / 100.0;
   // if(rmsd < 1e-6) { scf_data.switch_diis = true; } // rmsd check
 
-  if(damp < 100) {
+  // mix in damp% of the previous density, but only while the density rmsd is above conv_damp
+  scf_data.damp_applied = 0;
+  if(damp > 0 && rmsd > scf_options.conv_damp) {
+    scf_data.damp_applied = damp;
     // D = alpha*D + (1.0-alpha)*D_last;
     if(is_rhf) {
       tamm::scale_ip(D_alpha_tamm(), alpha);

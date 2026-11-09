@@ -24,6 +24,7 @@ void SCFOptions::print() {
   print_option("AO_tilesize", AO_tilesize, 18);
   print_option("writem", writem, 18);
   print_option("damp", damp, 18);
+  print_option("conv_damp", conv_damp, 18);
   print_option("n_lindep", n_lindep, 18);
 
   if(!moldenfile.empty()) {

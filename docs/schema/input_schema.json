@@ -110,7 +110,13 @@
           "type": "number"
         },
         "damp": {
-          "type": "number"
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 99
+        },
+        "conv_damp": {
+          "type": "number",
+          "minimum": 0
         },
         "nnodes": {
           "type": "number"

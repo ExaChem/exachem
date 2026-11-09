@@ -629,6 +629,8 @@ void exachem::scf::SCFEngine::print_write_iteration(ExecutionContext& exc, ChemE
                                                     SCFIterationState& scf_state) {
   const auto rank = exc.pg().rank();
   if(rank == 0) {
+    std::cout << " d=" << std::setw(2) << std::right << scf_data.damp_applied
+              << ",ls=" << std::fixed << std::setprecision(2) << scf_data.lshift_applied;
     std::cout << std::setw(4) << std::right << scf_state.iter << "  " << std::setw(10);
     if(chem_env.ioptions.scf_options.debug) {
       std::cout << std::fixed << std::setprecision(18) << scf_state.ehf;
@@ -651,6 +653,8 @@ void exachem::scf::SCFEngine::print_write_iteration(ExecutionContext& exc, ChemE
     set_iter("e_diff", scf_state.ediff);
     set_iter("rmsd", scf_state.rmsd);
     set_iter("ediis", scf_state.ediis);
+    set_iter("damp", scf_data.damp_applied);
+    set_iter("lshift", scf_data.lshift_applied);
     iter_info["performance"] = {{"total_time", loop_time}};
   }
   if(scf_state.iter % chem_env.ioptions.scf_options.writem == 0 ||
@@ -1170,11 +1174,12 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     if(rank == 0 && !chem_env.ioptions.scf_options.noscf) {
       std::cout << std::endl << std::endl;
       std::cout << " SCF iterations" << endl;
-      std::cout << std::string(77, '-') << endl;
+      std::cout << std::string(90, '-') << endl;
       std::string sph =
-        " Iter     Energy            E-Diff       RMSD        |[F,P]|^2       Time(s)";
+        "              Iter     Energy            E-Diff       RMSD        |[F,P]|^2 "
+        "      Time(s)";
       std::cout << sph << endl;
-      std::cout << std::string(77, '-') << endl;
+      std::cout << std::string(90, '-') << endl;
     }
 
     std::cout << std::fixed << std::setprecision(2);
@@ -1377,7 +1382,7 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
       if(scf_state.is_conv) {
         if(chem_env.ioptions.scf_options.noscf) cout << " SCF iterations skipped (noscf)" << endl;
         else {
-          cout << std::string(77, '-') << endl;
+          cout << std::string(90, '-') << endl;
           cout << " SCF iterations converged" << endl;
         }
         cout << endl << "** Total SCF energy = " << scf_state.ehf << endl;

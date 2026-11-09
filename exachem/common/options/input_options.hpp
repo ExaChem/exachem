@@ -153,7 +153,8 @@ public:
   std::string         nwmovecsfile{""};
   int                 n_lindep{0};
   int                 writem{1};
-  int                 damp{100}; // density mixing parameter
+  int                 damp{0};         // percentage of old density in damping
+  double              conv_damp{1e-4}; // damp only when density rmsd exceeds this
   std::string         scf_type{"restricted"};
   std::string         xc_grid_type{"UltraFine"};
   std::string         xc_pruning_scheme{"Robust"};

@@ -1374,11 +1374,18 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
 
     if(rank == 0) {
       std::cout.precision(13);
-      if(scf_state.is_conv) cout << endl << "** Total SCF energy = " << scf_state.ehf << endl;
+      if(scf_state.is_conv) {
+        if(chem_env.ioptions.scf_options.noscf) cout << " SCF iterations skipped (noscf)" << endl;
+        else {
+          cout << std::string(77, '-') << endl;
+          cout << " SCF iterations converged" << endl;
+        }
+        cout << endl << "** Total SCF energy = " << scf_state.ehf << endl;
+      }
       else {
-        cout << endl << std::string(50, '*') << endl;
-        cout << std::string(10, ' ') << "ERROR: SCF calculation does not converge!!!" << endl;
-        cout << std::string(50, '*') << endl;
+        cout << endl << std::string(45, '*') << endl;
+        cout << std::string(5, ' ') << "SCF calculation does not converge!" << endl;
+        cout << std::string(45, '*') << endl;
       }
     }
 
@@ -1495,7 +1502,9 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
   exc.pg().barrier();
   exc.pg().broadcast(&scf_state.is_conv, 0);
 
-  if(!scf_state.is_conv) { tamm_terminate("Please check SCF input parameters"); }
+  if(!scf_state.is_conv) {
+    tamm_terminate("\n** SCF calculation does not converge! Please check SCF input parameters");
+  }
 
   // F, C are not deallocated.
   chem_env.sys_data.n_occ_alpha = chem_env.sys_data.nelectrons_alpha;

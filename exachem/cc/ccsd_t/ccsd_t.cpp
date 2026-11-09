@@ -134,8 +134,9 @@ void exachem::cc::ccsd_t::CCSD_T_Driver<T>::ccsd_t_driver(ExecutionContext& ec, 
       max_pdim = std::max(max_pdim, k_range[t_p4b]);
     for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) max_hdim = std::max(max_hdim, k_range[t_h1b]);
 
-    size_t max_d1_kernels_pertask = 9 * noa;
-    size_t max_d2_kernels_pertask = 9 * nva;
+    // same sizing as the fused driver: the beta space can have more tiles than alpha
+    size_t max_d1_kernels_pertask = 9 * std::max(noa, noab - noa);
+    size_t max_d2_kernels_pertask = 9 * std::max(nva, nvab - nva);
     size_t size_T_s1_t1           = 9 * (max_pdim) * (max_hdim);
     size_t size_T_s1_v2           = 9 * (max_pdim * max_pdim) * (max_hdim * max_hdim);
     size_t size_T_d1_t2 = max_d1_kernels_pertask * (max_pdim * max_pdim) * (max_hdim * max_hdim);
@@ -270,18 +271,23 @@ void exachem::cc::ccsd_t::CCSD_T_Driver<T>::ccsd_t_driver(ExecutionContext& ec, 
 
   // if(rank == 0 && seq_h3b) cout << "running seq h3b loop variant..." << endl;
 
+  // the alpha and beta spaces can have different numbers of tiles in an open-shell calculation
+  const Index      noa_tiles = MO1("occ_alpha").num_tiles();
+  const Index      nva_tiles = MO1("virt_alpha").num_tiles();
   std::vector<int> k_spin;
-  for(tamm::Index x = 0; x < noab / 2; x++) k_spin.push_back(1);
-  for(tamm::Index x = noab / 2; x < noab; x++) k_spin.push_back(2);
-  for(tamm::Index x = 0; x < nvab / 2; x++) k_spin.push_back(1);
-  for(tamm::Index x = nvab / 2; x < nvab; x++) k_spin.push_back(2);
+  for(tamm::Index x = 0; x < noa_tiles; x++) k_spin.push_back(1);
+  for(tamm::Index x = noa_tiles; x < noab; x++) k_spin.push_back(2);
+  for(tamm::Index x = 0; x < nva_tiles; x++) k_spin.push_back(1);
+  for(tamm::Index x = nva_tiles; x < nvab; x++) k_spin.push_back(2);
 
   double ccsd_t_time = 0, total_t_time = 0;
+  size_t start_task = 0; // first task of this run, non-zero when resumed from a (T) checkpoint
 
   CCSD_T_Fused_Driver<T> ccsd_t_fused_driver_new;
-  std::tie(energy1, energy2, ccsd_t_time, total_t_time) = ccsd_t_fused_driver_new.execute(
-    chem_env, ec, k_spin, MO1, t_d_t1, t_d_t2, v2tensors, p_evl_sorted, hf_energy + corr_energy,
-    is_restricted, cache_s1t, cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v, seq_h3b);
+  std::tie(energy1, energy2, ccsd_t_time, total_t_time, start_task) =
+    ccsd_t_fused_driver_new.execute(chem_env, ec, k_spin, MO1, t_d_t1, t_d_t2, v2tensors,
+                                    p_evl_sorted, hf_energy + corr_energy, is_restricted, cache_s1t,
+                                    cache_s1v, cache_d1t, cache_d1v, cache_d2t, cache_d2v, seq_h3b);
 
   // cc_t2 = std::chrono::high_resolution_clock::now();
   // auto ccsd_t_time =
@@ -326,7 +332,7 @@ void exachem::cc::ccsd_t::CCSD_T_Driver<T>::ccsd_t_driver(ExecutionContext& ec, 
     CCSD_T_Fused_Driver<T> ccsd_t_perf_calculator;
     ccsd_t_perf_calculator.calculate_performance_ops(chem_env, ec, k_spin, MO1, p_evl_sorted,
                                                      hf_energy + corr_energy, is_restricted,
-                                                     total_num_ops, seq_h3b);
+                                                     total_num_ops, seq_h3b, start_task);
   }
 
   ec.pg().barrier();
@@ -352,7 +358,7 @@ void exachem::cc::ccsd_t::CCSD_T_Driver<T>::ccsd_t_driver(ExecutionContext& ec, 
 
   if(rank == 0) {
     std::cout << std::endl << "------CCSD(T) Performance------" << std::endl;
-    std::cout << "Total CCSD(T) Time: " << std::setprecision(2) << total_t_time << " secs"
+    std::cout << "Total CCSD(T) Time: " << std::setprecision(1) << total_t_time << " secs"
               << std::endl;
   }
   ccsd_t_time = comm_stats("CCSD(T) Avg. Work Time", ccsd_t_time);

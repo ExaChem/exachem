@@ -602,7 +602,7 @@ std::tuple<double, double> CD_CCSD_OS<T>::cd_ccsd_os_driver(
               << "Estimated system RAM required for Open Shell Cholesky CCSD calculation: "
               << std::fixed << std::setprecision(2) << total_ccsd_mem << " GiB" << std::endl;
     if(store_v4)
-      std::cout << " (V^4 intermediate size: " << std::fixed << std::setprecision(2) << v4int_size
+      std::cout << " (V^4 intermediates size: " << std::fixed << std::setprecision(2) << v4int_size
                 << " GiB)" << std::endl;
   }
   check_memory_requirements(ec, total_ccsd_mem);

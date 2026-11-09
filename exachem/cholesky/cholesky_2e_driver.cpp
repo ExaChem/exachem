@@ -100,7 +100,8 @@ void exachem::cholesky_2e::Cholesky_2E_Driver<T>::cholesky_2e_driver(ExecutionCo
     chem_env.run_context["do_freeze"]    = do_freeze;
     chem_env.run_context["mso_tilesize"] = chem_env.is_context.mso_tilesize;
     if(chem_env.ioptions.task_options.ccsd_t) {
-      // not used currently, triples can be restarted with a different tilesize.
+      // the (T) inputs can be rebuilt with a different tilesize, but resuming from a (T)
+      // checkpoint requires the same tilesize (checked against the checkpoint itself).
       chem_env.run_context["mso_tilesize_triples"] = chem_env.is_context.mso_tilesize_triples;
     }
     if(rank == 0)

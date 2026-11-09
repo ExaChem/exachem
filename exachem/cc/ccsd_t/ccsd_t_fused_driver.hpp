@@ -74,7 +74,7 @@ public:
   CCSD_T_Fused_Driver(CCSD_T_Fused_Driver&&)                 = default;
   CCSD_T_Fused_Driver& operator=(CCSD_T_Fused_Driver&&)      = default;
 
-  virtual std::tuple<T, T, double, double>
+  virtual std::tuple<T, T, double, double, size_t>
   execute(ChemEnv& chem_env, ExecutionContext& ec, std::vector<int>& k_spin,
           const TiledIndexSpace& MO, Tensor<T>& d_t1, Tensor<T>& d_t2,
           exachem::cholesky_2e::V2Tensors<T>& d_v2, std::vector<T>& k_evl_sorted, T hf_ccsd_energy,
@@ -88,11 +88,11 @@ public:
                                          std::vector<int>& k_spin, const TiledIndexSpace& MO,
                                          std::vector<T>& k_evl_sorted, double hf_ccsd_energy,
                                          bool is_restricted, long double& total_num_ops,
-                                         bool seq_h3b = false);
+                                         bool seq_h3b = false, size_t start_task = 0);
 };
 
 template<typename T>
-std::tuple<T, T, double, double> CCSD_T_Fused_Driver<T>::execute(
+std::tuple<T, T, double, double, size_t> CCSD_T_Fused_Driver<T>::execute(
   ChemEnv& chem_env, ExecutionContext& ec, std::vector<int>& k_spin, const TiledIndexSpace& MO,
   Tensor<T>& d_t1, Tensor<T>& d_t2, exachem::cholesky_2e::V2Tensors<T>& d_v2,
   std::vector<T>& k_evl_sorted, T hf_ccsd_energy, bool is_restricted,
@@ -100,13 +100,13 @@ std::tuple<T, T, double, double> CCSD_T_Fused_Driver<T>::execute(
   LRUCache<Index, std::vector<T>>& cache_d1t, LRUCache<Index, std::vector<T>>& cache_d1v,
   LRUCache<Index, std::vector<T>>& cache_d2t, LRUCache<Index, std::vector<T>>& cache_d2v,
   bool seq_h3b, bool tilesize_opt) {
-  auto rank     = ec.pg().rank().value();
-  bool nodezero = rank == 0;
+  auto rank  = ec.pg().rank().value();
+  bool rank0 = rank == 0;
 
 #if defined(USE_CUDA)
-// int opt_CUDA_TC = checkCudaKernelCompatible(nodezero);
+// int opt_CUDA_TC = checkCudaKernelCompatible(rank0);
 #if defined(USE_NV_TC)
-  if(nodezero) cout << "Using FP64 Tensor Cores" << endl;
+  if(rank0) cout << "Using FP64 Tensor Cores" << endl;
 #endif
 #endif
 
@@ -128,7 +128,7 @@ std::tuple<T, T, double, double> CCSD_T_Fused_Driver<T>::execute(
     sum += x;
   }
 
-  if(nodezero) {
+  if(rank0) {
     cout << "noa,nva = " << noa << ", " << nva << endl;
     cout << "noab,nvab = " << noab << ", " << nvab << endl;
     // cout << "k_spin = " << k_spin << endl;
@@ -170,9 +170,6 @@ std::tuple<T, T, double, double> CCSD_T_Fused_Driver<T>::execute(
 #endif
 
   std::unique_ptr<AtomicCounter> ac = std::make_unique<AtomicCounterGA>(ec.pg(), 1);
-  ac->allocate(0);
-  int64_t taskcount = 0;
-  int64_t next      = ac->fetch_add(0, 1);
 
   auto cc_t1 = std::chrono::high_resolution_clock::now();
 
@@ -185,8 +182,9 @@ std::tuple<T, T, double, double> CCSD_T_Fused_Driver<T>::execute(
   size_t max_d1_kernels_pertask = 9 * noab;
   size_t max_d2_kernels_pertask = 9 * nvab;
   if(tilesize_opt) {
-    max_d1_kernels_pertask = 9 * noa;
-    max_d2_kernels_pertask = 9 * nva;
+    // a task loops over the tiles of one spin, and the beta space can have more tiles than alpha
+    max_d1_kernels_pertask = 9 * std::max(noa, noab - noa);
+    max_d2_kernels_pertask = 9 * std::max(nva, nvab - nva);
   }
 
   //
@@ -415,11 +413,141 @@ std::tuple<T, T, double, double> CCSD_T_Fused_Driver<T>::execute(
 
   if(rank == 0) {
     // std::cout << "14256-seq3 loop variant" << std::endl << std::endl;
-    std::cout << "total number of tasks = " << total_tasks << std::endl << std::endl;
+    std::cout << std::endl << "Total number of tasks = " << total_tasks << std::endl;
   }
+
+  // (T) checkpoint: with writet, the progress is saved in the run context every 5% of the tasks.
+  // readt (or writet) resumes from a saved checkpoint.
+  const CCSDOptions& ccsd_options = chem_env.ioptions.ccsd_options;
+  const bool         skip_ccsd    = ccsd_options.skip_ccsd;
+  const bool         write_ckpt   = ccsd_options.writet && !skip_ccsd;
+  const bool         read_ckpt    = (ccsd_options.readt || ccsd_options.writet) && !skip_ccsd;
+  const double       threshold    = ccsd_options.threshold;
+  const int          ts_triples   = chem_env.is_context.mso_tilesize_triples;
+
+  if(rank0 && skip_ccsd && (ccsd_options.readt || ccsd_options.writet))
+    std::cout << "--- (T) Checkpointing disabled with skip_ccsd ---" << std::endl;
+
+  size_t start_task = 0;
+  if(read_ckpt) {
+    if(chem_env.run_context.contains("ccsd_t")) {
+      const auto& ckpt = chem_env.run_context["ccsd_t"];
+      if(ckpt["total_tasks"].get<size_t>() != total_tasks || ckpt["noab"].get<Index>() != noab ||
+         ckpt["nvab"].get<Index>() != nvab ||
+         ckpt["mso_tilesize_triples"].get<int>() != ts_triples) {
+        std::string err_msg = "\n[ERROR] Restarting a (T) calculation requires the same tiling\n";
+        err_msg += "  - (T) checkpoint: mso_tilesize_triples = " +
+                   std::to_string(ckpt["mso_tilesize_triples"].get<int>()) +
+                   ", total tasks = " + std::to_string(ckpt["total_tasks"].get<size_t>()) + "\n";
+        err_msg += "  - current run:    mso_tilesize_triples = " + std::to_string(ts_triples) +
+                   ", total tasks = " + std::to_string(total_tasks) + "\n";
+        err_msg += "  Restore the original tilesize, or remove the \"ccsd_t\" entry from the "
+                   ".runcontext.json file to restart (T) from the first task";
+        tamm_terminate(err_msg);
+      }
+      const double ckpt_threshold = ckpt["threshold"].get<double>();
+      if(ckpt_threshold != threshold) {
+        if(rank0) {
+          const auto flags = std::cout.flags();
+          const auto prec  = std::cout.precision();
+          std::cout << "--- (T) Checkpoint discarded: CC threshold changed (" << std::scientific
+                    << std::setprecision(2) << ckpt_threshold << " -> " << threshold
+                    << "), starting from the first task ---" << std::endl;
+          std::cout.flags(flags);
+          std::cout.precision(prec);
+        }
+      }
+      else {
+        start_task = ckpt["tasks_done"].get<size_t>();
+        // only rank 0 starts from the saved energies, the per-rank energies are summed at the end
+        if(rank0) {
+          energy_l[0] = ckpt["energy1"].get<T>();
+          energy_l[1] = ckpt["energy2"].get<T>();
+          if(start_task == total_tasks)
+            std::cout << "--- (T) Checkpoint is complete: " << total_tasks << "/" << total_tasks
+                      << " tasks already completed, using the saved energies ---" << std::endl;
+          else
+            std::cout << "--- (T) Resuming from checkpoint: " << start_task << "/" << total_tasks
+                      << " tasks already completed ---" << std::endl;
+        }
+      }
+    }
+    else if(rank0)
+      std::cout << "--- (T) No checkpoint found, starting from the first task ---" << std::endl;
+  }
+
+  // progress is reported every 20% of the tasks, or at every checkpoint with writet
+  const size_t progress_step = 20;
+  const int    task_width    = std::to_string(total_tasks).size();
+
+  auto print_progress = [&](size_t tasks_done) {
+    const size_t percentage = (tasks_done * 100) / total_tasks;
+    const double elapsed    = std::chrono::duration_cast<std::chrono::duration<double>>(
+                             std::chrono::high_resolution_clock::now() - cc_t1)
+                             .count();
+    const auto flags = std::cout.flags();
+    const auto prec  = std::cout.precision();
+    std::cout << std::right << "Progress: " << std::setw(task_width) << tasks_done << "/"
+              << total_tasks << " (" << std::setw(3) << percentage
+              << "%) | Elapsed time: " << std::fixed << std::setprecision(1) << std::setw(8)
+              << elapsed << " sec" << std::endl;
+    std::cout.flags(flags);
+    std::cout.precision(prec);
+  };
+
+  // With writet, a checkpoint is written every 5% of the tasks. Every rank walks every task
+  // number in the same order and runs the tasks it claimed in that order, so when all ranks reach
+  // the same task number, every task below it is done.
+  const size_t nckpts          = 20;
+  auto         next_ckpt_after = [&](size_t task) {
+    for(size_t k = 1; k <= nckpts; k++) {
+      const size_t boundary = total_tasks * k / nckpts;
+      if(boundary > task) return boundary;
+    }
+    return total_tasks;
+  };
+
+  double ckpt_wait_time = 0; // time spent writing checkpoints, not counted as work
+  // collective: called by every rank at the same task number
+  auto write_checkpoint = [&](size_t tasks_done) {
+    const auto ckpt_start = std::chrono::high_resolution_clock::now();
+#if defined(USE_CUDA) || defined(USE_HIP) || defined(USE_DPCPP)
+    // the energies are accumulated asynchronously
+    gpuDeviceSynchronize();
+#endif
+    const T ckpt_energy1 = ec.pg().reduce(&energy_l[0], ReduceOp::sum, 0);
+    const T ckpt_energy2 = ec.pg().reduce(&energy_l[1], ReduceOp::sum, 0);
+    if(rank0) {
+      auto& ckpt                   = chem_env.run_context["ccsd_t"];
+      ckpt["total_tasks"]          = total_tasks;
+      ckpt["noab"]                 = noab;
+      ckpt["nvab"]                 = nvab;
+      ckpt["mso_tilesize_triples"] = ts_triples;
+      ckpt["threshold"]            = threshold;
+      ckpt["tasks_done"]           = tasks_done;
+      ckpt["energy1"]              = ckpt_energy1;
+      ckpt["energy2"]              = ckpt_energy2;
+      chem_env.write_run_context();
+      print_progress(tasks_done);
+    }
+    ckpt_wait_time += std::chrono::duration_cast<std::chrono::duration<double>>(
+                        std::chrono::high_resolution_clock::now() - ckpt_start)
+                        .count();
+  };
+
+  size_t next_ckpt = next_ckpt_after(start_task);
+
+  // tasks below start_task were done before a restart and are never handed out
+  ac->allocate(start_task);
+  int64_t taskcount = 0;
+  int64_t next      = ac->fetch_add(0, 1);
 
   size_t current_task             = 0;
   size_t last_reported_percentage = 0;
+  if(total_tasks > 0) {
+    last_reported_percentage = (start_task * 100) / total_tasks;
+    last_reported_percentage -= last_reported_percentage % progress_step;
+  }
 
   for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) {
     for(size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
@@ -433,6 +561,11 @@ std::tuple<T, T, double, double> CCSD_T_Fused_Driver<T>::execute(
             //     for (size_t t_h1b = 0; t_h1b < noab; t_h1b++) {
             //     for (size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
             // #endif
+            if(write_ckpt && current_task == next_ckpt && next_ckpt < total_tasks) {
+              write_checkpoint(current_task);
+              next_ckpt = next_ckpt_after(current_task);
+            }
+
             current_task++;
             if(next == taskcount) {
               for(size_t t_h3b = t_h2b; t_h3b < noab; t_h3b++) {
@@ -512,22 +645,12 @@ std::tuple<T, T, double, double> CCSD_T_Fused_Driver<T>::execute(
               next = ac->fetch_add(0, 1);
             } // next == taskcount
 
-            if(current_task % 1000 == 0 || current_task == total_tasks) {
-              size_t percentage = (current_task * 100) / total_tasks;
-
-              if(rank == 0 && percentage != last_reported_percentage) {
-                last_reported_percentage = percentage;
-
-                const int bar_width = 50;
-                std::cout << "\r Progress [";
-                int pos = (bar_width * percentage) / 100;
-                for(int i = 0; i < bar_width; ++i) {
-                  if(i < pos) std::cout << "=";
-                  else if(i == pos) std::cout << ">";
-                  else std::cout << " ";
-                }
-                std::cout << "] " << percentage << "%";
-                std::flush(std::cout);
+            // report progress every 20% of the tasks
+            if(rank == 0 && !write_ckpt) {
+              const size_t percentage = (current_task * 100) / total_tasks;
+              if(percentage >= last_reported_percentage + progress_step) {
+                last_reported_percentage = percentage - percentage % progress_step;
+                print_progress(current_task);
               }
             }
 
@@ -538,6 +661,8 @@ std::tuple<T, T, double, double> CCSD_T_Fused_Driver<T>::execute(
     }
   }
   // } // end seq h3b
+
+  if(write_ckpt && start_task < total_tasks) write_checkpoint(total_tasks);
 
   if(rank == 0) std::cout << std::endl << std::endl;
 
@@ -579,27 +704,25 @@ std::tuple<T, T, double, double> CCSD_T_Fused_Driver<T>::execute(
 
   auto cc_t2 = std::chrono::high_resolution_clock::now();
   auto ccsd_t_time =
-    std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
+    std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count() -
+    ckpt_wait_time;
 
   ec.pg().barrier();
   cc_t2 = std::chrono::high_resolution_clock::now();
   auto total_t_time =
     std::chrono::duration_cast<std::chrono::duration<double>>((cc_t2 - cc_t1)).count();
 
-  next = ac->fetch_add(0, 1);
   ac->deallocate();
   // ac deleted automatically when the unique_ptr goes out of scope
 
-  return std::make_tuple(energy1, energy2, ccsd_t_time, total_t_time);
+  return std::make_tuple(energy1, energy2, ccsd_t_time, total_t_time, start_task);
 }
 
 template<typename T>
-void CCSD_T_Fused_Driver<T>::calculate_performance_ops(ChemEnv& chem_env, ExecutionContext& ec,
-                                                       std::vector<int>&      k_spin,
-                                                       const TiledIndexSpace& MO,
-                                                       std::vector<T>&        k_evl_sorted,
-                                                       double hf_ccsd_energy, bool is_restricted,
-                                                       long double& total_num_ops, bool seq_h3b) {
+void CCSD_T_Fused_Driver<T>::calculate_performance_ops(
+  ChemEnv& chem_env, ExecutionContext& ec, std::vector<int>& k_spin, const TiledIndexSpace& MO,
+  std::vector<T>& k_evl_sorted, double hf_ccsd_energy, bool is_restricted,
+  long double& total_num_ops, bool seq_h3b, size_t start_task) {
   auto rank = ec.pg().rank().value();
 
   Index noab = MO("occ").num_tiles();
@@ -652,11 +775,14 @@ void CCSD_T_Fused_Driver<T>::calculate_performance_ops(ChemEnv& chem_env, Execut
     } // nested for loops
   } // parallel h3b loop
   else { // seq h3b loop
-    for(size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
-      for(size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
-        for(size_t t_p6b = t_p5b; t_p6b < noab + nvab; t_p6b++) {
-          for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) {
-            for(size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
+    // same task order as execute(), so the tasks done before a (T) restart can be skipped
+    size_t taskcount = 0;
+    for(size_t t_h1b = 0; t_h1b < noab; t_h1b++) {
+      for(size_t t_p4b = noab; t_p4b < noab + nvab; t_p4b++) {
+        for(size_t t_h2b = t_h1b; t_h2b < noab; t_h2b++) {
+          for(size_t t_p5b = t_p4b; t_p5b < noab + nvab; t_p5b++) {
+            for(size_t t_p6b = t_p5b; t_p6b < noab + nvab; t_p6b++) {
+              if(taskcount++ < start_task) continue;
               for(size_t t_h3b = t_h2b; t_h3b < noab; t_h3b++) {
                 if((k_spin[t_p4b] + k_spin[t_p5b] + k_spin[t_p6b]) ==
                    (k_spin[t_h1b] + k_spin[t_h2b] + k_spin[t_h3b])) {

@@ -599,7 +599,7 @@ void ccsd_stats(ExecutionContext& ec, double hf_energy, double residual, double 
   if(rank == 0) {
     std::cout << std::string(66, '-') << std::endl;
     if(ccsd_conv) {
-      std::cout << " Iterations converged" << std::endl;
+      std::cout << " " << task_str << " iterations converged" << std::endl;
       std::cout.precision(15);
       std::cout << " " << task_str << " correlation energy / hartree =" << std::setw(26)
                 << std::right << energy << std::endl;

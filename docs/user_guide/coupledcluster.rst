@@ -74,7 +74,7 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
 
 :ccsd_maxiter: ``[default=100]`` The maximum number of iterations performed during the iterative solutions of amplitude equations.
 
-:writet: ``[default=false]`` Writes the T1,T2 amplitude tensors and the 2e integral tensor to disk to be used later for restarting a CC calculation. Currently, the cholesky decomposition module uses this option as well to write the 2e integral tensor to disk. Enabling this option implies restart. 
+:writet: ``[default=false]`` Writes the T1,T2 amplitude tensors and the 2e integral tensor to disk to be used later for restarting a CC calculation. Currently, the cholesky decomposition module uses this option as well to write the 2e integral tensor to disk. Enabling this option implies restart.
 
 :readt: ``[default=false]`` Reads the T1,T2 amplitude tensors and the 2e integral tensor from disk for restarting a CC calculation. Enabling this option implies restart. Does not need to be explicitly specified if ``writet=true``.
 
@@ -172,6 +172,15 @@ The (T) implementation and additional optimizations on various GPU architectures
 :ccsdt_tilesize: ``[default=40]`` Applies only to the (T) calculation. This specifies the tilesize for the MSO dimension of the T1,T2 amplitude and 2e integral tensors. The tensors are re-tiled post CCSD just before the (T) calculation begins.
 
 :skip_ccsd: ``[default=false]`` Mostly used for performance benchmarking for the (T) calculation. When enabled, the cholesky decomposition and CCSD iterations are skipped.
+
+**Restarting (T)**: The ``writet`` and ``readt`` options in the "CC" block also apply to the (T) calculation.
+
+- With ``writet=true``, the progress of the (T) calculation is checkpointed every 5% of the (T) tasks: the number of tasks done and the partial (T) energies are saved in the ``.runcontext.json`` file. A restarted run resumes (T) from the last checkpoint.
+- With ``readt=true`` (and ``writet=false``), a restarted run resumes (T) from a saved checkpoint, but does not write new checkpoints.
+- If no checkpoint exists, (T) starts from the first task.
+- Resuming requires the same ``ccsdt_tilesize``; a different tilesize stops the run with an error.
+- A changed CC ``threshold`` discards the checkpoint and starts (T) from the first task.
+- Checkpointing is disabled with ``skip_ccsd``.
 
 
 DUCC

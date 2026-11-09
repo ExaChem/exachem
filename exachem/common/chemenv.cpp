@@ -68,8 +68,14 @@ void ChemEnv::write_run_context() {
   // }
 
   // std::cout << std::endl << std::endl << run_context.dump() << std::endl;
-  std::ofstream res_file(json_file, std::ios::out);
-  res_file << std::setw(2) << run_context << std::endl;
+  // write to a temporary file and rename it, so a run killed mid-write never leaves a truncated
+  // file
+  const std::string tmp_file = json_file + ".tmp";
+  {
+    std::ofstream res_file(tmp_file, std::ios::out);
+    res_file << std::setw(2) << run_context << std::endl;
+  }
+  fs::rename(tmp_file, json_file);
 }
 
 void ChemEnv::write_sinfo() {

@@ -194,7 +194,7 @@ int main(int argc, char* argv[]) {
   std::chrono::duration<double> ec_duration = ec_t2 - ec_t1;
   if(rank == 0) {
     std::cout << std::endl
-              << "Total ExaChem runtime: " << std::fixed << std::setprecision(2)
+              << "Total ExaChem runtime: " << std::fixed << std::setprecision(1)
               << ec_duration.count() << " secs" << std::endl
               << std::endl;
   }

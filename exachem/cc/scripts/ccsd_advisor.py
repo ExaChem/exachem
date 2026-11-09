@@ -47,7 +47,7 @@ def parseargs(argv=None):
     parser.add_argument('-cv',  '--cv_count',   type=int, required=True, help='#cholesky vectors')
     parser.add_argument('-ppn', '--ppn',        type=int, required=True, help='mpi ranks per node')
     parser.add_argument('-gpn', '--gpn',        type=int, default =None, help='number of GPUs per node')
-    parser.add_argument('-ram', '--cpu_memory', type=int, required=True, help='CPU Memory per node in GiB')
+    parser.add_argument('-ram', '--cpu_memory', type=int, required=True, help='System RAM per node in GiB')
     parser.add_argument('-gram','--gpu_memory', type=int, required=True, help='Memory per GPU in GiB')
 
     parser.add_argument('-ctype',     '--scf_type',       type=str,  default="rhf", help='RHF/UHF')
@@ -215,9 +215,12 @@ ccsd_mem += _a01 + _a04 + _a05 + _a06 + _a001 + _a004 + _a006 \
 
 # The V^4 intermediate is stored only with store_v4; by default it is computed on the fly as a
 # lazy tensor.
+v4_mem = 0
 if cc_args.store_v4:
-    ccsd_mem += v_alpha*v_alpha*v_beta*v_beta
-    if is_uhf: ccsd_mem += v_alpha*v_alpha*v_alpha*v_alpha+v_beta*v_beta*v_beta*v_beta
+    v4_mem = v_alpha*v_alpha*v_beta*v_beta
+    if is_uhf: v4_mem += v_alpha*v_alpha*v_alpha*v_alpha+v_beta*v_beta*v_beta*v_beta
+    v4_pct = round(100.0*v4_mem/(ccsd_mem+v4_mem),1)
+    ccsd_mem += v4_mem
 
 gib=1024*1024*1024.0
 
@@ -225,12 +228,14 @@ gib=1024*1024*1024.0
 # memory, backed by /dev/shm, whose tmpfs size Linux limits to 50% of system RAM by default.
 # Node counts use the doubled sizes.
 ccsd_mem_plain = round(ccsd_mem*8/gib,2)
+v4_mem_plain = round(v4_mem*8/gib,2)
 chol_mem_plain = round(chol_mem*8/gib,2)
 
 #Multiply by 2 to account for posix shared mem
 # TODO: revisit if the /dev/shm limit is lifted: the node count estimates for CCSD and (T)
 # would then use the plain sizes.
 ccsd_mem = round(2*ccsd_mem*8/gib,2) #bytes
+v4_mem = round(2*v4_mem*8/gib,2)
 chol_mem = round(2*chol_mem*8/gib,2) #bytes 
 
 nnodes = math.ceil(ccsd_mem/cpu_mem)
@@ -243,7 +248,11 @@ print("\nEstimated system RAM required for Cholesky decomp of the 2e integrals: 
       + str(chol_mem_plain) + " GiB")
 print("(Requires at least " + str(chol_mem) + " GiB of system RAM if /dev/shm is limited to 50% of system RAM)")
 print("\nEstimated system RAM required for CCSD calculation: " + str(ccsd_mem_plain) + " GiB")
-print("(Requires at least " + str(ccsd_mem) + " GiB of system RAM if /dev/shm is limited to 50% of system RAM)\n")
+print("(Requires at least " + str(ccsd_mem) + " GiB of system RAM if /dev/shm is limited to 50% of system RAM)")
+if cc_args.store_v4:
+    print("-- memory required for the V^4 intermediate: " + str(v4_mem_plain) + " GiB ("
+          + str(v4_mem) + " GiB with the /dev/shm limit), accounting for " + str(v4_pct) + "% of the total estimate")
+print("")
 
 
 VabOab = v_alpha*o_beta*v_beta*o_alpha
@@ -452,7 +461,7 @@ def print_ccsd_memory_stats(nnodes_t,total_ccsd_t_mem,total_extra_buf_mem,total_
           f"{total_ccsd_t_mem_plain} GiB")
     print(f"(Requires at least {total_ccsd_t_mem} GiB of system RAM if /dev/shm is limited to 50% of system RAM)")
     print(f"-- memory required for the input tensors: {ccsd_t_mem_base_plain} GiB "
-          f"({ccsd_t_mem_base} GiB if /dev/shm is limited to 50% of system RAM)")
+          f"({ccsd_t_mem_base} GiB with the /dev/shm limit)")
     print(f"-- memory required for intermediate buffers: {total_extra_buf_mem} GiB")
     cache_msg = "-- memory required for caching t1,t2,v2 blocks"
     if total_cache_mem > (ccsd_t_mem_base + total_extra_buf_mem) / 2.0:

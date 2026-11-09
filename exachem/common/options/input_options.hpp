@@ -197,8 +197,8 @@ struct NewtonKrylovOptions {
   double      gamma{0.9};
   double      alpha{1.5};
   bool        adaptive_forcing{true}; // use the Eisenstat-Walker adaptive forcing term
-  double      newton_tol{1e-8};       // <0 means "follow the CC threshold"
-  double      gmres_tol{1e-8};        // <0 means "follow the CC threshold"
+  double      newton_tol{-1.0};       // sentinel: <0 means "follow the CC threshold"
+  double      gmres_tol{-1.0};        // sentinel: <0 means "follow the CC threshold"
 };
 
 // CC amplitude solver selection and per-solver options (CC.solvers).

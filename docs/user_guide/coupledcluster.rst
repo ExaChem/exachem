@@ -116,8 +116,8 @@ The following CCSD options are supported. The remaining CC methods (CC2, Lambda,
    * :strong:`gamma`: ``[default=0.9]`` Coefficient of the Eisenstat-Walker forcing term update :math:`\eta = \gamma\,(\lVert F_k\rVert / \lVert F_{k-1}\rVert)^{\alpha}`.
    * :strong:`alpha`: ``[default=1.5]`` Exponent of the Eisenstat-Walker forcing term update (see ``gamma``).
    * :strong:`adaptive_forcing`: ``[default=true]`` When enabled, uses the Eisenstat-Walker adaptive forcing term to stop the inner GMRES solve early (when the residual falls below ``eta`` times the right-hand-side norm), avoiding over-solving the linearized system in the early Newton iterations.
-   * :strong:`newton_tol`: ``[default=1e-8]`` Convergence threshold for the outer Newton iterations; the solver stops when the residual norm :math:`\lVert F(x)\rVert` falls below this value. A negative value follows the CCSD ``threshold``.
-   * :strong:`gmres_tol`: ``[default=1e-8]`` Convergence threshold for the inner GMRES solve. A negative value follows the CCSD ``threshold``.
+   * :strong:`newton_tol`: ``[default=threshold]`` Convergence threshold for the outer Newton iterations; the solver stops when the residual norm :math:`\lVert F(x)\rVert` falls below this value. If unspecified, it follows the CCSD ``threshold``.
+   * :strong:`gmres_tol`: ``[default=threshold]`` Convergence threshold for the inner GMRES solve. If unspecified, it follows the CCSD ``threshold``.
 
 Newton-Krylov Solvers
 ---------------------

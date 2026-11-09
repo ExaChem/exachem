@@ -38,8 +38,9 @@ inline void check_memory_requirements(ExecutionContext& ec, double calc_mem) {
   auto minfo = ec.mem_info();
   if(calc_mem > static_cast<double>(minfo.total_cpu_mem)) {
     ec.print_execution_environment();
-    std::string err_msg = "ERROR: Insufficient CPU memory, required = " + std::to_string(calc_mem) +
-                          "GiB, available = " + std::to_string(minfo.total_cpu_mem) + " GiB";
+    std::string err_msg =
+      "ERROR: Insufficient system RAM, estimated required = " + std::to_string(calc_mem) +
+      "GiB, available = " + std::to_string(minfo.total_cpu_mem) + " GiB";
     tamm_terminate(err_msg);
   }
 }

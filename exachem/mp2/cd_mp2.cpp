@@ -159,8 +159,8 @@ void CDMP2::run(ExecutionContext& ec, ChemEnv& chem_env) {
   const double mp2_mem_req = sum_tensor_sizes(state.dtmp, cholVpr, state.v2ijab);
 
   if(ec.print())
-    std::cout << "CPU memory required for MP2 calculation: " << std::fixed << std::setprecision(2)
-              << mp2_mem_req << " GiB" << std::endl;
+    std::cout << "Estimated system RAM required for MP2 calculation: " << std::fixed
+              << std::setprecision(2) << mp2_mem_req << " GiB" << std::endl;
   check_memory_requirements(ec, mp2_mem_req);
   compute_dtmp(ec, state);
 

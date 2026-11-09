@@ -508,7 +508,7 @@ void Cholesky_2E<TensorType>::cholesky_2e(ExecutionContext& ec, ChemEnv& chem_en
   double cd_mem_req       = sum_tensor_sizes(g_d_tamm, g_r_tamm, g_chol_tamm, g_chol_tamm_global);
   auto   check_cd_mem_req = [&](const std::string mstep) {
     if(ec.print())
-      std::cout << "- CPU memory required for " << mstep << ": " << std::fixed
+      std::cout << "- Estimated system RAM required for " << mstep << ": " << std::fixed
                 << std::setprecision(2) << cd_mem_req << " GiB" << std::endl;
     check_memory_requirements(ec, cd_mem_req);
   };

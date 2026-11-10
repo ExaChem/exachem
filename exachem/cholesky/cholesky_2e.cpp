@@ -29,63 +29,67 @@ void Cholesky_2E_Util::semicanonicalization(ExecutionContext& ec, ChemEnv& chem_
   auto        rank     = ec.pg().rank();
   SystemData& sys_data = chem_env.sys_data;
 
-  const int nmo = sys_data.nmo;
   const int noa = sys_data.n_occ_alpha;
   const int nob = sys_data.n_occ_beta;
   const int nva = sys_data.n_vir_alpha;
   const int nvb = sys_data.n_vir_beta;
-  const int nbf = sys_data.nbf_orig;
 
-  Matrix F_AO_eigen(nbf, nbf);
-  Matrix C_AO_eigen(nbf, nmo);
   if(rank == 0) {
-    tamm_to_eigen_tensor(F_AO, F_AO_eigen);
-    tamm_to_eigen_tensor(C_AO, C_AO_eigen);
+    const Matrix F_AO_eigen = tamm_to_eigen_matrix(F_AO);
+    Matrix       C_AO_eigen = tamm_to_eigen_matrix(C_AO);
+
+    // Largest off-diagonal element of a Fock block; empty blocks give 0
+    auto max_offdiag = [](const Matrix& block) {
+      if(block.size() == 0) return 0.0;
+      Matrix offdiag = block;
+      offdiag.diagonal().setZero();
+      return offdiag.cwiseAbs().maxCoeff();
+    };
 
     Matrix F_OO = C_AO_eigen.leftCols(noa).transpose() * F_AO_eigen * C_AO_eigen.leftCols(noa);
+    Matrix F_VV = C_AO_eigen.rightCols(nva).transpose() * F_AO_eigen * C_AO_eigen.rightCols(nva);
 
-    // Test if matrix is already diagonal
-    // Just check alpha OO space, assume that beta OO and VV spaces are similar
-    bool do_semicanonalization = false;
-    for(Eigen::Index i = 0; i < F_OO.rows(); ++i) {
-      if(do_semicanonalization) break;
-      for(Eigen::Index j = i + 1; j < F_OO.cols(); ++j) {
-        if(std::abs(F_OO(i, j)) > 1e-5) {
-          do_semicanonalization = true;
-          break;
-        }
-      }
+    // Semicanonicalization is needed unless the OO and VV blocks of every spin are already
+    // diagonal. F_AO is the Fock matrix used by the post-HF methods, so this works for any source
+    // of the orbitals.
+    double largest_offdiag = std::max(max_offdiag(F_OO), max_offdiag(F_VV));
+
+    Matrix C_AO_beta_eigen, F_OO_beta, F_VV_beta;
+    if(sys_data.is_unrestricted) {
+      const Matrix F_AO_beta_eigen = tamm_to_eigen_matrix(F_beta_AO);
+      C_AO_beta_eigen              = tamm_to_eigen_matrix(C_beta_AO);
+
+      F_OO_beta =
+        C_AO_beta_eigen.leftCols(nob).transpose() * F_AO_beta_eigen * C_AO_beta_eigen.leftCols(nob);
+      F_VV_beta = C_AO_beta_eigen.rightCols(nvb).transpose() * F_AO_beta_eigen *
+                  C_AO_beta_eigen.rightCols(nvb);
+      largest_offdiag = std::max({largest_offdiag, max_offdiag(F_OO_beta), max_offdiag(F_VV_beta)});
     }
+
+    const bool do_semicanonalization = largest_offdiag > 1e-5;
+
+    std::cout << std::endl
+              << "- Largest off-diagonal element of the Fock OO/VV blocks: " << std::scientific
+              << std::setprecision(4) << largest_offdiag << std::defaultfloat << std::endl
+              << "- Semicanonicalization " << (do_semicanonalization ? "performed" : "skipped")
+              << std::endl;
 
     if(do_semicanonalization) {
       Eigen::SelfAdjointEigenSolver<Matrix> es(F_OO);
-      Matrix                                rotmat = es.eigenvectors();
-      C_AO_eigen.leftCols(noa)                     = C_AO_eigen.leftCols(noa) * rotmat;
+      C_AO_eigen.leftCols(noa) = C_AO_eigen.leftCols(noa) * es.eigenvectors();
 
-      Matrix FVV = C_AO_eigen.rightCols(nva).transpose() * F_AO_eigen * C_AO_eigen.rightCols(nva);
-      Eigen::SelfAdjointEigenSolver<Matrix> es_v(FVV);
-      Matrix                                rotmat_v = es_v.eigenvectors();
-      C_AO_eigen.rightCols(nva)                      = C_AO_eigen.rightCols(nva) * rotmat_v;
+      Eigen::SelfAdjointEigenSolver<Matrix> es_v(F_VV);
+      C_AO_eigen.rightCols(nva) = C_AO_eigen.rightCols(nva) * es_v.eigenvectors();
 
       eigen_to_tamm_tensor(C_AO, C_AO_eigen);
 
       if(sys_data.is_unrestricted) {
-        Matrix C_AO_beta_eigen(nbf, nmo);
-        Matrix F_AO_beta_eigen(nbf, nbf);
-        tamm_to_eigen_tensor(F_beta_AO, F_AO_beta_eigen);
-        tamm_to_eigen_tensor(C_beta_AO, C_AO_beta_eigen);
+        Eigen::SelfAdjointEigenSolver<Matrix> es_beta(F_OO_beta);
+        C_AO_beta_eigen.leftCols(nob) = C_AO_beta_eigen.leftCols(nob) * es_beta.eigenvectors();
 
-        F_OO = C_AO_beta_eigen.leftCols(nob).transpose() * F_AO_beta_eigen *
-               C_AO_beta_eigen.leftCols(nob);
-        Eigen::SelfAdjointEigenSolver<Matrix> es_beta(F_OO);
-        Matrix                                rotmat_beta = es_beta.eigenvectors();
-        C_AO_beta_eigen.leftCols(nob) = C_AO_beta_eigen.leftCols(nob) * rotmat_beta;
+        Eigen::SelfAdjointEigenSolver<Matrix> es_v_beta(F_VV_beta);
+        C_AO_beta_eigen.rightCols(nvb) = C_AO_beta_eigen.rightCols(nvb) * es_v_beta.eigenvectors();
 
-        FVV = C_AO_beta_eigen.rightCols(nvb).transpose() * F_AO_beta_eigen *
-              C_AO_beta_eigen.rightCols(nvb);
-        Eigen::SelfAdjointEigenSolver<Matrix> es_v_beta(FVV);
-        Matrix                                rotmat_v_beta = es_v_beta.eigenvectors();
-        C_AO_beta_eigen.rightCols(nvb) = C_AO_beta_eigen.rightCols(nvb) * rotmat_v_beta;
         eigen_to_tamm_tensor(C_beta_AO, C_AO_beta_eigen);
       }
     }

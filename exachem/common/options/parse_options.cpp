@@ -7,6 +7,7 @@
  */
 
 #include "exachem/common/options/parse_options.hpp"
+#include "exachem/common/constants.hpp"
 
 ECOptionParser::ECOptionParser(ChemEnv& chem_env) {
   initialize(chem_env);
@@ -130,5 +131,12 @@ void ECOptionParser::parse_all_options(ChemEnv& chem_env) {
   ParsePDOSOptions      parse_pdos_options(chem_env);
   ParseEmbeddingOptions parse_embedding_options(chem_env);
   ParseTaskOptions      parse_task_options(chem_env);
-  IniSystemData         ini_sys_data(chem_env);
+
+  // FCIDUMP integrals need a tighter Cholesky default. An explicit CD diagtol always applies.
+  const bool user_diagtol = chem_env.jinput.contains("CD") &&
+                            chem_env.jinput["CD"].contains("diagtol");
+  if(chem_env.ioptions.task_options.fcidump && !user_diagtol)
+    chem_env.ioptions.cd_options.diagtol = exachem::constants::fcidump_diagtol;
+
+  IniSystemData ini_sys_data(chem_env);
 }

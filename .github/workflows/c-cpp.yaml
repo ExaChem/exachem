@@ -176,7 +176,7 @@ jobs:
       if: ${{ matrix.backend == 'ga' }}
       id: build_exachem
       run: |
-        echo "CI_NRANKS=3" >> $GITHUB_ENV
+        echo "CI_NRANKS=5" >> $GITHUB_ENV
 
         # TAMM build
         git clone https://github.com/NWChemEx/TAMM $GITHUB_WORKSPACE/TAMM

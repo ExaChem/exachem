@@ -10,7 +10,7 @@
 
 template<typename T = double>
 bool nonzero(T value) {
-  const T tresh = 1e-10;
+  const T tresh = 1e-12;
   if(std::fabs(value) > tresh) return true;
   else return false;
 }
@@ -93,7 +93,7 @@ void fcidump::write_2el_ints(std::ofstream& file, SystemData& sys_data, Tensor<T
             if(l >= nocc + nva) lx = factor * (l - nva - noa + 1);
 
             if(nonredundant(ix, jx, kx, lx, is_uhf) && nonzero(buf[c])) {
-              file << std::setw(16) << buf[c] << std::setw(6) << offset + ix << std::setw(4)
+              file << std::setw(22) << buf[c] << std::setw(6) << offset + ix << std::setw(4)
                    << offset + jx << std::setw(4) << offset + kx << std::setw(4) << offset + lx
                    << '\n';
             }
@@ -152,7 +152,7 @@ void fcidump::write_1el_ints(std::ofstream& file, SystemData& sys_data, Tensor<T
         if(j >= nocc + nva) jx = factor * (j - nva - noa + 1);
 
         if((ix >= jx) && nonzero(buf[c])) {
-          file << std::setw(16) << buf[c] << std::setw(6) << ix << std::setw(4) << jx
+          file << std::setw(22) << buf[c] << std::setw(6) << ix << std::setw(4) << jx
                << std::setw(4) << 0 << std::setw(4) << 0 << std::setw(4) << '\n';
         }
       }
@@ -233,15 +233,18 @@ void fcidump::write_fcidump_file(ChemEnv& chem_env, Tensor<T> H_MO, Tensor<T> fu
          << ",\nORBSYM=" << orbsym_str << "\nISYM=" << isym << ",IUHF=" << is_uhf << std::endl
          << "&END" << std::endl;
 
-    file << std::fixed << std::setprecision(10);
+    file << std::fixed << std::setprecision(15);
 
     write_2el_ints(file, sys_data, full_v2, norbs, is_uhf);
     write_1el_ints(file, sys_data, H_MO, norbs, is_uhf);
-    file << std::setw(16) << scalar << "     " << 0 << "   " << 0 << "   " << 0 << "   " << 0
+    file << std::setw(22) << scalar << "     " << 0 << "   " << 0 << "   " << 0 << "   " << 0
          << std::endl;
 
     std::cout << std::endl << "FCIDUMP file written to: " << filename << std::endl;
     file.close();
+
+    sys_data.results["output"]["FCIDUMP"]["one_shot_hf_energy"] = e_one_shot;
+    if(chem_env.ioptions.task_options.fcidump) chem_env.write_json_data();
   }
 
   if(ec.pg().rank() == 0) {

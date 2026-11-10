@@ -27,7 +27,7 @@ Options used in the Cholesky decomposition of atomic-orbital based two-electron 
     "write_cv": [false,5000]
   }
 
-:diagtol: ``[default=1e-5]`` The diagonal threshold used to terminate the decomposition procedure and truncate the Cholesky vectors.
+:diagtol: ``[default=1e-5]`` The diagonal threshold used to terminate the decomposition procedure and truncate the Cholesky vectors. The default is 1e-10 when writing an FCIDUMP file, either through the ``fcidump`` task or with ``FCIDUMP`` as the embedding ``high_level``. A value given in the input file always applies.
 
 :itilesize: ``[default=1000]`` The tilesize for the cholesky dimension representing the number of cholesky vectors. It is recommended to leave this at the default value.
 

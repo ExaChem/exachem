@@ -7,6 +7,7 @@
 #include "exachem/scf/scf_guess.hpp"
 
 #include "exachem/cholesky/cholesky_2e_driver.hpp"
+#include "exachem/common/constants.hpp"
 #include "exachem/common/fcidump.hpp"
 
 #if defined(ENABLE_CC)
@@ -378,6 +379,8 @@ void embedding(ExecutionContext& ec, ChemEnv& chem_env) {
     chem_env.ioptions.scf_options.lshift = 0.0;
     chem_env.ioptions.scf_options.noscf  = true;
     chem_env.sys_data.is_ks              = false;
+    // Otherwise snK keeps the functional's exchange fraction
+    chem_env.ioptions.scf_options.xc_type.clear();
     scf::scf_driver(ec, chem_env);
     chem_env.scf_context.skip_scf = true;
   }
@@ -635,6 +638,11 @@ void print_eigs(ExecutionContext& ec, Tensor<double>& F_tamm, Tensor<double>& C_
 
 void fci_driver_embedding(ExecutionContext& ec, ChemEnv& chem_env, std::vector<Matrix>& Vembedding,
                           const bool is_unrestricted, bool rank0) {
+  // FCIDUMP integrals need a tighter Cholesky default. An explicit CD diagtol always applies.
+  const bool user_diagtol = chem_env.jinput.contains("CD") &&
+                            chem_env.jinput["CD"].contains("diagtol");
+  if(!user_diagtol) chem_env.ioptions.cd_options.diagtol = exachem::constants::fcidump_diagtol;
+
   chem_env.cd_context.keep_movecs_so = true;
   cholesky_2e::cholesky_2e_driver(ec, chem_env);
   std::string files_prefix = chem_env.get_files_prefix();

@@ -1,0 +1,486 @@
+{
+  "program": {
+    "executable": "/hpc/home/panyala/code/exachem-dev/bcpu/methods_stage/hpc/home/panyala/code/install/exachem-bcpu/methods/ExaChem",
+    "build_date": "2026-11-06T21:57:08-0800"
+  },
+  "output": {
+    "execution_environment": {
+      "date": "2026-11-06T21:57:17-0800",
+      "nodes": 1,
+      "mpi_ranks": {
+        "per_node": 2,
+        "total": 2
+      },
+      "cpu": {
+        "model": "Intel(R) Xeon(R) Platinum 8276M CPU @ 2.20GHz",
+        "memory_per_node_gib": 6045,
+        "memory_total_gib": 6045
+      },
+      "gpu": null
+    },
+    "build_configuration": {
+      "git": {
+        "exachem": {
+          "branch": "ks-tests",
+          "commit": "250f69bbb3e1ebdc74ab4f7da79a56903cb92168",
+          "describe": "250f69bb",
+          "commit_date": "2026-11-06 20:56:15 -0800",
+          "dirty": true
+        },
+        "tamm": {
+          "branch": "main",
+          "commit": "6a6cc2f2f947af5ac6b9ea9d620d625a8cc5a72e",
+          "describe": "6a6cc2f2f",
+          "commit_date": "2026-11-03 22:44:59 -0800",
+          "dirty": false
+        }
+      },
+      "build_type": "Release",
+      "compilers": {
+        "c": "GNU 15.3.0",
+        "cxx": "GNU 15.3.0",
+        "fortran": "GNU 15.3.0"
+      },
+      "gpu": null,
+      "install_prefix": "/hpc/home/panyala/code/install/exachem-bcpu",
+      "language_bindings": {
+        "python": false
+      },
+      "linear_algebra": {
+        "blas": "OpenBLAS",
+        "blas_integers": 32,
+        "elpa": false,
+        "scalapack": false
+      },
+      "memory": {
+        "libnuma": false
+      },
+      "modules": {
+        "enabled": [
+          "CC"
+        ],
+        "gauxc_gpu": false,
+        "nwqsim": true
+      },
+      "mpi_library": "Open MPI v5.0.10, package: Open MPI root@koothan Distribution, ident: 5.0.10, repo rev: v5.0.10, Feb 23, 2026",
+      "parallelism": {
+        "global_arrays": {
+          "runtime": "MPI_PROGRESS_RANK"
+        },
+        "openmp": false
+      },
+      "shared_libraries": false,
+      "versions": {
+        "DOCTEST": "2.4.11",
+        "EcpInt": "95203c68d1bb4134a235480d8c69c3014faaccf9",
+        "Eigen3": "e50fac9ff304cbcaa8c1fdc92484ac33835ac675",
+        "GauXC": "162e4562552323a871af17ae4acd73b71071bd24",
+        "Global Arrays": "843923e3b263fbccf97023da92b93263ee9b670e",
+        "HDF5": "hdf5_1.14.4.3",
+        "LAPACK": "51b349470b3b26c948d068deb45c9b120a47ed32",
+        "LibInt2": "external (/hpc/home/panyala/code/install/exachem-bcpu)",
+        "NJSON": "3.12.0",
+        "NWQSim": "202f5cab03477c78ab9f0b4dbbbf8f135778ac8f",
+        "OpenBLAS": "0.3.34",
+        "SPDLOG": "v1.15.2"
+      }
+    },
+    "system_info": {
+      "nbf": 62,
+      "nshells": 22,
+      "nelectrons_total": 48,
+      "nelectrons_alpha": 24,
+      "nelectrons_beta": 24,
+      "nbf_orig": 62
+    },
+    "SCF": {
+      "nucl_rep_energy": 181.4321864722286,
+      "xHF": 0.0,
+      "iter": {
+        "1": {
+          "energy": -2088.5408515984204,
+          "e_diff": -2088.5408515984204,
+          "rmsd": 0.05690088163472248,
+          "ediis": 33.48030403380337,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.453455869
+          }
+        },
+        "2": {
+          "energy": -2087.9379522447657,
+          "e_diff": 0.6028993536547205,
+          "rmsd": 0.0857557340154913,
+          "ediis": 0.8402961327983871,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.486666755
+          }
+        },
+        "3": {
+          "energy": -2085.466943333334,
+          "e_diff": 2.471008911431909,
+          "rmsd": 0.03524348403208235,
+          "ediis": 12.239465749353855,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.492279554
+          }
+        },
+        "4": {
+          "energy": -2087.6680006880238,
+          "e_diff": -2.201057354689965,
+          "rmsd": 0.06497439038074498,
+          "ediis": 1.6396976316284095,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.491135986
+          }
+        },
+        "5": {
+          "energy": -2088.0198352664024,
+          "e_diff": -0.35183457837865717,
+          "rmsd": 0.0038153219366708867,
+          "ediis": 0.9541379776974842,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.51987391
+          }
+        },
+        "6": {
+          "energy": -2088.049649511033,
+          "e_diff": -0.029814244630415487,
+          "rmsd": 0.004138188040158541,
+          "ediis": 0.7073179435013701,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.859371491
+          }
+        },
+        "7": {
+          "energy": -2088.128390509001,
+          "e_diff": -0.07874099796799783,
+          "rmsd": 0.0027477222367822676,
+          "ediis": 0.19241353297233088,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.781788281
+          }
+        },
+        "8": {
+          "energy": -2088.146051213121,
+          "e_diff": -0.01766070412031695,
+          "rmsd": 0.0016693328585835434,
+          "ediis": 0.08073489288759611,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.787314637
+          }
+        },
+        "9": {
+          "energy": -2088.1539904285614,
+          "e_diff": -0.007939215440273983,
+          "rmsd": 0.001078116171727975,
+          "ediis": 0.028824670611023263,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.789044375
+          }
+        },
+        "10": {
+          "energy": -2088.157504969833,
+          "e_diff": -0.0035145412716701685,
+          "rmsd": 0.0006236162853334904,
+          "ediis": 0.005568927267857711,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.786853877
+          }
+        },
+        "11": {
+          "energy": -2088.1581913947575,
+          "e_diff": -0.0006864249244245002,
+          "rmsd": 0.0003588077418922558,
+          "ediis": 0.0009714873497819723,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.781508374
+          }
+        },
+        "12": {
+          "energy": -2088.158337506229,
+          "e_diff": -0.00014611147162213456,
+          "rmsd": 0.00022999489478058436,
+          "ediis": 0.00014274265983150515,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.733012511
+          }
+        },
+        "13": {
+          "energy": -2088.1583677564445,
+          "e_diff": -3.0250215331761865e-05,
+          "rmsd": 0.00017316874312016503,
+          "ediis": 9.045867236100599e-06,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.741469067
+          }
+        },
+        "14": {
+          "energy": -2088.158373573164,
+          "e_diff": -5.816719749418553e-06,
+          "rmsd": 0.00015411037758142695,
+          "ediis": 4.2819162568306676e-06,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.802440967
+          }
+        },
+        "15": {
+          "energy": -2088.1583769633894,
+          "e_diff": -3.390225174371153e-06,
+          "rmsd": 9.531402000645124e-05,
+          "ediis": 1.7764976566888756e-06,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.836853981
+          }
+        },
+        "16": {
+          "energy": -2088.1583782223142,
+          "e_diff": -1.2589248399308417e-06,
+          "rmsd": 6.317469115178628e-05,
+          "ediis": 4.676634904987835e-07,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.808341964
+          }
+        },
+        "17": {
+          "energy": -2088.1583786564897,
+          "e_diff": -4.3417549022706226e-07,
+          "rmsd": 3.8682828042458365e-05,
+          "ediis": 1.9062866741470772e-07,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.822019291
+          }
+        },
+        "18": {
+          "energy": -2088.158378811807,
+          "e_diff": -1.5531713870586827e-07,
+          "rmsd": 2.252684251729672e-05,
+          "ediis": 4.131904951049004e-08,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.832686559
+          }
+        },
+        "19": {
+          "energy": -2088.1583788610656,
+          "e_diff": -4.925868779537268e-08,
+          "rmsd": 1.3291748002102654e-05,
+          "ediis": 8.501125155798388e-09,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.81868273
+          }
+        },
+        "20": {
+          "energy": -2088.1583788772264,
+          "e_diff": -1.6160811355803162e-08,
+          "rmsd": 7.720952315852243e-06,
+          "ediis": 4.922591766514871e-09,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.835813093
+          }
+        },
+        "21": {
+          "energy": -2088.1583788829194,
+          "e_diff": -5.692982085747644e-09,
+          "rmsd": 4.414676118881951e-06,
+          "ediis": 1.4154259831249614e-09,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.834062399
+          }
+        },
+        "22": {
+          "energy": -2088.1583788847593,
+          "e_diff": -1.8399077816866338e-09,
+          "rmsd": 2.4785402906699907e-06,
+          "ediis": 2.814801155632846e-10,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.806152087
+          }
+        },
+        "23": {
+          "energy": -2088.158378885295,
+          "e_diff": -5.356923793442547e-10,
+          "rmsd": 1.4072151381430225e-06,
+          "ediis": 1.0851522407441503e-10,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.827594219
+          }
+        },
+        "24": {
+          "energy": -2088.158378885464,
+          "e_diff": -1.6916601452976465e-10,
+          "rmsd": 7.656332117320849e-07,
+          "ediis": 3.264136421354439e-11,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.829143805
+          }
+        },
+        "25": {
+          "energy": -2088.1583788855182,
+          "e_diff": -5.411493475548923e-11,
+          "rmsd": 4.238336612216318e-07,
+          "ediis": 8.97001806048395e-12,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.823468364
+          }
+        },
+        "26": {
+          "energy": -2088.158378885532,
+          "e_diff": -1.3642420526593924e-11,
+          "rmsd": 2.3793993662809677e-07,
+          "ediis": 2.460111784008377e-12,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.83444362
+          }
+        },
+        "27": {
+          "energy": -2088.158378885538,
+          "e_diff": -5.9117155615240335e-12,
+          "rmsd": 1.3336610171253897e-07,
+          "ediis": 7.393917051277583e-13,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.810626921
+          }
+        },
+        "28": {
+          "energy": -2088.1583788855387,
+          "e_diff": -9.094947017729282e-13,
+          "rmsd": 7.24894890071139e-08,
+          "ediis": 2.044627973092781e-13,
+          "damp": 0,
+          "lshift": 0.1,
+          "performance": {
+            "total_time": 0.82438048
+          }
+        }
+      },
+      "S2": 1.7172,
+      "NE_1e": -5320.9760768487595,
+      "kinetic_1e": 2084.3989925903265,
+      "energy_1e": -3236.5770842584325,
+      "energy_2e": 872.3623190297849,
+      "final_energy": -2088.1583788855387,
+      "n_iterations": 28,
+      "performance": {
+        "total_time": 22.938458566
+      }
+    },
+    "CD": {
+      "n_cholesky_vectors": 950,
+      "diagtol": 1e-10
+    },
+    "FCIDUMP": {
+      "one_shot_hf_energy": -2085.865431200727
+    }
+  },
+  "molecule": {
+    "name": "cr2_fcidump",
+    "basis": {
+      "basisset": "def2-svp"
+    },
+    "nbf": 62,
+    "nshells": 22,
+    "nelectrons": 48,
+    "nelectrons_alpha": 24,
+    "nelectrons_beta": 24
+  },
+  "input": {
+    "geometry": {
+      "coordinates": [
+        "Cr1   0.00000000     0.00000000    0.00000000",
+        "Cr2   0.00000000     0.00000000    1.68000000"
+      ],
+      "units": "angstrom"
+    },
+    "basis": {
+      "basisset": "def2-svp"
+    },
+    "common": {
+      "maxiter": 100
+    },
+    "SCF": {
+      "tol_lindep": 1e-06,
+      "scf_type": "unrestricted",
+      "conve": 1e-09,
+      "convd": 1e-07,
+      "diis_hist": 10,
+      "lshift": 0.1,
+      "DFT": {
+        "xc_type": [
+          "PBE"
+        ]
+      },
+      "guess": {
+        "atom_options": {
+          "Cr1": [
+            0,
+            3
+          ],
+          "Cr2": [
+            0,
+            -3
+          ]
+        }
+      }
+    },
+    "CC": {
+      "threshold": 1e-06,
+      "writet": false
+    },
+    "TASK": {
+      "fcidump": true
+    }
+  }
+}

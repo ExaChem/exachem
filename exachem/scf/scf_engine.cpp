@@ -685,7 +685,7 @@ bool exachem::scf::SCFEngine::check_convergence(ExecutionContext& exc, const Che
   else return false;
 } // check_convergence
 
-void exachem::scf::SCFEngine::compute_fock_matrix(ExecutionContext& ec, const ChemEnv& chem_env,
+void exachem::scf::SCFEngine::compute_fock_matrix(ExecutionContext& ec, ChemEnv& chem_env,
                                                   bool is_uhf, const bool do_schwarz_screen,
                                                   Matrix& SchwarzK, const size_t& max_nprim4,
                                                   std::vector<size_t>& shell2bf, bool& is_3c_init
@@ -699,14 +699,23 @@ void exachem::scf::SCFEngine::compute_fock_matrix(ExecutionContext& ec, const Ch
   // the last SCF iteration diagonalized — so that diag(C^T F C) gives the KS eigenvalues. CC
   // methods instead want the HF-like Fock built from the KS orbitals, hence the rebuild below.
   const bool keep_ks_fock = chem_env.sys_data.is_ks && chem_env.ioptions.task_options.gw;
-  if(chem_env.sys_data.is_ks && !keep_ks_fock) { // or rohf
+  // The last CUSCF Fock matrix still has the constraint in its closed-virtual block, which zeroes
+  // the singles driving term in correlated methods, so it is rebuilt without the constraint.
+  const bool is_cuscf = chem_env.sys_data.is_cuscf;
+  // snK only approximates exchange, so compute_2bf builds it analytically in this Fock matrix
+  const bool do_snK       = chem_env.sys_data.do_snK;
+  const bool snk_post_scf = do_snK && !chem_env.ioptions.task_options.scf;
+  if((chem_env.sys_data.is_ks || is_cuscf || snk_post_scf) && !keep_ks_fock) {
     sch(scf_data.ttensors.F_alpha_tmp() = 0).execute();
     if(chem_env.sys_data.is_unrestricted) sch(scf_data.ttensors.F_beta_tmp() = 0).execute();
 
     auto xHF_adjust = xHF;
     // TODO: skip for non-CC methods
-    if(!chem_env.ioptions.task_options.scf && !chem_env.ioptions.task_options.embedding)
-      xHF_adjust = 1.0;
+    const bool hf_fock = !chem_env.ioptions.task_options.scf &&
+                         !chem_env.ioptions.task_options.embedding;
+    if(hf_fock) xHF_adjust = 1.0;
+
+    if(!scf_data.direct_df) chem_env.sys_data.do_snK = false;
 
     // build a new Fock matrix
     if(chem_env.sys_data.is_hubbard) {
@@ -719,6 +728,7 @@ void exachem::scf::SCFEngine::compute_fock_matrix(ExecutionContext& ec, const Ch
                            max_nprim4, scf_data.ttensors, scf_data.etensors, is_3c_init,
                            scf_data.do_dens_fit, xHF_adjust);
     }
+    chem_env.sys_data.do_snK = do_snK;
 
     if(chem_env.ioptions.scf_options.read_vembedding) {
       sch(scf_data.ttensors.F_alpha() += scf_data.ttensors.Vembedding_alpha());
@@ -728,11 +738,6 @@ void exachem::scf::SCFEngine::compute_fock_matrix(ExecutionContext& ec, const Ch
     }
     else if(chem_env.ioptions.task_options.embedding) {
 #if defined(USE_GAUXC)
-      const bool do_snK = chem_env.sys_data.do_snK;
-      if(do_snK)
-        scf_gauxc.compute_exx(ec, chem_env, scf_data, scf_data.ttensors, scf_data.etensors,
-                              gauxc_integrator);
-
       const bool is_ks = chem_env.sys_data.is_ks;
       if(is_ks) {
         gauxc_exc    = scf_gauxc.compute_xcf(ec, chem_env, scf_data.ttensors, scf_data.etensors,
@@ -757,7 +762,43 @@ void exachem::scf::SCFEngine::compute_fock_matrix(ExecutionContext& ec, const Ch
     // CHECK
 
     if(chem_env.sys_data.do_qed) {
+      // compute_QED_2body reads D_last, which is one iteration behind the density here
+      sch(scf_data.ttensors.D_last_alpha() = scf_data.ttensors.D_alpha());
+      if(chem_env.sys_data.is_unrestricted)
+        sch(scf_data.ttensors.D_last_beta() = scf_data.ttensors.D_beta());
+      sch.execute();
       scf_qed.compute_QED_2body(ec, chem_env, scf_data, scf_data.ttensors);
+    }
+
+    // This Fock matrix has exact, analytic exchange, so it also gives the one-shot HF energy of
+    // the final density. For KS and snK references this differs from the SCF energy.
+    // The embedded HF energy under snK also needs it, but a DFT high level keeps its KS energy.
+    const bool embedded_hf = do_snK && chem_env.ioptions.scf_options.read_vembedding &&
+                             !chem_env.sys_data.is_ks;
+    if((hf_fock && (chem_env.sys_data.is_ks || do_snK)) || embedded_hf) {
+      // clang-format off
+      sch
+        (scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.nu)  = scf_data.ttensors.H1(scf_data.mu,scf_data.nu))
+        (scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.nu) += scf_data.ttensors.F_alpha(scf_data.mu,scf_data.nu))
+        (scf_data.ttensors.ehf_tamm()      = 0.5 * scf_data.ttensors.D_alpha() * scf_data.ttensors.ehf_tmp())
+        .execute();
+      if(chem_env.sys_data.is_unrestricted) {
+        sch
+          (scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.nu)  = scf_data.ttensors.H1(scf_data.mu,scf_data.nu))
+          (scf_data.ttensors.ehf_tmp(scf_data.mu,scf_data.nu) += scf_data.ttensors.F_beta(scf_data.mu,scf_data.nu))
+          (scf_data.ttensors.ehf_tamm()     += 0.5 * scf_data.ttensors.D_beta()  * scf_data.ttensors.ehf_tmp())
+          .execute();
+      }
+      // F has the full embedding potential, but the energy above only counted half of it
+      if(embedded_hf) {
+        sch(scf_data.ttensors.ehf_tamm() += 0.5 * scf_data.ttensors.D_alpha() * scf_data.ttensors.Vembedding_alpha());
+        if(chem_env.sys_data.is_unrestricted)
+          sch(scf_data.ttensors.ehf_tamm() += 0.5 * scf_data.ttensors.D_beta() * scf_data.ttensors.Vembedding_beta());
+        sch.execute();
+      }
+      // clang-format on
+      scf_data.one_shot_hf_energy = get_scalar(scf_data.ttensors.ehf_tamm);
+      scf_data.has_one_shot_hf    = true;
     }
   }
   else if(scf_data.lshift > 0) {
@@ -1002,6 +1043,11 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
       }
       scf_data.direct_df = false;
     }
+
+    // compute_2bf_ri_direct only builds J, so the final Fock matrix would have no exchange
+    if(scf_data.direct_df && !chem_env.ioptions.task_options.scf)
+      tamm_terminate("[SCF ERROR] direct_df is only supported for SCF tasks, since analytic "
+                     "exchange needs the 3c integrals");
 
     // SETUP LibECPint
     std::vector<libecpint::ECP>           ecps;
@@ -1416,6 +1462,14 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
 #endif
     );
 
+    if(scf_data.has_one_shot_hf) {
+      scf_data.one_shot_hf_energy += enuc;
+      if(rank == 0)
+        cout << "** One-shot HF energy ("
+             << (chem_env.sys_data.is_ks ? "on Kohn-Sham orbitals" : "with analytic exchange")
+             << ") = " << scf_data.one_shot_hf_energy << endl;
+    }
+
     sch(Fa_global(scf_data.mu, scf_data.nu) = scf_data.ttensors.F_alpha(scf_data.mu, scf_data.nu));
     if(chem_env.sys_data.is_unrestricted)
       sch(Fb_global(scf_data.mu, scf_data.nu) = scf_data.ttensors.F_beta(scf_data.mu, scf_data.nu));
@@ -1520,6 +1574,8 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
     chem_env.sys_data.nbf_orig - chem_env.sys_data.n_occ_beta - chem_env.sys_data.n_lindep;
 
   exc.pg().broadcast(&scf_state.ehf, 0);
+  exc.pg().broadcast(&scf_data.one_shot_hf_energy, 0);
+  exc.pg().broadcast(&scf_data.has_one_shot_hf, 0);
   exc.pg().broadcast(&enuc, 0);
   exc.pg().broadcast(&chem_env.sys_data.nbf, 0);
   exc.pg().broadcast(&chem_env.sys_data.n_lindep, 0);
@@ -1549,7 +1605,12 @@ void exachem::scf::SCFEngine::run(ExecutionContext& exc, ChemEnv& chem_env) {
 
   chem_env.scf_context.update(scf_state.ehf, enuc, scf_data.shell_tile_map, C_alpha_tamm, Fa_global,
                               C_beta_tamm, Fb_global, chem_env.ioptions.scf_options.noscf);
-  chem_env.scf_context.xHF = scf_data.xHF;
+  chem_env.scf_context.xHF          = scf_data.xHF;
+  chem_env.scf_context.ks_reference = scf_data.has_one_shot_hf;
+  if(scf_data.has_one_shot_hf) {
+    chem_env.scf_context.ks_energy = scf_state.ehf;
+    chem_env.scf_context.hf_energy = scf_data.one_shot_hf_energy;
+  }
   if(keep_vxc) {
     chem_env.scf_context.VXC_alpha_AO = VXCa_global;
     if(chem_env.sys_data.is_unrestricted) chem_env.scf_context.VXC_beta_AO = VXCb_global;

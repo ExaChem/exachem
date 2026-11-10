@@ -21,19 +21,21 @@ namespace exachem::scf {
 class SCFData {
 public:
   // diis
-  int                      idiis          = 0;
-  bool                     switch_diis    = false;
-  double                   exc            = 0.0;
-  double                   eqed           = 0.0;
-  bool                     do_snK         = false;
-  bool                     do_dens_fit    = false;
-  bool                     direct_df      = false;
-  bool                     do_load_bal    = false;
-  bool                     lshift_reset   = false;
-  double                   lshift         = 0;
-  int                      damp_applied   = 0; // damping (%) applied in the current iteration
-  double                   lshift_applied = 0; // level shift applied in the current iteration
-  double                   xHF            = 1.0;
+  int                      idiis              = 0;
+  bool                     switch_diis        = false;
+  double                   exc                = 0.0;
+  double                   eqed               = 0.0;
+  double                   one_shot_hf_energy = 0.0;
+  bool                     has_one_shot_hf    = false;
+  bool                     do_snK             = false;
+  bool                     do_dens_fit        = false;
+  bool                     direct_df          = false;
+  bool                     do_load_bal        = false;
+  bool                     lshift_reset       = false;
+  double                   lshift             = 0;
+  int                      damp_applied       = 0; // damping (%) applied in the current iteration
+  double                   lshift_applied     = 0; // level shift applied in the current iteration
+  double                   xHF                = 1.0;
   libecpint::ECPIntegrator ecp_factory;
 
   // AO spaces

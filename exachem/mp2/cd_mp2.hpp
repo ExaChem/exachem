@@ -31,6 +31,7 @@ protected:
     TiledIndexLabel cind;
     Tensor<T>       dtmp;
     Tensor<T>       v2ijab;
+    T               mp2_singles_energy{0};
     T               mp2_energy{0};
     T               mp2_alpha_energy{0};
     T               mp2_beta_energy{0};
@@ -43,6 +44,8 @@ protected:
   virtual void compute_dtmp(ExecutionContext& ec, CDMP2State& state);
   virtual void compute_closed_shell_mp2(ExecutionContext& ec, Scheduler& sch, CDMP2State& state);
   virtual void compute_open_shell_mp2(ExecutionContext& ec, Scheduler& sch, CDMP2State& state);
+  virtual void compute_singles_energy(ExecutionContext& ec, const ChemEnv& chem_env,
+                                      CDMP2State& state);
 
   virtual void update_chemenv(ChemEnv& chem_env, const CDMP2State& state) {
     chem_env.mp2_context.mp2_correlation_energy = state.mp2_energy;

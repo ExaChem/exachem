@@ -112,7 +112,7 @@ public:
   inline void    set_basis_purity(const ChemEnv& chem_env, libint2::BasisSet& basis) const {
     basis.set_pure(chem_env.ioptions.scf_options.gaussian_type == "spherical");
   }
-  virtual void compute_fock_matrix(ExecutionContext& ec, const ChemEnv& chem_env, bool is_uhf,
+  virtual void compute_fock_matrix(ExecutionContext& ec, ChemEnv& chem_env, bool is_uhf,
                                    const bool do_schwarz_screen, Matrix& SchwarzK,
                                    const size_t& max_nprim4, std::vector<size_t>& shell2bf,
                                    bool& is_3c_init

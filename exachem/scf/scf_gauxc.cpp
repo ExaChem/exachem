@@ -191,7 +191,7 @@ SCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
 
   // Setup dummy functional for snK calculations and no XC functional
   bool dummy_xc{false};
-  if(scf_options.snK && kernels.size() < 1) {
+  if(scf_options.snK && xc_vector.empty()) {
     kernels.push_back(
       ExchCXX::XCKernel(ExchCXX::Backend::builtin, ExchCXX::kernel_map.value("PBE_X"), polar));
     dummy_xc = true;

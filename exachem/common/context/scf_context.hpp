@@ -35,6 +35,11 @@ public:
   // bool scf_converged{false};
   bool skip_scf{false};
 
+  // Correlated methods on a Kohn-Sham reference use the HF Fock matrix built from the KS orbitals,
+  // so hf_energy is then the one-shot HF energy of those orbitals and ks_energy keeps the KS energy
+  bool   ks_reference{false};
+  double ks_energy{0.0};
+
   Matrix scf_gradients;
 
   void update(double hf_energy, double nuc_repl_energy, std::vector<size_t> shell_tile_map,

@@ -92,8 +92,20 @@ $MPIEXEC $EXE_PATH $CHEM_INP/cr2_pdos.json
 #EMBEDDING
 $MPIEXEC $EXE_PATH $CHEM_INP/cr2_embedding.json
 
+#DFT-MP2
+$MPIEXEC $EXE_PATH $CHEM_INP/cr2_mp2.json
+
+#DFT-CCSD
+$MPIEXEC $EXE_PATH $CHEM_INP/cr2_ccsd.json
+
+#FCIDUMP
+$MPIEXEC $EXE_PATH $CHEM_INP/butanol2_fcidump.json
+$MPIEXEC $EXE_PATH $CHEM_INP/cr2_fcidump.json
+
 cp *_files/restricted/json/*.json .
 cp *_files/unrestricted/json/*.json .
 cp *_files/unrestricted/scf/*.pdos .
+cp *_files/restricted/fci/*.fcidump .
+cp *_files/unrestricted/fci/*.fcidump .
 
 python3 $CHEM_SRC/ci/scripts/compare_results.py $CHEM_SRC/ci/reference_output/ .

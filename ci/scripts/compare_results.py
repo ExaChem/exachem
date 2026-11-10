@@ -143,6 +143,29 @@ def check_pdos(ref_pdos, pdos_threshold=1.0e-3):
         
     return True
 
+def read_fcidump_summary(fname):
+    with open(fname) as fcidump_file:
+        lines = fcidump_file.read().splitlines()
+    end = next(i for i, line in enumerate(lines) if line.split() == ["&END"])
+    return [line.split() for line in lines[:end+1]], lines[-1].split()
+
+# The reference holds only the header and the last line, which has the core energy.
+def check_fcidump(ref_file, fcidump_threshold=1.0e-6):
+    ref_header, ref_last = read_fcidump_summary(ref_res_path+"/"+ref_file)
+    cur_header, cur_last = read_fcidump_summary(cur_res_path+"/"+ref_file)
+
+    print(str(ref_file) + ": Checking FCIDUMP results", end='')
+    if ref_header != cur_header:
+        print("\n\tERROR: mismatch in FCIDUMP header")
+        return False
+    if cur_last[1:] != ["0", "0", "0", "0"]:
+        print("\n\tERROR: last FCIDUMP line is not the core energy: " + " ".join(cur_last))
+        return False
+    if not isclose(float(ref_last[0]), float(cur_last[0]), fcidump_threshold):
+        print("\n\tERROR: mismatch in core energy, reference: " + ref_last[0] + ", current: " + cur_last[0])
+        return False
+    return True
+
 missing_tests=[]
 for ref_file in ref_files:
 
@@ -158,6 +181,12 @@ for ref_file in ref_files:
         print(" ... OK")
         continue
     
+    if ref_file.endswith(".fcidump"):
+        is_ok = check_fcidump(ref_file)
+        if not is_ok: sys.exit(1)
+        print(" ... OK")
+        continue
+
     with open(ref_res_path+"/"+ref_file) as ref_json_file:
         ref_data = json.load(ref_json_file)
 
@@ -192,11 +221,31 @@ for ref_file in ref_files:
             sys.exit(1)
 
     ccsd_threshold = ref_data["input"].get("CC", {}).get("threshold", 1e-6)
+    # total energies carry both the SCF and the correlation errors
+    total_threshold = scf_threshold*scf_thresh_m + ccsd_threshold
     if "CCSD" in ref_data["output"]:
         #print("Checking CCSD results")
         ref_ccsd_energy = ref_data["output"]["CCSD"]["final_energy"]["correlation"]
         cur_ccsd_energy = cur_data["output"]["CCSD"]["final_energy"]["correlation"]
         rcheck = check_results(ref_ccsd_energy,cur_ccsd_energy,ccsd_threshold,"CCSD correlation energy")
+        rcheck &= check_results(ref_data["output"]["CCSD"]["final_energy"]["total"],
+                                cur_data["output"]["CCSD"]["final_energy"]["total"],
+                                total_threshold,"CCSD total energy")
+        if not rcheck: sys.exit(1)
+
+    if "MP2" in ref_data["output"]:
+        print("Checking MP2 results", end='')
+        ref_mp2_energy = ref_data["output"]["MP2"]["final_energy"]
+        cur_mp2_energy = cur_data["output"]["MP2"]["final_energy"]
+        rcheck = check_results(ref_mp2_energy["correlation"],cur_mp2_energy["correlation"],ccsd_threshold,"MP2 correlation energy")
+        rcheck &= check_results(ref_mp2_energy["total"],cur_mp2_energy["total"],total_threshold,"MP2 total energy")
+        if not rcheck: sys.exit(1)
+
+    if "FCIDUMP" in ref_data["output"]:
+        print("Checking FCIDUMP one-shot HF energy", end='')
+        rcheck = check_results(ref_data["output"]["FCIDUMP"]["one_shot_hf_energy"],
+                               cur_data["output"]["FCIDUMP"]["one_shot_hf_energy"],
+                               scf_threshold*scf_thresh_m,"FCIDUMP one-shot HF energy")
         if not rcheck: sys.exit(1)
 
     if "CCSD(T)" in ref_data["output"]:

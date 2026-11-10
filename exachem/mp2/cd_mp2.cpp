@@ -144,6 +144,27 @@ void CDMP2::compute_open_shell_mp2(ExecutionContext& ec, Scheduler& sch, CDMP2St
   sch.deallocate(mp2_ea, mp2_eb, mp2_ec).execute();
 } // compute_open_shell_mp2
 
+// Sum over f_ia^2 / (e_i - e_a) in the MSO basis. d_f1 is the HF Fock matrix in semicanonical
+// orbitals, so this vanishes for converged HF orbitals but not for Kohn-Sham orbitals.
+void CDMP2::compute_singles_energy(ExecutionContext& ec, const ChemEnv& chem_env,
+                                   CDMP2State& state) {
+  T          e_singles = 0;
+  const auto nocc      = state.p_evl_sorted_occ.size();
+  const auto nvir      = state.p_evl_sorted_virt.size();
+
+  if(ec.pg().rank() == 0) {
+    const Matrix fock = tamm_to_eigen_matrix(chem_env.cd_context.d_f1);
+    for(size_t i = 0; i < nocc; i++) {
+      for(size_t a = 0; a < nvir; a++) {
+        const T f_ia = fock(i, nocc + a);
+        e_singles += f_ia * f_ia / (state.p_evl_sorted_occ[i] - state.p_evl_sorted_virt[a]);
+      }
+    }
+  }
+  ec.pg().broadcast(&e_singles, 0);
+  state.mp2_singles_energy = e_singles;
+} // compute_singles_energy
+
 void CDMP2::run(ExecutionContext& ec, ChemEnv& chem_env) {
   cholesky_2e::cholesky_2e_driver(ec, chem_env);
   CDMP2State state;
@@ -173,6 +194,10 @@ void CDMP2::run(ExecutionContext& ec, ChemEnv& chem_env) {
   if(is_rhf) compute_closed_shell_mp2(ec, sch, state);
   else compute_open_shell_mp2(ec, sch, state);
 
+  compute_singles_energy(ec, chem_env, state);
+  const T mp2_doubles_energy = state.mp2_energy;
+  state.mp2_energy += state.mp2_singles_energy;
+
   const auto   mp_t2 = std::chrono::high_resolution_clock::now();
   const double mp2_time =
     std::chrono::duration_cast<std::chrono::duration<double>>((mp_t2 - mp_t1)).count();
@@ -180,6 +205,14 @@ void CDMP2::run(ExecutionContext& ec, ChemEnv& chem_env) {
   state.mp2_total_energy = state.hf_energy + state.mp2_energy;
 
   if(rank == 0) {
+    std::cout << std::fixed << std::setprecision(15);
+    if(chem_env.sys_data.is_ks && chem_env.scf_context.ks_reference) {
+      std::cout << "Kohn-Sham SCF energy / hartree: " << chem_env.scf_context.ks_energy << std::endl
+                << "One-shot HF energy (on Kohn-Sham orbitals) / hartree: " << state.hf_energy
+                << std::endl;
+    }
+    std::cout << "MP2 singles energy / hartree: " << state.mp2_singles_energy << std::endl
+              << "MP2 doubles energy / hartree: " << mp2_doubles_energy << std::endl;
     if(is_rhf) std::cout << "Closed-Shell ";
     else std::cout << "Open-Shell ";
     std::cout << "MP2 correlation energy / hartree: " << std::fixed << std::setprecision(15)
@@ -189,6 +222,12 @@ void CDMP2::run(ExecutionContext& ec, ChemEnv& chem_env) {
     std::cout << "Time to compute MP2 energy: " << std::fixed << std::setprecision(2) << mp2_time
               << " secs" << std::endl
               << std::endl;
+
+    auto& mp2_results                          = chem_env.sys_data.results["output"]["MP2"];
+    mp2_results["final_energy"]["correlation"] = state.mp2_energy;
+    mp2_results["final_energy"]["total"]       = state.mp2_total_energy;
+    mp2_results["performance"]["total_time"]   = mp2_time;
+    if(chem_env.ioptions.task_options.mp2) chem_env.write_json_data();
   }
 
   sch.deallocate(state.dtmp, state.v2ijab).execute();
